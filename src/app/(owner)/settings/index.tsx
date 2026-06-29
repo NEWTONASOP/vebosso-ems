@@ -102,6 +102,13 @@ export default function OwnerSettingsScreen() {
             color={Colors.accent}
           />
         </View>
+        <Divider style={styles.divider} />
+        <SettingsRow
+          emoji="🔄"
+          title="Version Control"
+          subtitle="Manage app updates and forced versions"
+          onPress={() => router.push('/(owner)/settings/version-control')}
+        />
       </View>
 
       {/* Account */}
