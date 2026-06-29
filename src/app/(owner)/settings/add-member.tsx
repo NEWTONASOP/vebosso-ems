@@ -197,22 +197,22 @@ export default function AddMemberScreen() {
             value={fullName}
             onChangeText={setFullName}
             style={styles.input}
-            outlineColor={Colors.borderLight}
+            outlineColor={Colors.border}
             activeOutlineColor={Colors.accent}
             textColor={Colors.text}
-            theme={{ colors: { onSurfaceVariant: Colors.textSecondary, surface: Colors.inputBackground } }}
+            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.inputBackground } }}
           />
 
           <TextInput
             mode="outlined"
-            label="Department"
+            label="Designation"
             value={department}
             onChangeText={setDepartment}
             style={styles.input}
-            outlineColor={Colors.borderLight}
+            outlineColor={Colors.border}
             activeOutlineColor={Colors.accent}
             textColor={Colors.text}
-            theme={{ colors: { onSurfaceVariant: Colors.textSecondary, surface: Colors.inputBackground } }}
+            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.inputBackground } }}
           />
 
           <Text style={styles.fieldLabel}>Role</Text>
@@ -253,10 +253,10 @@ export default function AddMemberScreen() {
             value={employeeId}
             onChangeText={setEmployeeId}
             style={styles.input}
-            outlineColor={Colors.borderLight}
+            outlineColor={Colors.border}
             activeOutlineColor={Colors.accent}
             textColor={Colors.text}
-            theme={{ colors: { onSurfaceVariant: Colors.textSecondary, surface: Colors.inputBackground } }}
+            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.inputBackground } }}
           />
 
           <TextInput
@@ -265,10 +265,10 @@ export default function AddMemberScreen() {
             value={password}
             onChangeText={setPassword}
             style={styles.input}
-            outlineColor={Colors.borderLight}
+            outlineColor={Colors.border}
             activeOutlineColor={Colors.accent}
             textColor={Colors.text}
-            theme={{ colors: { onSurfaceVariant: Colors.textSecondary, surface: Colors.inputBackground } }}
+            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.inputBackground } }}
           />
 
           <Button
@@ -312,6 +312,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Colors.shadow,
   },
   input: { marginBottom: 14, backgroundColor: Colors.inputBackground },
   fieldLabel: {
@@ -322,9 +323,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   segmented: { marginBottom: 14 },
-  segmentButton: { borderColor: Colors.borderLight },
+  segmentButton: { borderColor: Colors.border },
   managerList: { marginBottom: 14 },
-  managerChip: { marginRight: 8, borderColor: Colors.borderLight, borderRadius: 8 },
+  managerChip: { marginRight: 8, borderColor: Colors.border, borderRadius: 8 },
   createButton: { borderRadius: 12, marginTop: 8 },
   createButtonContent: { height: 50 },
   successContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24 },
@@ -335,6 +336,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Colors.shadow,
   },
   successEmoji: { fontSize: 56, marginBottom: 12 },
   successTitle: { fontSize: 24, fontWeight: '800', color: Colors.text },
@@ -351,6 +353,6 @@ const styles = StyleSheet.create({
   credLabel: { fontSize: 13, color: Colors.textSecondary },
   credValue: { fontSize: 16, fontWeight: '700', color: Colors.accent },
   copyButton: { borderRadius: 12, width: '100%', marginBottom: 12 },
-  addAnotherButton: { borderColor: Colors.borderLight, borderRadius: 12, width: '100%', marginBottom: 8 },
+  addAnotherButton: { borderColor: Colors.border, borderRadius: 12, width: '100%', marginBottom: 8 },
   snackbar: { backgroundColor: Colors.surfaceLight },
 });

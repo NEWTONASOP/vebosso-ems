@@ -1,10 +1,6 @@
-// ============================================================================
-// VEBOSSO EMS — Empty State Component
-// ============================================================================
-
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Button } from 'react-native-paper';
+import { View, StyleSheet } from 'react-native';
+import { Button, Text, Icon } from 'react-native-paper';
 import { Colors } from '../constants/colors';
 
 interface EmptyStateProps {
@@ -19,7 +15,7 @@ export function EmptyState({ icon, title, subtitle, actionLabel, onAction }: Emp
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
-        <Text style={styles.icon}>{icon}</Text>
+        <Icon source={icon} size={36} color={Colors.accent} />
       </View>
       <Text style={styles.title}>{title}</Text>
       {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
@@ -54,9 +50,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
-  },
-  icon: {
-    fontSize: 36,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   title: {
     fontSize: 18,

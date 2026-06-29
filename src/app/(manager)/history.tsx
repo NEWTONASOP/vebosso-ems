@@ -58,7 +58,7 @@ export default function ManagerHistoryScreen() {
       </View>
 
       {!selectedMember ? (
-        <EmptyState icon="📅" title="Select a Member" subtitle="Choose a team member to view their history" />
+        <EmptyState icon="calendar-month-outline" title="Select a Member" subtitle="Choose a team member to view their history" />
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.monthNav}>
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 8 },
   title: { fontSize: 26, fontWeight: '800', color: Colors.text },
   pickerSection: { paddingHorizontal: 20, paddingTop: 12 },
-  pickerButton: { borderColor: Colors.borderLight, borderRadius: 12, justifyContent: 'flex-start' },
+  pickerButton: { borderColor: Colors.border, borderRadius: 12, justifyContent: 'flex-start' },
   menuContent: { backgroundColor: Colors.surface },
   menuItemText: { color: Colors.text, fontSize: 14 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 20 },
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   weekdayLabel: { flex: 1, textAlign: 'center', fontSize: 12, color: Colors.textTertiary, fontWeight: '600' },
   calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   dayCell: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 8, marginBottom: 2 },
-  todayCell: { borderColor: Colors.accent, borderWidth: 2 },
+  todayCell: { borderColor: Colors.accent, borderWidth: 1.5, backgroundColor: Colors.accentSubtle },
   dayNumber: { fontSize: 14, color: Colors.text, fontWeight: '500' },
   todayText: { color: Colors.accent, fontWeight: '700' },
   dayHours: { fontSize: 9, marginTop: 1, fontWeight: '600' },

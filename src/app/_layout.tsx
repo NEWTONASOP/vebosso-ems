@@ -5,8 +5,9 @@
 import 'react-native-reanimated';
 import React, { useEffect } from 'react';
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { PaperProvider, MD3DarkTheme } from 'react-native-paper';
+import { PaperProvider, MD3LightTheme } from 'react-native-paper';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
 import { StyleSheet } from 'react-native';
@@ -18,9 +19,9 @@ import { OfflineBanner } from '../components/OfflineBanner';
 SplashScreen.preventAutoHideAsync();
 
 const theme = {
-  ...MD3DarkTheme,
+  ...MD3LightTheme,
   colors: {
-    ...MD3DarkTheme.colors,
+    ...MD3LightTheme.colors,
     ...PaperThemeColors,
   },
   roundness: 12,
@@ -87,8 +88,13 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      <PaperProvider theme={theme}>
-        <StatusBar style="light" />
+      <PaperProvider 
+        theme={theme}
+        settings={{
+          icon: props => <MaterialCommunityIcons {...props} />,
+        }}
+      >
+        <StatusBar style="dark" />
         <OfflineBanner />
         <AuthGuard />
         <Stack

@@ -84,10 +84,10 @@ export default function AnnouncementsScreen() {
             value={title}
             onChangeText={setTitle}
             style={styles.input}
-            outlineColor={Colors.borderLight}
+            outlineColor={Colors.border}
             activeOutlineColor={Colors.accent}
             textColor={Colors.text}
-            theme={{ colors: { onSurfaceVariant: Colors.textSecondary, surface: Colors.inputBackground } }}
+            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.inputBackground } }}
           />
           <TextInput
             mode="outlined"
@@ -97,10 +97,10 @@ export default function AnnouncementsScreen() {
             multiline
             numberOfLines={3}
             style={styles.input}
-            outlineColor={Colors.borderLight}
+            outlineColor={Colors.border}
             activeOutlineColor={Colors.accent}
             textColor={Colors.text}
-            theme={{ colors: { onSurfaceVariant: Colors.textSecondary, surface: Colors.inputBackground } }}
+            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.inputBackground } }}
           />
 
           <Text style={styles.fieldLabel}>Target Audience</Text>
@@ -136,7 +136,7 @@ export default function AnnouncementsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          <EmptyState icon="📢" title="No Announcements" subtitle="Create your first announcement to get started" />
+          <EmptyState icon="bullhorn-outline" title="No Announcements" subtitle="Create your first announcement to get started" />
         }
       />
 
@@ -165,6 +165,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Colors.shadow,
   },
   input: { marginBottom: 12, backgroundColor: Colors.inputBackground },
   fieldLabel: {

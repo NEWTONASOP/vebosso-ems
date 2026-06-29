@@ -1,12 +1,9 @@
-// ============================================================================
-// VEBOSSO EMS — Owner Tab Layout
-// ============================================================================
-
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Colors } from '../../constants/colors';
 import { useWorkStore } from '../../store/workStore';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { Icon } from 'react-native-paper';
 
 function TabBarBadge({ count }: { count: number }) {
   if (count === 0) return null;
@@ -29,6 +26,7 @@ const badgeStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
+    zIndex: 10,
   },
   text: { color: Colors.white, fontSize: 10, fontWeight: '700' },
 });
@@ -44,9 +42,20 @@ export default function OwnerLayout() {
           backgroundColor: Colors.tabBar,
           borderTopColor: Colors.tabBarBorder,
           borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 4,
+          height: 64,
+          paddingBottom: 10,
+          paddingTop: 6,
+          ...Platform.select({
+            ios: {
+              shadowColor: Colors.shadow.shadowColor,
+              shadowOffset: { width: 0, height: -3 },
+              shadowOpacity: 0.03,
+              shadowRadius: 6,
+            },
+            android: {
+              elevation: 8,
+            },
+          }),
         },
         tabBarActiveTintColor: Colors.tabActive,
         tabBarInactiveTintColor: Colors.tabInactive,
@@ -60,14 +69,14 @@ export default function OwnerLayout() {
         name="dashboard"
         options={{
           title: 'Dashboard',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📊</Text>,
+          tabBarIcon: ({ color }) => <Icon source="view-dashboard-outline" color={color as string} size={22} />,
         }}
       />
       <Tabs.Screen
         name="team"
         options={{
           title: 'Team',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>👥</Text>,
+          tabBarIcon: ({ color }) => <Icon source="account-group-outline" color={color as string} size={22} />,
         }}
       />
       <Tabs.Screen
@@ -76,7 +85,7 @@ export default function OwnerLayout() {
           title: 'Approvals',
           tabBarIcon: ({ color }) => (
             <View>
-              <Text style={{ fontSize: 20, color }}>✅</Text>
+              <Icon source="checkbox-marked-circle-outline" color={color as string} size={22} />
               <TabBarBadge count={pendingCount} />
             </View>
           ),
@@ -86,14 +95,14 @@ export default function OwnerLayout() {
         name="history"
         options={{
           title: 'History',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📅</Text>,
+          tabBarIcon: ({ color }) => <Icon source="calendar-month-outline" color={color as string} size={22} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⚙️</Text>,
+          tabBarIcon: ({ color }) => <Icon source="cog-outline" color={color as string} size={22} />,
         }}
       />
     </Tabs>

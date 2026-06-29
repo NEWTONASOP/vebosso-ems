@@ -162,7 +162,7 @@ export default function SessionManagementScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />
           }
           ListEmptyComponent={
-            <EmptyState icon="📱" title="No Active Sessions" subtitle="No users are currently logged in" />
+            <EmptyState icon="cellphone" title="No Active Sessions" subtitle="No users are currently logged in" />
           }
         />
       )}
@@ -190,6 +190,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Colors.shadow,
   },
   sessionInfo: { flex: 1 },
   sessionName: { fontSize: 15, fontWeight: '700', color: Colors.text },

@@ -47,7 +47,7 @@ export default function MemberProfileScreen() {
       <View style={styles.infoSection}>
         <InfoRow emoji="🆔" label="Employee ID" value={profile.employee_id} />
         <Divider style={styles.divider} />
-        <InfoRow emoji="🏢" label="Department" value={profile.department || 'Not assigned'} />
+        <InfoRow emoji="🏢" label="Designation" value={profile.department || 'Not assigned'} />
         <Divider style={styles.divider} />
         <InfoRow emoji="👤" label="Role" value={ROLE_LABELS[profile.role]} />
         <Divider style={styles.divider} />
@@ -121,6 +121,7 @@ const styles = StyleSheet.create({
     padding: 28,
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Colors.shadow,
   },
   avatar: { backgroundColor: Colors.accentSubtle, marginBottom: 14 },
   avatarLabel: { color: Colors.accent, fontSize: 24, fontWeight: '700' },
@@ -141,6 +142,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     overflow: 'hidden',
+    ...Colors.shadow,
   },
   divider: { backgroundColor: Colors.divider },
   actionsSection: {

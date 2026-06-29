@@ -86,7 +86,7 @@ export default function ManagerDashboard() {
       {isLoadingApprovals ? (
         <ListSkeleton count={2} />
       ) : pendingApprovals.length === 0 ? (
-        <EmptyState icon="✨" title="All caught up!" subtitle="No pending approvals from your team" />
+        <EmptyState icon="checkbox-marked-circle-outline" title="All caught up!" subtitle="No pending approvals from your team" />
       ) : (
         pendingApprovals.slice(0, 5).map((workLog) => (
           <ApprovalCard key={workLog.id} workLog={workLog} onApprove={handleApprove} onReject={handleReject} />
@@ -98,7 +98,7 @@ export default function ManagerDashboard() {
 
 function StatCard({ emoji, value, label, color, bgColor }: { emoji: string; value: string; label: string; color: string; bgColor: string }) {
   return (
-    <View style={[statStyles.card, { borderColor: bgColor }]}>
+    <View style={statStyles.card}>
       <View style={[statStyles.iconBg, { backgroundColor: bgColor }]}>
         <Text style={statStyles.emoji}>{emoji}</Text>
       </View>
@@ -109,7 +109,17 @@ function StatCard({ emoji, value, label, color, bgColor }: { emoji: string; valu
 }
 
 const statStyles = StyleSheet.create({
-  card: { flex: 1, minWidth: '45%', backgroundColor: Colors.surface, borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1 },
+  card: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Colors.shadow,
+  },
   iconBg: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   emoji: { fontSize: 18 },
   value: { fontSize: 26, fontWeight: '800' },

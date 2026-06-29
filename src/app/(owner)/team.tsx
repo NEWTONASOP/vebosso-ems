@@ -125,7 +125,7 @@ export default function OwnerTeamScreen() {
           }
           ListEmptyComponent={
             <EmptyState
-              icon="🔍"
+              icon="account-search-outline"
               title="No members found"
               subtitle={searchQuery ? 'Try a different search term' : 'Add members in Settings'}
             />
@@ -152,14 +152,15 @@ const styles = StyleSheet.create({
   searchInput: { color: Colors.text, fontSize: 14 },
   filterRow: { paddingTop: 12, paddingBottom: 8, gap: 8 },
   filterChip: {
-    backgroundColor: Colors.surfaceLight,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
     borderColor: Colors.border,
   },
   filterChipActive: {
     backgroundColor: Colors.accentSubtle,
     borderColor: Colors.accent,
   },
-  filterChipText: { color: Colors.textSecondary, fontSize: 12 },
-  filterChipTextActive: { color: Colors.accent },
+  filterChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600' },
+  filterChipTextActive: { color: Colors.accent, fontWeight: '700' },
   list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20 },
 });

@@ -1,10 +1,7 @@
-// ============================================================================
-// VEBOSSO EMS — Member Tab Layout
-// ============================================================================
-
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Platform } from 'react-native';
+import { Icon } from 'react-native-paper';
 import { Colors } from '../../constants/colors';
 
 export default function MemberLayout() {
@@ -16,9 +13,20 @@ export default function MemberLayout() {
           backgroundColor: Colors.tabBar,
           borderTopColor: Colors.tabBarBorder,
           borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 4,
+          height: 64,
+          paddingBottom: 10,
+          paddingTop: 6,
+          ...Platform.select({
+            ios: {
+              shadowColor: Colors.shadow.shadowColor,
+              shadowOffset: { width: 0, height: -3 },
+              shadowOpacity: 0.03,
+              shadowRadius: 6,
+            },
+            android: {
+              elevation: 8,
+            },
+          }),
         },
         tabBarActiveTintColor: Colors.tabActive,
         tabBarInactiveTintColor: Colors.tabInactive,
@@ -29,35 +37,35 @@ export default function MemberLayout() {
         name="home"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🏠</Text>,
+          tabBarIcon: ({ color }) => <Icon source="home-outline" color={color as string} size={22} />,
         }}
       />
       <Tabs.Screen
         name="tasks"
         options={{
           title: 'Tasks',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📋</Text>,
+          tabBarIcon: ({ color }) => <Icon source="clipboard-text-outline" color={color as string} size={22} />,
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
           title: 'History',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📅</Text>,
+          tabBarIcon: ({ color }) => <Icon source="calendar-month-outline" color={color as string} size={22} />,
         }}
       />
       <Tabs.Screen
         name="announcements"
         options={{
           title: 'News',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📢</Text>,
+          tabBarIcon: ({ color }) => <Icon source="bullhorn-outline" color={color as string} size={22} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>👤</Text>,
+          tabBarIcon: ({ color }) => <Icon source="account-circle-outline" color={color as string} size={22} />,
         }}
       />
     </Tabs>

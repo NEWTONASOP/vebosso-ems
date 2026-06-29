@@ -66,7 +66,7 @@ export default function ManagerMyTeamScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
-          ListEmptyComponent={<EmptyState icon="👥" title="No Team Members" subtitle="No members are assigned to your team yet" />}
+          ListEmptyComponent={<EmptyState icon="account-group-outline" title="No Team Members" subtitle="No members are assigned to your team yet" />}
         />
       )}
     </View>

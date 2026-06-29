@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Avatar } from 'react-native-paper';
+import { Text, Avatar, Icon } from 'react-native-paper';
 import { Colors } from '../constants/colors';
 import { Profile, WorkLogStatus } from '../types/database';
 import { WORK_LOG_STATUS_CONFIG, ROLE_LABELS } from '../constants/roles';
@@ -49,7 +49,10 @@ export function MemberCard({ member, currentStatus = 'offline', checkInTime, onP
           {member.employee_id} {member.department ? `• ${member.department}` : ''}
         </Text>
         {checkInTime && (
-          <Text style={styles.checkInTime}>🕐 {checkInTime}</Text>
+          <View style={styles.checkInRow}>
+            <Icon source="clock-outline" size={13} color={Colors.accent} />
+            <Text style={styles.checkInTime}>{checkInTime}</Text>
+          </View>
         )}
       </View>
 
@@ -74,6 +77,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Colors.shadow,
   },
   avatar: {
     backgroundColor: Colors.accentSubtle,
@@ -97,10 +101,16 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
+  checkInRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
   checkInTime: {
     fontSize: 12,
     color: Colors.accent,
-    marginTop: 2,
+    fontWeight: '600',
   },
   rightSection: {
     alignItems: 'flex-end',

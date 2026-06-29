@@ -41,7 +41,7 @@ export default function MemberAnnouncementsScreen() {
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
         ListEmptyComponent={
-          <EmptyState icon="📢" title="No Announcements" subtitle="You'll see company announcements here" />
+          <EmptyState icon="bullhorn-outline" title="No Announcements" subtitle="You'll see company announcements here" />
         }
       />
     </View>

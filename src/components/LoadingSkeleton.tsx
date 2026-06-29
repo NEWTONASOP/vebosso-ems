@@ -107,6 +107,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Colors.shadow,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -131,6 +132,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Colors.shadow,
   },
   profileSkeleton: {
     alignItems: 'center',

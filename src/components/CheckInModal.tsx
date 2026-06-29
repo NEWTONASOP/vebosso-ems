@@ -66,13 +66,13 @@ export function CheckInModal({ visible, onDismiss, onSubmit, isLoading }: CheckI
             multiline
             numberOfLines={4}
             style={styles.input}
-            outlineColor={Colors.borderLight}
+            outlineColor={Colors.border}
             activeOutlineColor={Colors.accent}
             textColor={Colors.text}
             placeholderTextColor={Colors.placeholder}
             theme={{
               colors: {
-                onSurfaceVariant: Colors.textSecondary,
+                onSurfaceVariant: Colors.textTertiary,
                 surface: Colors.inputBackground,
               },
             }}
@@ -125,6 +125,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Colors.shadow,
   },
   header: {
     alignItems: 'center',
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   cancelButton: {
-    borderColor: Colors.borderLight,
+    borderColor: Colors.border,
     borderRadius: 8,
   },
   submitButton: {

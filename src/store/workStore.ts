@@ -627,11 +627,14 @@ export const useWorkStore = create<WorkState>((set, get) => ({
   // ============================================================================
 
   subscribeToRealtime: (userId: string, role: string, managerId?: string) => {
+    get().unsubscribeFromRealtime();
+    
     const channels: RealtimeChannel[] = [];
+    const channelId = Math.random().toString(36).substring(7);
 
     // Subscribe to work_logs changes
     const workLogsChannel = supabase
-      .channel('work_logs_changes')
+      .channel(`work_logs_changes_${channelId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'work_logs' },
@@ -660,7 +663,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
     // Subscribe to tasks changes
     const tasksChannel = supabase
-      .channel('tasks_changes')
+      .channel(`tasks_changes_${channelId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'tasks' },
@@ -677,7 +680,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
     // Subscribe to announcements
     const announcementsChannel = supabase
-      .channel('announcements_changes')
+      .channel(`announcements_changes_${channelId}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'announcements' },

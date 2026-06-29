@@ -84,7 +84,7 @@ export default function OwnerApprovalsScreen() {
           }
           ListEmptyComponent={
             <EmptyState
-              icon="✨"
+              icon="checkbox-marked-circle-outline"
               title="All caught up!"
               subtitle="No pending approvals at the moment. Check back later."
             />

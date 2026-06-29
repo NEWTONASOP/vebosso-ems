@@ -88,7 +88,7 @@ export default function ForceChangePasswordScreen() {
           onChangeText={setNewPassword}
           secureTextEntry={!showPassword}
           style={styles.input}
-          outlineColor={Colors.borderLight}
+          outlineColor={Colors.border}
           activeOutlineColor={Colors.accent}
           textColor={Colors.text}
           right={
@@ -100,7 +100,7 @@ export default function ForceChangePasswordScreen() {
           }
           theme={{
             colors: {
-              onSurfaceVariant: Colors.textSecondary,
+              onSurfaceVariant: Colors.textTertiary,
               surface: Colors.inputBackground,
             },
           }}
@@ -126,12 +126,12 @@ export default function ForceChangePasswordScreen() {
           onChangeText={setConfirmPassword}
           secureTextEntry={!showPassword}
           style={styles.input}
-          outlineColor={Colors.borderLight}
+          outlineColor={Colors.border}
           activeOutlineColor={Colors.accent}
           textColor={Colors.text}
           theme={{
             colors: {
-              onSurfaceVariant: Colors.textSecondary,
+              onSurfaceVariant: Colors.textTertiary,
               surface: Colors.inputBackground,
             },
           }}
@@ -201,13 +201,13 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 48, marginBottom: 12 },
   title: { fontSize: 24, fontWeight: '800', color: Colors.text, marginBottom: 8 },
   subtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 },
-  formSection: { backgroundColor: Colors.surface, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.border },
+  formSection: { backgroundColor: Colors.surface, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.border, ...Colors.shadow },
   input: { marginBottom: 12, backgroundColor: Colors.inputBackground },
   strengthSection: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   strengthBar: { flex: 1, height: 4, borderRadius: 2, backgroundColor: Colors.surfaceLighter },
   strengthLabel: { fontSize: 12, fontWeight: '600', width: 50 },
   mismatchText: { fontSize: 12, color: Colors.error, marginBottom: 8, marginLeft: 4 },
-  requirements: { backgroundColor: Colors.primaryLight, borderRadius: 12, padding: 14, marginBottom: 20 },
+  requirements: { backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginBottom: 20, borderWidth: 1, borderColor: Colors.border },
   reqTitle: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600', marginBottom: 8 },
   button: { borderRadius: 12 },
   buttonContent: { height: 50 },

@@ -68,13 +68,13 @@ export default function LoginScreen() {
             }}
             autoCapitalize="characters"
             style={styles.input}
-            outlineColor={Colors.borderLight}
+            outlineColor={Colors.border}
             activeOutlineColor={Colors.accent}
             textColor={Colors.text}
             left={<TextInput.Icon icon="badge-account" color={Colors.textSecondary} />}
             theme={{
               colors: {
-                onSurfaceVariant: Colors.textSecondary,
+                onSurfaceVariant: Colors.textTertiary,
                 surface: Colors.inputBackground,
               },
             }}
@@ -90,7 +90,7 @@ export default function LoginScreen() {
             }}
             secureTextEntry={!showPassword}
             style={styles.input}
-            outlineColor={Colors.borderLight}
+            outlineColor={Colors.border}
             activeOutlineColor={Colors.accent}
             textColor={Colors.text}
             left={<TextInput.Icon icon="lock-outline" color={Colors.textSecondary} />}
@@ -103,7 +103,7 @@ export default function LoginScreen() {
             }
             theme={{
               colors: {
-                onSurfaceVariant: Colors.textSecondary,
+                onSurfaceVariant: Colors.textTertiary,
                 surface: Colors.inputBackground,
               },
             }}
@@ -168,13 +168,13 @@ const styles = StyleSheet.create({
   logoContainer: {
     width: 80,
     height: 80,
-    borderRadius: 20,
+    borderRadius: 22,
     backgroundColor: Colors.accentSubtle,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: Colors.accent,
+    borderColor: Colors.border,
   },
   logoIcon: {
     fontSize: 38,
@@ -198,6 +198,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     marginBottom: 20,
+    ...Colors.shadow,
   },
   welcomeText: {
     fontSize: 22,

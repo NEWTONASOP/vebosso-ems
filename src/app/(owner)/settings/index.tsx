@@ -172,6 +172,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     gap: 14,
+    ...Colors.shadow,
   },
   profileAvatar: {
     width: 52,
@@ -201,6 +202,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     overflow: 'hidden',
+    ...Colors.shadow,
   },
   settingRow: {
     flexDirection: 'row',

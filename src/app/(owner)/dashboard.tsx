@@ -133,7 +133,7 @@ export default function OwnerDashboard() {
         <ListSkeleton count={2} />
       ) : pendingApprovals.length === 0 ? (
         <EmptyState
-          icon="✨"
+          icon="checkbox-marked-circle-outline"
           title="All caught up!"
           subtitle="No pending approvals at the moment"
         />
@@ -165,7 +165,7 @@ function StatCard({
   bgColor: string;
 }) {
   return (
-    <View style={[statStyles.card, { borderColor: bgColor }]}>
+    <View style={statStyles.card}>
       <View style={[statStyles.iconBg, { backgroundColor: bgColor }]}>
         <Text style={statStyles.emoji}>{emoji}</Text>
       </View>
@@ -184,6 +184,8 @@ const statStyles = StyleSheet.create({
     padding: 14,
     alignItems: 'center',
     borderWidth: 1,
+    borderColor: Colors.border,
+    ...Colors.shadow,
   },
   iconBg: {
     width: 36,

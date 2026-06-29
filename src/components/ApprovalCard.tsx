@@ -51,7 +51,7 @@ export function ApprovalCard({ workLog, onApprove, onReject }: ApprovalCardProps
         </View>
         {profile.department && (
           <View style={styles.timeItem}>
-            <Text style={styles.timeLabel}>Department</Text>
+            <Text style={styles.timeLabel}>Designation</Text>
             <Text style={styles.timeValue}>{profile.department}</Text>
           </View>
         )}
@@ -106,6 +106,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Colors.shadow,
   },
   header: {
     flexDirection: 'row',

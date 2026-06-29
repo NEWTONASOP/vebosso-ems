@@ -125,6 +125,7 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Colors.shadow,
   },
   header: {
     flexDirection: 'row',

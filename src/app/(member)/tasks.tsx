@@ -101,7 +101,7 @@ export default function MemberTasksScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
         ListEmptyComponent={
           <EmptyState
-            icon="📋"
+            icon="clipboard-text-outline"
             title="No Tasks"
             subtitle={filter === 'all' ? 'No tasks assigned yet. Check back later!' : 'No tasks with this status'}
           />
@@ -121,13 +121,13 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', color: Colors.text },
   subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   progressSection: { paddingHorizontal: 20, paddingTop: 8 },
-  progressBar: { height: 6, backgroundColor: Colors.surfaceLight, borderRadius: 3, overflow: 'hidden' },
+  progressBar: { height: 6, backgroundColor: Colors.surfaceLighter, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: Colors.success, borderRadius: 3 },
   filterRow: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4, gap: 8, flexWrap: 'wrap' },
-  filterChip: { backgroundColor: Colors.surfaceLight },
-  filterChipActive: { backgroundColor: Colors.accentSubtle },
-  filterChipText: { color: Colors.textSecondary, fontSize: 11 },
-  filterChipTextActive: { color: Colors.accent },
+  filterChip: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
+  filterChipActive: { backgroundColor: Colors.accentSubtle, borderColor: Colors.accent },
+  filterChipText: { color: Colors.textSecondary, fontSize: 11, fontWeight: '600' },
+  filterChipTextActive: { color: Colors.accent, fontWeight: '700' },
   list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20 },
   snackbar: { backgroundColor: Colors.surfaceLight },
 });

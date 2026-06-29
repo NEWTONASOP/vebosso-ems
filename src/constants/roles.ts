@@ -26,32 +26,32 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
 export const WORK_LOG_STATUS_CONFIG = {
   pending_approval: {
     label: 'Pending Approval',
-    color: '#F59E0B',
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    color: '#D97706',
+    backgroundColor: 'rgba(217, 119, 6, 0.08)',
     icon: 'clock-outline',
   },
   working: {
     label: 'Working',
-    color: '#10B981',
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    color: '#059669',
+    backgroundColor: 'rgba(5, 150, 105, 0.08)',
     icon: 'briefcase-outline',
   },
   pending_checkout: {
     label: 'Pending Checkout',
-    color: '#6366F1',
-    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+    color: '#4F46E5',
+    backgroundColor: 'rgba(79, 70, 229, 0.08)',
     icon: 'clock-check-outline',
   },
   done: {
     label: 'Done',
-    color: '#9CA3AF',
-    backgroundColor: 'rgba(156, 163, 175, 0.12)',
+    color: '#475569',
+    backgroundColor: 'rgba(71, 85, 105, 0.08)',
     icon: 'check-circle-outline',
   },
   rejected: {
     label: 'Rejected',
-    color: '#EF4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    color: '#DC2626',
+    backgroundColor: 'rgba(220, 38, 38, 0.08)',
     icon: 'close-circle-outline',
   },
 } as const;
@@ -59,20 +59,20 @@ export const WORK_LOG_STATUS_CONFIG = {
 export const TASK_STATUS_CONFIG = {
   pending: {
     label: 'Pending',
-    color: '#F59E0B',
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    color: '#D97706',
+    backgroundColor: 'rgba(217, 119, 6, 0.08)',
     icon: 'circle-outline',
   },
   in_progress: {
     label: 'In Progress',
     color: '#2563EB',
-    backgroundColor: 'rgba(37, 99, 235, 0.12)',
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
     icon: 'progress-clock',
   },
   done: {
     label: 'Done',
-    color: '#10B981',
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    color: '#059669',
+    backgroundColor: 'rgba(5, 150, 105, 0.08)',
     icon: 'check-circle',
   },
 } as const;
@@ -80,18 +80,18 @@ export const TASK_STATUS_CONFIG = {
 export const LEAVE_STATUS_CONFIG = {
   pending: {
     label: 'Pending',
-    color: '#F59E0B',
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    color: '#D97706',
+    backgroundColor: 'rgba(217, 119, 6, 0.08)',
   },
   approved: {
     label: 'Approved',
-    color: '#10B981',
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    color: '#059669',
+    backgroundColor: 'rgba(5, 150, 105, 0.08)',
   },
   rejected: {
     label: 'Rejected',
-    color: '#EF4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    color: '#DC2626',
+    backgroundColor: 'rgba(220, 38, 38, 0.08)',
   },
 } as const;
 

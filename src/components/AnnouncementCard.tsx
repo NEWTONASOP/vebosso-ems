@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Text, Chip } from 'react-native-paper';
+import { Text, Chip, Icon } from 'react-native-paper';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Colors } from '../constants/colors';
 import { AnnouncementWithCreator } from '../types/database';
@@ -20,7 +20,7 @@ export function AnnouncementCard({ announcement }: AnnouncementCardProps) {
     <View style={styles.card}>
       <View style={styles.header}>
         <View style={styles.iconContainer}>
-          <Text style={styles.icon}>📢</Text>
+          <Icon source="bullhorn-outline" color={Colors.info} size={18} />
         </View>
         <View style={styles.headerInfo}>
           <Text style={styles.title}>{announcement.title}</Text>
@@ -48,8 +48,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderLeftWidth: 3,
+    borderLeftWidth: 4,
     borderLeftColor: Colors.info,
+    ...Colors.shadow,
   },
   header: {
     flexDirection: 'row',
@@ -88,6 +89,7 @@ const styles = StyleSheet.create({
   targetText: {
     fontSize: 10,
     color: Colors.info,
+    fontWeight: '600',
   },
   body: {
     fontSize: 14,

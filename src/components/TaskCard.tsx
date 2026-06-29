@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Chip } from 'react-native-paper';
+import { Text, Chip, Icon } from 'react-native-paper';
 import { format } from 'date-fns';
 import { Colors } from '../constants/colors';
 import { Task, TaskStatus } from '../types/database';
@@ -53,9 +53,12 @@ export function TaskCard({ task, onStatusChange, showAssignee }: TaskCardProps) 
 
       <View style={styles.footer}>
         {task.due_date && (
-          <Text style={styles.dueDate}>
-            📅 {format(new Date(task.due_date), 'MMM dd, yyyy')}
-          </Text>
+          <View style={styles.dueDateRow}>
+            <Icon source="calendar-clock" size={14} color={Colors.textSecondary} />
+            <Text style={styles.dueDate}>
+              {format(new Date(task.due_date), 'MMM dd, yyyy')}
+            </Text>
+          </View>
         )}
         <View style={styles.spacer} />
         {nextLabel && onStatusChange && (
@@ -81,6 +84,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Colors.shadow,
   },
   header: {
     flexDirection: 'row',
@@ -123,6 +127,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 10,
+  },
+  dueDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   dueDate: {
     fontSize: 12,
