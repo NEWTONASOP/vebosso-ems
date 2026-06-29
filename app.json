@@ -1,0 +1,67 @@
+{
+  "expo": {
+    "name": "VEBOSSO EMS",
+    "slug": "vebosso-ems",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "vebossoems",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.vebosso.ems"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png",
+        "backgroundColor": "#0A0F1E"
+      },
+      "package": "com.vebosso.ems",
+      "permissions": ["NOTIFICATIONS"],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-secure-store",
+      [
+        "expo-sqlite",
+        {
+          "enableFTS": false,
+          "useSQLCipher": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#2563EB"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0A0F1E",
+          "android": {
+            "image": "./assets/images/splash-icon.png",
+            "imageWidth": 120
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
+    }
+  }
+}
