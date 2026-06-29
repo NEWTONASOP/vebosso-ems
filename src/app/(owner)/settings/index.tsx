@@ -2,14 +2,13 @@
 // VEBOSSO EMS — Owner Settings Screen (Tab)
 // ============================================================================
 
-import React from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { Text, Divider, Switch } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '../../../store/authStore';
-import { useWorkStore } from '../../../store/workStore';
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Divider, Switch, Text } from 'react-native-paper';
 import { Colors } from '../../../constants/colors';
 import { APP_NAME } from '../../../constants/roles';
+import { useAuthStore } from '../../../store/authStore';
+import { useWorkStore } from '../../../store/workStore';
 
 export default function OwnerSettingsScreen() {
   const router = useRouter();
@@ -112,7 +111,7 @@ export default function OwnerSettingsScreen() {
           emoji="🔑"
           title="Change Password"
           subtitle="Update your password"
-          onPress={() => router.push('/(auth)/force-change-password')}
+          onPress={() => router.push('/(auth)/change-password')}
         />
         <Divider style={styles.divider} />
         <TouchableOpacity style={styles.settingRow} onPress={handleSignOut}>

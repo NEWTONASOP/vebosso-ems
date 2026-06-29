@@ -2,19 +2,18 @@
 // VEBOSSO EMS — Member Home Screen
 // ============================================================================
 
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { Text, Button, Snackbar } from 'react-native-paper';
-import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing, FadeInDown } from 'react-native-reanimated';
-import { format, differenceInMinutes } from 'date-fns';
-import { useAuthStore } from '../../store/authStore';
-import { useWorkStore } from '../../store/workStore';
-import { Colors } from '../../constants/colors';
+import { differenceInMinutes, format } from 'date-fns';
+import { useEffect, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Button, Snackbar, Text } from 'react-native-paper';
+import Animated, { Easing, FadeInDown, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { CheckInModal } from '../../components/CheckInModal';
 import { CheckOutModal } from '../../components/CheckOutModal';
-import { TaskCard } from '../../components/TaskCard';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
-import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
+import { TaskCard } from '../../components/TaskCard';
+import { Colors } from '../../constants/colors';
+import { useAuthStore } from '../../store/authStore';
+import { useWorkStore } from '../../store/workStore';
 
 export default function MemberHomeScreen() {
   const { profile } = useAuthStore();
@@ -58,17 +57,24 @@ export default function MemberHomeScreen() {
   }));
 
   useEffect(() => {
-    if (profile) {
-      fetchTodayLog(profile.id);
-      fetchTodayTasks(profile.id);
-      fetchSettings();
-      subscribeToRealtime(profile.id, 'member');
+    // Guard against missing profile
+    if (!profile?.id) {
+      console.warn('Profile not loaded yet');
+      return;
     }
+    
+    fetchTodayLog(profile.id);
+    fetchTodayTasks(profile.id);
+    fetchSettings();
+    subscribeToRealtime(profile.id, 'member');
+    
     return () => unsubscribeFromRealtime();
-  }, [profile]);
+  }, [profile?.id]); // Only trigger when profile.id changes
 
-  // Elapsed time counter
+  // Elapsed time counter with proper cleanup
   useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
     if (todayLog?.status === 'working' && todayLog.check_in_time) {
       const updateElapsed = () => {
         const mins = differenceInMinutes(new Date(), new Date(todayLog.check_in_time!));
@@ -77,18 +83,34 @@ export default function MemberHomeScreen() {
         setElapsed(`${h}h ${m}m`);
       };
       updateElapsed();
-      const interval = setInterval(updateElapsed, 60000);
-      return () => clearInterval(interval);
+      interval = setInterval(updateElapsed, 60000);
+    } else {
+      // Reset elapsed when not working
+      setElapsed('');
     }
-  }, [todayLog]);
+    
+    // Always cleanup interval on unmount or when dependencies change
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [todayLog?.status, todayLog?.check_in_time]);
 
   const onRefresh = async () => {
+    if (!profile?.id) return;
+    
     setRefreshing(true);
-    if (profile) {
-      await fetchTodayLog(profile.id);
-      await fetchTodayTasks(profile.id);
+    try {
+      await Promise.all([
+        fetchTodayLog(profile.id),
+        fetchTodayTasks(profile.id),
+      ]);
+    } catch (error) {
+      console.error('Refresh error:', error);
+    } finally {
+      setRefreshing(false);
     }
-    setRefreshing(false);
   };
 
   const handleCheckIn = async (plan: string) => {

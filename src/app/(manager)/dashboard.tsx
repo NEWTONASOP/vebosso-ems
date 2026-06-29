@@ -3,16 +3,16 @@
 // ============================================================================
 // Same as Owner dashboard but filtered to manager's team
 
-import React, { useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { Text } from 'react-native-paper';
 import { format } from 'date-fns';
-import { useAuthStore } from '../../store/authStore';
-import { useWorkStore } from '../../store/workStore';
-import { Colors } from '../../constants/colors';
-import { StatsSkeleton, ListSkeleton } from '../../components/LoadingSkeleton';
+import React, { useCallback, useEffect } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from 'react-native-paper';
 import { ApprovalCard } from '../../components/ApprovalCard';
 import { EmptyState } from '../../components/EmptyState';
+import { ListSkeleton } from '../../components/LoadingSkeleton';
+import { Colors } from '../../constants/colors';
+import { useAuthStore } from '../../store/authStore';
+import { useWorkStore } from '../../store/workStore';
 
 export default function ManagerDashboard() {
   const { profile } = useAuthStore();
@@ -26,21 +26,26 @@ export default function ManagerDashboard() {
   const [refreshing, setRefreshing] = React.useState(false);
 
   const loadData = useCallback(async () => {
-    if (!profile) return;
+    if (!profile?.id) return;
     await Promise.all([
       fetchStats(profile.id),
       fetchPendingApprovals(profile.id),
       fetchSettings(),
     ]);
-  }, [profile]);
+  }, [profile?.id]);
 
   useEffect(() => {
-    loadData();
-    if (profile) {
-      subscribeToRealtime(profile.id, 'manager', profile.id);
+    // Guard against missing profile
+    if (!profile?.id) {
+      console.warn('Profile not loaded yet');
+      return;
     }
+    
+    loadData();
+    subscribeToRealtime(profile.id, 'manager', profile.id);
+    
     return () => unsubscribeFromRealtime();
-  }, [profile]);
+  }, [profile?.id]); // Only trigger when profile.id changes
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -49,13 +54,27 @@ export default function ManagerDashboard() {
   };
 
   const handleApprove = async (workLogId: string) => {
-    if (!profile) return;
-    await approveCheckIn(workLogId, profile.id);
+    if (!profile?.id) {
+      console.error('Profile not loaded');
+      return;
+    }
+    try {
+      await approveCheckIn(workLogId, profile.id);
+    } catch (e) {
+      console.error('Approve error:', e);
+    }
   };
 
   const handleReject = async (workLogId: string) => {
-    if (!profile) return;
-    await rejectCheckIn(workLogId, profile.id, 'Please revise your plan');
+    if (!profile?.id) {
+      console.error('Profile not loaded');
+      return;
+    }
+    try {
+      await rejectCheckIn(workLogId, profile.id, 'Please revise your plan');
+    } catch (e) {
+      console.error('Reject error:', e);
+    }
   };
 
   const today = format(new Date(), 'EEEE, MMMM dd');

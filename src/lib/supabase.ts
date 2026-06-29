@@ -3,20 +3,31 @@
 // ============================================================================
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import 'react-native-url-polyfill/auto';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import * as SQLite from 'expo-sqlite';
+import 'react-native-url-polyfill/auto';
 
 // SQLite-based storage adapter for persistent auth sessions
 class SupabaseStorage {
   private db: SQLite.SQLiteDatabase | null = null;
+  private initPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
   private async getDb() {
+    // Prevent race condition with initialization lock
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+    
     if (!this.db) {
-      this.db = await SQLite.openDatabaseAsync('supabase-auth.db');
-      await this.db.execAsync(
-        'CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT);'
-      );
+      this.initPromise = (async () => {
+        this.db = await SQLite.openDatabaseAsync('supabase-auth.db');
+        await this.db.execAsync(
+          'CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT);'
+        );
+        this.initPromise = null;
+        return this.db;
+      })();
+      return this.initPromise;
     }
     return this.db;
   }
@@ -60,9 +71,16 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    '⚠️ Supabase URL or Anon Key is missing. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in your .env file.'
-  );
+  const errorMessage = '⚠️ Supabase URL or Anon Key is missing. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in your .env file.';
+  console.error(errorMessage);
+  
+  // In production, this is a critical error
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Missing Supabase configuration. Please contact support.');
+  }
+  
+  // In development, show clear warning but allow continuation for setup
+  console.warn('⚠️ Development mode: App will fail without proper Supabase configuration.');
 }
 
 const storage = new SupabaseStorage();

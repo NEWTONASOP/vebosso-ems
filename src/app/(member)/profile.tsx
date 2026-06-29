@@ -2,13 +2,12 @@
 // VEBOSSO EMS — Member Profile Screen
 // ============================================================================
 
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Text, Button, Avatar, Divider } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '../../store/authStore';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Avatar, Button, Divider, Text } from 'react-native-paper';
 import { Colors } from '../../constants/colors';
-import { ROLE_LABELS, APP_NAME } from '../../constants/roles';
+import { APP_NAME, ROLE_LABELS } from '../../constants/roles';
+import { useAuthStore } from '../../store/authStore';
 
 export default function MemberProfileScreen() {
   const router = useRouter();
@@ -58,7 +57,7 @@ export default function MemberProfileScreen() {
       <View style={styles.actionsSection}>
         <Button
           mode="outlined"
-          onPress={() => router.push('/(auth)/force-change-password')}
+          onPress={() => router.push('/(auth)/change-password')}
           style={styles.actionButton}
           textColor={Colors.accent}
           icon="lock-reset"

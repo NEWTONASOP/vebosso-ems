@@ -2,9 +2,9 @@
 // VEBOSSO EMS — Check-Out Modal
 // ============================================================================
 
-import React, { useState } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { Modal, Portal, Text, TextInput, Button, HelperText } from 'react-native-paper';
+import { useState } from 'react';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { Button, HelperText, Modal, Portal, Text, TextInput } from 'react-native-paper';
 import { Colors } from '../constants/colors';
 
 interface CheckOutModalProps {
@@ -19,12 +19,17 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
   const [error, setError] = useState('');
 
   const handleSubmit = async () => {
+    // Validate minimum length
     if (report.trim().length < 10) {
       setError('Please provide a more detailed day report (at least 10 characters)');
       return;
     }
+    
+    // Sanitize input - remove excessive whitespace and limit length
+    const sanitized = report.trim().slice(0, 1000); // Max 1000 chars
+    
     setError('');
-    await onSubmit(report);
+    await onSubmit(sanitized);
     setReport('');
   };
 

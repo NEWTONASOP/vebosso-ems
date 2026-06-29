@@ -2,9 +2,9 @@
 // VEBOSSO EMS — Check-In Modal
 // ============================================================================
 
-import React, { useState } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { Modal, Portal, Text, TextInput, Button, HelperText } from 'react-native-paper';
+import { useState } from 'react';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { Button, HelperText, Modal, Portal, Text, TextInput } from 'react-native-paper';
 import { Colors } from '../constants/colors';
 import { MIN_CHECKIN_PLAN_LENGTH } from '../constants/roles';
 
@@ -27,8 +27,12 @@ export function CheckInModal({ visible, onDismiss, onSubmit, isLoading }: CheckI
       setError(`Plan must be at least ${MIN_CHECKIN_PLAN_LENGTH} characters`);
       return;
     }
+    
+    // Sanitize input - remove excessive whitespace and limit length
+    const sanitized = plan.trim().slice(0, 1000); // Max 1000 chars
+    
     setError('');
-    await onSubmit(plan);
+    await onSubmit(sanitized);
     setPlan('');
   };
 

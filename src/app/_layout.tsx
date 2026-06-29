@@ -2,18 +2,19 @@
 // VEBOSSO EMS — Root Layout
 // ============================================================================
 
-import 'react-native-reanimated';
-import React, { useEffect } from 'react';
-import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { StatusBar } from 'expo-status-bar';
-import { PaperProvider, MD3LightTheme } from 'react-native-paper';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
-import { useAuthStore } from '../store/authStore';
-import { Colors, PaperThemeColors } from '../constants/colors';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { MD3LightTheme, PaperProvider } from 'react-native-paper';
+import 'react-native-reanimated';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { Colors, PaperThemeColors } from '../constants/colors';
+import { useAuthStore } from '../store/authStore';
 
 // Keep splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -87,25 +88,27 @@ export default function RootLayout() {
   }, [initialize]);
 
   return (
-    <GestureHandlerRootView style={styles.container}>
-      <PaperProvider 
-        theme={theme}
-        settings={{
-          icon: props => <MaterialCommunityIcons {...props} />,
-        }}
-      >
-        <StatusBar style="dark" />
-        <OfflineBanner />
-        <AuthGuard />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: Colors.background },
-            animation: 'fade',
+    <ErrorBoundary>
+      <GestureHandlerRootView style={styles.container}>
+        <PaperProvider 
+          theme={theme}
+          settings={{
+            icon: props => <MaterialCommunityIcons {...props} />,
           }}
-        />
-      </PaperProvider>
-    </GestureHandlerRootView>
+        >
+          <StatusBar style="dark" />
+          <OfflineBanner />
+          <AuthGuard />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: Colors.background },
+              animation: 'fade',
+            }}
+          />
+        </PaperProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
 

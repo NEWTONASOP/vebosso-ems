@@ -2,16 +2,16 @@
 // VEBOSSO EMS — Owner Dashboard
 // ============================================================================
 
-import React, { useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { Text, Surface } from 'react-native-paper';
 import { format } from 'date-fns';
-import { useAuthStore } from '../../store/authStore';
-import { useWorkStore } from '../../store/workStore';
-import { Colors } from '../../constants/colors';
-import { StatsSkeleton, ListSkeleton } from '../../components/LoadingSkeleton';
+import React, { useCallback, useEffect } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from 'react-native-paper';
 import { ApprovalCard } from '../../components/ApprovalCard';
 import { EmptyState } from '../../components/EmptyState';
+import { ListSkeleton } from '../../components/LoadingSkeleton';
+import { Colors } from '../../constants/colors';
+import { useAuthStore } from '../../store/authStore';
+import { useWorkStore } from '../../store/workStore';
 
 export default function OwnerDashboard() {
   const { profile } = useAuthStore();
@@ -39,12 +39,17 @@ export default function OwnerDashboard() {
   }, []);
 
   useEffect(() => {
-    loadData();
-    if (profile) {
-      subscribeToRealtime(profile.id, 'owner');
+    // Guard against missing profile
+    if (!profile?.id) {
+      console.warn('Profile not loaded yet');
+      return;
     }
+    
+    loadData();
+    subscribeToRealtime(profile.id, 'owner');
+    
     return () => unsubscribeFromRealtime();
-  }, [profile]);
+  }, [profile?.id]); // Only trigger when profile.id changes
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -53,20 +58,26 @@ export default function OwnerDashboard() {
   };
 
   const handleApprove = async (workLogId: string) => {
-    if (!profile) return;
+    if (!profile?.id) {
+      console.error('Profile not loaded');
+      return;
+    }
     try {
       await approveCheckIn(workLogId, profile.id);
     } catch (e) {
-      console.error(e);
+      console.error('Approve error:', e);
     }
   };
 
   const handleReject = async (workLogId: string) => {
-    if (!profile) return;
+    if (!profile?.id) {
+      console.error('Profile not loaded');
+      return;
+    }
     try {
       await rejectCheckIn(workLogId, profile.id, 'Please revise your plan');
     } catch (e) {
-      console.error(e);
+      console.error('Reject error:', e);
     }
   };
 

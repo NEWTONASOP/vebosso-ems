@@ -3,8 +3,8 @@
 // ============================================================================
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { create } from 'zustand';
 import { Session } from '@supabase/supabase-js';
+import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { Profile, UserRole } from '../types/database';
 
@@ -26,11 +26,15 @@ interface AuthState {
   signIn: (employeeId: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   fetchProfile: (userId: string) => Promise<Profile | null>;
-  updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  updateProfile: (updates: Partial<Profile>) => Promise<{ success: boolean; error?: string }>;
   changePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
   setError: (error: string | null) => void;
   clearError: () => void;
+  cleanup: () => void;
 }
+
+// Store auth subscription outside the store to prevent memory leaks
+let authSubscription: { data: { subscription: { unsubscribe: () => void } } } | null = null;
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   // Initial state
@@ -47,6 +51,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initialize: async () => {
     try {
       set({ isLoading: true, error: null });
+
+      // Clean up any existing subscription
+      if (authSubscription) {
+        authSubscription.data.subscription.unsubscribe();
+        authSubscription = null;
+      }
 
       // Get existing session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -73,7 +83,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       // Listen for auth state changes
-      supabase.auth.onAuthStateChange(async (event, newSession) => {
+      authSubscription = supabase.auth.onAuthStateChange(async (event, newSession) => {
         console.log('Auth state changed:', event);
 
         if (event === 'SIGNED_IN' && newSession?.user) {
@@ -238,7 +248,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // Update profile
   updateProfile: async (updates: Partial<Profile>) => {
     const userId = get().userId;
-    if (!userId) return;
+    if (!userId) {
+      return { success: false, error: 'Not authenticated' };
+    }
 
     try {
       const { data, error } = await supabase
@@ -250,12 +262,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (error) {
         console.error('Update profile error:', error);
-        throw error;
+        return { success: false, error: error.message || 'Failed to update profile' };
       }
 
       set({ profile: data as Profile });
+      return { success: true };
     } catch (error) {
-      throw error;
+      const errorMsg = error instanceof Error ? error.message : 'Failed to update profile';
+      console.error('Update profile error:', error);
+      return { success: false, error: errorMsg };
     }
   },
 
@@ -299,4 +314,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setError: (error: string | null) => set({ error }),
   clearError: () => set({ error: null }),
+
+  // Cleanup auth subscription to prevent memory leaks
+  cleanup: () => {
+    if (authSubscription) {
+      authSubscription.data.subscription.unsubscribe();
+      authSubscription = null;
+    }
+  },
 }));

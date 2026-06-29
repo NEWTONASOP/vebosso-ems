@@ -5,22 +5,21 @@
 // The Supabase client is typed as SupabaseClient<any> to avoid codegen requirement.
 // Our own types (WorkLog, Task, etc.) are still enforced at the interface level.
 
+import { RealtimeChannel } from '@supabase/supabase-js';
+import { format } from 'date-fns';
 import { create } from 'zustand';
+import { sendPushNotification } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
 import {
-  WorkLog,
-  WorkLogWithProfile,
-  Task,
-  TaskInsert,
-  Announcement,
-  AnnouncementWithCreator,
-  AppSetting,
-  Profile,
-  WorkLogStatus,
+    AnnouncementWithCreator,
+    AppSetting,
+    Profile,
+    Task,
+    TaskInsert,
+    WorkLog,
+    WorkLogStatus,
+    WorkLogWithProfile
 } from '../types/database';
-import { format } from 'date-fns';
-import { sendPushNotification } from '../lib/notifications';
-import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface WorkState {
   // Today's work state
@@ -627,6 +626,13 @@ export const useWorkStore = create<WorkState>((set, get) => ({
   // ============================================================================
 
   subscribeToRealtime: (userId: string, role: string, managerId?: string) => {
+    // Prevent duplicate subscriptions with guard
+    const existingChannels = get().channels;
+    if (existingChannels.length > 0) {
+      console.log('[Realtime] Already subscribed, skipping duplicate');
+      return;
+    }
+    
     get().unsubscribeFromRealtime();
     
     const channels: RealtimeChannel[] = [];
