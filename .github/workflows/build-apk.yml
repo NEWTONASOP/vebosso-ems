@@ -39,6 +39,12 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Publish OTA Update
+        run: |
+          eas update --branch main --message "Auto update from GitHub Actions" --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
       - name: Get version from app.json
         id: version
         run: |

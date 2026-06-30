@@ -20,7 +20,10 @@
         "backgroundColor": "#0A0F1E"
       },
       "package": "com.vebosso.ems",
-      "permissions": ["NOTIFICATIONS"],
+      "permissions": [
+        "NOTIFICATIONS",
+        "NOTIFICATIONS"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -59,9 +62,17 @@
       "typedRoutes": true
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "your-eas-project-id"
+        "projectId": "4ac738d0-e4b2-4814-8eb5-2389074f5c4a"
       }
+    },
+    "owner": "newtane",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4ac738d0-e4b2-4814-8eb5-2389074f5c4a"
     }
   }
 }
