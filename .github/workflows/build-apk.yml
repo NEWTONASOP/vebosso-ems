@@ -42,9 +42,11 @@ jobs:
           # By default, without --no-wait, it waits for the build to finish.
           eas build --platform android --profile production --non-interactive
           
-          # Download the latest build for this project
+          # Download the latest build for this project using wget
           echo "Downloading latest build..."
-          eas build:download --platform android --latest --output app.apk
+          APK_URL=$(eas build:list --platform android --status finished --limit 1 --json | jq -r '.[0].artifacts.buildUrl')
+          echo "Build URL: $APK_URL"
+          curl -L -o app.apk "$APK_URL"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
