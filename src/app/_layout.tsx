@@ -81,7 +81,9 @@ function AuthGuard() {
       return;
     }
 
-    if (inAuthGroup) {
+    const isChangePassword = segments[1] === 'change-password';
+
+    if (inAuthGroup && !isChangePassword) {
       switch (profile.role) {
         case 'owner':
           router.replace('/(owner)/dashboard');
