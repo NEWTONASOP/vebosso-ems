@@ -35,18 +35,17 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Build APK and Download
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Build APK Locally on Runner
         run: |
-          # Wait for build to finish and get the download URL
-          echo "Starting EAS Build..."
-          # By default, without --no-wait, it waits for the build to finish.
-          eas build --platform android --profile production --non-interactive
-          
-          # Download the latest build for this project using wget
-          echo "Downloading latest build..."
-          APK_URL=$(eas build:list --platform android --status finished --limit 1 --json | jq -r '.[0].artifacts.buildUrl')
-          echo "Build URL: $APK_URL"
-          curl -L -o app.apk "$APK_URL"
+          echo "Starting EAS Local Build on GitHub Actions..."
+          # The --local flag forces it to build using GitHub's hardware, completely bypassing the EAS Cloud queue and limits.
+          eas build --platform android --profile production --local --non-interactive --output app.apk
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
