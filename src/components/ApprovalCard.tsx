@@ -101,9 +101,9 @@ export function ApprovalCard({ workLog, onApprove, onReject }: ApprovalCardProps
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: Colors.border,
     ...Colors.shadow,
@@ -118,63 +118,70 @@ const styles = StyleSheet.create({
   avatarLabel: {
     color: Colors.accent,
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
   },
   headerInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 14,
   },
   name: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 17,
+    fontFamily: 'Inter_700Bold',
     color: Colors.text,
   },
   employeeId: {
     fontSize: 13,
+    fontFamily: 'Inter_500Medium',
     color: Colors.textSecondary,
     marginTop: 2,
   },
   statusChip: {
     height: 28,
+    borderRadius: 8,
   },
   statusText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: 'Inter_700Bold',
   },
   timeRow: {
     flexDirection: 'row',
-    marginTop: 14,
+    marginTop: 16,
     gap: 16,
   },
   timeItem: {
     flex: 1,
+    backgroundColor: Colors.surfaceLight,
+    padding: 12,
+    borderRadius: 12,
   },
   timeLabel: {
     fontSize: 12,
+    fontFamily: 'Inter_500Medium',
     color: Colors.textTertiary,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   timeValue: {
-    fontSize: 14,
+    fontSize: 15,
     color: Colors.text,
-    fontWeight: '600',
+    fontFamily: 'Inter_700Bold',
   },
   planSection: {
-    marginTop: 14,
+    marginTop: 16,
     backgroundColor: Colors.primaryLight,
-    borderRadius: 10,
-    padding: 12,
+    borderRadius: 12,
+    padding: 16,
   },
   planLabel: {
     fontSize: 13,
     color: Colors.textSecondary,
-    fontWeight: '600',
-    marginBottom: 6,
+    fontFamily: 'Inter_600SemiBold',
+    marginBottom: 8,
   },
   planText: {
     fontSize: 14,
     color: Colors.text,
-    lineHeight: 20,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 22,
   },
   actions: {
     flexDirection: 'row',
@@ -184,10 +191,10 @@ const styles = StyleSheet.create({
   rejectButton: {
     flex: 1,
     borderColor: Colors.error,
-    borderRadius: 10,
+    borderRadius: 12,
   },
   approveButton: {
     flex: 1,
-    borderRadius: 10,
+    borderRadius: 12,
   },
 });

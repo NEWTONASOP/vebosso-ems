@@ -116,49 +116,53 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.surface,
     margin: 20,
-    borderRadius: 16,
+    borderRadius: 24,
     padding: 24,
     borderWidth: 1,
     borderColor: Colors.border,
-    ...Colors.shadow,
+    ...Colors.shadowHeavy,
   },
   header: {
     alignItems: 'center',
     marginBottom: 20,
   },
   emoji: {
-    fontSize: 40,
-    marginBottom: 8,
+    fontSize: 44,
+    marginBottom: 12,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 24,
+    fontFamily: 'Inter_800ExtraBold',
     color: Colors.text,
     marginBottom: 4,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 14,
+    fontFamily: 'Inter_500Medium',
     color: Colors.textSecondary,
     textAlign: 'center',
   },
   input: {
     backgroundColor: Colors.inputBackground,
     minHeight: 120,
+    fontFamily: 'Inter_400Regular',
   },
   errorText: {
     color: Colors.error,
+    fontFamily: 'Inter_500Medium',
   },
   actions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 12,
-    marginTop: 16,
+    marginTop: 20,
   },
   cancelButton: {
     borderColor: Colors.border,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   submitButton: {
-    borderRadius: 8,
+    borderRadius: 12,
   },
 });

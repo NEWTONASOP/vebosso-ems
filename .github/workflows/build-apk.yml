@@ -35,9 +35,16 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Build APK
+      - name: Build APK and Download
         run: |
-          eas build --platform android --profile production --non-interactive --no-wait
+          # Wait for build to finish and get the download URL
+          echo "Starting EAS Build..."
+          # By default, without --no-wait, it waits for the build to finish.
+          eas build --platform android --profile production --non-interactive
+          
+          # Download the latest build for this project
+          echo "Downloading latest build..."
+          eas build:download --platform android --latest --output app.apk
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
@@ -53,17 +60,15 @@ jobs:
           VERSION=$(node -p "require('./app.json').expo.version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: Create Release and Upload APK
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: v${{ steps.version.outputs.version }}
-          release_name: Release v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
           body: |
             Automatic APK build for version ${{ steps.version.outputs.version }}
             
             Download the APK below to update your app.
-          draft: false
-          prerelease: false
+          files: app.apk

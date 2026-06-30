@@ -1,77 +1,85 @@
 // ============================================================================
-// VEBOSSO EMS — Brand Colors (Tamagui-Inspired Light Mode)
+// VEBOSSO EMS — Brand Colors (Premium SaaS Aesthetic)
 // ============================================================================
 
 export const Colors = {
-  // Primary palette
+  // Primary palette (Vibrant but professional)
   primary: '#FFFFFF',        // Pure white background for elements
-  primaryLight: '#F8FAFC',    // Light slate gray for sub-elements
-  accent: '#4F46E5',          // Indigo - primary action color
-  accentLight: '#6366F1',     // Lighter indigo for hover/active
-  accentDark: '#3730A3',      // Darker indigo for pressed states
-  accentSubtle: 'rgba(79, 70, 229, 0.08)', // Subtle indigo tint for backgrounds
+  primaryLight: '#FAFAFA',    // Ultra light gray for sub-elements
+  accent: '#000000',          // High contrast black for primary actions (Linear style)
+  accentLight: '#333333',     // Dark gray for hover/active
+  accentDark: '#000000',      // Solid black for pressed states
+  accentSubtle: 'rgba(0, 0, 0, 0.04)', // Subtle tint for backgrounds
 
-  // Status colors
-  success: '#10B981',         // Green - approved, done, active
-  successLight: 'rgba(16, 185, 129, 0.08)',
-  warning: '#F59E0B',         // Amber - pending, in progress
-  warningLight: 'rgba(245, 158, 11, 0.08)',
-  error: '#EF4444',           // Red - rejected, error
-  errorLight: 'rgba(239, 68, 68, 0.08)',
-  info: '#0EA5E9',            // Sky Blue - info, announcements
-  infoLight: 'rgba(14, 165, 233, 0.08)',
+  // Status colors (Muted, premium hues)
+  success: '#17B877',         // Crisp Emerald - approved, done
+  successLight: 'rgba(23, 184, 119, 0.1)',
+  warning: '#F5A623',         // Vibrant Amber - pending, in progress
+  warningLight: 'rgba(245, 166, 35, 0.1)',
+  error: '#F43F5E',           // Rose Red - rejected, error
+  errorLight: 'rgba(244, 63, 94, 0.1)',
+  info: '#3B82F6',            // Bright Blue - info, announcements
+  infoLight: 'rgba(59, 130, 246, 0.1)',
 
   // Surface colors
-  surface: '#FFFFFF',         // Card/surface background (pure white)
-  surfaceLight: '#F8FAFC',    // Elevated surface background
-  surfaceLighter: '#F1F5F9',  // Higher contrast elevated surfaces
-  border: '#E2E8F0',          // Default thin light border (slate-200)
-  borderLight: '#F1F5F9',     // Very light border (slate-100)
-  divider: 'rgba(15, 23, 42, 0.06)', // Slate-900 divider at low opacity
+  surface: '#FFFFFF',         // Card/surface background
+  surfaceLight: '#F9FAFB',    // Elevated surface background
+  surfaceLighter: '#F3F4F6',  // Higher contrast elevated surfaces
+  border: '#E5E7EB',          // Soft light border
+  borderLight: '#F3F4F6',     // Very light border
+  divider: 'rgba(0, 0, 0, 0.06)', // Subtle divider
 
   // Text colors
-  text: '#0F172A',            // Primary text (slate-900)
-  textSecondary: '#475569',   // Secondary text (slate-600)
-  textTertiary: '#94A3B8',    // Muted text (slate-400)
-  textInverse: '#FFFFFF',     // Text on dark backgrounds (e.g. colored buttons)
+  text: '#111827',            // Deep charcoal for primary text
+  textSecondary: '#6B7280',   // Medium gray for secondary
+  textTertiary: '#9CA3AF',    // Light gray for muted text
+  textInverse: '#FFFFFF',     // Text on dark backgrounds
 
   // Background colors
-  background: '#F8FAFC',      // Main app background (slate-50 style cool white)
-  backgroundOverlay: 'rgba(15, 23, 42, 0.3)', // Soft dark overlay for modals
+  background: '#FAFAFA',      // Main app background (off-white)
+  backgroundOverlay: 'rgba(0, 0, 0, 0.4)', // Dark overlay for modals (Glassmorphism backdrop)
 
   // Tab bar
-  tabBar: '#FFFFFF',          // Clean white tab bar
-  tabBarBorder: '#E2E8F0',    // Slate border top
-  tabInactive: '#94A3B8',     // Muted tabs
-  tabActive: '#4F46E5',       // Highlighted tab
+  tabBar: 'rgba(255, 255, 255, 0.85)', // Translucent white
+  tabBarBorder: '#E5E7EB',    
+  tabInactive: '#9CA3AF',     
+  tabActive: '#111827',       
 
   // Specific UI elements
-  skeleton: '#E2E8F0',        // Light grey skeleton base
-  skeletonHighlight: '#F1F5F9', // Shimmer highlight
-  badge: '#EF4444',           // Notification badge
-  inputBackground: '#FFFFFF', // Clean white input fields
-  inputBorder: '#E2E8F0',     // Light input borders
-  inputFocusBorder: '#4F46E5', // Focused input border
-  placeholder: '#94A3B8',     // Placeholder slate
+  skeleton: '#F3F4F6',        
+  skeletonHighlight: '#FFFFFF', 
+  badge: '#F43F5E',           
+  inputBackground: '#FFFFFF', 
+  inputBorder: '#E5E7EB',     
+  inputFocusBorder: '#111827', 
+  placeholder: '#9CA3AF',     
 
-  // Gradients (as arrays for LinearGradient)
-  gradientPrimary: ['#FFFFFF', '#F8FAFC'] as const,
-  gradientAccent: ['#6366F1', '#4F46E5'] as const,
-  gradientSuccess: ['#34D399', '#10B981'] as const,
-  gradientCard: ['#FFFFFF', '#F8FAFC'] as const,
+  // Gradients (as arrays for LinearGradient) - Softer transitions
+  gradientPrimary: ['#FFFFFF', '#F9FAFB'] as const,
+  gradientAccent: ['#333333', '#000000'] as const,
+  gradientSuccess: ['#34D399', '#17B877'] as const,
+  gradientCard: ['rgba(255,255,255,0.8)', 'rgba(255,255,255,0.4)'] as const, // Glass effect
 
   // Role-specific accent colors
-  ownerAccent: '#7C3AED',     // Deep Violet for owner elements
-  managerAccent: '#2563EB',   // Cobalt Blue for manager elements
-  memberAccent: '#10B981',    // Emerald Green for member elements
+  ownerAccent: '#8B5CF6',     // Violet
+  managerAccent: '#3B82F6',   // Blue
+  memberAccent: '#17B877',    // Emerald
 
-  // Shadow properties for elevated surfaces
+  // Shadow properties for elevated surfaces (Premium soft shadows)
   shadow: {
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  
+  shadowHeavy: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
   },
 
   // Color utilities
@@ -83,7 +91,7 @@ export const Colors = {
   transparent: 'transparent',
 } as const;
 
-// React Native Paper custom theme colors (Optimized for MD3LightTheme)
+// React Native Paper custom theme colors
 export const PaperThemeColors = {
   primary: Colors.accent,
   onPrimary: Colors.white,
@@ -120,9 +128,10 @@ export const PaperThemeColors = {
     level4: Colors.surfaceLighter,
     level5: Colors.surfaceLighter,
   },
-  surfaceDisabled: 'rgba(15, 23, 42, 0.08)',
-  onSurfaceDisabled: 'rgba(15, 23, 42, 0.38)',
+  surfaceDisabled: 'rgba(17, 24, 39, 0.08)',
+  onSurfaceDisabled: 'rgba(17, 24, 39, 0.38)',
   backdrop: Colors.backgroundOverlay,
 };
 
 export type ColorKey = keyof typeof Colors;
+
