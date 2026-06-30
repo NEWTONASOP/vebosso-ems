@@ -53,11 +53,17 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
   try {
     const currentVersion = getCurrentVersion();
 
-    // Fetch version requirements from database
-    const { data, error } = await supabase
+    // Fetch version requirements from database with timeout
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Version check timeout')), 5000)
+    );
+    
+    const queryPromise = supabase
       .from('app_settings')
       .select('key, value')
       .in('key', ['minimum_app_version', 'latest_app_version', 'update_message']);
+
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
     if (error) {
       console.error('Version check error:', error);

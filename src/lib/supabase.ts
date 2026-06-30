@@ -11,21 +11,36 @@ import 'react-native-url-polyfill/auto';
 class SupabaseStorage {
   private db: SQLite.SQLiteDatabase | null = null;
   private initPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+  private isInitializing: boolean = false;
 
   private async getDb() {
-    // Prevent race condition with initialization lock
+    // Return existing database if already initialized
+    if (this.db && !this.isInitializing) {
+      return this.db;
+    }
+    
+    // Wait for ongoing initialization
     if (this.initPromise) {
       return this.initPromise;
     }
     
-    if (!this.db) {
+    // Start new initialization
+    if (!this.db && !this.isInitializing) {
+      this.isInitializing = true;
       this.initPromise = (async () => {
-        this.db = await SQLite.openDatabaseAsync('supabase-auth.db');
-        await this.db.execAsync(
-          'CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT);'
-        );
-        this.initPromise = null;
-        return this.db;
+        try {
+          this.db = await SQLite.openDatabaseAsync('supabase-auth.db');
+          await this.db.execAsync(
+            'CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT);'
+          );
+          return this.db;
+        } catch (error) {
+          console.error('SQLite initialization error:', error);
+          throw error;
+        } finally {
+          this.isInitializing = false;
+          this.initPromise = null;
+        }
       })();
       return this.initPromise;
     }
@@ -74,9 +89,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
   const errorMessage = '⚠️ Supabase URL or Anon Key is missing. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in your .env file.';
   console.error(errorMessage);
   
-  // In production, this is a critical error
+  // In production, log error but don't throw to prevent crash on startup
+  // The app will handle auth failures gracefully
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('Missing Supabase configuration. Please contact support.');
+    console.error('Missing Supabase configuration. App may not function correctly.');
   }
   
   // In development, show clear warning but allow continuation for setup

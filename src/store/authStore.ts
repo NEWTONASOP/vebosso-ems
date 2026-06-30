@@ -58,12 +58,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         authSubscription = null;
       }
 
-      // Get existing session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // Get existing session with timeout
+      const sessionPromise = supabase.auth.getSession();
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Session timeout')), 10000)
+      );
+
+      const { data: { session }, error: sessionError } = await Promise.race([
+        sessionPromise, 
+        timeoutPromise
+      ]);
 
       if (sessionError) {
         console.error('Session error:', sessionError);
-        set({ isLoading: false, isInitialized: true });
+        set({ isLoading: false, isInitialized: true, error: sessionError.message });
         return;
       }
 

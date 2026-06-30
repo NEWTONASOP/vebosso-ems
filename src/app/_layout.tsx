@@ -7,7 +7,7 @@ import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-rout
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text as RNText } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { configureFonts, MD3LightTheme, PaperProvider } from 'react-native-paper';
 import 'react-native-reanimated';
@@ -17,12 +17,12 @@ import { Colors, PaperThemeColors } from '../constants/colors';
 import { useAuthStore } from '../store/authStore';
 
 import {
-  useFonts,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-  Inter_800ExtraBold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
+    useFonts,
 } from '@expo-google-fonts/inter';
 
 // Keep splash screen visible while we fetch resources
