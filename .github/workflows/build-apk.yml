@@ -41,7 +41,7 @@ jobs:
 
       - name: Publish OTA Update
         run: |
-          eas update --branch main --message "Auto update from GitHub Actions" --non-interactive
+          eas update --branch main --message "Auto update from GitHub Actions" --platform android --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
