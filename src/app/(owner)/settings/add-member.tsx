@@ -170,7 +170,7 @@ export default function AddMemberScreen() {
           </View>
         </ScrollView>
 
-        <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} style={styles.snackbar}>
+        <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>
           {snackMessage}
         </Snackbar>
       </View>
@@ -287,7 +287,7 @@ export default function AddMemberScreen() {
         </View>
       </ScrollView>
 
-      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} style={styles.snackbar}>
+      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>
         {snackMessage}
       </Snackbar>
     </View>
@@ -354,5 +354,4 @@ const styles = StyleSheet.create({
   credValue: { fontSize: 16, fontWeight: '700', color: Colors.accent },
   copyButton: { borderRadius: 12, width: '100%', marginBottom: 12 },
   addAnotherButton: { borderColor: Colors.border, borderRadius: 12, width: '100%', marginBottom: 8 },
-  snackbar: { backgroundColor: Colors.surfaceLight },
 });

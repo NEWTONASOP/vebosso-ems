@@ -108,7 +108,7 @@ export default function MemberTasksScreen() {
         }
       />
 
-      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} style={styles.snackbar}>
+      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>
         {snackMessage}
       </Snackbar>
     </View>
@@ -129,5 +129,4 @@ const styles = StyleSheet.create({
   filterChipText: { color: Colors.textSecondary, fontSize: 11, fontWeight: '600' },
   filterChipTextActive: { color: Colors.accent, fontWeight: '700' },
   list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20 },
-  snackbar: { backgroundColor: Colors.surfaceLight },
 });

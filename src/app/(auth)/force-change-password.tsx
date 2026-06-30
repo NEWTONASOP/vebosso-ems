@@ -167,7 +167,7 @@ export default function ForceChangePasswordScreen() {
         visible={!!snackMessage}
         onDismiss={() => setSnackMessage('')}
         duration={4000}
-        style={styles.snackbar}
+       
       >
         {snackMessage}
       </Snackbar>
@@ -211,5 +211,4 @@ const styles = StyleSheet.create({
   reqTitle: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600', marginBottom: 8 },
   button: { borderRadius: 12 },
   buttonContent: { height: 50 },
-  snackbar: { backgroundColor: Colors.surfaceLight },
 });

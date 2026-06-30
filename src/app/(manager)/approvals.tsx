@@ -61,7 +61,7 @@ export default function ManagerApprovalsScreen() {
           ListEmptyComponent={<EmptyState icon="checkbox-marked-circle-outline" title="All caught up!" subtitle="No pending approvals" />}
         />
       )}
-      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} style={styles.snackbar}>{snackMessage}</Snackbar>
+      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>{snackMessage}</Snackbar>
     </View>
   );
 }
@@ -73,5 +73,4 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   content: { paddingHorizontal: 20 },
   list: { paddingHorizontal: 20, paddingBottom: 20 },
-  snackbar: { backgroundColor: Colors.surfaceLight },
 });

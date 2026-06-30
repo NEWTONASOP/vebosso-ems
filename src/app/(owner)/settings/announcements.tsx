@@ -140,7 +140,7 @@ export default function AnnouncementsScreen() {
         }
       />
 
-      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} style={styles.snackbar}>
+      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>
         {snackMessage}
       </Snackbar>
     </View>
@@ -177,5 +177,4 @@ const styles = StyleSheet.create({
   segmented: { marginBottom: 14 },
   sendButton: { borderRadius: 10, marginTop: 4 },
   list: { paddingHorizontal: 16, paddingBottom: 20 },
-  snackbar: { backgroundColor: Colors.surfaceLight },
 });

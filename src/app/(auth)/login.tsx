@@ -141,7 +141,7 @@ export default function LoginScreen() {
         visible={!!snackError}
         onDismiss={() => setSnackError('')}
         duration={4000}
-        style={styles.snackbar}
+       
         action={{ label: 'OK', textColor: Colors.accent }}
       >
         {snackError}

@@ -309,7 +309,7 @@ export default function MemberHomeScreen() {
 
       <CheckInModal visible={showCheckIn} onDismiss={() => setShowCheckIn(false)} onSubmit={handleCheckIn} isLoading={checkInLoading} />
       <CheckOutModal visible={showCheckOut} onDismiss={() => setShowCheckOut(false)} onSubmit={handleCheckOut} />
-      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} style={styles.snackbar}>{snackMessage}</Snackbar>
+      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>{snackMessage}</Snackbar>
     </ScrollView>
   );
 }
@@ -358,5 +358,4 @@ const styles = StyleSheet.create({
   doneStat: { alignItems: 'center' },
   doneStatLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', color: Colors.textSecondary },
   doneStatValue: { fontSize: 18, fontFamily: 'Inter_700Bold', color: Colors.text, marginTop: 6 },
-  snackbar: { backgroundColor: Colors.text, borderRadius: 8 },
 });

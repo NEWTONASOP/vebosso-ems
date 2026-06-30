@@ -167,7 +167,7 @@ export default function ManagerMyWorkScreen() {
 
       <CheckInModal visible={showCheckIn} onDismiss={() => setShowCheckIn(false)} onSubmit={handleCheckIn} isLoading={checkInLoading} />
       <CheckOutModal visible={showCheckOut} onDismiss={() => setShowCheckOut(false)} onSubmit={handleCheckOut} />
-      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} style={styles.snackbar}>{snackMessage}</Snackbar>
+      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>{snackMessage}</Snackbar>
     </ScrollView>
   );
 }
@@ -205,5 +205,4 @@ const styles = StyleSheet.create({
   workingLabel: { fontSize: 12, color: Colors.textSecondary },
   workingValue: { fontSize: 18, fontWeight: '700', color: Colors.text, marginTop: 2 },
   endButton: { borderRadius: 14, width: '100%' },
-  snackbar: { backgroundColor: Colors.surfaceLight },
 });

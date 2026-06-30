@@ -96,7 +96,7 @@ export default function OwnerApprovalsScreen() {
         visible={!!snackMessage}
         onDismiss={() => setSnackMessage('')}
         duration={3000}
-        style={styles.snackbar}
+       
       >
         {snackMessage}
       </Snackbar>
@@ -111,5 +111,4 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   content: { paddingHorizontal: 20 },
   list: { paddingHorizontal: 20, paddingBottom: 20 },
-  snackbar: { backgroundColor: Colors.surfaceLight },
 });
