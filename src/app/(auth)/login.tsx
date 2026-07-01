@@ -1,14 +1,15 @@
 // ============================================================================
-// VEBOSSO EMS — Login Screen
+// VEBOSSO EMS — Login Screen (Premium Fintech / Apple Wallet Aesthetic)
 // ============================================================================
 
 import React, { useState } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { TextInput, Button, Text, Snackbar } from 'react-native-paper';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { TextInput, Text, Snackbar } from 'react-native-paper';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useAuthStore } from '../../store/authStore';
 import { Colors } from '../../constants/colors';
 import { APP_NAME, APP_TAGLINE } from '../../constants/roles';
+import { Feather } from '@expo/vector-icons';
 
 export default function LoginScreen() {
   const [employeeId, setEmployeeId] = useState('');
@@ -16,7 +17,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [snackError, setSnackError] = useState('');
 
-  const { signIn, isLoading, error, clearError } = useAuthStore();
+  const { signIn, isLoading, clearError } = useAuthStore();
 
   const handleLogin = async () => {
     if (!employeeId.trim()) {
@@ -42,17 +43,18 @@ export default function LoginScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         {/* Logo / Branding */}
         <Animated.View entering={FadeInDown.duration(800).delay(200)} style={styles.brandSection}>
           <View style={styles.logoContainer}>
-            <Text style={styles.logoIcon}>🏢</Text>
+            <Feather name="layers" size={32} color="#FFFFFF" />
           </View>
           <Text style={styles.appName}>{APP_NAME}</Text>
           <Text style={styles.tagline}>{APP_TAGLINE}</Text>
         </Animated.View>
 
-        {/* Login Form */}
+        {/* Login Form Card */}
         <Animated.View entering={FadeInUp.duration(800).delay(400)} style={styles.formSection}>
           <Text style={styles.welcomeText}>Welcome back</Text>
           <Text style={styles.welcomeSubtext}>Sign in with your employee credentials</Text>
@@ -60,7 +62,7 @@ export default function LoginScreen() {
           <TextInput
             mode="outlined"
             label="Employee ID"
-            placeholder="e.g. VB-0023"
+            placeholder="e.g. VB-0001"
             value={employeeId}
             onChangeText={(text) => {
               setEmployeeId(text.toUpperCase());
@@ -68,14 +70,15 @@ export default function LoginScreen() {
             }}
             autoCapitalize="characters"
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.text}
-            left={<TextInput.Icon icon="badge-account" color={Colors.textSecondary} />}
+            outlineColor="#E5E7EB"
+            activeOutlineColor="#000000"
+            textColor="#1C1C1E"
+            outlineStyle={styles.inputOutline}
+            left={<TextInput.Icon icon="badge-account" color="#8E8E93" />}
             theme={{
               colors: {
-                onSurfaceVariant: Colors.textTertiary,
-                surface: Colors.inputBackground,
+                onSurfaceVariant: '#AEAEB2',
+                surface: '#F4F4F6',
               },
             }}
           />
@@ -90,43 +93,47 @@ export default function LoginScreen() {
             }}
             secureTextEntry={!showPassword}
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.text}
-            left={<TextInput.Icon icon="lock-outline" color={Colors.textSecondary} />}
+            outlineColor="#E5E7EB"
+            activeOutlineColor="#000000"
+            textColor="#1C1C1E"
+            outlineStyle={styles.inputOutline}
+            left={<TextInput.Icon icon="lock-outline" color="#8E8E93" />}
             right={
               <TextInput.Icon
                 icon={showPassword ? 'eye-off' : 'eye'}
-                color={Colors.textSecondary}
+                color="#8E8E93"
                 onPress={() => setShowPassword(!showPassword)}
               />
             }
             theme={{
               colors: {
-                onSurfaceVariant: Colors.textTertiary,
-                surface: Colors.inputBackground,
+                onSurfaceVariant: '#AEAEB2',
+                surface: '#F4F4F6',
               },
             }}
           />
 
-          <Button
-            mode="contained"
+          {/* Premium Black Pill Button */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.loginBtn,
+              pressed && styles.btnPressed,
+              isLoading && styles.btnDisabled,
+            ]}
             onPress={handleLogin}
-            loading={isLoading}
             disabled={isLoading}
-            style={styles.loginButton}
-            contentStyle={styles.loginButtonContent}
-            buttonColor={Colors.accent}
-            textColor={Colors.white}
-            labelStyle={styles.loginButtonLabel}
           >
-            Sign In
-          </Button>
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.loginBtnText}>Sign In</Text>
+            )}
+          </Pressable>
 
           <View style={styles.helpSection}>
-            <Text style={styles.helpIcon}>ℹ️</Text>
+            <Feather name="info" size={14} color="#AEAEB2" />
             <Text style={styles.helpText}>
-              Don't have an account? Contact your admin for access.
+              Don't have an account? Contact your admin.
             </Text>
           </View>
         </Animated.View>
@@ -141,8 +148,8 @@ export default function LoginScreen() {
         visible={!!snackError}
         onDismiss={() => setSnackError('')}
         duration={4000}
-       
-        action={{ label: 'OK', textColor: Colors.accent }}
+        style={styles.snackbar}
+        action={{ label: 'OK', textColor: '#000000' }}
       >
         {snackError}
       </Snackbar>
@@ -150,82 +157,112 @@ export default function LoginScreen() {
   );
 }
 
+// ============================================================================
+// Styles
+// ============================================================================
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#EDEDED', // Premium Fintech light grey
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 40,
+    width: '100%',
+    maxWidth: 400, // Compact widescreen layout
+    alignSelf: 'center',
   },
   brandSection: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 32,
   },
   logoContainer: {
-    width: 80,
-    height: 80,
+    width: 72,
+    height: 72,
     borderRadius: 22,
-    backgroundColor: Colors.accentSubtle,
+    backgroundColor: '#000000', // Solid black squircle logo
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  logoIcon: {
-    fontSize: 38,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   appName: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: Colors.text,
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 30,
+    color: '#000000',
     letterSpacing: 4,
   },
   tagline: {
-    fontSize: 14,
-    color: Colors.textSecondary,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    color: '#8E8E93',
     marginTop: 4,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   formSection: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
     padding: 24,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
     marginBottom: 20,
-    ...Colors.shadow,
+    elevation: 3,
   },
   welcomeText: {
+    fontFamily: 'Inter_800ExtraBold',
     fontSize: 22,
-    fontWeight: '700',
-    color: Colors.text,
+    color: '#1C1C1E',
+    letterSpacing: -0.5,
     marginBottom: 4,
   },
   welcomeSubtext: {
-    fontSize: 14,
-    color: Colors.textSecondary,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    color: '#8E8E93',
     marginBottom: 24,
   },
   input: {
     marginBottom: 16,
-    backgroundColor: Colors.inputBackground,
+    backgroundColor: '#F4F4F6', // System Gray 6
+    fontSize: 15,
   },
-  loginButton: {
+  inputOutline: {
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  loginBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+    borderRadius: 24,
+    width: '100%',
+    height: 48,
     marginTop: 8,
-    borderRadius: 12,
+    gap: 8,
   },
-  loginButtonContent: {
-    height: 52,
+  loginBtnText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 14,
+    color: '#FFFFFF',
   },
-  loginButtonLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+  btnPressed: {
+    transform: [{ scale: 0.97 }],
+    opacity: 0.9,
+  },
+  btnDisabled: {
+    backgroundColor: '#AEAEB2',
   },
   helpSection: {
     flexDirection: 'row',
@@ -234,20 +271,20 @@ const styles = StyleSheet.create({
     marginTop: 20,
     gap: 6,
   },
-  helpIcon: {
-    fontSize: 14,
-  },
   helpText: {
-    fontSize: 13,
-    color: Colors.textTertiary,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    color: '#AEAEB2',
     textAlign: 'center',
   },
   version: {
+    fontFamily: 'Inter_500Medium',
     textAlign: 'center',
-    fontSize: 12,
-    color: Colors.textTertiary,
+    fontSize: 11,
+    color: '#AEAEB2',
   },
   snackbar: {
-    backgroundColor: Colors.surfaceLight,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
   },
 });

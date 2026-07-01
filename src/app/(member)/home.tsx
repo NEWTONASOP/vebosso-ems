@@ -1,12 +1,11 @@
 // ============================================================================
-// VEBOSSO EMS — Member Home Screen
+// VEBOSSO EMS — Member Home Screen (Premium Fintech / Apple Wallet Aesthetic)
 // ============================================================================
 
 import { differenceInMinutes, format } from 'date-fns';
 import { useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Snackbar, Text } from 'react-native-paper';
-import Animated, { Easing, FadeInDown, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import { RefreshControl, ScrollView, StyleSheet, View, Platform, Pressable } from 'react-native';
+import { Snackbar, Text } from 'react-native-paper';
 import { CheckInModal } from '../../components/CheckInModal';
 import { CheckOutModal } from '../../components/CheckOutModal';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
@@ -14,6 +13,8 @@ import { TaskCard } from '../../components/TaskCard';
 import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
+import { Feather } from '@expo/vector-icons';
+import { TaskStatus } from '../../types/database';
 
 export default function MemberHomeScreen() {
   const { profile } = useAuthStore();
@@ -31,33 +32,7 @@ export default function MemberHomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [elapsed, setElapsed] = useState('');
 
-  // Pulse animation for pending status
-  const pulseScale = useSharedValue(1);
-  const pulseOpacity = useSharedValue(1);
-
   useEffect(() => {
-    if (todayLog?.status === 'pending_approval') {
-      pulseScale.value = withRepeat(
-        withTiming(1.05, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
-        -1, true
-      );
-      pulseOpacity.value = withRepeat(
-        withTiming(0.5, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
-        -1, true
-      );
-    } else {
-      pulseScale.value = 1;
-      pulseOpacity.value = 1;
-    }
-  }, [todayLog?.status]);
-
-  const pulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseScale.value }],
-    opacity: pulseOpacity.value,
-  }));
-
-  useEffect(() => {
-    // Guard against missing profile
     if (!profile?.id) {
       console.warn('Profile not loaded yet');
       return;
@@ -69,9 +44,9 @@ export default function MemberHomeScreen() {
     subscribeToRealtime(profile.id, 'member');
     
     return () => unsubscribeFromRealtime();
-  }, [profile?.id]); // Only trigger when profile.id changes
+  }, [profile?.id]);
 
-  // Elapsed time counter with proper cleanup
+  // Elapsed time counter
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     
@@ -80,20 +55,16 @@ export default function MemberHomeScreen() {
         const mins = differenceInMinutes(new Date(), new Date(todayLog.check_in_time!));
         const h = Math.floor(mins / 60);
         const m = mins % 60;
-        setElapsed(`${h}h ${m}m`);
+        setElapsed(`${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m`);
       };
       updateElapsed();
       interval = setInterval(updateElapsed, 60000);
     } else {
-      // Reset elapsed when not working
       setElapsed('');
     }
     
-    // Always cleanup interval on unmount or when dependencies change
     return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
+      if (interval) clearInterval(interval);
     };
   }, [todayLog?.status, todayLog?.check_in_time]);
 
@@ -135,52 +106,69 @@ export default function MemberHomeScreen() {
     }
   };
 
+  const handleStatusChange = async (taskId: string, status: TaskStatus) => {
+    try {
+      await updateTaskStatus(taskId, status);
+      setSnackMessage(status === 'done' ? 'Task completed! ✅' : 'Task updated');
+    } catch {
+      setSnackMessage('Failed to update task');
+    }
+  };
+
+  const formatLogTime = (timeStr: string | null | undefined) => {
+    if (!timeStr) return '--';
+    try {
+      return format(new Date(timeStr), 'hh:mm a');
+    } catch {
+      return '--';
+    }
+  };
+
   const renderStatusCard = () => {
     if (isLoadingToday) return <ListSkeleton count={1} />;
 
     // Not checked in
     if (!todayLog) {
       return (
-        <Animated.View entering={FadeInDown.duration(600)} style={styles.statusCard}>
+        <View style={styles.statusCard}>
           <Text style={styles.statusEmoji}>☀️</Text>
           <Text style={styles.statusTitle}>Good {new Date().getHours() < 12 ? 'morning' : 'afternoon'}!</Text>
           <Text style={styles.statusSubtitle}>Ready to start your work day?</Text>
-          <Button
-            mode="contained"
+          <Pressable
+            style={({ pressed }) => [
+              styles.startBtn,
+              pressed && styles.btnPressed
+            ]}
             onPress={() => setShowCheckIn(true)}
-            style={styles.startButton}
-            contentStyle={styles.startButtonContent}
-            buttonColor={Colors.accent}
-            textColor={Colors.white}
-            labelStyle={styles.startButtonLabel}
-            icon="play-circle"
           >
-            Start Day
-          </Button>
-        </Animated.View>
+            <Feather name="play" size={16} color="#FFFFFF" />
+            <Text style={styles.startBtnText}>Start Day</Text>
+          </Pressable>
+        </View>
       );
     }
 
     // Pending approval
     if (todayLog.status === 'pending_approval') {
       return (
-        <View style={[styles.statusCard, styles.pendingCard]}>
-          <Animated.View style={pulseStyle}>
-            <Text style={styles.statusEmoji}>⏳</Text>
-          </Animated.View>
-          <Text style={styles.statusTitle}>Waiting for Approval</Text>
-          <Text style={styles.statusSubtitle}>
-            Your check-in is being reviewed by your manager
-          </Text>
-          <View style={styles.pendingDots}>
-            <Animated.View style={[styles.dot, { backgroundColor: Colors.warning }, pulseStyle]} />
-            <Animated.View style={[styles.dot, { backgroundColor: Colors.warning }, pulseStyle]} />
-            <Animated.View style={[styles.dot, { backgroundColor: Colors.warning }, pulseStyle]} />
-          </View>
-          <View style={styles.pendingInfo}>
-            <Text style={styles.pendingInfoText}>
-              Checked in at {todayLog.check_in_time ? format(new Date(todayLog.check_in_time), 'hh:mm a') : '--'}
-            </Text>
+        <View style={styles.statusCard}>
+          <Text style={styles.statusEmoji}>⏳</Text>
+          <Text style={styles.heroLabel}>CHECK-IN REQUEST</Text>
+          <Text style={styles.heroValue}>Awaiting Approval</Text>
+          <Text style={styles.statusSubtitle}>Your check-in plan is being reviewed by your manager.</Text>
+          
+          <View style={styles.cardDetailsGroup}>
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Status</Text>
+              <View style={[rowStyles.badge, { backgroundColor: '#FEF7E0' }]}>
+                <Text style={[rowStyles.badgeText, { color: '#B06000' }]}>Pending</Text>
+              </View>
+            </View>
+            <View style={rowStyles.separator} />
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Check-in Sent</Text>
+              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
+            </View>
           </View>
         </View>
       );
@@ -189,42 +177,41 @@ export default function MemberHomeScreen() {
     // Working
     if (todayLog.status === 'working') {
       return (
-        <View style={[styles.statusCard, styles.workingCard]}>
-          <Text style={styles.statusEmoji}>💼</Text>
-          <Text style={styles.statusTitle}>You're Working!</Text>
-
-          <View style={styles.workingStats}>
-            <View style={styles.workingStat}>
-              <Text style={styles.workingStatLabel}>Started</Text>
-              <Text style={styles.workingStatValue}>
-                {todayLog.check_in_time ? format(new Date(todayLog.check_in_time), 'hh:mm a') : '--'}
-              </Text>
+        <View style={styles.statusCard}>
+          <Text style={styles.heroLabel}>ELAPSED TIME TODAY</Text>
+          <Text style={styles.heroValue}>{elapsed || '00h 00m'}</Text>
+          
+          <View style={styles.cardDetailsGroup}>
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Status</Text>
+              <View style={[rowStyles.badge, { backgroundColor: '#E8F0FE' }]}>
+                <Text style={[rowStyles.badgeText, { color: '#1A73E8' }]}>Working</Text>
+              </View>
             </View>
-            <View style={styles.workingDivider} />
-            <View style={styles.workingStat}>
-              <Text style={styles.workingStatLabel}>Elapsed</Text>
-              <Text style={styles.workingStatValue}>{elapsed}</Text>
+            <View style={rowStyles.separator} />
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Started At</Text>
+              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
             </View>
-            <View style={styles.workingDivider} />
-            <View style={styles.workingStat}>
-              <Text style={styles.workingStatLabel}>Tasks</Text>
-              <Text style={styles.workingStatValue}>
+            <View style={rowStyles.separator} />
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Tasks Completed</Text>
+              <Text style={rowStyles.value}>
                 {todayTasks.filter((t) => t.status === 'done').length}/{todayTasks.length}
               </Text>
             </View>
           </View>
 
-          <Button
-            mode="contained"
+          <Pressable
+            style={({ pressed }) => [
+              styles.endBtn,
+              pressed && styles.btnPressed
+            ]}
             onPress={() => setShowCheckOut(true)}
-            style={styles.endButton}
-            contentStyle={styles.endButtonContent}
-            buttonColor={Colors.error}
-            textColor={Colors.white}
-            icon="stop-circle"
           >
-            End Day
-          </Button>
+            <Feather name="square" size={16} color="#FF3B30" />
+            <Text style={styles.endBtnText}>End Day</Text>
+          </Pressable>
         </View>
       );
     }
@@ -232,41 +219,53 @@ export default function MemberHomeScreen() {
     // Rejected
     if (todayLog.status === 'rejected') {
       return (
-        <View style={[styles.statusCard, styles.rejectedCard]}>
+        <View style={styles.statusCard}>
           <Text style={styles.statusEmoji}>❌</Text>
-          <Text style={styles.statusTitle}>Check-in Rejected</Text>
+          <Text style={styles.heroLabel}>CHECK-IN REJECTED</Text>
+          <Text style={styles.heroValue}>Try Again</Text>
           {todayLog.rejection_reason && (
-            <Text style={styles.rejectionReason}>"{todayLog.rejection_reason}"</Text>
+            <Text style={styles.rejectionReason}>Reason: "{todayLog.rejection_reason}"</Text>
           )}
-          <Text style={styles.statusSubtitle}>Please try again with an updated plan</Text>
+          <Text style={styles.statusSubtitle}>Please update your plan and submit another check-in.</Text>
+          <Pressable
+            style={({ pressed }) => [
+              styles.startBtn,
+              pressed && styles.btnPressed
+            ]}
+            onPress={() => setShowCheckIn(true)}
+          >
+            <Feather name="refresh-cw" size={16} color="#FFFFFF" />
+            <Text style={styles.startBtnText}>Re-submit Check-in</Text>
+          </Pressable>
         </View>
       );
     }
 
     // Done
     if (todayLog.status === 'done') {
+      const formattedHours = todayLog.total_hours ? `${Math.floor(todayLog.total_hours)}h ${Math.round((todayLog.total_hours % 1) * 60)}m` : '--';
       return (
-        <View style={[styles.statusCard, styles.doneCard]}>
-          <Text style={styles.statusEmoji}>✅</Text>
-          <Text style={styles.statusTitle}>Day Complete!</Text>
-          <View style={styles.doneStats}>
-            <View style={styles.doneStat}>
-              <Text style={styles.doneStatLabel}>Check-in</Text>
-              <Text style={styles.doneStatValue}>
-                {todayLog.check_in_time ? format(new Date(todayLog.check_in_time), 'hh:mm a') : '--'}
-              </Text>
+        <View style={styles.statusCard}>
+          <Text style={styles.statusEmoji}>🎉</Text>
+          <Text style={styles.heroLabel}>TOTAL HOURS LOGGED</Text>
+          <Text style={styles.heroValue}>{formattedHours}</Text>
+          
+          <View style={styles.cardDetailsGroup}>
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Status</Text>
+              <View style={[rowStyles.badge, { backgroundColor: '#E6F4EA' }]}>
+                <Text style={[rowStyles.badgeText, { color: '#137333' }]}>Completed</Text>
+              </View>
             </View>
-            <View style={styles.doneStat}>
-              <Text style={styles.doneStatLabel}>Check-out</Text>
-              <Text style={styles.doneStatValue}>
-                {todayLog.check_out_time ? format(new Date(todayLog.check_out_time), 'hh:mm a') : '--'}
-              </Text>
+            <View style={rowStyles.separator} />
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Check-in</Text>
+              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
             </View>
-            <View style={styles.doneStat}>
-              <Text style={styles.doneStatLabel}>Hours</Text>
-              <Text style={[styles.doneStatValue, { color: Colors.success }]}>
-                {todayLog.total_hours ? `${todayLog.total_hours}h` : '--'}
-              </Text>
+            <View style={rowStyles.separator} />
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Check-out</Text>
+              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_out_time)}</Text>
             </View>
           </View>
         </View>
@@ -280,30 +279,36 @@ export default function MemberHomeScreen() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#000000" />}
+      showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
+      {/* Header Greeting */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>
-            Hello, {profile?.full_name?.split(' ')[0] || 'there'} 👋
-          </Text>
-          <Text style={styles.date}>{format(new Date(), 'EEEE, MMMM dd, yyyy')}</Text>
-        </View>
+        <Text style={styles.greeting}>
+          Hello, {profile?.full_name?.split(' ')[0] || 'there'} 👋
+        </Text>
+        <Text style={styles.date}>{format(new Date(), 'EEEE, MMMM dd')}</Text>
       </View>
 
-      {/* Status Card */}
+      {/* Primary Dashboard Card */}
       <View style={styles.content}>
         {renderStatusCard()}
       </View>
 
-      {/* Today's Tasks */}
+      {/* Today's Tasks in unified Grouped Card */}
       {todayTasks.length > 0 && (
-        <View style={styles.content}>
+        <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Today's Tasks</Text>
-          {todayTasks.map((task) => (
-            <TaskCard key={task.id} task={task} onStatusChange={updateTaskStatus} />
-          ))}
+          <View style={styles.groupedCard}>
+            {todayTasks.map((task, index) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onStatusChange={handleStatusChange}
+                isLast={index === todayTasks.length - 1}
+              />
+            ))}
+          </View>
         </View>
       )}
 
@@ -314,48 +319,204 @@ export default function MemberHomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  scrollContent: { paddingBottom: 20 },
-  header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 12 },
-  greeting: { fontSize: 28, fontFamily: 'Inter_800ExtraBold', color: Colors.text, letterSpacing: -0.5 },
-  date: { fontSize: 14, fontFamily: 'Inter_500Medium', color: Colors.textSecondary, marginTop: 4 },
-  content: { paddingHorizontal: 20 },
-  sectionTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: Colors.text, marginTop: 24, marginBottom: 12 },
-  statusCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    padding: 28,
+// ============================================================================
+// Styles
+// ============================================================================
+
+const rowStyles = StyleSheet.create({
+  rowContent: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginTop: 8,
-    ...Colors.shadowHeavy,
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    minHeight: 46,
   },
-  pendingCard: { borderColor: Colors.warningLight },
-  workingCard: { borderColor: Colors.successLight },
-  rejectedCard: { borderColor: Colors.errorLight },
-  doneCard: { borderColor: Colors.borderLight },
-  statusEmoji: { fontSize: 52, marginBottom: 16 },
-  statusTitle: { fontSize: 22, fontFamily: 'Inter_800ExtraBold', color: Colors.text },
-  statusSubtitle: { fontSize: 14, fontFamily: 'Inter_400Regular', color: Colors.textSecondary, marginTop: 8, textAlign: 'center', lineHeight: 20 },
-  startButton: { borderRadius: 16, marginTop: 24, width: '100%' },
-  startButtonContent: { height: 56 },
-  startButtonLabel: { fontSize: 16, fontFamily: 'Inter_700Bold' },
-  pendingDots: { flexDirection: 'row', gap: 8, marginTop: 16 },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  pendingInfo: { marginTop: 16, backgroundColor: Colors.warningLight, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
-  pendingInfoText: { fontSize: 13, color: Colors.warning, fontFamily: 'Inter_600SemiBold' },
-  workingStats: { flexDirection: 'row', marginTop: 24, marginBottom: 24, width: '100%', justifyContent: 'space-around' },
-  workingStat: { alignItems: 'center' },
-  workingStatLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', color: Colors.textSecondary },
-  workingStatValue: { fontSize: 20, fontFamily: 'Inter_800ExtraBold', color: Colors.text, marginTop: 6 },
-  workingDivider: { width: 1, height: 40, backgroundColor: Colors.divider },
-  endButton: { borderRadius: 16, width: '100%' },
-  endButtonContent: { height: 56 },
-  rejectionReason: { fontSize: 14, color: Colors.error, fontFamily: 'Inter_500Medium', fontStyle: 'italic', marginTop: 12, textAlign: 'center' },
-  doneStats: { flexDirection: 'row', marginTop: 20, width: '100%', justifyContent: 'space-around' },
-  doneStat: { alignItems: 'center' },
-  doneStatLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', color: Colors.textSecondary },
-  doneStatValue: { fontSize: 18, fontFamily: 'Inter_700Bold', color: Colors.text, marginTop: 6 },
+  label: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    color: '#8E8E93',
+  },
+  value: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    color: '#1C1C1E',
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  badgeText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    marginHorizontal: 16,
+  },
+});
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#EDEDED', // Premium Fintech light grey
+  },
+  scrollContent: {
+    paddingBottom: 110,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 36,
+    paddingBottom: 12,
+  },
+  greeting: {
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 28,
+    color: '#1C1C1E',
+    letterSpacing: -0.7,
+  },
+  date: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    color: '#8E8E93',
+    marginTop: 2,
+  },
+  content: {
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  statusCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    elevation: 3,
+  },
+  statusEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  statusTitle: {
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 22,
+    color: '#1C1C1E',
+    letterSpacing: -0.4,
+  },
+  statusSubtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: '#8E8E93',
+    marginTop: 6,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 8,
+  },
+  // Hero Values
+  heroLabel: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+    color: '#8E8E93',
+    letterSpacing: 1,
+  },
+  heroValue: {
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 38,
+    color: '#000000',
+    letterSpacing: -1,
+    marginVertical: 4,
+  },
+  cardDetailsGroup: {
+    width: '100%',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    marginTop: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.02)',
+  },
+  // Buttons
+  startBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000', // Solid Black Fintech style
+    borderRadius: 24,
+    width: '100%',
+    height: 48,
+    marginTop: 20,
+    gap: 8,
+  },
+  startBtnText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 14,
+    color: '#FFFFFF',
+  },
+  endBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 59, 48, 0.08)', // Soft red
+    borderRadius: 24,
+    width: '100%',
+    height: 48,
+    marginTop: 20,
+    gap: 8,
+  },
+  endBtnText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 14,
+    color: '#FF3B30',
+  },
+  btnPressed: {
+    transform: [{ scale: 0.97 }],
+    opacity: 0.9,
+  },
+  rejectionReason: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    color: '#FF3B30',
+    backgroundColor: 'rgba(255, 59, 48, 0.05)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  // Task sections
+  sectionContainer: {
+    marginTop: 24,
+    paddingHorizontal: 16,
+  },
+  sectionTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 13,
+    color: '#8E8E93',
+    marginBottom: 8,
+    marginLeft: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  groupedCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    elevation: 3,
+  },
 });

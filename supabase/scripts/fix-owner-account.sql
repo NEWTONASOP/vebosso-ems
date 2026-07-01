@@ -1,8 +1,13 @@
 -- ============================================================================
--- VEBOSSO EMS — Fix broken owner account (run once in Supabase SQL Editor)
+-- VEBOSSO EMS — Fix broken owner account (Fresh Reset)
 -- ============================================================================
--- Use this if owner login fails after an earlier seed run.
--- It removes the broken owner auth/profile rows and recreates them correctly.
+-- Run this in your Supabase SQL Editor.
+-- Deletes all old users and recreates the owner account.
+--
+-- Login credentials:
+--   Employee ID: VB-0001
+--   Email:       owner@vebosso.com
+--   Password:    VEBOSSO
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -10,27 +15,18 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 DO $$
 DECLARE
   owner_uid UUID := uuid_generate_v4();
-  owner_email TEXT := 'vb0001@vebosso.local';
-  owner_password TEXT := 'VebossoOwner@2024';
+  owner_email TEXT := 'owner@vebosso.com';
+  owner_password TEXT := 'VEBOSSO';
   encrypted_pw TEXT;
-  existing_uid UUID;
 BEGIN
-  SELECT id INTO existing_uid FROM public.profiles WHERE role = 'owner' LIMIT 1;
-
-  IF existing_uid IS NOT NULL THEN
-    DELETE FROM public.profiles WHERE id = existing_uid;
-    DELETE FROM auth.identities WHERE user_id = existing_uid;
-    DELETE FROM auth.users WHERE id = existing_uid;
-  END IF;
-
-  -- Also remove orphaned auth rows for the owner email
-  DELETE FROM auth.identities
-  WHERE user_id IN (SELECT id FROM auth.users WHERE email = owner_email);
-
-  DELETE FROM auth.users WHERE email = owner_email;
+  -- Delete all existing auth identities and users
+  -- Note: Cascades will automatically delete rows in public.profiles, work_logs, tasks, etc.
+  DELETE FROM auth.identities;
+  DELETE FROM auth.users;
 
   encrypted_pw := extensions.crypt(owner_password, extensions.gen_salt('bf'));
 
+  -- Create owner user in auth.users
   INSERT INTO auth.users (
     instance_id,
     id,
@@ -69,6 +65,7 @@ BEGIN
     ''
   );
 
+  -- Create identity mapping
   INSERT INTO auth.identities (
     id,
     user_id,
@@ -89,6 +86,7 @@ BEGIN
     NOW()
   );
 
+  -- Create profile row linked to the user
   INSERT INTO public.profiles (
     id,
     full_name,
@@ -107,5 +105,8 @@ BEGIN
     false
   );
 
-  RAISE NOTICE 'Owner account recreated. Employee ID: VB-0001, Password: VebossoOwner@2024';
+  RAISE NOTICE 'Owner account seeded successfully!';
+  RAISE NOTICE 'Employee ID: VB-0001';
+  RAISE NOTICE 'Email: owner@vebosso.com';
+  RAISE NOTICE 'Password: VEBOSSO';
 END $$;

@@ -1,12 +1,13 @@
 -- ============================================================================
--- VEBOSSO EMS — Seed Owner Account
+-- VEBOSSO EMS — Seed Owner Account (Fresh Reset)
 -- ============================================================================
--- Run this AFTER running the migrations.
--- Creates the initial owner account in Supabase Auth + profiles table.
+-- Run this in your Supabase SQL Editor.
+-- Deletes all old users and recreates the owner account.
 --
 -- Login credentials:
 --   Employee ID: VB-0001
---   Password:    VebossoOwner@2024
+--   Email:       owner@vebosso.com
+--   Password:    VEBOSSO
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -14,17 +15,18 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 DO $$
 DECLARE
   owner_uid UUID := uuid_generate_v4();
-  owner_email TEXT := 'vb0001@vebosso.local';
-  owner_password TEXT := 'VebossoOwner@2024';
+  owner_email TEXT := 'owner@vebosso.com';
+  owner_password TEXT := 'VEBOSSO';
   encrypted_pw TEXT;
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.profiles WHERE role = 'owner') THEN
-    RAISE NOTICE 'Owner account already exists. Skipping seed.';
-    RETURN;
-  END IF;
+  -- Delete all existing auth identities and users
+  -- Note: Cascades will automatically delete rows in public.profiles, work_logs, tasks, etc.
+  DELETE FROM auth.identities;
+  DELETE FROM auth.users;
 
   encrypted_pw := extensions.crypt(owner_password, extensions.gen_salt('bf'));
 
+  -- Create owner user in auth.users
   INSERT INTO auth.users (
     instance_id,
     id,
@@ -63,6 +65,7 @@ BEGIN
     ''
   );
 
+  -- Create identity mapping
   INSERT INTO auth.identities (
     id,
     user_id,
@@ -83,6 +86,7 @@ BEGIN
     NOW()
   );
 
+  -- Create profile row linked to the user
   INSERT INTO public.profiles (
     id,
     full_name,
@@ -101,7 +105,8 @@ BEGIN
     false
   );
 
-  RAISE NOTICE 'Owner account created successfully!';
+  RAISE NOTICE 'Owner account seeded successfully!';
   RAISE NOTICE 'Employee ID: VB-0001';
-  RAISE NOTICE 'Password: VebossoOwner@2024';
+  RAISE NOTICE 'Email: owner@vebosso.com';
+  RAISE NOTICE 'Password: VEBOSSO';
 END $$;

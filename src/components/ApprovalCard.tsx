@@ -1,14 +1,15 @@
 // ============================================================================
-// VEBOSSO EMS — Approval Card Component
+// VEBOSSO EMS — Approval Card Component (Premium Fintech Aesthetic)
 // ============================================================================
 
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Button, Avatar, Chip } from 'react-native-paper';
+import { View, StyleSheet, Pressable } from 'react-native';
+import { Text } from 'react-native-paper';
 import { format } from 'date-fns';
 import { Colors } from '../constants/colors';
 import { WorkLogWithProfile } from '../types/database';
 import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
+import { Feather } from '@expo/vector-icons';
 
 interface ApprovalCardProps {
   workLog: WorkLogWithProfile;
@@ -19,31 +20,32 @@ interface ApprovalCardProps {
 export function ApprovalCard({ workLog, onApprove, onReject }: ApprovalCardProps) {
   const profile = workLog.profiles;
   const statusConfig = WORK_LOG_STATUS_CONFIG[workLog.status];
+  
   const checkInTime = workLog.check_in_time
     ? format(new Date(workLog.check_in_time), 'hh:mm a')
     : '--';
 
   return (
     <View style={styles.card}>
+      {/* Header Info */}
       <View style={styles.header}>
-        <Avatar.Text
-          size={44}
-          label={profile.full_name.substring(0, 2).toUpperCase()}
-          style={styles.avatar}
-          labelStyle={styles.avatarLabel}
-        />
+        <View style={styles.avatar}>
+          <Text style={styles.avatarLabel}>
+            {profile.full_name.substring(0, 2).toUpperCase()}
+          </Text>
+        </View>
         <View style={styles.headerInfo}>
           <Text style={styles.name}>{profile.full_name}</Text>
           <Text style={styles.employeeId}>{profile.employee_id}</Text>
         </View>
-        <Chip
-          style={[styles.statusChip, { backgroundColor: statusConfig.backgroundColor }]}
-          textStyle={[styles.statusText, { color: statusConfig.color }]}
-        >
-          {statusConfig.label}
-        </Chip>
+        <View style={[styles.statusBadge, { backgroundColor: statusConfig.backgroundColor }]}>
+          <Text style={[styles.statusBadgeText, { color: statusConfig.color }]}>
+            {statusConfig.label}
+          </Text>
+        </View>
       </View>
 
+      {/* Time & Designation Fields */}
       <View style={styles.timeRow}>
         <View style={styles.timeItem}>
           <Text style={styles.timeLabel}>Check-in Time</Text>
@@ -57,40 +59,49 @@ export function ApprovalCard({ workLog, onApprove, onReject }: ApprovalCardProps
         )}
       </View>
 
+      {/* Check-in Plan details */}
       {workLog.check_in_plan && (
         <View style={styles.planSection}>
-          <Text style={styles.planLabel}>📋 Plan for Today</Text>
+          <Text style={styles.planLabel}>
+            <Feather name="clipboard" size={14} color="#8E8E93" /> Plan for Today
+          </Text>
           <Text style={styles.planText}>{workLog.check_in_plan}</Text>
         </View>
       )}
 
+      {/* Actions (Approve/Reject) */}
       {workLog.status === 'pending_approval' && (
         <View style={styles.actions}>
-          <Button
-            mode="outlined"
+          <Pressable
+            style={({ pressed }) => [
+              styles.rejectBtn,
+              pressed && styles.btnPressed
+            ]}
             onPress={() => onReject(workLog.id)}
-            style={styles.rejectButton}
-            textColor={Colors.error}
-            icon="close"
           >
-            Reject
-          </Button>
-          <Button
-            mode="contained"
+            <Feather name="x" size={14} color="#FF3B30" />
+            <Text style={styles.rejectBtnText}>Reject</Text>
+          </Pressable>
+          
+          <Pressable
+            style={({ pressed }) => [
+              styles.approveBtn,
+              pressed && styles.btnPressed
+            ]}
             onPress={() => onApprove(workLog.id)}
-            style={styles.approveButton}
-            buttonColor={Colors.success}
-            textColor={Colors.white}
-            icon="check"
           >
-            Approve
-          </Button>
+            <Feather name="check" size={14} color="#FFFFFF" />
+            <Text style={styles.approveBtnText}>Approve</Text>
+          </Pressable>
         </View>
       )}
 
+      {/* Checkout Day Report */}
       {workLog.status === 'pending_checkout' && workLog.day_report && (
         <View style={styles.planSection}>
-          <Text style={styles.planLabel}>📝 Day Report</Text>
+          <Text style={styles.planLabel}>
+            <Feather name="file-text" size={14} color="#8E8E93" /> Day Report
+          </Text>
           <Text style={styles.planText}>{workLog.day_report}</Text>
         </View>
       )}
@@ -98,103 +109,145 @@ export function ApprovalCard({ workLog, onApprove, onReject }: ApprovalCardProps
   );
 }
 
+// ============================================================================
+// Styles
+// ============================================================================
+
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
     padding: 20,
-    marginBottom: 16,
+    marginBottom: 14,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    elevation: 3,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   avatar: {
-    backgroundColor: Colors.accentSubtle,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#8B5CF6' + '15',
+    borderWidth: 1,
+    borderColor: '#8B5CF6' + '30',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarLabel: {
-    color: Colors.accent,
+    fontFamily: 'Inter_800ExtraBold',
+    color: '#8B5CF6',
     fontSize: 16,
-    fontFamily: 'Inter_700Bold',
   },
   headerInfo: {
     flex: 1,
-    marginLeft: 14,
+    marginLeft: 12,
   },
   name: {
-    fontSize: 17,
     fontFamily: 'Inter_700Bold',
-    color: Colors.text,
+    fontSize: 16,
+    color: '#1C1C1E',
+    letterSpacing: -0.2,
   },
   employeeId: {
-    fontSize: 13,
     fontFamily: 'Inter_500Medium',
-    color: Colors.textSecondary,
+    fontSize: 12,
+    color: '#8E8E93',
     marginTop: 2,
   },
-  statusChip: {
-    height: 28,
-    borderRadius: 8,
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
-  statusText: {
-    fontSize: 11,
+  statusBadgeText: {
     fontFamily: 'Inter_700Bold',
+    fontSize: 10,
   },
   timeRow: {
     flexDirection: 'row',
     marginTop: 16,
-    gap: 16,
+    gap: 12,
   },
   timeItem: {
     flex: 1,
-    backgroundColor: Colors.surfaceLight,
+    backgroundColor: '#F4F4F6', // System Gray 6
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 14,
   },
   timeLabel: {
-    fontSize: 12,
     fontFamily: 'Inter_500Medium',
-    color: Colors.textTertiary,
+    fontSize: 11,
+    color: '#8E8E93',
     marginBottom: 4,
   },
   timeValue: {
-    fontSize: 15,
-    color: Colors.text,
     fontFamily: 'Inter_700Bold',
+    fontSize: 14,
+    color: '#1C1C1E',
   },
   planSection: {
-    marginTop: 16,
-    backgroundColor: Colors.primaryLight,
-    borderRadius: 12,
-    padding: 16,
+    marginTop: 14,
+    backgroundColor: 'rgba(0, 122, 255, 0.04)', // Tinted soft blue
+    borderRadius: 14,
+    padding: 14,
   },
   planLabel: {
-    fontSize: 13,
-    color: Colors.textSecondary,
     fontFamily: 'Inter_600SemiBold',
-    marginBottom: 8,
+    fontSize: 12,
+    color: '#007AFF',
+    marginBottom: 6,
   },
   planText: {
-    fontSize: 14,
-    color: Colors.text,
     fontFamily: 'Inter_400Regular',
-    lineHeight: 22,
+    fontSize: 13,
+    color: '#3A3A3C',
+    lineHeight: 18,
   },
   actions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     marginTop: 16,
   },
-  rejectButton: {
+  rejectBtn: {
     flex: 1,
-    borderColor: Colors.error,
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 59, 48, 0.08)', // Soft red
+    borderRadius: 20,
+    height: 40,
+    gap: 6,
   },
-  approveButton: {
+  rejectBtnText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 13,
+    color: '#FF3B30',
+  },
+  approveBtn: {
     flex: 1,
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000', // Solid black
+    borderRadius: 20,
+    height: 40,
+    gap: 6,
+  },
+  approveBtnText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 13,
+    color: '#FFFFFF',
+  },
+  btnPressed: {
+    transform: [{ scale: 0.97 }],
+    opacity: 0.9,
   },
 });

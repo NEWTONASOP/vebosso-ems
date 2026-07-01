@@ -1,14 +1,16 @@
 // ============================================================================
-// VEBOSSO EMS — Owner Settings Screen (Tab)
+// VEBOSSO EMS — Owner Settings Screen (Premium Fintech Aesthetic)
 // ============================================================================
 
 import { useRouter } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Divider, Switch, Text } from 'react-native-paper';
+import { ScrollView, StyleSheet, TouchableOpacity, View, Platform, Pressable } from 'react-native';
+import { Alert } from '../../../lib/alert';
+import { Switch, Text } from 'react-native-paper';
 import { Colors } from '../../../constants/colors';
 import { APP_NAME } from '../../../constants/roles';
 import { useAuthStore } from '../../../store/authStore';
 import { useWorkStore } from '../../../store/workStore';
+import { Feather } from '@expo/vector-icons';
 
 export default function OwnerSettingsScreen() {
   const router = useRouter();
@@ -43,53 +45,63 @@ export default function OwnerSettingsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
       </View>
 
-      {/* Profile Section */}
+      {/* Profile Card (Apple ID Style) */}
       <View style={styles.profileCard}>
         <View style={styles.profileAvatar}>
           <Text style={styles.avatarText}>
             {profile?.full_name?.substring(0, 2).toUpperCase()}
           </Text>
         </View>
-        <View>
+        <View style={styles.profileInfo}>
           <Text style={styles.profileName}>{profile?.full_name}</Text>
-          <Text style={styles.profileRole}>Owner • {profile?.employee_id}</Text>
+          <View style={styles.roleBadge}>
+            <View style={styles.roleDot} />
+            <Text style={styles.profileRole}>Owner • {profile?.employee_id}</Text>
+          </View>
         </View>
       </View>
 
-      {/* Team Management */}
+      {/* Team Management Group */}
       <Text style={styles.sectionLabel}>Team Management</Text>
-      <View style={styles.section}>
+      <View style={styles.groupedCard}>
         <SettingsRow
-          emoji="➕"
+          icon="user-plus"
+          iconColor="#007AFF"
           title="Add New Member"
           subtitle="Create employee accounts"
           onPress={() => router.push('/(owner)/settings/add-member')}
         />
-        <Divider style={styles.divider} />
+        <View style={styles.separator} />
         <SettingsRow
-          emoji="📢"
+          icon="bell"
+          iconColor="#FF9500"
           title="Announcements"
           subtitle="Send announcements to team"
           onPress={() => router.push('/(owner)/settings/announcements')}
         />
-        <Divider style={styles.divider} />
+        <View style={styles.separator} />
         <SettingsRow
-          emoji="📱"
+          icon="cpu"
+          iconColor="#5856D6"
           title="Session Management"
           subtitle="View and manage active sessions"
           onPress={() => router.push('/(owner)/settings/session-management')}
+          isLast
         />
       </View>
 
-      {/* App Settings */}
+      {/* App Settings Group */}
       <Text style={styles.sectionLabel}>App Settings</Text>
-      <View style={styles.section}>
-        <View style={styles.settingToggle}>
+      <View style={styles.groupedCard}>
+        <View style={styles.toggleRow}>
+          <View style={[styles.iconContainer, { backgroundColor: 'rgba(142, 142, 147, 0.12)' }]}>
+            <Feather name="check-square" size={18} color="#8E8E93" />
+          </View>
           <View style={styles.settingInfo}>
             <Text style={styles.settingTitle}>Require Checkout Approval</Text>
             <Text style={styles.settingSubtitle}>
@@ -99,32 +111,41 @@ export default function OwnerSettingsScreen() {
           <Switch
             value={requireCheckoutApproval}
             onValueChange={handleToggleCheckout}
-            color={Colors.accent}
+            color="#000000" // Custom black switch to match fintech design
           />
         </View>
-
       </View>
 
-      {/* Account */}
+      {/* Account Actions Group */}
       <Text style={styles.sectionLabel}>Account</Text>
-      <View style={styles.section}>
+      <View style={styles.groupedCard}>
         <SettingsRow
-          emoji="🔑"
+          icon="lock"
+          iconColor="#FFCC00"
           title="Change Password"
           subtitle="Update your password"
           onPress={() => router.push('/(auth)/change-password')}
         />
-        <Divider style={styles.divider} />
-        <TouchableOpacity style={styles.settingRow} onPress={handleSignOut}>
-          <Text style={styles.settingEmoji}>🚪</Text>
+        <View style={styles.separator} />
+        <Pressable
+          style={({ pressed }) => [
+            styles.settingRow,
+            pressed && styles.rowPressed
+          ]}
+          onPress={handleSignOut}
+        >
+          <View style={[styles.iconContainer, { backgroundColor: 'rgba(255, 59, 48, 0.12)' }]}>
+            <Feather name="log-out" size={18} color="#FF3B30" />
+          </View>
           <View style={styles.settingInfo}>
-            <Text style={[styles.settingTitle, { color: Colors.error }]}>Sign Out</Text>
+            <Text style={[styles.settingTitle, { color: '#FF3B30' }]}>Sign Out</Text>
             <Text style={styles.settingSubtitle}>Log out of your account</Text>
           </View>
-        </TouchableOpacity>
+          <Feather name="chevron-right" size={16} color="#C7C7CC" />
+        </Pressable>
       </View>
 
-      {/* App Info */}
+      {/* App Info Footer */}
       <View style={styles.appInfo}>
         <Text style={styles.appName}>{APP_NAME} EMS</Text>
         <Text style={styles.appVersion}>Version 1.0.0</Text>
@@ -133,96 +154,205 @@ export default function OwnerSettingsScreen() {
   );
 }
 
-function SettingsRow({
-  emoji,
-  title,
-  subtitle,
-  onPress,
-}: {
-  emoji: string;
+// ============================================================================
+// Row Component
+// ============================================================================
+
+interface SettingsRowProps {
+  icon: string;
+  iconColor: string;
   title: string;
   subtitle: string;
   onPress: () => void;
-}) {
+  isLast?: boolean;
+}
+
+function SettingsRow({ icon, iconColor, title, subtitle, onPress }: SettingsRowProps) {
   return (
-    <TouchableOpacity style={styles.settingRow} onPress={onPress} activeOpacity={0.6}>
-      <Text style={styles.settingEmoji}>{emoji}</Text>
+    <Pressable
+      style={({ pressed }) => [
+        styles.settingRow,
+        pressed && styles.rowPressed
+      ]}
+      onPress={onPress}
+    >
+      <View style={[styles.iconContainer, { backgroundColor: iconColor + '12' }]}>
+        <Feather name={icon as any} size={18} color={iconColor} />
+      </View>
       <View style={styles.settingInfo}>
         <Text style={styles.settingTitle}>{title}</Text>
         <Text style={styles.settingSubtitle}>{subtitle}</Text>
       </View>
-      <Text style={styles.chevron}>›</Text>
-    </TouchableOpacity>
+      <Feather name="chevron-right" size={16} color="#C7C7CC" />
+    </Pressable>
   );
 }
 
+// ============================================================================
+// Styles
+// ============================================================================
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  scrollContent: { paddingBottom: 40 },
-  header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 8 },
-  title: { fontSize: 26, fontWeight: '800', color: Colors.text },
+  container: {
+    flex: 1,
+    backgroundColor: '#EDEDED', // Premium Fintech light grey
+  },
+  scrollContent: {
+    paddingBottom: 110, // Increased bottom padding to clear tab bar
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 36,
+    paddingBottom: 8,
+  },
+  title: {
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 28,
+    color: '#1C1C1E',
+    letterSpacing: -0.7,
+  },
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    marginHorizontal: 20,
-    marginTop: 16,
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 14,
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 14,
-    ...Colors.shadow,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    gap: 16,
+    elevation: 3,
   },
   profileAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: Colors.accentSubtle,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#8B5CF6' + '15', // Violet role tint
+    borderWidth: 1,
+    borderColor: '#8B5CF6' + '30',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { color: Colors.accent, fontSize: 18, fontWeight: '700' },
-  profileName: { fontSize: 18, fontWeight: '700', color: Colors.text },
-  profileRole: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  avatarText: {
+    fontFamily: 'Inter_800ExtraBold',
+    color: '#8B5CF6',
+    fontSize: 20,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 18,
+    color: '#1C1C1E',
+    letterSpacing: -0.2,
+  },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  roleDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#8B5CF6',
+    marginRight: 6,
+  },
+  profileRole: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    color: '#8E8E93',
+  },
   sectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textTertiary,
-    paddingHorizontal: 20,
-    marginTop: 24,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+    color: '#8E8E93',
+    paddingHorizontal: 28,
+    marginTop: 26,
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  section: {
-    backgroundColor: Colors.surface,
-    marginHorizontal: 20,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  groupedCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    borderRadius: 24,
     overflow: 'hidden',
-    ...Colors.shadow,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    elevation: 3,
   },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
-    gap: 12,
+    minHeight: 52,
+    backgroundColor: '#FFFFFF',
   },
-  settingEmoji: { fontSize: 22, width: 32, textAlign: 'center' },
-  settingInfo: { flex: 1 },
-  settingTitle: { fontSize: 15, fontWeight: '600', color: Colors.text },
-  settingSubtitle: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
-  chevron: { fontSize: 22, color: Colors.textTertiary },
-  settingToggle: {
+  rowPressed: {
+    backgroundColor: '#F2F2F7',
+  },
+  iconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8, // iOS Squircle style
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  settingInfo: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  settingTitle: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: '#1C1C1E',
+  },
+  settingSubtitle: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 11,
+    color: '#8E8E93',
+    marginTop: 2,
+  },
+  toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
-    gap: 12,
+    minHeight: 52,
+    backgroundColor: '#FFFFFF',
   },
-  divider: { backgroundColor: Colors.divider },
-  appInfo: { alignItems: 'center', paddingVertical: 24 },
-  appName: { fontSize: 14, fontWeight: '700', color: Colors.textTertiary },
-  appVersion: { fontSize: 12, color: Colors.textTertiary, marginTop: 2 },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    marginLeft: 62, // Padding left (14) + Icon width (32) + Icon margin (16)
+  },
+  appInfo: {
+    alignItems: 'center',
+    paddingVertical: 36,
+  },
+  appName: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+    color: '#AEAEB2',
+  },
+  appVersion: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 10,
+    color: '#C7C7CC',
+    marginTop: 2,
+  },
 });

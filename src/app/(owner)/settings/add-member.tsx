@@ -1,10 +1,10 @@
 // ============================================================================
-// VEBOSSO EMS — Add Member Screen
+// VEBOSSO EMS — Add Member Screen (Premium Fintech Aesthetic)
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { TextInput, Button, Text, SegmentedButtons, Snackbar, IconButton } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Platform, Pressable, ActivityIndicator } from 'react-native';
+import { TextInput, Text, Snackbar } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../../lib/supabase';
@@ -12,7 +12,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { useWorkStore } from '../../../store/workStore';
 import { Colors } from '../../../constants/colors';
 import { EMPLOYEE_ID_PREFIX } from '../../../constants/roles';
-import { Profile } from '../../../types/database';
+import { Feather } from '@expo/vector-icons';
 
 export default function AddMemberScreen() {
   const router = useRouter();
@@ -113,9 +113,9 @@ export default function AddMemberScreen() {
   if (createdCredentials) {
     return (
       <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.successContent}>
+        <ScrollView contentContainerStyle={styles.successContent} showsVerticalScrollIndicator={false}>
           <View style={styles.successCard}>
-            <Text style={styles.successEmoji}>✅</Text>
+            <Text style={styles.successEmoji}>🎉</Text>
             <Text style={styles.successTitle}>Member Created!</Text>
             <Text style={styles.successSubtitle}>
               Share these credentials with the new member
@@ -126,25 +126,29 @@ export default function AddMemberScreen() {
                 <Text style={styles.credLabel}>Employee ID</Text>
                 <Text style={styles.credValue}>{createdCredentials.employeeId}</Text>
               </View>
+              <View style={styles.credRowDivider} />
               <View style={styles.credRow}>
-                <Text style={styles.credLabel}>Password</Text>
+                <Text style={styles.credLabel}>Temporary Password</Text>
                 <Text style={styles.credValue}>{createdCredentials.password}</Text>
               </View>
             </View>
 
-            <Button
-              mode="contained"
+            <Pressable
+              style={({ pressed }) => [
+                styles.copyBtn,
+                pressed && styles.btnPressed
+              ]}
               onPress={handleCopyCredentials}
-              style={styles.copyButton}
-              buttonColor={Colors.accent}
-              textColor={Colors.white}
-              icon="content-copy"
             >
-              Copy Credentials
-            </Button>
+              <Feather name="copy" size={14} color="#FFFFFF" />
+              <Text style={styles.copyBtnText}>Copy Credentials</Text>
+            </Pressable>
 
-            <Button
-              mode="outlined"
+            <Pressable
+              style={({ pressed }) => [
+                styles.addAnotherBtn,
+                pressed && styles.btnPressed
+              ]}
               onPress={() => {
                 setCreatedCredentials(null);
                 setFullName('');
@@ -154,42 +158,45 @@ export default function AddMemberScreen() {
                 const nextNum = (teamMembers.length + 3).toString().padStart(4, '0');
                 setEmployeeId(`${EMPLOYEE_ID_PREFIX}-${nextNum}`);
               }}
-              style={styles.addAnotherButton}
-              textColor={Colors.textSecondary}
             >
-              Add Another Member
-            </Button>
+              <Text style={styles.addAnotherBtnText}>Add Another Member</Text>
+            </Pressable>
 
-            <Button
-              mode="text"
+            <Pressable
+              style={({ pressed }) => [
+                styles.backTextBtn,
+                pressed && { opacity: 0.7 }
+              ]}
               onPress={() => router.back()}
-              textColor={Colors.textTertiary}
             >
-              Back to Settings
-            </Button>
+              <Text style={styles.backText}>Back to Settings</Text>
+            </Pressable>
           </View>
         </ScrollView>
 
-        <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>
-          {snackMessage}
-        </Snackbar>
+        <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>{snackMessage}</Snackbar>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {/* Header with circular back chevron */}
         <View style={styles.header}>
-          <IconButton
-            icon="arrow-left"
-            iconColor={Colors.text}
-            size={24}
+          <Pressable
+            style={({ pressed }) => [
+              styles.backBtn,
+              pressed && styles.btnPressed
+            ]}
             onPress={() => router.back()}
-          />
-          <Text style={styles.title}>Add New Member</Text>
+          >
+            <Feather name="arrow-left" size={18} color="#1C1C1E" />
+          </Pressable>
+          <Text style={styles.title}>Add Member</Text>
         </View>
 
+        {/* Form Card */}
         <View style={styles.formSection}>
           <TextInput
             mode="outlined"
@@ -197,54 +204,64 @@ export default function AddMemberScreen() {
             value={fullName}
             onChangeText={setFullName}
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.text}
-            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.inputBackground } }}
+            outlineColor="#E5E7EB"
+            activeOutlineColor="#000000"
+            textColor="#1C1C1E"
+            outlineStyle={styles.inputOutline}
+            theme={{ colors: { onSurfaceVariant: '#AEAEB2', surface: '#F4F4F6' } }}
           />
 
           <TextInput
             mode="outlined"
-            label="Designation"
+            label="Designation (e.g. Designer)"
             value={department}
             onChangeText={setDepartment}
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.text}
-            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.inputBackground } }}
+            outlineColor="#E5E7EB"
+            activeOutlineColor="#000000"
+            textColor="#1C1C1E"
+            outlineStyle={styles.inputOutline}
+            theme={{ colors: { onSurfaceVariant: '#AEAEB2', surface: '#F4F4F6' } }}
           />
 
+          {/* Role Segment Selector */}
           <Text style={styles.fieldLabel}>Role</Text>
-          <SegmentedButtons
-            value={role}
-            onValueChange={(v) => setRole(v as 'manager' | 'member')}
-            buttons={[
-              { value: 'member', label: 'Member', style: styles.segmentButton },
-              { value: 'manager', label: 'Manager', style: styles.segmentButton },
-            ]}
-            style={styles.segmented}
-          />
+          <View style={styles.segmentedContainer}>
+            <Pressable
+              style={[styles.segmentBtn, role === 'member' && styles.segmentBtnActive]}
+              onPress={() => setRole('member')}
+            >
+              <Text style={[styles.segmentText, role === 'member' && styles.segmentTextActive]}>Member</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.segmentBtn, role === 'manager' && styles.segmentBtnActive]}
+              onPress={() => setRole('manager')}
+            >
+              <Text style={[styles.segmentText, role === 'manager' && styles.segmentTextActive]}>Manager</Text>
+            </Pressable>
+          </View>
 
+          {/* Manager chips */}
           {role === 'member' && managers.length > 0 && (
-            <>
+            <View style={styles.managerSection}>
               <Text style={styles.fieldLabel}>Assign Manager (Optional)</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.managerList}>
-                {managers.map((mgr) => (
-                  <Button
-                    key={mgr.id}
-                    mode={managerId === mgr.id ? 'contained' : 'outlined'}
-                    onPress={() => setManagerId(managerId === mgr.id ? '' : mgr.id)}
-                    style={styles.managerChip}
-                    compact
-                    buttonColor={managerId === mgr.id ? Colors.accent : undefined}
-                    textColor={managerId === mgr.id ? Colors.white : Colors.textSecondary}
-                  >
-                    {mgr.full_name}
-                  </Button>
-                ))}
+                {managers.map((mgr) => {
+                  const isSelected = managerId === mgr.id;
+                  return (
+                    <Pressable
+                      key={mgr.id}
+                      style={[styles.managerChip, isSelected && styles.managerChipActive]}
+                      onPress={() => setManagerId(isSelected ? '' : mgr.id)}
+                    >
+                      <Text style={[styles.managerChipText, isSelected && styles.managerChipTextActive]}>
+                        {mgr.full_name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
-            </>
+            </View>
           )}
 
           <TextInput
@@ -253,10 +270,11 @@ export default function AddMemberScreen() {
             value={employeeId}
             onChangeText={setEmployeeId}
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.text}
-            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.inputBackground } }}
+            outlineColor="#E5E7EB"
+            activeOutlineColor="#000000"
+            textColor="#1C1C1E"
+            outlineStyle={styles.inputOutline}
+            theme={{ colors: { onSurfaceVariant: '#AEAEB2', surface: '#F4F4F6' } }}
           />
 
           <TextInput
@@ -265,93 +283,313 @@ export default function AddMemberScreen() {
             value={password}
             onChangeText={setPassword}
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.text}
-            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.inputBackground } }}
+            outlineColor="#E5E7EB"
+            activeOutlineColor="#000000"
+            textColor="#1C1C1E"
+            outlineStyle={styles.inputOutline}
+            theme={{ colors: { onSurfaceVariant: '#AEAEB2', surface: '#F4F4F6' } }}
           />
 
-          <Button
-            mode="contained"
+          {/* Action button */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.createBtn,
+              pressed && styles.btnPressed,
+              isLoading && styles.btnDisabled
+            ]}
             onPress={handleCreate}
-            loading={isLoading}
             disabled={isLoading}
-            style={styles.createButton}
-            contentStyle={styles.createButtonContent}
-            buttonColor={Colors.accent}
-            textColor={Colors.white}
-            icon="account-plus"
           >
-            Create Member
-          </Button>
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <>
+                <Feather name="user-plus" size={16} color="#FFFFFF" />
+                <Text style={styles.createBtnText}>Create Member</Text>
+              </>
+            )}
+          </Pressable>
         </View>
       </ScrollView>
 
-      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>
-        {snackMessage}
-      </Snackbar>
+      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>{snackMessage}</Snackbar>
     </View>
   );
 }
 
+// ============================================================================
+// Styles
+// ============================================================================
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  scrollContent: { paddingBottom: 40 },
+  container: {
+    flex: 1,
+    backgroundColor: '#EDEDED', // Premium Fintech light grey
+  },
+  scrollContent: {
+    paddingBottom: 40,
+    width: '100%',
+    maxWidth: 500,
+    alignSelf: 'center',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 50,
-    paddingHorizontal: 8,
-    gap: 4,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 36,
+    paddingBottom: 12,
+    gap: 12,
   },
-  title: { fontSize: 22, fontWeight: '700', color: Colors.text },
-  formSection: {
-    backgroundColor: Colors.surface,
-    margin: 20,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
-  },
-  input: { marginBottom: 14, backgroundColor: Colors.inputBackground },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  segmented: { marginBottom: 14 },
-  segmentButton: { borderColor: Colors.border },
-  managerList: { marginBottom: 14 },
-  managerChip: { marginRight: 8, borderColor: Colors.border, borderRadius: 8 },
-  createButton: { borderRadius: 12, marginTop: 8 },
-  createButtonContent: { height: 50 },
-  successContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24 },
-  successCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    padding: 28,
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  successEmoji: { fontSize: 56, marginBottom: 12 },
-  successTitle: { fontSize: 24, fontWeight: '800', color: Colors.text },
-  successSubtitle: { fontSize: 14, color: Colors.textSecondary, marginTop: 4, marginBottom: 20 },
+  title: {
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 24,
+    color: '#1C1C1E',
+    letterSpacing: -0.5,
+  },
+  formSection: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    elevation: 3,
+    marginTop: 14,
+  },
+  input: {
+    marginBottom: 14,
+    backgroundColor: '#F4F4F6', // System Gray 6
+    fontSize: 15,
+  },
+  inputOutline: {
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  fieldLabel: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+    color: '#8E8E93',
+    marginBottom: 8,
+    marginLeft: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  // Custom segment control
+  segmentedContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F4F4F6',
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 16,
+    gap: 4,
+  },
+  segmentBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  segmentBtnActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segmentText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: '#8E8E93',
+  },
+  segmentTextActive: {
+    color: '#000000',
+  },
+  // Manager section
+  managerSection: {
+    marginBottom: 16,
+  },
+  managerList: {
+    flexDirection: 'row',
+    paddingVertical: 2,
+  },
+  managerChip: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    marginRight: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  managerChipActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  managerChipText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+    color: '#8E8E93',
+  },
+  managerChipTextActive: {
+    color: '#FFFFFF',
+  },
+  createBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000', // Solid Black pill
+    borderRadius: 24,
+    width: '100%',
+    height: 48,
+    marginTop: 8,
+    gap: 8,
+  },
+  createBtnText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 14,
+    color: '#FFFFFF',
+  },
+  btnPressed: {
+    transform: [{ scale: 0.97 }],
+    opacity: 0.9,
+  },
+  btnDisabled: {
+    backgroundColor: '#AEAEB2',
+  },
+  // Success content styles
+  successContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+  },
+  successCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    elevation: 3,
+  },
+  successEmoji: {
+    fontSize: 56,
+    marginBottom: 12,
+  },
+  successTitle: {
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 22,
+    color: '#1C1C1E',
+    letterSpacing: -0.5,
+  },
+  successSubtitle: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    color: '#8E8E93',
+    marginTop: 4,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
   credentialBox: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: 12,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
     padding: 16,
     width: '100%',
-    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.02)',
     marginBottom: 20,
   },
-  credRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  credLabel: { fontSize: 13, color: Colors.textSecondary },
-  credValue: { fontSize: 16, fontWeight: '700', color: Colors.accent },
-  copyButton: { borderRadius: 12, width: '100%', marginBottom: 12 },
-  addAnotherButton: { borderColor: Colors.border, borderRadius: 12, width: '100%', marginBottom: 8 },
+  credRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  credRowDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    marginVertical: 10,
+  },
+  credLabel: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    color: '#8E8E93',
+  },
+  credValue: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 14,
+    color: '#1C1C1E',
+  },
+  copyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000', // Solid Black
+    borderRadius: 24,
+    width: '100%',
+    height: 46,
+    gap: 8,
+    marginBottom: 10,
+  },
+  copyBtnText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 13,
+    color: '#FFFFFF',
+  },
+  addAnotherBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F2F2F7', // Muted Gray
+    borderRadius: 24,
+    width: '100%',
+    height: 46,
+    marginBottom: 16,
+  },
+  addAnotherBtnText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 13,
+    color: '#55555A',
+  },
+  backTextBtn: {
+    paddingVertical: 4,
+  },
+  backText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    color: '#8E8E93',
+    textDecorationLine: 'underline',
+  },
 });

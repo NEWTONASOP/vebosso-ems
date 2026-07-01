@@ -1,16 +1,17 @@
 // ============================================================================
-// VEBOSSO EMS — Session Management Screen
+// VEBOSSO EMS — Session Management Screen (Premium Fintech Aesthetic)
 // ============================================================================
 
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, Alert, RefreshControl } from 'react-native';
-import { Text, Button, IconButton } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, RefreshControl, Platform, Pressable } from 'react-native';
+import { Alert } from '../../../lib/alert';
+import { Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '../../../lib/supabase';
-import { Colors } from '../../../constants/colors';
 import { EmptyState } from '../../../components/EmptyState';
 import { ListSkeleton } from '../../../components/LoadingSkeleton';
+import { Feather } from '@expo/vector-icons';
 
 interface SessionInfo {
   id: string;
@@ -82,131 +83,232 @@ export default function SessionManagementScreen() {
     );
   };
 
-  const handleLogoutAll = (userId: string, name: string) => {
-    Alert.alert(
-      'Logout All Sessions',
-      `Force logout all sessions for ${name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout All',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase.functions.invoke('force-logout', {
-                body: { user_id: userId },
-              });
-              if (error) throw error;
-              fetchSessions();
-            } catch (e) {
-              console.error(e);
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const renderSession = ({ item }: { item: SessionInfo }) => (
-    <View style={styles.sessionCard}>
-      <View style={styles.sessionInfo}>
-        <Text style={styles.sessionName}>{item.profiles.full_name}</Text>
-        <Text style={styles.sessionDetail}>
-          {item.profiles.employee_id} • {item.device_info || 'Unknown device'}
-        </Text>
-        <Text style={styles.sessionTime}>
-          Last active {formatDistanceToNow(new Date(item.last_active), { addSuffix: true })}
-        </Text>
-      </View>
-      <View style={styles.sessionActions}>
-        <View style={styles.activeBadge}>
-          <View style={styles.activeDot} />
-          <Text style={styles.activeText}>Active</Text>
-        </View>
-        <Button
-          mode="outlined"
-          onPress={() => handleForceLogout(item)}
-          compact
-          textColor={Colors.error}
-          style={styles.logoutButton}
-        >
-          Logout
-        </Button>
-      </View>
-    </View>
-  );
-
   return (
     <View style={styles.container}>
+      {/* Header with circular outline back button */}
       <View style={styles.header}>
-        <IconButton
-          icon="arrow-left"
-          iconColor={Colors.text}
-          size={24}
+        <Pressable
+          style={({ pressed }) => [
+            styles.backBtn,
+            pressed && styles.btnPressed
+          ]}
           onPress={() => router.back()}
-        />
+        >
+          <Feather name="arrow-left" size={18} color="#1C1C1E" />
+        </Pressable>
         <Text style={styles.title}>Active Sessions</Text>
       </View>
 
       {isLoading ? (
-        <View style={styles.content}>
-          <ListSkeleton count={4} />
+        <View style={styles.skeletonContainer}>
+          <ListSkeleton count={3} />
         </View>
       ) : (
-        <FlatList
-          data={sessions}
-          renderItem={renderSession}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />
-          }
-          ListEmptyComponent={
-            <EmptyState icon="cellphone" title="No Active Sessions" subtitle="No users are currently logged in" />
-          }
-        />
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#000000" />}
+          showsVerticalScrollIndicator={false}
+        >
+          {sessions.length > 0 ? (
+            <View style={styles.groupedCard}>
+              {sessions.map((session, index) => {
+                const timeAgo = formatDistanceToNow(new Date(session.last_active), { addSuffix: true });
+                return (
+                  <View key={session.id} style={styles.rowWrapper}>
+                    <View style={styles.rowContent}>
+                      {/* Left: Device Info and Profile */}
+                      <View style={styles.infoCol}>
+                        <Text style={styles.sessionName}>{session.profiles.full_name}</Text>
+                        <Text style={styles.sessionDetail}>
+                          {session.profiles.employee_id} • {session.device_info || 'Unknown device'}
+                        </Text>
+                        <Text style={styles.sessionTime}>Active {timeAgo}</Text>
+                      </View>
+
+                      {/* Right: Active Pill and Logout Button */}
+                      <View style={styles.actionCol}>
+                        <View style={styles.activeBadge}>
+                          <View style={styles.activeDot} />
+                          <Text style={styles.activeText}>Active</Text>
+                        </View>
+
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.logoutBtn,
+                            pressed && styles.btnPressed
+                          ]}
+                          onPress={() => handleForceLogout(session)}
+                        >
+                          <Text style={styles.logoutBtnText}>Logout</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                    {index < sessions.length - 1 && <View style={styles.separator} />}
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.emptyCard}>
+              <EmptyState icon="cellphone" title="No Active Sessions" subtitle="No users are currently logged in" />
+            </View>
+          )}
+        </ScrollView>
       )}
     </View>
   );
 }
 
+// ============================================================================
+// Styles
+// ============================================================================
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: {
+    flex: 1,
+    backgroundColor: '#EDEDED', // Premium Fintech light grey
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 50,
-    paddingHorizontal: 8,
-    gap: 4,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 36,
+    paddingBottom: 12,
+    gap: 12,
   },
-  title: { fontSize: 22, fontWeight: '700', color: Colors.text },
-  content: { paddingHorizontal: 20 },
-  list: { paddingHorizontal: 20, paddingBottom: 20 },
-  sessionCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-    flexDirection: 'row',
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  sessionInfo: { flex: 1 },
-  sessionName: { fontSize: 15, fontWeight: '700', color: Colors.text },
-  sessionDetail: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
-  sessionTime: { fontSize: 11, color: Colors.textTertiary, marginTop: 4 },
-  sessionActions: { alignItems: 'flex-end', gap: 8 },
+  title: {
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 24,
+    color: '#1C1C1E',
+    letterSpacing: -0.5,
+  },
+  skeletonContainer: {
+    paddingHorizontal: 16,
+    marginTop: 14,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+  },
+  groupedCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    elevation: 3,
+    marginTop: 14,
+  },
+  rowWrapper: {
+    backgroundColor: '#FFFFFF',
+  },
+  rowContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    justifyContent: 'space-between',
+  },
+  infoCol: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  sessionName: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 16,
+    color: '#1C1C1E',
+    letterSpacing: -0.2,
+  },
+  sessionDetail: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: 3,
+  },
+  sessionTime: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    color: '#AEAEB2',
+    marginTop: 4,
+  },
+  actionCol: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
   activeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.successLight,
+    backgroundColor: 'rgba(52, 199, 89, 0.12)', // Soft Green capsule
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 4,
   },
-  activeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.success },
-  activeText: { fontSize: 11, color: Colors.success, fontWeight: '600' },
-  logoutButton: { borderColor: Colors.error, borderRadius: 8 },
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#34C759',
+  },
+  activeText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 10,
+    color: '#34C759',
+  },
+  logoutBtn: {
+    backgroundColor: 'rgba(255, 59, 48, 0.08)', // Soft red
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  logoutBtnText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+    color: '#FF3B30',
+  },
+  btnPressed: {
+    transform: [{ scale: 0.97 }],
+    opacity: 0.9,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    marginHorizontal: 16,
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    elevation: 3,
+    marginTop: 14,
+  },
 });

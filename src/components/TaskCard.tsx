@@ -1,31 +1,22 @@
 // ============================================================================
-// VEBOSSO EMS — Task Card Component
+// VEBOSSO EMS — Task Card Row Component (Fintech Aesthetic)
 // ============================================================================
 
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
-import { Text, Chip, Icon } from 'react-native-paper';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import { Text } from 'react-native-paper';
 import { format } from 'date-fns';
 import { Colors } from '../constants/colors';
 import { Task, TaskStatus } from '../types/database';
-import { TASK_STATUS_CONFIG } from '../constants/roles';
+import { Feather } from '@expo/vector-icons';
 
 interface TaskCardProps {
   task: Task;
   onStatusChange?: (taskId: string, status: TaskStatus) => void;
-  showAssignee?: boolean;
+  isLast?: boolean;
 }
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
-export function TaskCard({ task, onStatusChange, showAssignee }: TaskCardProps) {
-  const statusConfig = TASK_STATUS_CONFIG[task.status];
-  
-  // Animation values
-  const scale = useSharedValue(1);
-  const opacity = useSharedValue(1);
-
+export function TaskCard({ task, onStatusChange, isLast }: TaskCardProps) {
   const getNextStatus = (): TaskStatus | null => {
     if (task.status === 'pending') return 'in_progress';
     if (task.status === 'in_progress') return 'done';
@@ -33,193 +24,197 @@ export function TaskCard({ task, onStatusChange, showAssignee }: TaskCardProps) 
   };
 
   const nextStatus = getNextStatus();
-  const nextLabel = nextStatus === 'in_progress' ? 'Start Task' : nextStatus === 'done' ? 'Mark Complete' : null;
+  const nextLabel = nextStatus === 'in_progress' ? 'Start' : nextStatus === 'done' ? 'Complete' : null;
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.98, { damping: 20, stiffness: 300 });
+  const getStatusStyle = () => {
+    switch (task.status) {
+      case 'done':
+        return {
+          icon: 'check-circle',
+          color: '#34C759', // Green
+          bgColor: 'rgba(52, 199, 89, 0.12)',
+        };
+      case 'in_progress':
+        return {
+          icon: 'play-circle',
+          color: '#007AFF', // Blue
+          bgColor: 'rgba(0, 122, 255, 0.12)',
+        };
+      default:
+        return {
+          icon: 'circle',
+          color: '#8E8E93', // Grey
+          bgColor: 'rgba(142, 142, 147, 0.12)',
+        };
+    }
   };
 
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 20, stiffness: 300 });
-  };
+  const statusStyle = getStatusStyle();
 
   const handleAction = () => {
-    if (!onStatusChange || !nextStatus) return;
-    
-    // Quick completion animation
-    if (nextStatus === 'done') {
-      opacity.value = withTiming(0.5, { duration: 300 });
+    if (onStatusChange && nextStatus) {
+      onStatusChange(task.id, nextStatus);
     }
-    
-    onStatusChange(task.id, nextStatus);
   };
 
+  const getFormattedDate = () => {
+    if (!task.due_date) return null;
+    try {
+      return format(new Date(task.due_date), 'MMM dd');
+    } catch {
+      return task.due_date;
+    }
+  };
+
+  const dueDate = getFormattedDate();
+
   return (
-    <AnimatedPressable 
-      style={[styles.card, animatedStyle]}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-    >
-      <View style={styles.header}>
-        <View style={styles.titleContainer}>
-          <View style={styles.titleRow}>
-            <View style={[styles.statusDot, { backgroundColor: statusConfig.color }]} />
-            <Text style={[styles.title, task.status === 'done' && styles.titleDone]} numberOfLines={1}>
-              {task.title}
-            </Text>
-          </View>
-          {task.description && (
-            <Text style={styles.description} numberOfLines={2}>
-              {task.description}
-            </Text>
-          )}
+    <View style={styles.rowWrapper}>
+      <View style={styles.rowContent}>
+        {/* Left Status Icon Container */}
+        <View style={[styles.iconContainer, { backgroundColor: statusStyle.bgColor }]}>
+          <Feather name={statusStyle.icon as any} size={16} color={statusStyle.color} />
         </View>
-        <Chip
-          style={[styles.statusChip, { backgroundColor: statusConfig.backgroundColor }]}
-          textStyle={[styles.statusText, { color: statusConfig.color }]}
-          compact
-        >
-          {statusConfig.label}
-        </Chip>
-      </View>
 
-      <View style={styles.divider} />
-
-      <View style={styles.footer}>
-        <View style={styles.footerLeft}>
-          {task.due_date && (
-            <View style={styles.dueDateRow}>
-              <Icon source="calendar-clock" size={14} color={Colors.textTertiary} />
-              <Text style={styles.dueDate}>
-                {format(new Date(task.due_date), 'MMM dd')}
+        {/* Center Text Column */}
+        <View style={styles.textContainer}>
+          <Text style={[styles.title, task.status === 'done' && styles.titleDone]} numberOfLines={1}>
+            {task.title}
+          </Text>
+          <View style={styles.metaRow}>
+            {dueDate && (
+              <Text style={styles.metaText}>
+                Due {dueDate}
               </Text>
-            </View>
-          )}
+            )}
+            {task.description && (
+              <Text style={styles.description} numberOfLines={1}>
+                {dueDate ? ` • ${task.description}` : task.description}
+              </Text>
+            )}
+          </View>
         </View>
-        
-        {nextLabel && onStatusChange && (
+
+        {/* Right Action Button/Badge */}
+        {nextLabel && onStatusChange ? (
           <Pressable
             style={({ pressed }) => [
-              styles.actionButton,
-              { backgroundColor: TASK_STATUS_CONFIG[nextStatus!].backgroundColor },
-              pressed && { opacity: 0.8 }
+              styles.actionBtn,
+              nextStatus === 'in_progress' ? styles.startBtn : styles.completeBtn,
+              pressed && styles.btnPressed,
             ]}
             onPress={handleAction}
           >
-            <Text style={[styles.actionText, { color: TASK_STATUS_CONFIG[nextStatus!].color }]}>
+            <Text
+              style={[
+                styles.actionBtnText,
+                nextStatus === 'in_progress' ? styles.startBtnText : styles.completeBtnText,
+              ]}
+            >
               {nextLabel}
             </Text>
-            <Icon 
-              source={nextStatus === 'in_progress' ? 'play-circle' : 'check-circle'} 
-              size={14} 
-              color={TASK_STATUS_CONFIG[nextStatus!].color} 
-            />
           </Pressable>
+        ) : (
+          <View style={[styles.statusBadge, { backgroundColor: statusStyle.bgColor }]}>
+            <Text style={[styles.statusBadgeText, { color: statusStyle.color }]}>
+              {task.status === 'done' ? 'Done' : task.status === 'in_progress' ? 'Running' : 'Pending'}
+            </Text>
+          </View>
         )}
       </View>
-    </AnimatedPressable>
+      {!isLast && <View style={styles.separator} />}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+  rowWrapper: {
+    backgroundColor: '#FFFFFF',
   },
-  header: {
+  rowContent: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    minHeight: 56,
   },
-  titleContainer: {
+  iconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16, // Circular icon container
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  textContainer: {
     flex: 1,
     paddingRight: 12,
   },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
   title: {
-    fontSize: 16,
-    color: Colors.text,
     fontFamily: 'Inter_600SemiBold',
-    flex: 1,
+    fontSize: 15,
+    color: '#1C1C1E',
   },
   titleDone: {
     textDecorationLine: 'line-through',
-    color: Colors.textTertiary,
+    color: '#AEAEB2',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  metaText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    color: '#8E8E93',
   },
   description: {
-    fontSize: 13,
-    color: Colors.textSecondary,
     fontFamily: 'Inter_400Regular',
-    lineHeight: 18,
-    paddingLeft: 16, // Align with title text past the dot
-  },
-  statusChip: {
-    height: 24,
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 11,
-    fontFamily: 'Inter_600SemiBold',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.borderLight,
-    marginVertical: 12,
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  footerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  dueDateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.surfaceLight,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  dueDate: {
     fontSize: 12,
-    color: Colors.textSecondary,
-    fontFamily: 'Inter_500Medium',
+    color: '#AEAEB2',
+    flex: 1,
   },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  actionBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  actionText: {
-    fontSize: 12,
+  startBtn: {
+    backgroundColor: '#000000', // Solid Black
+  },
+  startBtnText: {
+    color: '#FFFFFF',
+  },
+  completeBtn: {
+    backgroundColor: 'rgba(52, 199, 89, 0.12)', // Soft Green
+  },
+  completeBtnText: {
+    color: '#34C759',
+  },
+  actionBtnText: {
     fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+    letterSpacing: -0.1,
+  },
+  btnPressed: {
+    transform: [{ scale: 0.96 }],
+    opacity: 0.9,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusBadgeText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    marginLeft: 62, // 16 (padding) + 32 (icon) + 14 (margin) = 62px inset
   },
 });
-

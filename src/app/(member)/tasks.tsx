@@ -1,21 +1,21 @@
 // ============================================================================
-// VEBOSSO EMS — Member Tasks Screen
+// VEBOSSO EMS — Member Tasks Screen (Premium Fintech / Apple Wallet Aesthetic)
 // ============================================================================
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
-import { Text, Chip, Snackbar } from 'react-native-paper';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, ScrollView, RefreshControl, Platform, Pressable } from 'react-native';
+import { Text, Snackbar } from 'react-native-paper';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Colors } from '../../constants/colors';
 import { TaskCard } from '../../components/TaskCard';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { EmptyState } from '../../components/EmptyState';
-import { Task, TaskStatus } from '../../types/database';
+import { TaskStatus } from '../../types/database';
 
 export default function MemberTasksScreen() {
   const { profile } = useAuthStore();
-  const { todayTasks, fetchTodayTasks, updateTaskStatus } = useWorkStore();
+  const { todayTasks, fetchTodayTasks, updateTaskStatus, isLoadingToday } = useWorkStore();
   const [filter, setFilter] = useState<TaskStatus | 'all'>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
@@ -50,63 +50,83 @@ export default function MemberTasksScreen() {
     pending: todayTasks.filter((t) => t.status === 'pending').length,
   };
 
-  const renderItem = useCallback(({ item }: { item: Task }) => (
-    <TaskCard task={item} onStatusChange={handleStatusChange} />
-  ), []);
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>My Tasks</Text>
+        <Text style={styles.title}>Tasks</Text>
         <Text style={styles.subtitle}>
-          {stats.done}/{stats.total} completed
+          {stats.done}/{stats.total} completed today
         </Text>
       </View>
 
-      {/* Progress bar */}
-      {stats.total > 0 && (
-        <View style={styles.progressSection}>
-          <View style={styles.progressBar}>
-            <View
-              style={[styles.progressFill, { width: `${(stats.done / stats.total) * 100}%` }]}
-            />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#000000" />}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Progress Analytics Card */}
+        {stats.total > 0 && (
+          <View style={styles.progressCard}>
+            <View style={styles.progressHeader}>
+              <Text style={styles.progressTitle}>Completion Rate</Text>
+              <Text style={styles.progressValue}>
+                {Math.round((stats.done / stats.total) * 100)}%
+              </Text>
+            </View>
+            <View style={styles.progressBar}>
+              <View
+                style={[styles.progressFill, { width: `${(styles.progressFill.width = (stats.done / stats.total) * 100)}%` }]}
+              />
+            </View>
           </View>
+        )}
+
+        {/* Filter segment pills */}
+        <View style={styles.filterRow}>
+          {(['all', 'pending', 'in_progress', 'done'] as const).map((f) => {
+            const isActive = filter === f;
+            const count = f === 'all' ? stats.total : f === 'pending' ? stats.pending : f === 'in_progress' ? stats.inProgress : stats.done;
+            const label = f === 'all' ? 'All' : f === 'pending' ? 'Pending' : f === 'in_progress' ? 'Running' : 'Done';
+            return (
+              <Pressable
+                key={f}
+                style={[styles.filterPill, isActive && styles.filterPillActive]}
+                onPress={() => setFilter(f)}
+              >
+                <Text style={[styles.filterText, isActive && styles.filterTextActive]}>
+                  {label} ({count})
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
-      )}
 
-      {/* Filter chips */}
-      <View style={styles.filterRow}>
-        {(['all', 'pending', 'in_progress', 'done'] as const).map((f) => (
-          <Chip
-            key={f}
-            selected={filter === f}
-            onPress={() => setFilter(f)}
-            style={[styles.filterChip, filter === f && styles.filterChipActive]}
-            textStyle={[styles.filterChipText, filter === f && styles.filterChipTextActive]}
-            compact
-          >
-            {f === 'all' ? `All (${stats.total})` :
-             f === 'pending' ? `Pending (${stats.pending})` :
-             f === 'in_progress' ? `In Progress (${stats.inProgress})` :
-             `Done (${stats.done})`}
-          </Chip>
-        ))}
-      </View>
-
-      <FlatList
-        data={filteredTasks}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
-        ListEmptyComponent={
-          <EmptyState
-            icon="clipboard-text-outline"
-            title="No Tasks"
-            subtitle={filter === 'all' ? 'No tasks assigned yet. Check back later!' : 'No tasks with this status'}
-          />
-        }
-      />
+        {/* Tasks unified Grouped Card */}
+        <View style={styles.listContainer}>
+          {isLoadingToday ? (
+            <ListSkeleton count={3} />
+          ) : filteredTasks.length > 0 ? (
+            <View style={styles.groupedCard}>
+              {filteredTasks.map((task, index) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onStatusChange={handleStatusChange}
+                  isLast={index === filteredTasks.length - 1}
+                />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyCard}>
+              <EmptyState
+                icon="clipboard-text-outline"
+                title="No Tasks Found"
+                subtitle={filter === 'all' ? 'No tasks assigned yet.' : 'No tasks in this category'}
+              />
+            </View>
+          )}
+        </View>
+      </ScrollView>
 
       <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>
         {snackMessage}
@@ -115,18 +135,141 @@ export default function MemberTasksScreen() {
   );
 }
 
+// ============================================================================
+// Styles
+// ============================================================================
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 8 },
-  title: { fontSize: 26, fontWeight: '800', color: Colors.text },
-  subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
-  progressSection: { paddingHorizontal: 20, paddingTop: 8 },
-  progressBar: { height: 6, backgroundColor: Colors.surfaceLighter, borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: Colors.success, borderRadius: 3 },
-  filterRow: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4, gap: 8, flexWrap: 'wrap' },
-  filterChip: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
-  filterChipActive: { backgroundColor: Colors.accentSubtle, borderColor: Colors.accent },
-  filterChipText: { color: Colors.textSecondary, fontSize: 11, fontWeight: '600' },
-  filterChipTextActive: { color: Colors.accent, fontWeight: '700' },
-  list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20 },
+  container: {
+    flex: 1,
+    backgroundColor: '#EDEDED', // Premium Fintech light grey
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 36,
+    paddingBottom: 8,
+  },
+  title: {
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 28,
+    color: '#1C1C1E',
+    letterSpacing: -0.7,
+  },
+  subtitle: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    color: '#8E8E93',
+    marginTop: 2,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 110,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+  },
+  // Progress Analytics Card
+  progressCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    marginTop: 14,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    elevation: 3,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  progressTitle: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    color: '#8E8E93',
+  },
+  progressValue: {
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 16,
+    color: '#000000',
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#EFEFF4',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#000000', // Premium solid black progress fill
+    borderRadius: 4,
+    width: 0, // Fallback width overwritten dynamically
+  },
+  // Filter row
+  filterRow: {
+    flexDirection: 'row',
+    paddingVertical: 14,
+    gap: 8,
+    flexWrap: 'wrap',
+    paddingHorizontal: 4,
+  },
+  filterPill: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  filterPillActive: {
+    backgroundColor: '#000000', // Active solid black pill
+    borderColor: '#000000',
+  },
+  filterText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+    color: '#8E8E93',
+  },
+  filterTextActive: {
+    color: '#FFFFFF',
+  },
+  // List Container
+  listContainer: {
+    marginTop: 6,
+  },
+  groupedCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    elevation: 3,
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    elevation: 3,
+  },
 });

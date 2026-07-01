@@ -1,9 +1,13 @@
+// ============================================================================
+// VEBOSSO EMS — Manager Tab Layout (Floating Premium Navigation)
+// ============================================================================
+
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, Platform } from 'react-native';
-import { Icon } from 'react-native-paper';
 import { Colors } from '../../constants/colors';
 import { useWorkStore } from '../../store/workStore';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 
 function TabBarBadge({ count }: { count: number }) {
   if (count === 0) return null;
@@ -19,16 +23,20 @@ const badgeStyles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -10,
-    backgroundColor: Colors.badge,
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
+    backgroundColor: '#FF3B30', // System Red badge
+    borderRadius: 9,
+    minWidth: 16,
+    height: 16,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
     zIndex: 10,
   },
-  text: { color: Colors.white, fontSize: 10, fontWeight: '700' },
+  text: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontFamily: 'Inter_700Bold',
+  },
 });
 
 export default function ManagerLayout() {
@@ -39,41 +47,51 @@ export default function ManagerLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: Colors.tabBar,
-          borderTopColor: Colors.tabBarBorder,
-          borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 10,
-          paddingTop: 6,
-          ...Platform.select({
-            ios: {
-              shadowColor: Colors.shadow.shadowColor,
-              shadowOffset: { width: 0, height: -3 },
-              shadowOpacity: 0.03,
-              shadowRadius: 6,
-            },
-            android: {
-              elevation: 8,
-            },
-          }),
+          position: 'absolute',
+          bottom: Platform.OS === 'ios' ? 28 : 16,
+          left: 16,
+          right: 16,
+          backgroundColor: 'rgba(255, 255, 255, 0.96)', // Translucent White
+          borderRadius: 24,
+          height: 60,
+          borderTopWidth: 0, // Remove native top line
+          borderWidth: 1,
+          borderColor: 'rgba(0, 0, 0, 0.04)',
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.05,
+          shadowRadius: 18,
+          elevation: 5,
         },
-        tabBarActiveTintColor: Colors.tabActive,
-        tabBarInactiveTintColor: Colors.tabInactive,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarActiveTintColor: '#000000', // Solid black active state
+        tabBarInactiveTintColor: '#AEAEB2', // iOS Muted Gray
+        tabBarLabelStyle: {
+          fontFamily: 'Inter_600SemiBold',
+          fontSize: 10,
+          marginTop: -4,
+          marginBottom: 4,
+        },
+        tabBarIconStyle: {
+          marginTop: 4,
+        },
       }}
     >
       <Tabs.Screen
         name="dashboard"
         options={{
           title: 'Dashboard',
-          tabBarIcon: ({ color }) => <Icon source="view-dashboard-outline" color={color as string} size={22} />,
+          tabBarIcon: ({ color }) => (
+            <Feather name="grid" color={color} size={18} />
+          ),
         }}
       />
       <Tabs.Screen
         name="my-team"
         options={{
           title: 'My Team',
-          tabBarIcon: ({ color }) => <Icon source="account-group-outline" color={color as string} size={22} />,
+          tabBarIcon: ({ color }) => (
+            <Feather name="users" color={color} size={18} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -81,8 +99,8 @@ export default function ManagerLayout() {
         options={{
           title: 'Approvals',
           tabBarIcon: ({ color }) => (
-            <View>
-              <Icon source="checkbox-marked-circle-outline" color={color as string} size={22} />
+            <View style={styles.iconWrapper}>
+              <Feather name="check-circle" color={color} size={18} />
               <TabBarBadge count={pendingCount} />
             </View>
           ),
@@ -92,16 +110,26 @@ export default function ManagerLayout() {
         name="history"
         options={{
           title: 'History',
-          tabBarIcon: ({ color }) => <Icon source="calendar-month-outline" color={color as string} size={22} />,
+          tabBarIcon: ({ color }) => (
+            <Feather name="calendar" color={color} size={18} />
+          ),
         }}
       />
       <Tabs.Screen
         name="my-work"
         options={{
           title: 'My Work',
-          tabBarIcon: ({ color }) => <Icon source="briefcase-outline" color={color as string} size={22} />,
+          tabBarIcon: ({ color }) => (
+            <Feather name="briefcase" color={color} size={18} />
+          ),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  iconWrapper: {
+    position: 'relative',
+  },
+});
