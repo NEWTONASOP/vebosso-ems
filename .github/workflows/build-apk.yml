@@ -1,106 +1,106 @@
-name: Build APK on Push
+# name: Build APK on Push
 
-on:
-  push:
-    branches:
-      - main
-      - master
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
+# on:
+#   push:
+#     branches:
+#       - main
+#       - master
+#     paths-ignore:
+#       - '**.md'
+#       - 'docs/**'
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+#     permissions:
+#       contents: write
     
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: '20'
+#           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+#       - name: Install dependencies
+#         run: npm ci
 
-      - name: Setup Expo
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: latest
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+#       - name: Setup Expo
+#         uses: expo/expo-github-action@v8
+#         with:
+#           expo-version: latest
+#           eas-version: latest
+#           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+#       - name: Setup Java
+#         uses: actions/setup-java@v4
+#         with:
+#           distribution: 'temurin'
+#           java-version: '17'
 
-      - name: Build APK Locally on Runner
-        run: |
-          echo "Starting EAS Local Build on GitHub Actions..."
-          # The --local flag forces it to build using GitHub's hardware, completely bypassing the EAS Cloud queue and limits.
-          eas build --platform android --profile production --local --non-interactive --output app.apk
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+#       - name: Build APK Locally on Runner
+#         run: |
+#           echo "Starting EAS Local Build on GitHub Actions..."
+#           # The --local flag forces it to build using GitHub's hardware, completely bypassing the EAS Cloud queue and limits.
+#           eas build --platform android --profile production --local --non-interactive --output app.apk
+#         env:
+#           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Publish OTA Update
-        run: |
-          eas update --branch main --message "Auto update from GitHub Actions" --platform android --non-interactive
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+#       - name: Publish OTA Update
+#         run: |
+#           eas update --branch main --message "Auto update from GitHub Actions" --platform android --non-interactive
+#         env:
+#           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Get version from app.json
-        id: version
-        run: |
-          VERSION=$(node -p "require('./app.json').expo.version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+#       - name: Get version from app.json
+#         id: version
+#         run: |
+#           VERSION=$(node -p "require('./app.json').expo.version")
+#           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Create Release and Upload APK
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: Release v${{ steps.version.outputs.version }}
-          body: |
-            Automatic APK build for version ${{ steps.version.outputs.version }}
+#       - name: Create Release and Upload APK
+#         uses: softprops/action-gh-release@v2
+#         env:
+#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#         with:
+#           tag_name: v${{ steps.version.outputs.version }}
+#           name: Release v${{ steps.version.outputs.version }}
+#           body: |
+#             Automatic APK build for version ${{ steps.version.outputs.version }}
             
-            Download the APK below to update your app.
-          files: app.apk
+#             Download the APK below to update your app.
+#           files: app.apk
 
-      - name: Update Supabase Version
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
-            echo "Supabase secrets not set. Skipping database update."
-            exit 0
-          fi
+#       - name: Update Supabase Version
+#         env:
+#           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+#           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+#           VERSION: ${{ steps.version.outputs.version }}
+#         run: |
+#           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+#             echo "Supabase secrets not set. Skipping database update."
+#             exit 0
+#           fi
           
-          echo "Updating Supabase versions to $VERSION..."
+#           echo "Updating Supabase versions to $VERSION..."
           
-          # Update latest_app_version
-          curl -s -X PATCH "$SUPABASE_URL/rest/v1/app_settings?key=eq.latest_app_version" \
-            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: return=minimal" \
-            -d "{\"value\": \"$VERSION\"}"
+#           # Update latest_app_version
+#           curl -s -X PATCH "$SUPABASE_URL/rest/v1/app_settings?key=eq.latest_app_version" \
+#             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+#             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+#             -H "Content-Type: application/json" \
+#             -H "Prefer: return=minimal" \
+#             -d "{\"value\": \"$VERSION\"}"
 
-          # Update minimum_app_version
-          curl -s -X PATCH "$SUPABASE_URL/rest/v1/app_settings?key=eq.minimum_app_version" \
-            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: return=minimal" \
-            -d "{\"value\": \"$VERSION\"}"
+#           # Update minimum_app_version
+#           curl -s -X PATCH "$SUPABASE_URL/rest/v1/app_settings?key=eq.minimum_app_version" \
+#             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+#             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+#             -H "Content-Type: application/json" \
+#             -H "Prefer: return=minimal" \
+#             -d "{\"value\": \"$VERSION\"}"
             
-          echo "Successfully updated Supabase versions!"
+#           echo "Successfully updated Supabase versions!"
