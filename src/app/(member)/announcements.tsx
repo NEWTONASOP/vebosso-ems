@@ -10,6 +10,7 @@ import { useWorkStore } from '../../store/workStore';
 import { Colors } from '../../constants/colors';
 import { AnnouncementCard } from '../../components/AnnouncementCard';
 import { EmptyState } from '../../components/EmptyState';
+import { PageTransition } from '../../components/PageTransition';
 
 export default function MemberAnnouncementsScreen() {
   const { profile } = useAuthStore();
@@ -27,6 +28,7 @@ export default function MemberAnnouncementsScreen() {
   };
 
   return (
+    <PageTransition>
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Announcements</Text>
@@ -37,7 +39,7 @@ export default function MemberAnnouncementsScreen() {
 
       <FlatList
         data={announcements}
-        renderItem={({ item }) => <AnnouncementCard announcement={item} />}
+        renderItem={({ item, index }) => <AnnouncementCard announcement={item} index={index} />}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#000000" />}
@@ -53,6 +55,7 @@ export default function MemberAnnouncementsScreen() {
         }
       />
     </View>
+    </PageTransition>
   );
 }
 

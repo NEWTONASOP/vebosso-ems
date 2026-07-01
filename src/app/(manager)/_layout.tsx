@@ -39,6 +39,8 @@ const badgeStyles = StyleSheet.create({
   },
 });
 
+import { BlurView } from 'expo-blur';
+
 export default function ManagerLayout() {
   const pendingCount = useWorkStore((s) => s.pendingApprovalsCount);
 
@@ -51,18 +53,25 @@ export default function ManagerLayout() {
           bottom: Platform.OS === 'ios' ? 28 : 16,
           left: 16,
           right: 16,
-          backgroundColor: 'rgba(255, 255, 255, 0.96)', // Translucent White
+          backgroundColor: 'transparent',
           borderRadius: 24,
           height: 60,
-          borderTopWidth: 0, // Remove native top line
+          borderTopWidth: 0,
           borderWidth: 1,
-          borderColor: 'rgba(0, 0, 0, 0.04)',
+          borderColor: 'rgba(255, 255, 255, 0.2)',
           shadowColor: '#000000',
           shadowOffset: { width: 0, height: 10 },
           shadowOpacity: 0.05,
           shadowRadius: 18,
           elevation: 5,
         },
+        tabBarBackground: () => (
+          <BlurView 
+            tint="light" 
+            intensity={60} 
+            style={{ flex: 1, borderRadius: 24, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.7)' }} 
+          />
+        ),
         tabBarActiveTintColor: '#000000', // Solid black active state
         tabBarInactiveTintColor: '#AEAEB2', // iOS Muted Gray
         tabBarLabelStyle: {

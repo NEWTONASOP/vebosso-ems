@@ -12,6 +12,7 @@ import { TaskCard } from '../../components/TaskCard';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { EmptyState } from '../../components/EmptyState';
 import { TaskStatus } from '../../types/database';
+import { PageTransition } from '../../components/PageTransition';
 
 export default function MemberTasksScreen() {
   const { profile } = useAuthStore();
@@ -51,6 +52,7 @@ export default function MemberTasksScreen() {
   };
 
   return (
+    <PageTransition>
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Tasks</Text>
@@ -132,6 +134,7 @@ export default function MemberTasksScreen() {
         {snackMessage}
       </Snackbar>
     </View>
+    </PageTransition>
   );
 }
 

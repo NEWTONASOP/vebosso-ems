@@ -13,6 +13,7 @@ import { WorkLog } from '../../types/database';
 import { WorkLogDetail } from '../../components/WorkLogDetail';
 import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
 import { Feather } from '@expo/vector-icons';
+import { PageTransition } from '../../components/PageTransition';
 
 export default function MemberHistoryScreen() {
   const { profile } = useAuthStore();
@@ -42,6 +43,7 @@ export default function MemberHistoryScreen() {
   const totalHours = workLogs.reduce((sum, l) => sum + (l.total_hours || 0), 0);
 
   return (
+    <PageTransition>
     <View style={styles.container}>
       {/* Header title */}
       <View style={styles.header}>
@@ -154,6 +156,7 @@ export default function MemberHistoryScreen() {
 
       <WorkLogDetail visible={showDetail} onDismiss={() => setShowDetail(false)} workLog={selectedLog} />
     </View>
+    </PageTransition>
   );
 }
 

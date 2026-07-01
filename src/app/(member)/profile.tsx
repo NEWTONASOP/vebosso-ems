@@ -12,6 +12,8 @@ import { useAuthStore } from '../../store/authStore';
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 
+import { PageTransition } from '../../components/PageTransition';
+
 export default function MemberProfileScreen() {
   const router = useRouter();
   const { profile, signOut } = useAuthStore();
@@ -48,6 +50,7 @@ export default function MemberProfileScreen() {
   };
 
   return (
+    <PageTransition>
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       {/* Header bar: Avatar left, Outline icons right */}
       <View style={styles.header}>
@@ -116,6 +119,7 @@ export default function MemberProfileScreen() {
         <Text style={styles.appVersion}>v1.0.0</Text>
       </View>
     </ScrollView>
+    </PageTransition>
   );
 }
 

@@ -16,6 +16,9 @@ import { useWorkStore } from '../../store/workStore';
 import { Feather } from '@expo/vector-icons';
 import { TaskStatus } from '../../types/database';
 
+import { PageTransition } from '../../components/PageTransition';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
+
 export default function MemberHomeScreen() {
   const { profile } = useAuthStore();
   const {
@@ -134,16 +137,13 @@ export default function MemberHomeScreen() {
           <Text style={styles.statusEmoji}>☀️</Text>
           <Text style={styles.statusTitle}>Good {new Date().getHours() < 12 ? 'morning' : 'afternoon'}!</Text>
           <Text style={styles.statusSubtitle}>Ready to start your work day?</Text>
-          <Pressable
-            style={({ pressed }) => [
-              styles.startBtn,
-              pressed && styles.btnPressed
-            ]}
+          <AnimatedPressable
+            style={styles.startBtn}
             onPress={() => setShowCheckIn(true)}
           >
             <Feather name="play" size={16} color="#FFFFFF" />
             <Text style={styles.startBtnText}>Start Day</Text>
-          </Pressable>
+          </AnimatedPressable>
         </View>
       );
     }
@@ -202,16 +202,13 @@ export default function MemberHomeScreen() {
             </View>
           </View>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.endBtn,
-              pressed && styles.btnPressed
-            ]}
+          <AnimatedPressable
+            style={styles.endBtn}
             onPress={() => setShowCheckOut(true)}
           >
-            <Feather name="square" size={16} color="#FF3B30" />
+            <Feather name="power" size={16} color="#FF3B30" />
             <Text style={styles.endBtnText}>End Day</Text>
-          </Pressable>
+          </AnimatedPressable>
         </View>
       );
     }
@@ -227,16 +224,13 @@ export default function MemberHomeScreen() {
             <Text style={styles.rejectionReason}>Reason: "{todayLog.rejection_reason}"</Text>
           )}
           <Text style={styles.statusSubtitle}>Please update your plan and submit another check-in.</Text>
-          <Pressable
-            style={({ pressed }) => [
-              styles.startBtn,
-              pressed && styles.btnPressed
-            ]}
+          <AnimatedPressable
+            style={styles.startBtn}
             onPress={() => setShowCheckIn(true)}
           >
             <Feather name="refresh-cw" size={16} color="#FFFFFF" />
             <Text style={styles.startBtnText}>Re-submit Check-in</Text>
-          </Pressable>
+          </AnimatedPressable>
         </View>
       );
     }
@@ -276,6 +270,7 @@ export default function MemberHomeScreen() {
   };
 
   return (
+    <PageTransition>
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
@@ -316,6 +311,7 @@ export default function MemberHomeScreen() {
       <CheckOutModal visible={showCheckOut} onDismiss={() => setShowCheckOut(false)} onSubmit={handleCheckOut} />
       <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>{snackMessage}</Snackbar>
     </ScrollView>
+    </PageTransition>
   );
 }
 

@@ -3,8 +3,10 @@
 // ============================================================================
 
 import React from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import { AnimatedPressable } from './AnimatedPressable';
 import { format } from 'date-fns';
 import { Colors } from '../constants/colors';
 import { Task, TaskStatus } from '../types/database';
@@ -14,9 +16,10 @@ interface TaskCardProps {
   task: Task;
   onStatusChange?: (taskId: string, status: TaskStatus) => void;
   isLast?: boolean;
+  index?: number;
 }
 
-export function TaskCard({ task, onStatusChange, isLast }: TaskCardProps) {
+export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardProps) {
   const getNextStatus = (): TaskStatus | null => {
     if (task.status === 'pending') return 'in_progress';
     if (task.status === 'in_progress') return 'done';
@@ -69,7 +72,11 @@ export function TaskCard({ task, onStatusChange, isLast }: TaskCardProps) {
   const dueDate = getFormattedDate();
 
   return (
-    <View style={styles.rowWrapper}>
+    <Animated.View 
+      entering={FadeInDown.delay(index * 50).springify()} 
+      layout={LinearTransition.springify()}
+      style={styles.rowWrapper}
+    >
       <View style={styles.rowContent}>
         {/* Left Status Icon Container */}
         <View style={[styles.iconContainer, { backgroundColor: statusStyle.bgColor }]}>
@@ -97,7 +104,7 @@ export function TaskCard({ task, onStatusChange, isLast }: TaskCardProps) {
 
         {/* Right Action Button/Badge */}
         {nextLabel && onStatusChange ? (
-          <Pressable
+          <AnimatedPressable
             style={({ pressed }) => [
               styles.actionBtn,
               nextStatus === 'in_progress' ? styles.startBtn : styles.completeBtn,
@@ -113,7 +120,7 @@ export function TaskCard({ task, onStatusChange, isLast }: TaskCardProps) {
             >
               {nextLabel}
             </Text>
-          </Pressable>
+          </AnimatedPressable>
         ) : (
           <View style={[styles.statusBadge, { backgroundColor: statusStyle.bgColor }]}>
             <Text style={[styles.statusBadgeText, { color: statusStyle.color }]}>
@@ -123,7 +130,7 @@ export function TaskCard({ task, onStatusChange, isLast }: TaskCardProps) {
         )}
       </View>
       {!isLast && <View style={styles.separator} />}
-    </View>
+    </Animated.View>
   );
 }
 

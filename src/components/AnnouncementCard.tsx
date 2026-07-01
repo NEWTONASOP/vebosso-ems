@@ -10,15 +10,22 @@ import { Colors } from '../constants/colors';
 import { AnnouncementWithCreator } from '../types/database';
 import { Feather } from '@expo/vector-icons';
 
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+
 interface AnnouncementCardProps {
   announcement: AnnouncementWithCreator;
+  index?: number;
 }
 
-export function AnnouncementCard({ announcement }: AnnouncementCardProps) {
+export function AnnouncementCard({ announcement, index = 0 }: AnnouncementCardProps) {
   const timeAgo = formatDistanceToNow(new Date(announcement.created_at), { addSuffix: true });
 
   return (
-    <View style={styles.card}>
+    <Animated.View 
+      entering={FadeInDown.delay(index * 50).springify()}
+      layout={LinearTransition.springify()}
+      style={styles.card}
+    >
       <View style={styles.header}>
         {/* Squircle Blue Icon Box */}
         <View style={styles.iconContainer}>
@@ -42,7 +49,7 @@ export function AnnouncementCard({ announcement }: AnnouncementCardProps) {
       </View>
 
       <Text style={styles.body}>{announcement.body}</Text>
-    </View>
+    </Animated.View>
   );
 }
 

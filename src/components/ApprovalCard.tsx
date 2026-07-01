@@ -3,7 +3,9 @@
 // ============================================================================
 
 import React from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import { AnimatedPressable } from './AnimatedPressable';
 import { Text } from 'react-native-paper';
 import { format } from 'date-fns';
 import { Colors } from '../constants/colors';
@@ -15,9 +17,10 @@ interface ApprovalCardProps {
   workLog: WorkLogWithProfile;
   onApprove: (workLogId: string) => void;
   onReject: (workLogId: string) => void;
+  index?: number;
 }
 
-export function ApprovalCard({ workLog, onApprove, onReject }: ApprovalCardProps) {
+export function ApprovalCard({ workLog, onApprove, onReject, index = 0 }: ApprovalCardProps) {
   const profile = workLog.profiles;
   const statusConfig = WORK_LOG_STATUS_CONFIG[workLog.status];
   
@@ -26,7 +29,11 @@ export function ApprovalCard({ workLog, onApprove, onReject }: ApprovalCardProps
     : '--';
 
   return (
-    <View style={styles.card}>
+    <Animated.View 
+      entering={FadeInDown.delay(index * 50).springify()}
+      layout={LinearTransition.springify()}
+      style={styles.card}
+    >
       {/* Header Info */}
       <View style={styles.header}>
         <View style={styles.avatar}>
@@ -72,7 +79,7 @@ export function ApprovalCard({ workLog, onApprove, onReject }: ApprovalCardProps
       {/* Actions (Approve/Reject) */}
       {workLog.status === 'pending_approval' && (
         <View style={styles.actions}>
-          <Pressable
+          <AnimatedPressable
             style={({ pressed }) => [
               styles.rejectBtn,
               pressed && styles.btnPressed
@@ -81,9 +88,9 @@ export function ApprovalCard({ workLog, onApprove, onReject }: ApprovalCardProps
           >
             <Feather name="x" size={14} color="#FF3B30" />
             <Text style={styles.rejectBtnText}>Reject</Text>
-          </Pressable>
+          </AnimatedPressable>
           
-          <Pressable
+          <AnimatedPressable
             style={({ pressed }) => [
               styles.approveBtn,
               pressed && styles.btnPressed
@@ -92,7 +99,7 @@ export function ApprovalCard({ workLog, onApprove, onReject }: ApprovalCardProps
           >
             <Feather name="check" size={14} color="#FFFFFF" />
             <Text style={styles.approveBtnText}>Approve</Text>
-          </Pressable>
+          </AnimatedPressable>
         </View>
       )}
 
@@ -105,7 +112,7 @@ export function ApprovalCard({ workLog, onApprove, onReject }: ApprovalCardProps
           <Text style={styles.planText}>{workLog.day_report}</Text>
         </View>
       )}
-    </View>
+    </Animated.View>
   );
 }
 

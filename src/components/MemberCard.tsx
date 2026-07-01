@@ -3,8 +3,10 @@
 // ============================================================================
 
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Text, Avatar, Icon } from 'react-native-paper';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import { AnimatedPressable } from './AnimatedPressable';
 import { Colors } from '../constants/colors';
 import { Profile, WorkLogStatus } from '../types/database';
 import { WORK_LOG_STATUS_CONFIG, ROLE_LABELS } from '../constants/roles';
@@ -14,9 +16,10 @@ interface MemberCardProps {
   currentStatus?: WorkLogStatus | 'offline' | 'on_leave';
   checkInTime?: string;
   onPress?: () => void;
+  index?: number;
 }
 
-export function MemberCard({ member, currentStatus = 'offline', checkInTime, onPress }: MemberCardProps) {
+export function MemberCard({ member, currentStatus = 'offline', checkInTime, onPress, index = 0 }: MemberCardProps) {
   const getStatusDisplay = () => {
     if (currentStatus === 'offline') {
       return { label: 'Offline', color: Colors.textTertiary, bg: Colors.surfaceLight };
@@ -31,11 +34,15 @@ export function MemberCard({ member, currentStatus = 'offline', checkInTime, onP
   const status = getStatusDisplay();
 
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={onPress}
-      activeOpacity={0.7}
+    <Animated.View
+      entering={FadeInDown.delay(index * 50).springify()}
+      layout={LinearTransition.springify()}
+      style={styles.cardContainer}
     >
+      <AnimatedPressable
+        style={styles.card}
+        onPress={onPress}
+      >
       <Avatar.Text
         size={44}
         label={member.full_name.substring(0, 2).toUpperCase()}
@@ -63,16 +70,19 @@ export function MemberCard({ member, currentStatus = 'offline', checkInTime, onP
         </View>
         <Text style={styles.roleLabel}>{ROLE_LABELS[member.role]}</Text>
       </View>
-    </TouchableOpacity>
+      </AnimatedPressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  cardContainer: {
+    marginBottom: 10,
+  },
   card: {
     backgroundColor: Colors.surface,
     borderRadius: 14,
     padding: 14,
-    marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
