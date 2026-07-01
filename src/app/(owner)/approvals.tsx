@@ -2,15 +2,15 @@
 // VEBOSSO EMS — Owner Approvals Screen
 // ============================================================================
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
-import { Text, Snackbar } from 'react-native-paper';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { Snackbar, Text } from 'react-native-paper';
+import { ApprovalCard } from '../../components/ApprovalCard';
+import { EmptyState } from '../../components/EmptyState';
+import { ListSkeleton } from '../../components/LoadingSkeleton';
+import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
-import { Colors } from '../../constants/colors';
-import { ApprovalCard } from '../../components/ApprovalCard';
-import { ListSkeleton } from '../../components/LoadingSkeleton';
-import { EmptyState } from '../../components/EmptyState';
 import { WorkLogWithProfile } from '../../types/database';
 
 export default function OwnerApprovalsScreen() {
@@ -107,7 +107,7 @@ export default function OwnerApprovalsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 12 },
-  title: { fontSize: 26, fontWeight: '800', color: Colors.text },
+  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
   subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   content: { paddingHorizontal: 20 },
   list: { paddingHorizontal: 20, paddingBottom: 20 },

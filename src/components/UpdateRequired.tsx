@@ -139,11 +139,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
+    fontFamily: 'Inter_800ExtraBold',
     fontSize: 28,
-    fontWeight: '800',
     color: Colors.text,
     marginBottom: 12,
     textAlign: 'center',
+    letterSpacing: -0.7,
   },
   message: {
     fontSize: 16,

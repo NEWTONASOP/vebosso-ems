@@ -2,12 +2,12 @@
 // VEBOSSO EMS — Force Change Password Screen
 // ============================================================================
 
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { TextInput, Button, Text, Snackbar, ProgressBar } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '../../store/authStore';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Button, ProgressBar, Snackbar, Text, TextInput } from 'react-native-paper';
 import { Colors } from '../../constants/colors';
+import { useAuthStore } from '../../store/authStore';
 
 export default function ForceChangePasswordScreen() {
   const [newPassword, setNewPassword] = useState('');
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
   header: { alignItems: 'center', marginBottom: 32 },
   emoji: { fontSize: 48, marginBottom: 12 },
-  title: { fontSize: 24, fontWeight: '800', color: Colors.text, marginBottom: 8 },
+  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, marginBottom: 8, letterSpacing: -0.7 },
   subtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 },
   formSection: { backgroundColor: Colors.surface, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.border, ...Colors.shadow },
   input: { marginBottom: 12, backgroundColor: Colors.inputBackground },

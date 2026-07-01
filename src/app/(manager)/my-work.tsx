@@ -3,19 +3,19 @@
 // ============================================================================
 // Manager's own check-in, tasks, and day report (same UX as member home)
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { Text, Button, Snackbar } from 'react-native-paper';
-import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from 'react-native-reanimated';
-import { format, differenceInMinutes } from 'date-fns';
-import { useAuthStore } from '../../store/authStore';
-import { useWorkStore } from '../../store/workStore';
-import { Colors } from '../../constants/colors';
+import { differenceInMinutes, format } from 'date-fns';
+import { useEffect, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Button, Snackbar, Text } from 'react-native-paper';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { CheckInModal } from '../../components/CheckInModal';
 import { CheckOutModal } from '../../components/CheckOutModal';
-import { TaskCard } from '../../components/TaskCard';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
+import { TaskCard } from '../../components/TaskCard';
+import { Colors } from '../../constants/colors';
 import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
+import { useAuthStore } from '../../store/authStore';
+import { useWorkStore } from '../../store/workStore';
 
 export default function ManagerMyWorkScreen() {
   const { profile } = useAuthStore();
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scrollContent: { paddingBottom: 20 },
   header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 12 },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: Colors.text },
+  headerTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
   headerDate: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   content: { paddingHorizontal: 20 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, marginTop: 20, marginBottom: 12 },

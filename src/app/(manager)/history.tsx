@@ -2,17 +2,17 @@
 // VEBOSSO EMS — Manager History Screen
 // ============================================================================
 
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, FlatList } from 'react-native';
-import { Text, Menu, Button } from 'react-native-paper';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
+import { eachDayOfInterval, endOfMonth, format, isSameDay, startOfMonth } from 'date-fns';
+import { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Button, Menu, Text } from 'react-native-paper';
+import { EmptyState } from '../../components/EmptyState';
+import { WorkLogDetail } from '../../components/WorkLogDetail';
+import { Colors } from '../../constants/colors';
+import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
-import { Colors } from '../../constants/colors';
-import { WorkLog, Profile } from '../../types/database';
-import { WorkLogDetail } from '../../components/WorkLogDetail';
-import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
-import { EmptyState } from '../../components/EmptyState';
+import { Profile, WorkLog } from '../../types/database';
 
 export default function ManagerHistoryScreen() {
   const { profile } = useAuthStore();
@@ -97,7 +97,7 @@ export default function ManagerHistoryScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 8 },
-  title: { fontSize: 26, fontWeight: '800', color: Colors.text },
+  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
   pickerSection: { paddingHorizontal: 20, paddingTop: 12 },
   pickerButton: { borderColor: Colors.border, borderRadius: 12, justifyContent: 'flex-start' },
   menuContent: { backgroundColor: Colors.surface },

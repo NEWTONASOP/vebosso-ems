@@ -120,10 +120,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 28,
     color: Colors.text,
     marginBottom: 8,
+    letterSpacing: -0.7,
   },
   message: {
     fontSize: 16,

@@ -2,14 +2,14 @@
 // VEBOSSO EMS — Owner Team Screen
 // ============================================================================
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
-import { Text, Searchbar, Chip } from 'react-native-paper';
-import { useWorkStore } from '../../store/workStore';
-import { Colors } from '../../constants/colors';
-import { MemberCard } from '../../components/MemberCard';
-import { ListSkeleton } from '../../components/LoadingSkeleton';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { Chip, Searchbar, Text } from 'react-native-paper';
 import { EmptyState } from '../../components/EmptyState';
+import { ListSkeleton } from '../../components/LoadingSkeleton';
+import { MemberCard } from '../../components/MemberCard';
+import { Colors } from '../../constants/colors';
+import { useWorkStore } from '../../store/workStore';
 import { Profile } from '../../types/database';
 
 export default function OwnerTeamScreen() {
@@ -139,7 +139,7 @@ export default function OwnerTeamScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 8 },
-  title: { fontSize: 26, fontWeight: '800', color: Colors.text },
+  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
   subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   searchSection: { paddingHorizontal: 20, paddingTop: 12 },
   searchbar: {

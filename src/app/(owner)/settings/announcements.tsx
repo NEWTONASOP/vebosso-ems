@@ -2,15 +2,15 @@
 // VEBOSSO EMS — Announcements Management Screen
 // ============================================================================
 
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, FlatList } from 'react-native';
-import { TextInput, Button, Text, SegmentedButtons, IconButton, Snackbar } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '../../../store/authStore';
-import { useWorkStore } from '../../../store/workStore';
-import { Colors } from '../../../constants/colors';
+import { useEffect, useState } from 'react';
+import { FlatList, StyleSheet, View } from 'react-native';
+import { Button, IconButton, SegmentedButtons, Snackbar, Text, TextInput } from 'react-native-paper';
 import { AnnouncementCard } from '../../../components/AnnouncementCard';
 import { EmptyState } from '../../../components/EmptyState';
+import { Colors } from '../../../constants/colors';
+import { useAuthStore } from '../../../store/authStore';
+import { useWorkStore } from '../../../store/workStore';
 
 export default function AnnouncementsScreen() {
   const router = useRouter();
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     gap: 4,
   },
-  title: { fontSize: 22, fontWeight: '700', color: Colors.text },
+  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
   newButton: { borderRadius: 10 },
   formSection: {
     backgroundColor: Colors.surface,

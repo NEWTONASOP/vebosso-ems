@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
   },
   header: { alignItems: 'center', marginBottom: 24 },
   emoji: { fontSize: 48, marginBottom: 12 },
-  title: { fontSize: 24, fontWeight: '800', color: Colors.text, marginBottom: 8 },
+  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, marginBottom: 8, letterSpacing: -0.7 },
   subtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 },
   formSection: { backgroundColor: Colors.surface, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.border, ...Colors.shadow },
   input: { marginBottom: 12, backgroundColor: Colors.inputBackground },
@@ -243,5 +243,6 @@ const styles = StyleSheet.create({
   reqTitle: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600', marginBottom: 8 },
   button: { borderRadius: 12, marginBottom: 8 },
   buttonContent: { height: 50 },
-  cancelButton: { marginTop: 4 },
+  cancelButton: { marginTop: 4 },
+
 });

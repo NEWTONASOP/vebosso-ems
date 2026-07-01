@@ -140,11 +140,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontFamily: 'Inter_800ExtraBold',
     color: Colors.text,
     marginBottom: 4,
-    letterSpacing: -0.5,
+    letterSpacing: -0.7,
   },
   subtitle: {
     fontSize: 14,
