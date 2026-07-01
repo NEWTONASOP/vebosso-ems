@@ -31,7 +31,7 @@ export default function ManagerDashboard() {
       fetchPendingApprovals(profile.id),
       fetchSettings(),
     ]);
-  }, [profile?.id]);
+  }, [profile, fetchStats, fetchPendingApprovals, fetchSettings]);
 
   useEffect(() => {
     if (!profile?.id) {
@@ -43,7 +43,7 @@ export default function ManagerDashboard() {
     subscribeToRealtime(profile.id, 'manager', profile.id);
     
     return () => unsubscribeFromRealtime();
-  }, [profile?.id]);
+  }, [profile, loadData, subscribeToRealtime, unsubscribeFromRealtime]);
 
   const onRefresh = async () => {
     setRefreshing(true);

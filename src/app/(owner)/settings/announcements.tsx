@@ -28,7 +28,7 @@ export default function AnnouncementsScreen() {
     if (profile) {
       fetchAnnouncements(profile.role, profile.id);
     }
-  }, [profile]);
+  }, [profile, fetchAnnouncements]);
 
   const handleSend = async () => {
     if (!title.trim() || !body.trim()) {
@@ -50,7 +50,7 @@ export default function AnnouncementsScreen() {
       setBody('');
       setShowForm(false);
       fetchAnnouncements(profile.role, profile.id);
-    } catch (e) {
+    } catch {
       setSnackMessage('Failed to send announcement');
     } finally {
       setIsLoading(false);

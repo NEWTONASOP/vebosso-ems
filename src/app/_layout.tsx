@@ -13,6 +13,7 @@ import { configureFonts, MD3LightTheme, PaperProvider } from 'react-native-paper
 import 'react-native-reanimated';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { UpdateRequired } from '../components/UpdateRequired';
 import { Colors, PaperThemeColors } from '../constants/colors';
 import { useAuthStore } from '../store/authStore';
 
@@ -169,7 +170,6 @@ export default function RootLayout() {
 
   // Show update screen if force update is required
   if (!isCheckingVersion && versionCheck?.forceUpdate) {
-    const { UpdateRequired } = require('../components/UpdateRequired');
     return (
       <ErrorBoundary>
         <GestureHandlerRootView style={styles.container}>

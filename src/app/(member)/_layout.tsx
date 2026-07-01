@@ -4,8 +4,7 @@
 
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
-import { Colors } from '../../constants/colors';
+
 import { Feather } from '@expo/vector-icons';
 
 import { CustomTabBar } from '../../components/CustomTabBar';

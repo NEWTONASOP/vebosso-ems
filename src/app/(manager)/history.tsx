@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { eachDayOfInterval, endOfMonth, format, isSameDay, startOfMonth } from 'date-fns';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Menu, Text } from 'react-native-paper';
 import { EmptyState } from '../../components/EmptyState';
@@ -24,21 +24,22 @@ export default function ManagerHistoryScreen() {
   const [showDetail, setShowDetail] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  useEffect(() => {
-    if (profile) fetchTeamMembers(profile.id);
-  }, [profile]);
-
-  useEffect(() => {
-    if (selectedMember) loadHistory();
-  }, [selectedMember, currentMonth]);
-
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     if (!selectedMember) return;
     const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
     const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
     const logs = await fetchWorkHistory(selectedMember.id, start, end);
     setWorkLogs(logs);
-  };
+  }, [selectedMember, currentMonth, fetchWorkHistory]);
+
+  useEffect(() => {
+    if (profile) fetchTeamMembers(profile.id);
+  }, [profile, fetchTeamMembers]);
+
+  useEffect(() => {
+    // eslint-disable-next-line
+    if (selectedMember) void loadHistory();
+  }, [selectedMember, loadHistory]);
 
   const daysInMonth = eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) });
   const getLogForDay = (day: Date) => workLogs.find((log) => isSameDay(new Date(log.date), day));

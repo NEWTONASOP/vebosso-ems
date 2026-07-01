@@ -1,7 +1,7 @@
 // ============================================================================
 // VEBOSSO EMS — Auth Store (Zustand)
 // ============================================================================
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 
 import { Session } from '@supabase/supabase-js';
 import { create } from 'zustand';
@@ -199,7 +199,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       set({ isLoading: false });
       return { success: false, error: 'An unexpected error occurred' };
-    } catch (error) {
+    } catch {
       const msg = 'Network error. Please check your connection and try again.';
       set({ isLoading: false, error: msg });
       return { success: false, error: msg };
@@ -319,7 +319,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       set({ isLoading: false });
       return { success: true };
-    } catch (error) {
+    } catch {
       const msg = 'Failed to change password. Please try again.';
       set({ isLoading: false, error: msg });
       return { success: false, error: msg };

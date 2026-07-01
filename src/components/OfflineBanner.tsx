@@ -3,7 +3,7 @@
 // ============================================================================
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { Text, StyleSheet } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import Animated, {
   useSharedValue,
@@ -33,7 +33,7 @@ export function OfflineBanner() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [opacity, translateY]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
@@ -45,7 +45,7 @@ export function OfflineBanner() {
   return (
     <Animated.View style={[styles.container, animatedStyle]}>
       <Text style={styles.icon}>📡</Text>
-      <Text style={styles.text}>You're offline. Some features may not work.</Text>
+      <Text style={styles.text}>You&apos;re offline. Some features may not work.</Text>
     </Animated.View>
   );
 }

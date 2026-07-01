@@ -1,10 +1,10 @@
-import React from 'react';
-import { View, StyleSheet, Platform, Pressable } from 'react-native';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { BlurView } from 'expo-blur';
-import { Text } from 'react-native-paper';
 import { Feather } from '@expo/vector-icons';
+import { BottomTabBarProps } from 'expo-router/tabs';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import React from 'react';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from 'react-native-paper';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 // Map route names to icons
@@ -99,10 +99,13 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress }: TabItemPro
   });
 
   const handlePressIn = () => {
+    // Reanimated shared values are intentionally mutable outside React state.
+    // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
     scale.value = withSpring(0.92, { damping: 10, stiffness: 300 });
   };
 
   const handlePressOut = () => {
+    // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
     scale.value = withSpring(1, { damping: 10, stiffness: 300 });
   };
 
@@ -127,6 +130,7 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress }: TabItemPro
       >
         {iconElement}
         <Text
+          numberOfLines={1}
           style={[
             styles.label,
             isFocused ? styles.labelActive : styles.labelInactive,
@@ -180,17 +184,17 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    minWidth: 60,
   },
   pillContainer: {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 24,
-    width: '90%',
-    minHeight: 52,
-    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 20,
+    minHeight: 56,
+    gap: 3,
   },
   pillActive: {
     backgroundColor: 'rgba(0, 0, 0, 0.05)', // Light grey active capsule background
@@ -202,6 +206,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     fontSize: 10,
     letterSpacing: -0.1,
+    textAlign: 'center',
   },
   labelActive: {
     color: '#000000',

@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, ViewStyle } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft, Easing } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, Easing } from 'react-native-reanimated';
 
 interface PageTransitionProps {
   children: React.ReactNode;

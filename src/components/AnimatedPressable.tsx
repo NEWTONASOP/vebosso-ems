@@ -3,7 +3,7 @@
 // ============================================================================
 
 import React from 'react';
-import { Pressable, PressableProps, StyleProp, ViewStyle, StyleSheet } from 'react-native';
+import { Pressable, PressableProps, StyleSheet } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -17,8 +17,6 @@ interface AnimatedPressableProps extends Omit<PressableProps, 'style' | 'childre
   scaleTo?: number;
   hapticStyle?: Haptics.ImpactFeedbackStyle;
 }
-
-const AnimatedPressableCore = Animated.createAnimatedComponent(Pressable);
 
 const AnimatedPressableComponent = React.forwardRef<any, AnimatedPressableProps>(
   (
@@ -43,6 +41,7 @@ const AnimatedPressableComponent = React.forwardRef<any, AnimatedPressableProps>
     });
 
     const handlePressIn = (e: any) => {
+
       scale.value = withSpring(scaleTo, {
         mass: 0.1,
         damping: 10,
@@ -52,6 +51,7 @@ const AnimatedPressableComponent = React.forwardRef<any, AnimatedPressableProps>
     };
 
     const handlePressOut = (e: any) => {
+
       scale.value = withSpring(1, {
         mass: 0.1,
         damping: 10,
@@ -113,5 +113,7 @@ const AnimatedPressableComponent = React.forwardRef<any, AnimatedPressableProps>
     );
   }
 );
+
+AnimatedPressableComponent.displayName = 'AnimatedPressable';
 
 export const AnimatedPressable = AnimatedPressableComponent;

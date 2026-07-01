@@ -3,14 +3,13 @@
 // ============================================================================
 
 import { differenceInMinutes, format } from 'date-fns';
-import { useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View, Platform, Pressable } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View, Platform } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
 import { CheckInModal } from '../../components/CheckInModal';
 import { CheckOutModal } from '../../components/CheckOutModal';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { TaskCard } from '../../components/TaskCard';
-import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Feather } from '@expo/vector-icons';
@@ -33,7 +32,7 @@ export default function MemberHomeScreen() {
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [elapsed, setElapsed] = useState('');
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     if (!profile?.id) {
@@ -47,29 +46,22 @@ export default function MemberHomeScreen() {
     subscribeToRealtime(profile.id, 'member');
     
     return () => unsubscribeFromRealtime();
-  }, [profile?.id]);
+  }, [profile?.id, fetchTodayLog, fetchTodayTasks, fetchSettings, subscribeToRealtime, unsubscribeFromRealtime]);
 
-  // Elapsed time counter
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    
-    if (todayLog?.status === 'working' && todayLog.check_in_time) {
-      const updateElapsed = () => {
-        const mins = differenceInMinutes(new Date(), new Date(todayLog.check_in_time!));
-        const h = Math.floor(mins / 60);
-        const m = mins % 60;
-        setElapsed(`${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m`);
-      };
-      updateElapsed();
-      interval = setInterval(updateElapsed, 60000);
-    } else {
-      setElapsed('');
-    }
-    
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+    if (todayLog?.status !== 'working' || !todayLog.check_in_time) return;
+    const interval = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(interval);
   }, [todayLog?.status, todayLog?.check_in_time]);
+
+  const elapsed = useMemo(() => {
+    if (todayLog?.status !== 'working' || !todayLog.check_in_time) return '';
+    const mins = differenceInMinutes(new Date(), new Date(todayLog.check_in_time));
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayLog?.status, todayLog?.check_in_time, tick]);
 
   const onRefresh = async () => {
     if (!profile?.id) return;
@@ -221,7 +213,7 @@ export default function MemberHomeScreen() {
           <Text style={styles.heroLabel}>CHECK-IN REJECTED</Text>
           <Text style={styles.heroValue}>Try Again</Text>
           {todayLog.rejection_reason && (
-            <Text style={styles.rejectionReason}>Reason: "{todayLog.rejection_reason}"</Text>
+            <Text style={styles.rejectionReason}>Reason: &quot;{todayLog.rejection_reason}&quot;</Text>
           )}
           <Text style={styles.statusSubtitle}>Please update your plan and submit another check-in.</Text>
           <AnimatedPressable
@@ -293,7 +285,7 @@ export default function MemberHomeScreen() {
       {/* Today's Tasks in unified Grouped Card */}
       {todayTasks.length > 0 && (
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Today's Tasks</Text>
+          <Text style={styles.sectionTitle}>Today&apos;s Tasks</Text>
           <View style={styles.groupedCard}>
             {todayTasks.map((task, index) => (
               <TaskCard

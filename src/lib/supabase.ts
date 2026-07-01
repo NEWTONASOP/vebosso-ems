@@ -1,7 +1,7 @@
 // ============================================================================
 // VEBOSSO EMS — Supabase Client
 // ============================================================================
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import * as SQLite from 'expo-sqlite';

@@ -21,7 +21,7 @@ export default function ManagerApprovalsScreen() {
 
   useEffect(() => {
     if (profile) fetchPendingApprovals(profile.id);
-  }, [profile]);
+  }, [profile, fetchPendingApprovals]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -29,19 +29,19 @@ export default function ManagerApprovalsScreen() {
     setRefreshing(false);
   };
 
-  const handleApprove = async (workLogId: string) => {
+  const handleApprove = useCallback(async (workLogId: string) => {
     if (!profile) return;
     try { await approveCheckIn(workLogId, profile.id); setSnackMessage('Approved ✅'); } catch { setSnackMessage('Failed'); }
-  };
+  }, [profile, approveCheckIn]);
 
-  const handleReject = async (workLogId: string) => {
+  const handleReject = useCallback(async (workLogId: string) => {
     if (!profile) return;
     try { await rejectCheckIn(workLogId, profile.id, 'Please revise'); setSnackMessage('Rejected'); } catch { setSnackMessage('Failed'); }
-  };
+  }, [profile, rejectCheckIn]);
 
   const renderItem = useCallback(({ item }: { item: WorkLogWithProfile }) => (
     <ApprovalCard workLog={item} onApprove={handleApprove} onReject={handleReject} />
-  ), [profile]);
+  ), [handleApprove, handleReject]);
 
   return (
     <View style={styles.container}>

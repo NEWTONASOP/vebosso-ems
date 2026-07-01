@@ -49,6 +49,7 @@ export default function SessionManagementScreen() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line
     fetchSessions();
   }, []);
 

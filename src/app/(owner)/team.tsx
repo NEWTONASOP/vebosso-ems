@@ -21,7 +21,7 @@ export default function OwnerTeamScreen() {
 
   useEffect(() => {
     fetchTeamMembers();
-  }, []);
+  }, [fetchTeamMembers]);
 
   const onRefresh = async () => {
     setRefreshing(true);

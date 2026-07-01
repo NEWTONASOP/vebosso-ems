@@ -13,7 +13,6 @@ import { CheckOutModal } from '../../components/CheckOutModal';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { TaskCard } from '../../components/TaskCard';
 import { Colors } from '../../constants/colors';
-import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 
@@ -33,7 +32,7 @@ export default function ManagerMyWorkScreen() {
     if (todayLog?.status === 'pending_approval') {
       pulseOpacity.value = withRepeat(withTiming(0.4, { duration: 1000, easing: Easing.inOut(Easing.ease) }), -1, true);
     }
-  }, [todayLog?.status]);
+  }, [todayLog?.status, pulseOpacity]);
 
   const pulseStyle = useAnimatedStyle(() => ({ opacity: pulseOpacity.value }));
 
@@ -42,7 +41,7 @@ export default function ManagerMyWorkScreen() {
       fetchTodayLog(profile.id);
       fetchTodayTasks(profile.id);
     }
-  }, [profile]);
+  }, [profile, fetchTodayLog, fetchTodayTasks]);
 
   // Elapsed time counter
   useEffect(() => {
@@ -55,6 +54,7 @@ export default function ManagerMyWorkScreen() {
       }, 60000);
       // Set initial
       const mins = differenceInMinutes(new Date(), new Date(todayLog.check_in_time));
+      // eslint-disable-next-line
       setElapsed(`${Math.floor(mins / 60)}h ${mins % 60}m`);
       return () => clearInterval(interval);
     }
@@ -96,7 +96,7 @@ export default function ManagerMyWorkScreen() {
       );
     }
 
-    const statusConfig = WORK_LOG_STATUS_CONFIG[todayLog.status];
+
 
     if (todayLog.status === 'pending_approval') {
       return (
@@ -115,7 +115,7 @@ export default function ManagerMyWorkScreen() {
       return (
         <View style={[styles.statusCard, styles.workingCard]}>
           <Text style={styles.statusEmoji}>💼</Text>
-          <Text style={styles.statusTitle}>You're Working</Text>
+          <Text style={styles.statusTitle}>You&apos;re Working</Text>
           <View style={styles.workingInfo}>
             <View style={styles.workingDetail}>
               <Text style={styles.workingLabel}>Since</Text>
@@ -160,7 +160,7 @@ export default function ManagerMyWorkScreen() {
 
       {todayTasks.length > 0 && (
         <View style={styles.content}>
-          <Text style={styles.sectionTitle}>Today's Tasks</Text>
+          <Text style={styles.sectionTitle}>Today&apos;s Tasks</Text>
           {todayTasks.map((task) => <TaskCard key={task.id} task={task} onStatusChange={updateTaskStatus} />)}
         </View>
       )}

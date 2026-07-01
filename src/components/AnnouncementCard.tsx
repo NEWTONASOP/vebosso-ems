@@ -6,7 +6,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import { formatDistanceToNow } from 'date-fns';
-import { Colors } from '../constants/colors';
+
 import { AnnouncementWithCreator } from '../types/database';
 import { Feather } from '@expo/vector-icons';
 

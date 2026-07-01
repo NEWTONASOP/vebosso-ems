@@ -2,13 +2,12 @@
 // VEBOSSO EMS — Member History Screen (Premium Fintech / Apple Wallet Aesthetic)
 // ============================================================================
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { Text } from 'react-native-paper';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
-import { Colors } from '../../constants/colors';
 import { WorkLog } from '../../types/database';
 import { WorkLogDetail } from '../../components/WorkLogDetail';
 import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
@@ -23,17 +22,18 @@ export default function MemberHistoryScreen() {
   const [showDetail, setShowDetail] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  useEffect(() => {
-    loadHistory();
-  }, [profile, currentMonth]);
-
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     if (!profile) return;
     const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
     const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
     const logs = await fetchWorkHistory(profile.id, start, end);
     setWorkLogs(logs);
-  };
+  }, [profile, currentMonth, fetchWorkHistory]);
+
+  useEffect(() => {
+    // eslint-disable-next-line
+    void loadHistory();
+  }, [loadHistory]);
 
   const daysInMonth = eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) });
   const getLogForDay = (day: Date) => workLogs.find((l) => isSameDay(new Date(l.date), day));

@@ -21,7 +21,7 @@ export default function ManagerMyTeamScreen() {
 
   useEffect(() => {
     if (profile) fetchTeamMembers(profile.id);
-  }, [profile]);
+  }, [profile, fetchTeamMembers]);
 
   const onRefresh = async () => {
     setRefreshing(true);

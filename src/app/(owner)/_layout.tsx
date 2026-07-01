@@ -4,10 +4,11 @@
 
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Colors } from '../../constants/colors';
 import { useWorkStore } from '../../store/workStore';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+
+import { CustomTabBar } from '../../components/CustomTabBar';
 
 function TabBarBadge({ count }: { count: number }) {
   if (count === 0) return null;
@@ -38,8 +39,6 @@ const badgeStyles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
   },
 });
-
-import { CustomTabBar } from '../../components/CustomTabBar';
 
 export default function OwnerLayout() {
   const pendingCount = useWorkStore((s) => s.pendingApprovalsCount);

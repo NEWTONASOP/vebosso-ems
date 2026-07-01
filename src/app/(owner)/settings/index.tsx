@@ -3,10 +3,10 @@
 // ============================================================================
 
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, TouchableOpacity, View, Platform, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, View, Platform, Pressable } from 'react-native';
 import { Alert } from '../../../lib/alert';
 import { Switch, Text } from 'react-native-paper';
-import { Colors } from '../../../constants/colors';
+
 import { APP_NAME } from '../../../constants/roles';
 import { useAuthStore } from '../../../store/authStore';
 import { useWorkStore } from '../../../store/workStore';

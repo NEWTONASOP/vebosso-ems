@@ -7,7 +7,6 @@ import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable
 import { TextInput, Text, Snackbar } from 'react-native-paper';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useAuthStore } from '../../store/authStore';
-import { Colors } from '../../constants/colors';
 import { APP_NAME, APP_TAGLINE } from '../../constants/roles';
 import { Feather } from '@expo/vector-icons';
 
@@ -133,7 +132,7 @@ export default function LoginScreen() {
           <View style={styles.helpSection}>
             <Feather name="info" size={14} color="#AEAEB2" />
             <Text style={styles.helpText}>
-              Don't have an account? Contact your admin.
+              Don&apos;t have an account? Contact your admin.
             </Text>
           </View>
         </Animated.View>

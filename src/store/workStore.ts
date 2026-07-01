@@ -1,7 +1,7 @@
 // ============================================================================
 // VEBOSSO EMS — Work Store (Zustand)
 // ============================================================================
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 // The Supabase client is typed as SupabaseClient<any> to avoid codegen requirement.
 // Our own types (WorkLog, Task, etc.) are still enforced at the interface level.
 
@@ -170,7 +170,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       });
 
       return { success: true };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Failed to check in. Please try again.' };
     }
   },
@@ -201,7 +201,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
       set({ todayLog: data as WorkLog });
       return { success: true };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Failed to check out. Please try again.' };
     }
   },
@@ -223,7 +223,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       }
 
       set({ todayLog: data ? (data as unknown as WorkLog) : null, isLoadingToday: false });
-    } catch (error) {
+    } catch {
       set({ isLoadingToday: false });
     }
   },
@@ -316,7 +316,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         pendingApprovalsCount: approvals.length,
         isLoadingApprovals: false,
       });
-    } catch (error) {
+    } catch {
       set({ isLoadingApprovals: false });
     }
   },
@@ -419,7 +419,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       }
 
       set({ teamMembers: (data as Profile[]) || [], isLoadingTeam: false });
-    } catch (error) {
+    } catch {
       set({ isLoadingTeam: false });
     }
   },
@@ -543,7 +543,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         announcements: (data || []) as unknown as AnnouncementWithCreator[],
         isLoadingAnnouncements: false,
       });
-    } catch (error) {
+    } catch {
       set({ isLoadingAnnouncements: false });
     }
   },

@@ -36,7 +36,7 @@ export default function OwnerDashboard() {
       fetchPendingApprovals(),
       fetchSettings(),
     ]);
-  }, []);
+  }, [fetchStats, fetchPendingApprovals, fetchSettings]);
 
   useEffect(() => {
     if (!profile?.id) {
@@ -48,7 +48,7 @@ export default function OwnerDashboard() {
     subscribeToRealtime(profile.id, 'owner');
     
     return () => unsubscribeFromRealtime();
-  }, [profile?.id]);
+  }, [profile?.id, loadData, subscribeToRealtime, unsubscribeFromRealtime]);
 
   const onRefresh = async () => {
     setRefreshing(true);

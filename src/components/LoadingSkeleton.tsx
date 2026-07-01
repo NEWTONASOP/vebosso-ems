@@ -25,7 +25,7 @@ export function Skeleton({ width = '100%', height = 16, borderRadius = 8, style 
 
   useEffect(() => {
     shimmer.value = withRepeat(withTiming(1, { duration: 1200 }), -1, true);
-  }, []);
+  }, [shimmer]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: interpolate(shimmer.value, [0, 1], [0.3, 0.7]),

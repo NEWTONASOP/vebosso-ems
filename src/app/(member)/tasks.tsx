@@ -7,7 +7,6 @@ import { View, StyleSheet, ScrollView, RefreshControl, Platform, Pressable } fro
 import { Text, Snackbar } from 'react-native-paper';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
-import { Colors } from '../../constants/colors';
 import { TaskCard } from '../../components/TaskCard';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { EmptyState } from '../../components/EmptyState';
@@ -23,7 +22,7 @@ export default function MemberTasksScreen() {
 
   useEffect(() => {
     if (profile) fetchTodayTasks(profile.id);
-  }, [profile]);
+  }, [profile, fetchTodayTasks]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -77,7 +76,7 @@ export default function MemberTasksScreen() {
             </View>
             <View style={styles.progressBar}>
               <View
-                style={[styles.progressFill, { width: `${(styles.progressFill.width = (stats.done / stats.total) * 100)}%` }]}
+                style={[styles.progressFill, { width: `${(stats.done / stats.total) * 100}%` }]}
               />
             </View>
           </View>

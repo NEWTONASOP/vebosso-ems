@@ -28,7 +28,7 @@ export default function OwnerApprovalsScreen() {
 
   useEffect(() => {
     fetchPendingApprovals();
-  }, []);
+  }, [fetchPendingApprovals]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -36,29 +36,29 @@ export default function OwnerApprovalsScreen() {
     setRefreshing(false);
   };
 
-  const handleApprove = async (workLogId: string) => {
+  const handleApprove = useCallback(async (workLogId: string) => {
     if (!profile) return;
     try {
       await approveCheckIn(workLogId, profile.id);
       setSnackMessage('Check-in approved ✅');
-    } catch (e) {
+    } catch {
       setSnackMessage('Failed to approve. Please try again.');
     }
-  };
+  }, [profile, approveCheckIn]);
 
-  const handleReject = async (workLogId: string) => {
+  const handleReject = useCallback(async (workLogId: string) => {
     if (!profile) return;
     try {
       await rejectCheckIn(workLogId, profile.id, 'Please revise your plan and check in again.');
       setSnackMessage('Check-in rejected');
-    } catch (e) {
+    } catch {
       setSnackMessage('Failed to reject. Please try again.');
     }
-  };
+  }, [profile, rejectCheckIn]);
 
   const renderItem = useCallback(({ item }: { item: WorkLogWithProfile }) => (
     <ApprovalCard workLog={item} onApprove={handleApprove} onReject={handleReject} />
-  ), [profile]);
+  ), [handleApprove, handleReject]);
 
   return (
     <View style={styles.container}>

@@ -10,6 +10,7 @@ import { isRunningInExpoGo } from 'expo';
 
 // Lazily load expo-notifications to prevent crash under Expo Go on Android
 const expoNotifications = !isRunningInExpoGo()
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   ? (require('expo-notifications') as typeof Notifications)
   : null;
 
@@ -114,7 +115,7 @@ export async function savePushToken(userId: string, token: string): Promise<void
   try {
     const { error } = await supabase
       .from('profiles')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       .update({ expo_push_token: token } as any)
       .eq('id', userId);
 
@@ -136,7 +137,7 @@ export async function sendPushNotification(
   data?: Record<string, unknown>
 ): Promise<void> {
   try {
-    const { data: response, error } = await supabase.functions.invoke('send-push-notification', {
+    const { error } = await supabase.functions.invoke('send-push-notification', {
       body: { user_id: userId, title, body, data },
     });
 

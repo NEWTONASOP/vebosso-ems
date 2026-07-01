@@ -8,7 +8,7 @@ import { Text } from 'react-native-paper';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { AnimatedPressable } from './AnimatedPressable';
 import { format } from 'date-fns';
-import { Colors } from '../constants/colors';
+
 import { Task, TaskStatus } from '../types/database';
 import { Feather } from '@expo/vector-icons';
 

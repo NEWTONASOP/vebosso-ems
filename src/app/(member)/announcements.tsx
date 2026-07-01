@@ -7,19 +7,18 @@ import { View, StyleSheet, FlatList, RefreshControl, Platform } from 'react-nati
 import { Text } from 'react-native-paper';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
-import { Colors } from '../../constants/colors';
 import { AnnouncementCard } from '../../components/AnnouncementCard';
 import { EmptyState } from '../../components/EmptyState';
 import { PageTransition } from '../../components/PageTransition';
 
 export default function MemberAnnouncementsScreen() {
   const { profile } = useAuthStore();
-  const { announcements, isLoadingAnnouncements, fetchAnnouncements } = useWorkStore();
+  const { announcements, fetchAnnouncements } = useWorkStore();
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (profile) fetchAnnouncements(profile.role, profile.id);
-  }, [profile]);
+  }, [profile, fetchAnnouncements]);
 
   const onRefresh = async () => {
     setRefreshing(true);
