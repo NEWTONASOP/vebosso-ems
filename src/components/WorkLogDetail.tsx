@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { Colors } from '../constants/colors';
 import { WorkLog } from '../types/database';
 import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
+import { Feather } from '@expo/vector-icons';
 
 interface WorkLogDetailProps {
   visible: boolean;
@@ -55,7 +56,9 @@ export function WorkLogDetail({ visible, onDismiss, workLog }: WorkLogDetailProp
           {/* Time Summary */}
           <View style={styles.timeRow}>
             <View style={styles.timeCard}>
-              <Text style={styles.timeEmoji}>🟢</Text>
+              <View style={[styles.iconWrapper, { backgroundColor: 'rgba(52, 199, 89, 0.1)' }]}>
+                <Feather name="log-in" size={16} color="#34C759" />
+              </View>
               <Text style={styles.timeLabel}>Check In</Text>
               <Text style={styles.timeValue}>
                 {workLog.check_in_time
@@ -64,7 +67,9 @@ export function WorkLogDetail({ visible, onDismiss, workLog }: WorkLogDetailProp
               </Text>
             </View>
             <View style={styles.timeCard}>
-              <Text style={styles.timeEmoji}>🔴</Text>
+              <View style={[styles.iconWrapper, { backgroundColor: 'rgba(255, 59, 48, 0.1)' }]}>
+                <Feather name="log-out" size={16} color="#FF3B30" />
+              </View>
               <Text style={styles.timeLabel}>Check Out</Text>
               <Text style={styles.timeValue}>
                 {workLog.check_out_time
@@ -73,7 +78,9 @@ export function WorkLogDetail({ visible, onDismiss, workLog }: WorkLogDetailProp
               </Text>
             </View>
             <View style={styles.timeCard}>
-              <Text style={styles.timeEmoji}>⏱️</Text>
+              <View style={[styles.iconWrapper, { backgroundColor: 'rgba(0, 122, 255, 0.1)' }]}>
+                <Feather name="clock" size={16} color="#007AFF" />
+              </View>
               <Text style={styles.timeLabel}>Total Hours</Text>
               <Text style={styles.timeValue}>
                 {workLog.total_hours ? `${workLog.total_hours}h` : '--'}
@@ -120,7 +127,7 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.surface,
     margin: 16,
-    borderRadius: 16,
+    borderRadius: 24,
     padding: 20,
     maxHeight: '80%',
     borderWidth: 1,
@@ -162,9 +169,13 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center',
   },
-  timeEmoji: {
-    fontSize: 20,
-    marginBottom: 4,
+  iconWrapper: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
   },
   timeLabel: {
     fontSize: 11,

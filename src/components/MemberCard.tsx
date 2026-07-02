@@ -31,7 +31,16 @@ export function MemberCard({ member, currentStatus = 'offline', checkInTime, onP
     return { label: config?.label || 'Unknown', color: config?.color || Colors.textTertiary, bg: config?.backgroundColor || Colors.surfaceLight };
   };
 
+  const getAvatarColors = () => {
+    switch (member.role) {
+      case 'owner': return { bg: Colors.ownerAccent + '15', text: Colors.ownerAccent };
+      case 'manager': return { bg: Colors.managerAccent + '15', text: Colors.managerAccent };
+      case 'member': default: return { bg: Colors.memberAccent + '15', text: Colors.memberAccent };
+    }
+  };
+
   const status = getStatusDisplay();
+  const avatarColors = getAvatarColors();
 
   return (
     <Animated.View
@@ -46,8 +55,8 @@ export function MemberCard({ member, currentStatus = 'offline', checkInTime, onP
       <Avatar.Text
         size={44}
         label={member.full_name.substring(0, 2).toUpperCase()}
-        style={styles.avatar}
-        labelStyle={styles.avatarLabel}
+        style={[styles.avatar, { backgroundColor: avatarColors.bg }]}
+        labelStyle={[styles.avatarLabel, { color: avatarColors.text }]}
       />
 
       <View style={styles.info}>
@@ -81,7 +90,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: 14,
+    borderRadius: 20,
     padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
@@ -90,10 +99,8 @@ const styles = StyleSheet.create({
     ...Colors.shadow,
   },
   avatar: {
-    backgroundColor: Colors.accentSubtle,
   },
   avatarLabel: {
-    color: Colors.accent,
     fontSize: 15,
     fontWeight: '700',
   },

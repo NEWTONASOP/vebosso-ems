@@ -3,8 +3,9 @@
 // ============================================================================
 
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, View, Platform } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
+import { Alert } from '../../lib/alert';
 import { ApprovalCard } from '../../components/ApprovalCard';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
@@ -46,14 +47,27 @@ export default function OwnerApprovalsScreen() {
     }
   }, [profile, approveCheckIn]);
 
-  const handleReject = useCallback(async (workLogId: string) => {
+  const handleReject = useCallback((workLogId: string) => {
     if (!profile) return;
-    try {
-      await rejectCheckIn(workLogId, profile.id, 'Please revise your plan and check in again.');
-      setSnackMessage('Check-in rejected');
-    } catch {
-      setSnackMessage('Failed to reject. Please try again.');
-    }
+    Alert.alert(
+      'Reject Request',
+      'Are you sure you want to reject this request?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await rejectCheckIn(workLogId, profile.id, 'Please revise your plan and check in again.');
+              setSnackMessage('Check-in rejected');
+            } catch {
+              setSnackMessage('Failed to reject. Please try again.');
+            }
+          }
+        }
+      ]
+    );
   }, [profile, rejectCheckIn]);
 
   const renderItem = useCallback(({ item }: { item: WorkLogWithProfile }) => (
@@ -96,7 +110,7 @@ export default function OwnerApprovalsScreen() {
         visible={!!snackMessage}
         onDismiss={() => setSnackMessage('')}
         duration={3000}
-       
+        style={{ bottom: 80 }}
       >
         {snackMessage}
       </Snackbar>
@@ -106,9 +120,9 @@ export default function OwnerApprovalsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 12 },
+  header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 12 },
   title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
   subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   content: { paddingHorizontal: 20 },
-  list: { paddingHorizontal: 20, paddingBottom: 20 },
+  list: { paddingHorizontal: 20, paddingBottom: 110 },
 });

@@ -15,7 +15,7 @@ export function EmptyState({ icon, title, subtitle, actionLabel, onAction }: Emp
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
-        <Icon source={icon} size={36} color={Colors.accent} />
+        <Icon source={icon} size={36} color={Colors.textTertiary} />
       </View>
       <Text style={styles.title}>{title}</Text>
       {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
@@ -68,6 +68,6 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 20,
-    borderRadius: 8,
+    borderRadius: 20,
   },
 });

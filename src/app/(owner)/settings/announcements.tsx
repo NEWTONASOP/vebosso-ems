@@ -4,8 +4,9 @@
 
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
-import { Button, IconButton, SegmentedButtons, Snackbar, Text, TextInput } from 'react-native-paper';
+import { FlatList, StyleSheet, View, Platform, Pressable } from 'react-native';
+import { Button, Snackbar, Text, TextInput } from 'react-native-paper';
+import { Feather } from '@expo/vector-icons';
 import { AnnouncementCard } from '../../../components/AnnouncementCard';
 import { EmptyState } from '../../../components/EmptyState';
 import { Colors } from '../../../constants/colors';
@@ -60,20 +61,30 @@ export default function AnnouncementsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <IconButton icon="arrow-left" iconColor={Colors.text} size={24} onPress={() => router.back()} />
+        <Pressable
+          style={({ pressed }) => [
+            styles.backBtn,
+            pressed && styles.btnPressed
+          ]}
+          onPress={() => router.back()}
+        >
+          <Feather name="arrow-left" size={18} color={Colors.textPrimary} />
+        </Pressable>
         <Text style={styles.title}>Announcements</Text>
         <View style={{ flex: 1 }} />
-        <Button
-          mode="contained"
+        <Pressable
+          style={({ pressed }) => [
+            styles.newBtn,
+            pressed && styles.btnPressed,
+            showForm && styles.newBtnActive
+          ]}
           onPress={() => setShowForm(!showForm)}
-          compact
-          buttonColor={Colors.accent}
-          textColor={Colors.white}
-          icon={showForm ? 'close' : 'plus'}
-          style={styles.newButton}
         >
-          {showForm ? 'Cancel' : 'New'}
-        </Button>
+          <Feather name={showForm ? 'x' : 'plus'} size={16} color={showForm ? Colors.textPrimary : Colors.white} />
+          <Text style={[styles.newBtnText, showForm && styles.newBtnTextActive]}>
+            {showForm ? 'Cancel' : 'New'}
+          </Text>
+        </Pressable>
       </View>
 
       {showForm && (
@@ -85,9 +96,10 @@ export default function AnnouncementsScreen() {
             onChangeText={setTitle}
             style={styles.input}
             outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.text}
-            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.inputBackground } }}
+            activeOutlineColor={Colors.textPrimary}
+            textColor={Colors.textPrimary}
+            outlineStyle={styles.inputOutline}
+            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.systemGray6 } }}
           />
           <TextInput
             mode="outlined"
@@ -98,35 +110,43 @@ export default function AnnouncementsScreen() {
             numberOfLines={3}
             style={styles.input}
             outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.text}
-            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.inputBackground } }}
+            activeOutlineColor={Colors.textPrimary}
+            textColor={Colors.textPrimary}
+            outlineStyle={styles.inputOutline}
+            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.systemGray6 } }}
           />
 
           <Text style={styles.fieldLabel}>Target Audience</Text>
-          <SegmentedButtons
-            value={targetRole}
-            onValueChange={setTargetRole}
-            buttons={[
+          <View style={styles.segmentedContainer}>
+            {[
               { value: 'all', label: 'Everyone' },
               { value: 'manager', label: 'Managers' },
-              { value: 'member', label: 'Members' },
-            ]}
-            style={styles.segmented}
-          />
+              { value: 'member', label: 'Members' }
+            ].map((option) => (
+              <Pressable
+                key={option.value}
+                style={[styles.segmentBtn, targetRole === option.value && styles.segmentBtnActive]}
+                onPress={() => setTargetRole(option.value)}
+              >
+                <Text style={[styles.segmentText, targetRole === option.value && styles.segmentTextActive]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
 
-          <Button
-            mode="contained"
+          <Pressable
+            style={({ pressed }) => [
+              styles.sendBtn,
+              pressed && styles.btnPressed,
+              isLoading && { opacity: 0.7 }
+            ]}
             onPress={handleSend}
-            loading={isLoading}
             disabled={isLoading}
-            buttonColor={Colors.accent}
-            textColor={Colors.white}
-            style={styles.sendButton}
-            icon="send"
           >
-            Send Announcement
-          </Button>
+            <Feather name="send" size={16} color={Colors.white} />
+            <Text style={styles.sendBtnText}>Send Announcement</Text>
+          </Pressable>
         </View>
       )}
 
@@ -152,29 +172,130 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 50,
-    paddingHorizontal: 8,
-    gap: 4,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 36,
+    paddingBottom: 12,
+    gap: 12,
   },
-  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
-  newButton: { borderRadius: 10 },
-  formSection: {
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: Colors.surface,
-    margin: 16,
-    borderRadius: 14,
-    padding: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
     ...Colors.shadow,
+    elevation: 1,
   },
-  input: { marginBottom: 12, backgroundColor: Colors.inputBackground },
-  fieldLabel: {
+  btnPressed: {
+    transform: [{ scale: 0.97 }],
+    opacity: 0.9,
+  },
+  title: {
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 24,
+    color: Colors.textPrimary,
+    letterSpacing: -0.5,
+  },
+  newBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    gap: 6,
+  },
+  newBtnActive: {
+    backgroundColor: Colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  newBtnText: {
+    fontFamily: 'Inter_700Bold',
     fontSize: 13,
-    fontWeight: '600',
+    color: Colors.white,
+  },
+  newBtnTextActive: {
+    color: Colors.textPrimary,
+  },
+  formSection: {
+    backgroundColor: Colors.surface,
+    marginHorizontal: 16,
+    borderRadius: 24,
+    padding: 20,
+    ...Colors.shadow,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    elevation: 3,
+    marginTop: 14,
+  },
+  input: {
+    marginBottom: 14,
+    backgroundColor: Colors.systemGray6,
+    fontSize: 15,
+  },
+  inputOutline: {
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  fieldLabel: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
     color: Colors.textSecondary,
     marginBottom: 8,
+    marginLeft: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
-  segmented: { marginBottom: 14 },
-  sendButton: { borderRadius: 10, marginTop: 4 },
-  list: { paddingHorizontal: 16, paddingBottom: 20 },
+  segmentedContainer: {
+    flexDirection: 'row',
+    backgroundColor: Colors.systemGray6,
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 16,
+    gap: 4,
+  },
+  segmentBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  segmentBtnActive: {
+    backgroundColor: Colors.surface,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segmentText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  segmentTextActive: {
+    color: Colors.accent,
+  },
+  sendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.accent, // Solid Black pill
+    borderRadius: 24,
+    width: '100%',
+    height: 48,
+    marginTop: 8,
+    gap: 8,
+  },
+  sendBtnText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 14,
+    color: Colors.white,
+  },
+  list: { paddingHorizontal: 16, paddingBottom: 110, paddingTop: 14 },
 });

@@ -102,7 +102,7 @@ export function ProfileSkeleton() {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: '45%',
     backgroundColor: Colors.surface,
-    borderRadius: 12,
+    borderRadius: 24,
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,

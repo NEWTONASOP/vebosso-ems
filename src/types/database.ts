@@ -168,7 +168,7 @@ export interface TaskUpdate {
 // ============================================================================
 
 export interface WorkLogWithProfile extends WorkLog {
-  profiles: Pick<Profile, 'full_name' | 'employee_id' | 'avatar_url' | 'department'>;
+  profiles: Pick<Profile, 'full_name' | 'employee_id' | 'avatar_url' | 'department' | 'role'>;
 }
 
 export interface TaskWithProfiles extends Task {

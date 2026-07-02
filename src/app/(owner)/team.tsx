@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, View, Platform } from 'react-native';
 import { Chip, Searchbar, Text } from 'react-native-paper';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
@@ -138,7 +138,7 @@ export default function OwnerTeamScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 8 },
+  header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 8 },
   title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
   subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   searchSection: { paddingHorizontal: 20, paddingTop: 12 },
@@ -162,5 +162,5 @@ const styles = StyleSheet.create({
   },
   filterChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600' },
   filterChipTextActive: { color: Colors.accent, fontWeight: '700' },
-  list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20 },
+  list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 110 },
 });

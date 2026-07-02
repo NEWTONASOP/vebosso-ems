@@ -14,9 +14,9 @@ const ICON_MAP: Record<string, string> = {
   history: 'calendar',
   announcements: 'bell',
   profile: 'user',
-  dashboard: 'sliders',
-  members: 'users',
-  approvals: 'clipboard',
+  dashboard: 'grid',
+  team: 'users',
+  approvals: 'check-circle',
   settings: 'settings',
 };
 
@@ -28,7 +28,7 @@ const LABEL_MAP: Record<string, string> = {
   announcements: 'News',
   profile: 'Profile',
   dashboard: 'Dashboard',
-  members: 'Members',
+  team: 'Team',
   approvals: 'Approvals',
   settings: 'Settings',
 };

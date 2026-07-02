@@ -12,6 +12,8 @@ import { format } from 'date-fns';
 import { WorkLogWithProfile } from '../types/database';
 import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
 import { Feather } from '@expo/vector-icons';
+import { Colors } from '../constants/colors';
+import * as Haptics from 'expo-haptics';
 
 interface ApprovalCardProps {
   workLog: WorkLogWithProfile;
@@ -28,6 +30,18 @@ export function ApprovalCard({ workLog, onApprove, onReject, index = 0 }: Approv
     ? format(new Date(workLog.check_in_time), 'hh:mm a')
     : '--';
 
+  const getAvatarColors = () => {
+    // @ts-ignore - role might be missing if not explicitly fetched in the join, defaulting safely
+    const role = profile.role || 'member';
+    switch (role) {
+      case 'owner': return { bg: Colors.ownerAccent + '15', text: Colors.ownerAccent };
+      case 'manager': return { bg: Colors.managerAccent + '15', text: Colors.managerAccent };
+      case 'member': default: return { bg: Colors.memberAccent + '15', text: Colors.memberAccent };
+    }
+  };
+
+  const avatarColors = getAvatarColors();
+
   return (
     <Animated.View 
       entering={FadeInDown.delay(index * 50).springify()}
@@ -36,8 +50,8 @@ export function ApprovalCard({ workLog, onApprove, onReject, index = 0 }: Approv
     >
       {/* Header Info */}
       <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarLabel}>
+        <View style={[styles.avatar, { backgroundColor: avatarColors.bg, borderColor: avatarColors.text + '30' }]}>
+          <Text style={[styles.avatarLabel, { color: avatarColors.text }]}>
             {profile.full_name.substring(0, 2).toUpperCase()}
           </Text>
         </View>
@@ -69,9 +83,10 @@ export function ApprovalCard({ workLog, onApprove, onReject, index = 0 }: Approv
       {/* Check-in Plan details */}
       {workLog.check_in_plan && (
         <View style={styles.planSection}>
-          <Text style={styles.planLabel}>
-            <Feather name="clipboard" size={14} color="#8E8E93" /> Plan for Today
-          </Text>
+          <View style={styles.planLabelRow}>
+            <Feather name="clipboard" size={14} color="#007AFF" />
+            <Text style={styles.planLabel}> Plan for Today</Text>
+          </View>
           <Text style={styles.planText}>{workLog.check_in_plan}</Text>
         </View>
       )}
@@ -84,7 +99,10 @@ export function ApprovalCard({ workLog, onApprove, onReject, index = 0 }: Approv
               styles.rejectBtn,
               pressed && styles.btnPressed
             ]}
-            onPress={() => onReject(workLog.id)}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              onReject(workLog.id);
+            }}
           >
             <Feather name="x" size={14} color="#FF3B30" />
             <Text style={styles.rejectBtnText}>Reject</Text>
@@ -95,7 +113,10 @@ export function ApprovalCard({ workLog, onApprove, onReject, index = 0 }: Approv
               styles.approveBtn,
               pressed && styles.btnPressed
             ]}
-            onPress={() => onApprove(workLog.id)}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              onApprove(workLog.id);
+            }}
           >
             <Feather name="check" size={14} color="#FFFFFF" />
             <Text style={styles.approveBtnText}>Approve</Text>
@@ -106,9 +127,10 @@ export function ApprovalCard({ workLog, onApprove, onReject, index = 0 }: Approv
       {/* Checkout Day Report */}
       {workLog.status === 'pending_checkout' && workLog.day_report && (
         <View style={styles.planSection}>
-          <Text style={styles.planLabel}>
-            <Feather name="file-text" size={14} color="#8E8E93" /> Day Report
-          </Text>
+          <View style={styles.planLabelRow}>
+            <Feather name="file-text" size={14} color="#007AFF" />
+            <Text style={styles.planLabel}> Day Report</Text>
+          </View>
           <Text style={styles.planText}>{workLog.day_report}</Text>
         </View>
       )}
@@ -206,11 +228,15 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
   },
+  planLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
   planLabel: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
     color: '#007AFF',
-    marginBottom: 6,
   },
   planText: {
     fontFamily: 'Inter_400Regular',

@@ -3,8 +3,9 @@
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Platform, Pressable, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ScrollView, Platform, Pressable, ActivityIndicator, KeyboardAvoidingView } from 'react-native';
 import { TextInput, Text, Snackbar } from 'react-native-paper';
+import { Colors } from '../../../constants/colors';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../../lib/supabase';
@@ -25,6 +26,7 @@ export default function AddMemberScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
   const [createdCredentials, setCreatedCredentials] = useState<{ employeeId: string; password: string } | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Auto-generate employee ID
   useEffect(() => {
@@ -141,7 +143,7 @@ export default function AddMemberScreen() {
               ]}
               onPress={handleCopyCredentials}
             >
-              <Feather name="copy" size={14} color="#FFFFFF" />
+              <Feather name="copy" size={14} color={Colors.white} />
               <Text style={styles.copyBtnText}>Copy Credentials</Text>
             </Pressable>
 
@@ -181,7 +183,7 @@ export default function AddMemberScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {/* Header with circular back chevron */}
         <View style={styles.header}>
@@ -192,7 +194,7 @@ export default function AddMemberScreen() {
             ]}
             onPress={() => router.back()}
           >
-            <Feather name="arrow-left" size={18} color="#1C1C1E" />
+            <Feather name="arrow-left" size={18} color={Colors.textPrimary} />
           </Pressable>
           <Text style={styles.title}>Add Member</Text>
         </View>
@@ -205,11 +207,11 @@ export default function AddMemberScreen() {
             value={fullName}
             onChangeText={setFullName}
             style={styles.input}
-            outlineColor="#E5E7EB"
-            activeOutlineColor="#000000"
-            textColor="#1C1C1E"
+            outlineColor={Colors.border}
+            activeOutlineColor={Colors.textPrimary}
+            textColor={Colors.textPrimary}
             outlineStyle={styles.inputOutline}
-            theme={{ colors: { onSurfaceVariant: '#AEAEB2', surface: '#F4F4F6' } }}
+            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.systemGray6 } }}
           />
 
           <TextInput
@@ -218,11 +220,11 @@ export default function AddMemberScreen() {
             value={department}
             onChangeText={setDepartment}
             style={styles.input}
-            outlineColor="#E5E7EB"
-            activeOutlineColor="#000000"
-            textColor="#1C1C1E"
+            outlineColor={Colors.border}
+            activeOutlineColor={Colors.textPrimary}
+            textColor={Colors.textPrimary}
             outlineStyle={styles.inputOutline}
-            theme={{ colors: { onSurfaceVariant: '#AEAEB2', surface: '#F4F4F6' } }}
+            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.systemGray6 } }}
           />
 
           {/* Role Segment Selector */}
@@ -271,11 +273,11 @@ export default function AddMemberScreen() {
             value={employeeId}
             onChangeText={setEmployeeId}
             style={styles.input}
-            outlineColor="#E5E7EB"
-            activeOutlineColor="#000000"
-            textColor="#1C1C1E"
+            outlineColor={Colors.border}
+            activeOutlineColor={Colors.textPrimary}
+            textColor={Colors.textPrimary}
             outlineStyle={styles.inputOutline}
-            theme={{ colors: { onSurfaceVariant: '#AEAEB2', surface: '#F4F4F6' } }}
+            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.systemGray6 } }}
           />
 
           <TextInput
@@ -284,11 +286,13 @@ export default function AddMemberScreen() {
             value={password}
             onChangeText={setPassword}
             style={styles.input}
-            outlineColor="#E5E7EB"
-            activeOutlineColor="#000000"
-            textColor="#1C1C1E"
+            outlineColor={Colors.border}
+            activeOutlineColor={Colors.textPrimary}
+            textColor={Colors.textPrimary}
             outlineStyle={styles.inputOutline}
-            theme={{ colors: { onSurfaceVariant: '#AEAEB2', surface: '#F4F4F6' } }}
+            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.systemGray6 } }}
+            secureTextEntry={!showPassword}
+            right={<TextInput.Icon icon={showPassword ? 'eye-off' : 'eye'} onPress={() => setShowPassword(!showPassword)} color={Colors.textSecondary} />}
           />
 
           {/* Action button */}
@@ -302,10 +306,10 @@ export default function AddMemberScreen() {
             disabled={isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
+              <ActivityIndicator color={Colors.white} size="small" />
             ) : (
               <>
-                <Feather name="user-plus" size={16} color="#FFFFFF" />
+                <Feather name="user-plus" size={16} color={Colors.white} />
                 <Text style={styles.createBtnText}>Create Member</Text>
               </>
             )}
@@ -314,7 +318,7 @@ export default function AddMemberScreen() {
       </ScrollView>
 
       <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>{snackMessage}</Snackbar>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -325,7 +329,7 @@ export default function AddMemberScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EDEDED', // Premium Fintech light grey
+    backgroundColor: Colors.background, // Premium Fintech light grey
   },
   scrollContent: {
     paddingBottom: 40,
@@ -345,40 +349,34 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
+    borderColor: Colors.border,
+    ...Colors.shadow,
     elevation: 1,
   },
   title: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 24,
-    color: '#1C1C1E',
+    color: Colors.textPrimary,
     letterSpacing: -0.5,
   },
   formSection: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     marginHorizontal: 16,
     borderRadius: 24,
     padding: 20,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
+    ...Colors.shadow,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
+    borderColor: Colors.border,
     elevation: 3,
     marginTop: 14,
   },
   input: {
     marginBottom: 14,
-    backgroundColor: '#F4F4F6', // System Gray 6
+    backgroundColor: Colors.systemGray6,
     fontSize: 15,
   },
   inputOutline: {
@@ -388,7 +386,7 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontFamily: 'Inter_700Bold',
     fontSize: 12,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     marginBottom: 8,
     marginLeft: 4,
     textTransform: 'uppercase',
@@ -397,7 +395,7 @@ const styles = StyleSheet.create({
   // Custom segment control
   segmentedContainer: {
     flexDirection: 'row',
-    backgroundColor: '#F4F4F6',
+    backgroundColor: Colors.systemGray6,
     borderRadius: 14,
     padding: 4,
     marginBottom: 16,
@@ -411,7 +409,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   segmentBtnActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -421,10 +419,10 @@ const styles = StyleSheet.create({
   segmentText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
   },
   segmentTextActive: {
-    color: '#000000',
+    color: Colors.accent,
   },
   // Manager section
   managerSection: {
@@ -435,9 +433,9 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   managerChip: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 14,
@@ -449,22 +447,22 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   managerChipActive: {
-    backgroundColor: '#000000',
-    borderColor: '#000000',
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
   },
   managerChipText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 11,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
   },
   managerChipTextActive: {
-    color: '#FFFFFF',
+    color: Colors.white,
   },
   createBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000000', // Solid Black pill
+    backgroundColor: Colors.accent, // Solid Black pill
     borderRadius: 24,
     width: '100%',
     height: 48,
@@ -474,14 +472,14 @@ const styles = StyleSheet.create({
   createBtnText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 14,
-    color: '#FFFFFF',
+    color: Colors.white,
   },
   btnPressed: {
     transform: [{ scale: 0.97 }],
     opacity: 0.9,
   },
   btnDisabled: {
-    backgroundColor: '#AEAEB2',
+    backgroundColor: Colors.textTertiary,
   },
   // Success content styles
   successContent: {
@@ -493,16 +491,13 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   successCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 28,
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04,
-    shadowRadius: 20,
+    ...Colors.shadow,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
+    borderColor: Colors.border,
     elevation: 3,
   },
   successEmoji: {
@@ -512,24 +507,24 @@ const styles = StyleSheet.create({
   successTitle: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 22,
-    color: '#1C1C1E',
+    color: Colors.textPrimary,
     letterSpacing: -0.5,
   },
   successSubtitle: {
     fontFamily: 'Inter_500Medium',
     fontSize: 13,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     marginTop: 4,
     marginBottom: 20,
     textAlign: 'center',
   },
   credentialBox: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: Colors.surfaceLight,
     borderRadius: 16,
     padding: 16,
     width: '100%',
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.02)',
+    borderColor: Colors.divider,
     marginBottom: 20,
   },
   credRow: {
@@ -540,24 +535,24 @@ const styles = StyleSheet.create({
   },
   credRowDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: Colors.divider,
     marginVertical: 10,
   },
   credLabel: {
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
   },
   credValue: {
     fontFamily: 'Inter_700Bold',
     fontSize: 14,
-    color: '#1C1C1E',
+    color: Colors.textPrimary,
   },
   copyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000000', // Solid Black
+    backgroundColor: Colors.accent, // Solid Black
     borderRadius: 24,
     width: '100%',
     height: 46,
@@ -567,13 +562,13 @@ const styles = StyleSheet.create({
   copyBtnText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 13,
-    color: '#FFFFFF',
+    color: Colors.white,
   },
   addAnotherBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F2F2F7', // Muted Gray
+    backgroundColor: Colors.surfacePressed, // Muted Gray
     borderRadius: 24,
     width: '100%',
     height: 46,
@@ -582,7 +577,7 @@ const styles = StyleSheet.create({
   addAnotherBtnText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 13,
-    color: '#55555A',
+    color: Colors.textSecondary,
   },
   backTextBtn: {
     paddingVertical: 4,
@@ -590,7 +585,7 @@ const styles = StyleSheet.create({
   backText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     textDecorationLine: 'underline',
   },
 });

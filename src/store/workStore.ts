@@ -283,7 +283,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .from('work_logs')
         .select(`
           *,
-          profiles!work_logs_user_id_fkey (full_name, employee_id, avatar_url, department)
+          profiles!work_logs_user_id_fkey (full_name, employee_id, avatar_url, department, role)
         `)
         .in('status', ['pending_approval', 'pending_checkout'])
         .order('check_in_time', { ascending: false });

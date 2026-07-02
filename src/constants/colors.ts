@@ -31,12 +31,13 @@ export const Colors = {
 
   // Text colors
   text: '#111827',            // Deep charcoal for primary text
+  textPrimary: '#1C1C1E',     // Premium text primary
   textSecondary: '#6B7280',   // Medium gray for secondary
   textTertiary: '#9CA3AF',    // Light gray for muted text
   textInverse: '#FFFFFF',     // Text on dark backgrounds
 
   // Background colors
-  background: '#FAFAFA',      // Main app background (off-white)
+  background: '#F2F2F7',      // Main app background (iOS System Gray 6)
   backgroundOverlay: 'rgba(0, 0, 0, 0.4)', // Dark overlay for modals (Glassmorphism backdrop)
 
   // Tab bar
@@ -53,6 +54,9 @@ export const Colors = {
   inputBorder: '#E5E7EB',     
   inputFocusBorder: '#111827', 
   placeholder: '#9CA3AF',     
+  systemGray: '#8E8E93',      // Default system gray
+  systemGray6: '#F4F4F6',     // Light system gray
+  surfacePressed: '#F2F2F7',  // Pressed state for surfaces
 
   // Gradients (as arrays for LinearGradient) - Softer transitions
   gradientPrimary: ['#FFFFFF', '#F9FAFB'] as const,

@@ -4,9 +4,11 @@
 
 import { eachDayOfInterval, endOfMonth, format, isSameDay, startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Button, Menu, Text } from 'react-native-paper';
+import { ScrollView, StyleSheet, TouchableOpacity, View, Platform, ActivityIndicator } from 'react-native';
+import { Button, Text } from 'react-native-paper';
+import { Feather } from '@expo/vector-icons';
 import { EmptyState } from '../../components/EmptyState';
+import { MemberPickerModal } from '../../components/MemberPickerModal';
 import { WorkLogDetail } from '../../components/WorkLogDetail';
 import { Colors } from '../../constants/colors';
 import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
@@ -16,18 +18,22 @@ import { Profile, WorkLog } from '../../types/database';
 export default function OwnerHistoryScreen() {
   const { teamMembers, fetchTeamMembers, fetchWorkHistory } = useWorkStore();
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
-  const [menuVisible, setMenuVisible] = useState(false);
+  const [pickerVisible, setPickerVisible] = useState(false);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<WorkLog | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
+  const [isLoading, setIsLoading] = useState(false);
+
   const loadHistory = useCallback(async () => {
     if (!selectedMember) return;
+    setIsLoading(true);
     const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
     const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
     const logs = await fetchWorkHistory(selectedMember.id, start, end);
     setWorkLogs(logs);
+    setIsLoading(false);
   }, [selectedMember, currentMonth, fetchWorkHistory]);
 
   useEffect(() => {
@@ -57,6 +63,11 @@ export default function OwnerHistoryScreen() {
     return WORK_LOG_STATUS_CONFIG[log.status]?.color || 'transparent';
   };
 
+  const minDate = new Date();
+  minDate.setMonth(minDate.getMonth() - 6);
+  const isMinMonth = currentMonth <= startOfMonth(minDate);
+  const isMaxMonth = currentMonth >= startOfMonth(new Date());
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -65,35 +76,24 @@ export default function OwnerHistoryScreen() {
 
       {/* Member Picker */}
       <View style={styles.pickerSection}>
-        <Menu
-          visible={menuVisible}
-          onDismiss={() => setMenuVisible(false)}
-          anchor={
-            <Button
-              mode="outlined"
-              onPress={() => setMenuVisible(true)}
-              style={styles.pickerButton}
-              textColor={Colors.text}
-              icon="account"
-            >
-              {selectedMember?.full_name || 'Select a member'}
-            </Button>
-          }
-          contentStyle={styles.menuContent}
+        <Button
+          mode="outlined"
+          onPress={() => setPickerVisible(true)}
+          style={styles.pickerButton}
+          textColor={Colors.text}
+          icon="account"
         >
-          {teamMembers.map((member) => (
-            <Menu.Item
-              key={member.id}
-              title={`${member.full_name} (${member.employee_id})`}
-              onPress={() => {
-                setSelectedMember(member);
-                setMenuVisible(false);
-              }}
-              titleStyle={styles.menuItemText}
-            />
-          ))}
-        </Menu>
+          {selectedMember?.full_name || 'Select a member'}
+        </Button>
       </View>
+
+      <MemberPickerModal
+        visible={pickerVisible}
+        onDismiss={() => setPickerVisible(false)}
+        members={teamMembers}
+        selectedMember={selectedMember}
+        onSelectMember={setSelectedMember}
+      />
 
       {!selectedMember ? (
         <EmptyState icon="calendar-month-outline" title="Select a Member" subtitle="Choose a team member to view their attendance history" />
@@ -103,14 +103,18 @@ export default function OwnerHistoryScreen() {
           <View style={styles.monthNav}>
             <TouchableOpacity
               onPress={() => setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1))}
+              disabled={isMinMonth}
+              style={{ opacity: isMinMonth ? 0.3 : 1, padding: 8 }}
             >
-              <Text style={styles.navArrow}>◀</Text>
+              <Feather name="chevron-left" size={24} color={Colors.accent} />
             </TouchableOpacity>
             <Text style={styles.monthTitle}>{format(currentMonth, 'MMMM yyyy')}</Text>
             <TouchableOpacity
               onPress={() => setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1))}
+              disabled={isMaxMonth}
+              style={{ opacity: isMaxMonth ? 0.3 : 1, padding: 8 }}
             >
-              <Text style={styles.navArrow}>▶</Text>
+              <Feather name="chevron-right" size={24} color={Colors.accent} />
             </TouchableOpacity>
           </View>
 
@@ -121,43 +125,49 @@ export default function OwnerHistoryScreen() {
             ))}
           </View>
 
-          <View style={styles.calendarGrid}>
-            {/* Empty cells for offset */}
-            {Array.from({ length: daysInMonth[0].getDay() }).map((_, i) => (
-              <View key={`empty-${i}`} style={styles.dayCell} />
-            ))}
-            {daysInMonth.map((day) => {
-              const log = getLogForDay(day);
-              const isToday = isSameDay(day, new Date());
-              return (
-                <TouchableOpacity
-                  key={day.toISOString()}
-                  style={[
-                    styles.dayCell,
-                    { backgroundColor: getDayColor(log) },
-                    log && { borderColor: getDayBorderColor(log), borderWidth: 1.5 },
-                    isToday && styles.todayCell,
-                  ]}
-                  onPress={() => {
-                    if (log) {
-                      setSelectedLog(log);
-                      setShowDetail(true);
-                    }
-                  }}
-                  disabled={!log}
-                >
-                  <Text style={[styles.dayNumber, isToday && styles.todayText]}>
-                    {format(day, 'd')}
-                  </Text>
-                  {log && (
-                    <Text style={[styles.dayHours, { color: WORK_LOG_STATUS_CONFIG[log.status]?.color }]}>
-                      {log.total_hours ? `${log.total_hours}h` : '·'}
+          {isLoading ? (
+            <View style={{ height: 300, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={Colors.accent} />
+            </View>
+          ) : (
+            <View style={styles.calendarGrid}>
+              {/* Empty cells for offset */}
+              {Array.from({ length: daysInMonth[0].getDay() }).map((_, i) => (
+                <View key={`empty-${i}`} style={styles.dayCell} />
+              ))}
+              {daysInMonth.map((day) => {
+                const log = getLogForDay(day);
+                const isToday = isSameDay(day, new Date());
+                return (
+                  <TouchableOpacity
+                    key={day.toISOString()}
+                    style={[
+                      styles.dayCell,
+                      { backgroundColor: getDayColor(log) },
+                      log && { borderColor: getDayBorderColor(log), borderWidth: 1.5 },
+                      isToday && styles.todayCell,
+                    ]}
+                    onPress={() => {
+                      if (log) {
+                        setSelectedLog(log);
+                        setShowDetail(true);
+                      }
+                    }}
+                    disabled={!log}
+                  >
+                    <Text style={[styles.dayNumber, isToday && styles.todayText]}>
+                      {format(day, 'd')}
                     </Text>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+                    {log && (
+                      <Text style={[styles.dayHours, { color: WORK_LOG_STATUS_CONFIG[log.status]?.color }]}>
+                        {log.total_hours ? `${log.total_hours}h` : '·'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
           {/* Legend */}
           <View style={styles.legend}>
@@ -182,20 +192,17 @@ export default function OwnerHistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 8 },
+  header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 8 },
   title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
   pickerSection: { paddingHorizontal: 20, paddingTop: 12 },
   pickerButton: { borderColor: Colors.border, borderRadius: 12, justifyContent: 'flex-start' },
-  menuContent: { backgroundColor: Colors.surface },
-  menuItemText: { color: Colors.text, fontSize: 14 },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 20 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 110 },
   monthNav: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 16,
   },
-  navArrow: { fontSize: 18, color: Colors.accent, padding: 8 },
   monthTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
   weekdayRow: { flexDirection: 'row', marginBottom: 4 },
   weekdayLabel: {

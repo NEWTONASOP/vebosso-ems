@@ -12,6 +12,7 @@ import { supabase } from '../../../lib/supabase';
 import { EmptyState } from '../../../components/EmptyState';
 import { ListSkeleton } from '../../../components/LoadingSkeleton';
 import { Feather } from '@expo/vector-icons';
+import { Colors } from '../../../constants/colors';
 
 interface SessionInfo {
   id: string;
@@ -95,7 +96,7 @@ export default function SessionManagementScreen() {
           ]}
           onPress={() => router.back()}
         >
-          <Feather name="arrow-left" size={18} color="#1C1C1E" />
+          <Feather name="arrow-left" size={18} color={Colors.textPrimary} />
         </Pressable>
         <Text style={styles.title}>Active Sessions</Text>
       </View>
@@ -107,7 +108,7 @@ export default function SessionManagementScreen() {
       ) : (
         <ScrollView
           contentContainerStyle={styles.scrollContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#000000" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
           showsVerticalScrollIndicator={false}
         >
           {sessions.length > 0 ? (
@@ -167,7 +168,7 @@ export default function SessionManagementScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EDEDED', // Premium Fintech light grey
+    backgroundColor: Colors.background, // Premium Fintech light grey
   },
   header: {
     flexDirection: 'row',
@@ -181,21 +182,18 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
+    borderColor: Colors.border,
+    ...Colors.shadow,
     elevation: 1,
   },
   title: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 24,
-    color: '#1C1C1E',
+    color: Colors.textPrimary,
     letterSpacing: -0.5,
   },
   skeletonContainer: {
@@ -210,20 +208,17 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   groupedCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
+    ...Colors.shadow,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
+    borderColor: Colors.border,
     elevation: 3,
     marginTop: 14,
   },
   rowWrapper: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   rowContent: {
     flexDirection: 'row',
@@ -239,19 +234,19 @@ const styles = StyleSheet.create({
   sessionName: {
     fontFamily: 'Inter_700Bold',
     fontSize: 16,
-    color: '#1C1C1E',
+    color: Colors.textPrimary,
     letterSpacing: -0.2,
   },
   sessionDetail: {
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     marginTop: 3,
   },
   sessionTime: {
     fontFamily: 'Inter_400Regular',
     fontSize: 11,
-    color: '#AEAEB2',
+    color: Colors.textTertiary,
     marginTop: 4,
   },
   actionCol: {
@@ -261,7 +256,7 @@ const styles = StyleSheet.create({
   activeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(52, 199, 89, 0.12)', // Soft Green capsule
+    backgroundColor: Colors.successLight, // Soft Green capsule
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
@@ -271,15 +266,15 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#34C759',
+    backgroundColor: Colors.success,
   },
   activeText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 10,
-    color: '#34C759',
+    color: Colors.success,
   },
   logoutBtn: {
-    backgroundColor: 'rgba(255, 59, 48, 0.08)', // Soft red
+    backgroundColor: Colors.errorLight, // Soft red
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 14,
@@ -287,7 +282,7 @@ const styles = StyleSheet.create({
   logoutBtnText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 12,
-    color: '#FF3B30',
+    color: Colors.error,
   },
   btnPressed: {
     transform: [{ scale: 0.97 }],
@@ -295,20 +290,17 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: Colors.divider,
     marginHorizontal: 16,
   },
   emptyCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
+    ...Colors.shadow,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
+    borderColor: Colors.border,
     elevation: 3,
     marginTop: 14,
   },

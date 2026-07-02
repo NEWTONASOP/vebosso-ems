@@ -8,12 +8,15 @@ import { RefreshControl, ScrollView, StyleSheet, View, Platform } from 'react-na
 import { Text } from 'react-native-paper';
 import { ApprovalCard } from '../../components/ApprovalCard';
 import { EmptyState } from '../../components/EmptyState';
-import { ListSkeleton } from '../../components/LoadingSkeleton';
+import { ListSkeleton, StatsSkeleton } from '../../components/LoadingSkeleton';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Feather } from '@expo/vector-icons';
+import { Colors } from '../../constants/colors';
+import { useRouter } from 'expo-router';
 
 export default function OwnerDashboard() {
+  const router = useRouter();
   const { profile } = useAuthStore();
   const {
     stats,
@@ -81,7 +84,7 @@ export default function OwnerDashboard() {
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#000000" />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />
       }
       showsVerticalScrollIndicator={false}
     >
@@ -96,37 +99,50 @@ export default function OwnerDashboard() {
 
       {/* Stats Cards Dashboard widgets */}
       <Text style={styles.sectionTitle}>Overview</Text>
-      <View style={styles.statsGrid}>
-        <StatCard
-          icon="users"
-          iconColor="#007AFF"
-          value={stats.totalMembers.toString()}
-          label="Total Members"
-        />
-        <StatCard
-          icon="check-circle"
-          iconColor="#34C759"
-          value={stats.activeNow.toString()}
-          label="Active Now"
-        />
-        <StatCard
-          icon="sun"
-          iconColor="#FF9500"
-          value={stats.onLeaveToday.toString()}
-          label="On Leave"
-        />
-        <StatCard
-          icon="clock"
-          iconColor="#5856D6"
-          value={stats.pendingApprovals.toString()}
-          label="Pending"
-        />
-      </View>
+      {isLoadingApprovals && stats.totalMembers === 0 ? (
+        <View style={styles.statsSkeletonContainer}>
+          <StatsSkeleton />
+        </View>
+      ) : (
+        <View style={styles.statsGrid}>
+          <StatCard
+            icon="users"
+            iconColor={Colors.info}
+            value={stats.totalMembers.toString()}
+            label="Total Members"
+          />
+          <StatCard
+            icon="check-circle"
+            iconColor={Colors.success}
+            value={stats.activeNow.toString()}
+            label="Active Now"
+          />
+          <StatCard
+            icon="sun"
+            iconColor={Colors.warning}
+            value={stats.onLeaveToday.toString()}
+            label="On Leave"
+          />
+          <StatCard
+            icon="clock"
+            iconColor="#5856D6"
+            value={stats.pendingApprovals.toString()}
+            label="Pending"
+          />
+        </View>
+      )}
 
       {/* Pending Approvals */}
-      <Text style={styles.sectionTitle}>
-        Pending Approvals {pendingApprovals.length > 0 ? `(${pendingApprovals.length})` : ''}
-      </Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>
+          Pending Approvals {pendingApprovals.length > 0 ? `(${pendingApprovals.length})` : ''}
+        </Text>
+        {pendingApprovals.length > 5 && (
+          <Text style={styles.viewAllBtn} onPress={() => router.push('/(owner)/approvals')}>
+            View All
+          </Text>
+        )}
+      </View>
 
       <View style={styles.listContainer}>
         {isLoadingApprovals ? (
@@ -181,17 +197,13 @@ const statStyles = StyleSheet.create({
   card: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 2,
+    borderColor: Colors.border,
+    ...Colors.shadow,
   },
   iconBg: {
     width: 32,
@@ -204,13 +216,13 @@ const statStyles = StyleSheet.create({
   value: {
     fontSize: 24,
     fontFamily: 'Inter_800ExtraBold',
-    color: '#000000',
+    color: Colors.text,
     letterSpacing: -0.5,
   },
   label: {
     fontSize: 12,
     fontFamily: 'Inter_500Medium',
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     marginTop: 2,
   },
 });
@@ -218,7 +230,7 @@ const statStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EDEDED', // Premium Fintech light grey
+    backgroundColor: Colors.background,
   },
   scrollContent: {
     paddingBottom: 110,
@@ -228,57 +240,70 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 36,
+    paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingBottom: 12,
   },
   greeting: {
     fontFamily: 'Inter_500Medium',
     fontSize: 14,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
   },
   name: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 28,
-    color: '#1C1C1E',
+    color: Colors.text,
     marginTop: 2,
     letterSpacing: -0.7,
   },
   date: {
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: '#AEAEB2',
+    color: Colors.textTertiary,
     marginTop: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingRight: 20,
   },
   sectionTitle: {
     fontFamily: 'Inter_700Bold',
     fontSize: 13,
-    color: '#8E8E93',
-    paddingHorizontal: 28,
+    color: Colors.textSecondary,
+    paddingHorizontal: 20,
     marginTop: 26,
     marginBottom: 12,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
+  viewAllBtn: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: Colors.accent,
+    marginTop: 26,
+    marginBottom: 12,
+  },
+  statsSkeletonContainer: {
+    paddingTop: 8,
+    paddingHorizontal: 20,
+  },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
   },
   listContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
   },
   emptyCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    elevation: 3,
+    borderColor: Colors.border,
+    ...Colors.shadow,
   },
 });
