@@ -4,6 +4,7 @@
 
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
+import { Linking } from 'react-native';
 import { supabase } from './supabase';
 
 interface VersionCheckResult {
@@ -78,7 +79,7 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
     }
 
     const settings: Record<string, string> = {};
-    data?.forEach((item) => {
+    data?.forEach((item: { key: string; value: string }) => {
       settings[item.key] = item.value;
     });
 
@@ -120,7 +121,6 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
  */
 export async function openAppStore(): Promise<void> {
   try {
-    const { Linking } = await import('expo-linking');
     
     // Get download URL from database settings
     const { data } = await supabase

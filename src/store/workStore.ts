@@ -626,14 +626,12 @@ export const useWorkStore = create<WorkState>((set, get) => ({
   // ============================================================================
 
   subscribeToRealtime: (userId: string, role: string, managerId?: string) => {
-    // Prevent duplicate subscriptions with guard
+    // Prevent duplicate subscriptions — if channels already exist, bail out early
     const existingChannels = get().channels;
     if (existingChannels.length > 0) {
       console.log('[Realtime] Already subscribed, skipping duplicate');
       return;
     }
-    
-    get().unsubscribeFromRealtime();
     
     const channels: RealtimeChannel[] = [];
     const channelId = Math.random().toString(36).substring(7);

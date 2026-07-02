@@ -14,9 +14,9 @@ class SupabaseStorage {
   private initPromise: Promise<SQLite.SQLiteDatabase> | null = null;
   private isInitializing: boolean = false;
 
-  private async getDb() {
+  private async getDb(): Promise<SQLite.SQLiteDatabase> {
     // Return existing database if already initialized
-    if (this.db && !this.isInitializing) {
+    if (this.db) {
       return this.db;
     }
     
@@ -26,26 +26,24 @@ class SupabaseStorage {
     }
     
     // Start new initialization
-    if (!this.db && !this.isInitializing) {
-      this.isInitializing = true;
-      this.initPromise = (async () => {
-        try {
-          this.db = await SQLite.openDatabaseAsync('supabase-auth.db');
-          await this.db.execAsync(
-            'CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT);'
-          );
-          return this.db;
-        } catch (error) {
-          console.error('SQLite initialization error:', error);
-          throw error;
-        } finally {
-          this.isInitializing = false;
-          this.initPromise = null;
-        }
-      })();
-      return this.initPromise;
-    }
-    return this.db;
+    this.isInitializing = true;
+    this.initPromise = (async () => {
+      try {
+        const database = await SQLite.openDatabaseAsync('supabase-auth.db');
+        await database.execAsync(
+          'CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT);'
+        );
+        this.db = database;
+        return database;
+      } catch (error) {
+        console.error('SQLite initialization error:', error);
+        throw error;
+      } finally {
+        this.isInitializing = false;
+        this.initPromise = null;
+      }
+    })();
+    return this.initPromise;
   }
 
   async getItem(key: string): Promise<string | null> {
