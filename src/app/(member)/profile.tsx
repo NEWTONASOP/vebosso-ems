@@ -31,11 +31,11 @@ export default function MemberProfileScreen() {
   const getRoleAccent = () => {
     switch (profile.role) {
       case 'owner':
-        return Colors.ownerAccent || '#8B5CF6';
+        return Colors.ownerAccent;
       case 'manager':
-        return Colors.managerAccent || '#3B82F6';
+        return Colors.managerAccent;
       default:
-        return Colors.memberAccent || '#17B877';
+        return Colors.memberAccent;
     }
   };
 
@@ -64,7 +64,7 @@ export default function MemberProfileScreen() {
         <Text style={styles.headerTitle}>Profile</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.headerBtn} activeOpacity={0.7}>
-            <Feather name="bell" size={18} color="#1C1C1E" />
+            <Feather name="bell" size={18} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -76,9 +76,9 @@ export default function MemberProfileScreen() {
         
         {/* Capsule Badge */}
         <View style={styles.badgeContainer}>
-          <View style={[styles.rolePill, { backgroundColor: '#000000' }]}>
+          <View style={[styles.rolePill, { backgroundColor: Colors.accent }]}>
             <Text style={styles.rolePillText}>{ROLE_LABELS[profile.role]}</Text>
-            <Feather name="chevron-right" size={10} color="#FFFFFF" style={styles.roleChevron} />
+            <Feather name="chevron-right" size={10} color={Colors.white} style={styles.roleChevron} />
           </View>
         </View>
       </View>
@@ -87,7 +87,7 @@ export default function MemberProfileScreen() {
       <View style={styles.sectionContainer}>
         <Text style={styles.sectionTitle}>Details</Text>
         <View style={styles.groupedCard}>
-          <InfoRow label="Status" value="Active" valueBadge badgeColor="#E6F4EA" badgeTextColor="#137333" />
+          <InfoRow label="Status" value="Active" valueBadge badgeColor={Colors.successLight} badgeTextColor={Colors.success} />
           <InfoRow label="Full Name" value={profile.full_name} />
           <InfoRow label="Designation" value={profile.department || 'Not assigned'} />
           <InfoRow label="Joined" value={getJoinedDate()} isLast />
@@ -178,7 +178,7 @@ function ActionRow({ label, icon, onPress, isDestructive, isLast }: ActionRowPro
         <Feather
           name={icon as any}
           size={16}
-          color={isDestructive ? '#FF3B30' : '#8E8E93'}
+          color={isDestructive ? Colors.error : Colors.textSecondary}
         />
       </View>
       {!isLast && <View style={rowStyles.separator} />}
@@ -186,14 +186,12 @@ function ActionRow({ label, icon, onPress, isDestructive, isLast }: ActionRowPro
   );
 }
 
-
-
 const rowStyles = StyleSheet.create({
   rowWrapper: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   pressed: {
-    backgroundColor: '#F2F2F7',
+    backgroundColor: Colors.surfacePressed,
   },
   rowContent: {
     flexDirection: 'row',
@@ -206,12 +204,12 @@ const rowStyles = StyleSheet.create({
   label: {
     fontFamily: 'Inter_500Medium',
     fontSize: 15,
-    color: '#8E8E93', // Muted Gray
+    color: Colors.textSecondary,
   },
   value: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
-    color: '#1C1C1E', // Dark Value
+    color: Colors.textPrimary,
     letterSpacing: -0.1,
   },
   badge: {
@@ -225,21 +223,19 @@ const rowStyles = StyleSheet.create({
   },
   destructiveText: {
     fontFamily: 'Inter_600SemiBold',
-    color: '#FF3B30',
+    color: Colors.error,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: Colors.divider,
     marginHorizontal: 16,
   },
 });
 
-
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EDEDED', // True Fintech Light Gray background
+    backgroundColor: Colors.background,
   },
   scrollContent: {
     paddingBottom: 110,
@@ -251,8 +247,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 36,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingBottom: 12,
   },
   headerLeft: {
@@ -268,13 +264,13 @@ const styles = StyleSheet.create({
   },
   miniAvatarText: {
     fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
+    color: Colors.white,
     fontSize: 14,
   },
   headerTitle: {
     fontFamily: 'Inter_700Bold',
     fontSize: 17,
-    color: '#1C1C1E',
+    color: Colors.textPrimary,
   },
   headerRight: {
     width: 40,
@@ -284,11 +280,11 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
   },
   // Hero section
   heroSection: {
@@ -298,13 +294,13 @@ const styles = StyleSheet.create({
   heroLabel: {
     fontFamily: 'Inter_700Bold',
     fontSize: 12,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     letterSpacing: 1,
   },
   heroValue: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 42,
-    color: '#000000',
+    color: Colors.textPrimary,
     letterSpacing: -1,
     marginVertical: 4,
   },
@@ -321,7 +317,7 @@ const styles = StyleSheet.create({
   },
   rolePillText: {
     fontFamily: 'Inter_600SemiBold',
-    color: '#FFFFFF',
+    color: Colors.white,
     fontSize: 12,
   },
   roleChevron: {
@@ -330,26 +326,24 @@ const styles = StyleSheet.create({
   // Sections
   sectionContainer: {
     marginTop: 20,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
   },
   sectionTitle: {
     fontFamily: 'Inter_700Bold',
     fontSize: 13,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     marginBottom: 8,
     marginLeft: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   groupedCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24, // High-end rounded corners
+    backgroundColor: Colors.surface,
+    borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Colors.shadow,
   },
 
   // Footer
@@ -360,12 +354,12 @@ const styles = StyleSheet.create({
   appName: {
     fontFamily: 'Inter_700Bold',
     fontSize: 12,
-    color: '#AEAEB2',
+    color: Colors.textTertiary,
   },
   appVersion: {
     fontFamily: 'Inter_500Medium',
     fontSize: 10,
-    color: '#C7C7CC',
+    color: Colors.textTertiary,
     marginTop: 2,
   },
 });

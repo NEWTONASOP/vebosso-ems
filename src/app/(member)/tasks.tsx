@@ -12,6 +12,7 @@ import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { EmptyState } from '../../components/EmptyState';
 import { TaskStatus } from '../../types/database';
 import { PageTransition } from '../../components/PageTransition';
+import { Colors } from '../../constants/colors';
 
 export default function MemberTasksScreen() {
   const { profile } = useAuthStore();
@@ -62,7 +63,7 @@ export default function MemberTasksScreen() {
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#000000" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
         showsVerticalScrollIndicator={false}
       >
         {/* Progress Analytics Card */}
@@ -144,27 +145,27 @@ export default function MemberTasksScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EDEDED', // Premium Fintech light grey
+    backgroundColor: Colors.background,
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 36,
+    paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingBottom: 8,
   },
   title: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 28,
-    color: '#1C1C1E',
+    color: Colors.textPrimary,
     letterSpacing: -0.7,
   },
   subtitle: {
     fontFamily: 'Inter_500Medium',
     fontSize: 13,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     marginTop: 2,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 110,
     width: '100%',
     maxWidth: 600,
@@ -172,17 +173,13 @@ const styles = StyleSheet.create({
   },
   // Progress Analytics Card
   progressCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 20,
     marginTop: 14,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    elevation: 3,
+    borderColor: Colors.border,
+    ...Colors.shadow,
   },
   progressHeader: {
     flexDirection: 'row',
@@ -193,22 +190,22 @@ const styles = StyleSheet.create({
   progressTitle: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
   },
   progressValue: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 16,
-    color: '#000000',
+    color: Colors.textPrimary,
   },
   progressBar: {
     height: 8,
-    backgroundColor: '#EFEFF4',
+    backgroundColor: Colors.surfaceLighter,
     borderRadius: 4,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#000000', // Premium solid black progress fill
+    backgroundColor: Colors.memberAccent,
     borderRadius: 4,
     width: 0, // Fallback width overwritten dynamically
   },
@@ -221,57 +218,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   filterPill: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 14,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-    elevation: 1,
   },
   filterPillActive: {
-    backgroundColor: '#000000', // Active solid black pill
-    borderColor: '#000000',
+    backgroundColor: Colors.memberAccent,
+    borderColor: Colors.memberAccent,
   },
   filterText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 11,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
   },
   filterTextActive: {
-    color: '#FFFFFF',
+    color: Colors.white,
   },
   // List Container
   listContainer: {
     marginTop: 6,
   },
   groupedCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    elevation: 3,
+    borderColor: Colors.border,
+    ...Colors.shadow,
   },
   emptyCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    elevation: 3,
+    borderColor: Colors.border,
+    ...Colors.shadow,
   },
 });

@@ -14,6 +14,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Feather } from '@expo/vector-icons';
 import { TaskStatus } from '../../types/database';
+import { Colors } from '../../constants/colors';
 
 import { PageTransition } from '../../components/PageTransition';
 import { AnimatedPressable } from '../../components/AnimatedPressable';
@@ -133,7 +134,7 @@ export default function MemberHomeScreen() {
             style={styles.startBtn}
             onPress={() => setShowCheckIn(true)}
           >
-            <Feather name="play" size={16} color="#FFFFFF" />
+            <Feather name="play" size={16} color={Colors.white} />
             <Text style={styles.startBtnText}>Start Day</Text>
           </AnimatedPressable>
         </View>
@@ -152,8 +153,8 @@ export default function MemberHomeScreen() {
           <View style={styles.cardDetailsGroup}>
             <View style={rowStyles.rowContent}>
               <Text style={rowStyles.label}>Status</Text>
-              <View style={[rowStyles.badge, { backgroundColor: '#FEF7E0' }]}>
-                <Text style={[rowStyles.badgeText, { color: '#B06000' }]}>Pending</Text>
+              <View style={[rowStyles.badge, { backgroundColor: Colors.warningLight }]}>
+                <Text style={[rowStyles.badgeText, { color: Colors.warning }]}>Pending</Text>
               </View>
             </View>
             <View style={rowStyles.separator} />
@@ -176,8 +177,8 @@ export default function MemberHomeScreen() {
           <View style={styles.cardDetailsGroup}>
             <View style={rowStyles.rowContent}>
               <Text style={rowStyles.label}>Status</Text>
-              <View style={[rowStyles.badge, { backgroundColor: '#E8F0FE' }]}>
-                <Text style={[rowStyles.badgeText, { color: '#1A73E8' }]}>Working</Text>
+              <View style={[rowStyles.badge, { backgroundColor: Colors.successLight }]}>
+                <Text style={[rowStyles.badgeText, { color: Colors.memberAccent }]}>Working</Text>
               </View>
             </View>
             <View style={rowStyles.separator} />
@@ -198,7 +199,7 @@ export default function MemberHomeScreen() {
             style={styles.endBtn}
             onPress={() => setShowCheckOut(true)}
           >
-            <Feather name="power" size={16} color="#FF3B30" />
+            <Feather name="power" size={16} color={Colors.error} />
             <Text style={styles.endBtnText}>End Day</Text>
           </AnimatedPressable>
         </View>
@@ -220,7 +221,7 @@ export default function MemberHomeScreen() {
             style={styles.startBtn}
             onPress={() => setShowCheckIn(true)}
           >
-            <Feather name="refresh-cw" size={16} color="#FFFFFF" />
+            <Feather name="refresh-cw" size={16} color={Colors.white} />
             <Text style={styles.startBtnText}>Re-submit Check-in</Text>
           </AnimatedPressable>
         </View>
@@ -239,8 +240,8 @@ export default function MemberHomeScreen() {
           <View style={styles.cardDetailsGroup}>
             <View style={rowStyles.rowContent}>
               <Text style={rowStyles.label}>Status</Text>
-              <View style={[rowStyles.badge, { backgroundColor: '#E6F4EA' }]}>
-                <Text style={[rowStyles.badgeText, { color: '#137333' }]}>Completed</Text>
+              <View style={[rowStyles.badge, { backgroundColor: Colors.successLight }]}>
+                <Text style={[rowStyles.badgeText, { color: Colors.success }]}>Completed</Text>
               </View>
             </View>
             <View style={rowStyles.separator} />
@@ -266,7 +267,7 @@ export default function MemberHomeScreen() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#000000" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
       showsVerticalScrollIndicator={false}
     >
       {/* Header Greeting */}
@@ -323,12 +324,12 @@ const rowStyles = StyleSheet.create({
   label: {
     fontFamily: 'Inter_500Medium',
     fontSize: 14,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
   },
   value: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
-    color: '#1C1C1E',
+    color: Colors.textPrimary,
   },
   badge: {
     paddingHorizontal: 8,
@@ -341,7 +342,7 @@ const rowStyles = StyleSheet.create({
   },
   separator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: Colors.divider,
     marginHorizontal: 16,
   },
 });
@@ -349,7 +350,7 @@ const rowStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EDEDED', // Premium Fintech light grey
+    backgroundColor: Colors.background,
   },
   scrollContent: {
     paddingBottom: 110,
@@ -359,37 +360,33 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 36,
+    paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingBottom: 12,
   },
   greeting: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 28,
-    color: '#1C1C1E',
+    color: Colors.textPrimary,
     letterSpacing: -0.7,
   },
   date: {
     fontFamily: 'Inter_500Medium',
     fontSize: 13,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     marginTop: 2,
   },
   content: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     marginTop: 8,
   },
   statusCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    elevation: 3,
+    borderColor: Colors.border,
+    ...Colors.shadow,
   },
   statusEmoji: {
     fontSize: 48,
@@ -398,13 +395,13 @@ const styles = StyleSheet.create({
   statusTitle: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 22,
-    color: '#1C1C1E',
+    color: Colors.textPrimary,
     letterSpacing: -0.4,
   },
   statusSubtitle: {
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     marginTop: 6,
     textAlign: 'center',
     lineHeight: 18,
@@ -414,31 +411,31 @@ const styles = StyleSheet.create({
   heroLabel: {
     fontFamily: 'Inter_700Bold',
     fontSize: 11,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     letterSpacing: 1,
   },
   heroValue: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 38,
-    color: '#000000',
+    color: Colors.textPrimary,
     letterSpacing: -1,
     marginVertical: 4,
   },
   cardDetailsGroup: {
     width: '100%',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: Colors.surfaceLight,
     borderRadius: 16,
     marginTop: 18,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.02)',
+    borderColor: Colors.divider,
   },
   // Buttons
   startBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000000', // Solid Black Fintech style
+    backgroundColor: Colors.accent,
     borderRadius: 24,
     width: '100%',
     height: 48,
@@ -448,13 +445,13 @@ const styles = StyleSheet.create({
   startBtnText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 14,
-    color: '#FFFFFF',
+    color: Colors.white,
   },
   endBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 59, 48, 0.08)', // Soft red
+    backgroundColor: Colors.errorLight,
     borderRadius: 24,
     width: '100%',
     height: 48,
@@ -464,7 +461,7 @@ const styles = StyleSheet.create({
   endBtnText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 14,
-    color: '#FF3B30',
+    color: Colors.error,
   },
   btnPressed: {
     transform: [{ scale: 0.97 }],
@@ -473,8 +470,8 @@ const styles = StyleSheet.create({
   rejectionReason: {
     fontFamily: 'Inter_500Medium',
     fontSize: 13,
-    color: '#FF3B30',
-    backgroundColor: 'rgba(255, 59, 48, 0.05)',
+    color: Colors.error,
+    backgroundColor: Colors.errorLight,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
@@ -484,27 +481,23 @@ const styles = StyleSheet.create({
   // Task sections
   sectionContainer: {
     marginTop: 24,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
   },
   sectionTitle: {
     fontFamily: 'Inter_700Bold',
     fontSize: 13,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     marginBottom: 8,
     marginLeft: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   groupedCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    elevation: 3,
+    borderColor: Colors.border,
+    ...Colors.shadow,
   },
 });

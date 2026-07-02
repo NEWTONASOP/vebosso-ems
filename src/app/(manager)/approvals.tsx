@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, Platform, RefreshControl, StyleSheet, View } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
 import { ApprovalCard } from '../../components/ApprovalCard';
 import { EmptyState } from '../../components/EmptyState';
@@ -68,9 +68,9 @@ export default function ManagerApprovalsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 12 },
+  header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 12 },
   title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
-  subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  subtitle: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   content: { paddingHorizontal: 20 },
-  list: { paddingHorizontal: 20, paddingBottom: 20 },
+  list: { paddingHorizontal: 20, paddingBottom: 110 },
 });

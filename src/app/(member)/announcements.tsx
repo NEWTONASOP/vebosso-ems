@@ -10,6 +10,7 @@ import { useWorkStore } from '../../store/workStore';
 import { AnnouncementCard } from '../../components/AnnouncementCard';
 import { EmptyState } from '../../components/EmptyState';
 import { PageTransition } from '../../components/PageTransition';
+import { Colors } from '../../constants/colors';
 
 export default function MemberAnnouncementsScreen() {
   const { profile } = useAuthStore();
@@ -41,7 +42,7 @@ export default function MemberAnnouncementsScreen() {
         renderItem={({ item, index }) => <AnnouncementCard announcement={item} index={index} />}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#000000" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyCard}>
@@ -61,43 +62,39 @@ export default function MemberAnnouncementsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EDEDED', // Premium Fintech light grey
+    backgroundColor: Colors.background,
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 36,
+    paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingBottom: 12,
   },
   title: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 28,
-    color: '#1C1C1E',
+    color: Colors.textPrimary,
     letterSpacing: -0.7,
   },
   subtitle: {
     fontFamily: 'Inter_500Medium',
     fontSize: 13,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     marginTop: 2,
   },
   list: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 110,
     width: '100%',
     maxWidth: 600,
     alignSelf: 'center',
   },
   emptyCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    elevation: 3,
+    borderColor: Colors.border,
+    ...Colors.shadow,
   },
 });

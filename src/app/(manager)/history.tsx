@@ -4,7 +4,7 @@
 
 import { eachDayOfInterval, endOfMonth, format, isSameDay, startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Menu, Text } from 'react-native-paper';
 import { EmptyState } from '../../components/EmptyState';
 import { WorkLogDetail } from '../../components/WorkLogDetail';
@@ -13,6 +13,7 @@ import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Profile, WorkLog } from '../../types/database';
+import { Feather } from '@expo/vector-icons';
 
 export default function ManagerHistoryScreen() {
   const { profile } = useAuthStore();
@@ -63,9 +64,13 @@ export default function ManagerHistoryScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.monthNav}>
-            <TouchableOpacity onPress={() => setCurrentMonth((p) => new Date(p.getFullYear(), p.getMonth() - 1))}><Text style={styles.navArrow}>◀</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.navBtn} onPress={() => setCurrentMonth((p) => new Date(p.getFullYear(), p.getMonth() - 1))} activeOpacity={0.7}>
+              <Feather name="chevron-left" size={18} color={Colors.textPrimary} />
+            </TouchableOpacity>
             <Text style={styles.monthTitle}>{format(currentMonth, 'MMMM yyyy')}</Text>
-            <TouchableOpacity onPress={() => setCurrentMonth((p) => new Date(p.getFullYear(), p.getMonth() + 1))}><Text style={styles.navArrow}>▶</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.navBtn} onPress={() => setCurrentMonth((p) => new Date(p.getFullYear(), p.getMonth() + 1))} activeOpacity={0.7}>
+              <Feather name="chevron-right" size={18} color={Colors.textPrimary} />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.weekdayRow}>
@@ -97,22 +102,31 @@ export default function ManagerHistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 8 },
+  header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 8 },
   title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
   pickerSection: { paddingHorizontal: 20, paddingTop: 12 },
   pickerButton: { borderColor: Colors.border, borderRadius: 12, justifyContent: 'flex-start' },
   menuContent: { backgroundColor: Colors.surface },
   menuItemText: { color: Colors.text, fontSize: 14 },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 20 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 110 },
   monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16 },
-  navArrow: { fontSize: 18, color: Colors.accent, padding: 8 },
-  monthTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
+  navBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  monthTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: Colors.text },
   weekdayRow: { flexDirection: 'row', marginBottom: 4 },
-  weekdayLabel: { flex: 1, textAlign: 'center', fontSize: 12, color: Colors.textTertiary, fontWeight: '600' },
+  weekdayLabel: { flex: 1, textAlign: 'center', fontSize: 12, color: Colors.textTertiary, fontFamily: 'Inter_600SemiBold' },
   calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   dayCell: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 8, marginBottom: 2 },
   todayCell: { borderColor: Colors.accent, borderWidth: 1.5, backgroundColor: Colors.accentSubtle },
-  dayNumber: { fontSize: 14, color: Colors.text, fontWeight: '500' },
-  todayText: { color: Colors.accent, fontWeight: '700' },
-  dayHours: { fontSize: 9, marginTop: 1, fontWeight: '600' },
+  dayNumber: { fontSize: 14, color: Colors.text, fontFamily: 'Inter_500Medium' },
+  todayText: { color: Colors.accent, fontFamily: 'Inter_700Bold' },
+  dayHours: { fontSize: 9, marginTop: 1, fontFamily: 'Inter_600SemiBold' },
 });

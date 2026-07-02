@@ -5,7 +5,7 @@
 
 import { differenceInMinutes, format } from 'date-fns';
 import { useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Snackbar, Text } from 'react-native-paper';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { CheckInModal } from '../../components/CheckInModal';
@@ -174,12 +174,12 @@ export default function ManagerMyWorkScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  scrollContent: { paddingBottom: 20 },
-  header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 12 },
+  scrollContent: { paddingBottom: 110 },
+  header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 12 },
   headerTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
   headerDate: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   content: { paddingHorizontal: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, marginTop: 20, marginBottom: 12 },
+  sectionTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: Colors.text, marginTop: 20, marginBottom: 12 },
   statusCard: {
     backgroundColor: Colors.surface,
     borderRadius: 20,
@@ -194,15 +194,15 @@ const styles = StyleSheet.create({
   workingCard: { borderColor: Colors.success },
   doneCard: { borderColor: Colors.border },
   statusEmoji: { fontSize: 44, marginBottom: 10 },
-  statusTitle: { fontSize: 20, fontWeight: '700', color: Colors.text },
-  statusSubtitle: { fontSize: 14, color: Colors.textSecondary, marginTop: 4, textAlign: 'center' },
+  statusTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: Colors.text },
+  statusSubtitle: { fontSize: 14, fontFamily: 'Inter_500Medium', color: Colors.textSecondary, marginTop: 4, textAlign: 'center' },
   startButton: { borderRadius: 14, marginTop: 20, width: '100%' },
   startButtonContent: { height: 52 },
   pendingDots: { flexDirection: 'row', gap: 6, marginTop: 16 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   workingInfo: { flexDirection: 'row', gap: 20, marginTop: 16, marginBottom: 16 },
   workingDetail: { alignItems: 'center' },
-  workingLabel: { fontSize: 12, color: Colors.textSecondary },
-  workingValue: { fontSize: 18, fontWeight: '700', color: Colors.text, marginTop: 2 },
+  workingLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', color: Colors.textSecondary },
+  workingValue: { fontSize: 18, fontFamily: 'Inter_700Bold', color: Colors.text, marginTop: 2 },
   endButton: { borderRadius: 14, width: '100%' },
 });

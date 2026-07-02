@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, Platform, RefreshControl, StyleSheet, View } from 'react-native';
 import { Searchbar, Text } from 'react-native-paper';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
@@ -75,12 +75,12 @@ export default function ManagerMyTeamScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 8 },
+  header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 8 },
   title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
-  subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  subtitle: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   searchSection: { paddingHorizontal: 20, paddingTop: 12 },
   searchbar: { backgroundColor: Colors.inputBackground, borderRadius: 12, elevation: 0, borderWidth: 1, borderColor: Colors.border },
   searchInput: { color: Colors.text, fontSize: 14 },
   content: { paddingHorizontal: 20 },
-  list: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
+  list: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 110 },
 });

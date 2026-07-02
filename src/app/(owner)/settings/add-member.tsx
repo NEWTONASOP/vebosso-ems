@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 36,
+    paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingBottom: 12,
     gap: 12,
   },
@@ -410,11 +410,7 @@ const styles = StyleSheet.create({
   },
   segmentBtnActive: {
     backgroundColor: Colors.surface,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    ...Colors.shadow,
   },
   segmentText: {
     fontFamily: 'Inter_600SemiBold',
@@ -440,11 +436,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 14,
     marginRight: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-    elevation: 1,
+    ...Colors.shadow,
   },
   managerChipActive: {
     backgroundColor: Colors.accent,
@@ -479,7 +471,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   btnDisabled: {
-    backgroundColor: Colors.textTertiary,
+    backgroundColor: Colors.surfaceLighter,
   },
   // Success content styles
   successContent: {

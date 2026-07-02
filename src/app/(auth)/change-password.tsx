@@ -4,7 +4,7 @@
 
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View, Platform } from 'react-native';
 import { Button, IconButton, ProgressBar, Snackbar, Text, TextInput } from 'react-native-paper';
 import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
@@ -221,12 +221,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 20,
-    paddingTop: 20,
+    paddingTop: Platform.OS === 'ios' ? 20 : 10,
   },
   backButton: { margin: 0 },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     color: Colors.text,
   },
   header: { alignItems: 'center', marginBottom: 24 },
@@ -237,10 +237,10 @@ const styles = StyleSheet.create({
   input: { marginBottom: 12, backgroundColor: Colors.inputBackground },
   strengthSection: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   strengthBar: { flex: 1, height: 4, borderRadius: 2, backgroundColor: Colors.surfaceLighter },
-  strengthLabel: { fontSize: 12, fontWeight: '600', width: 50 },
+  strengthLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', width: 50 },
   mismatchText: { fontSize: 12, color: Colors.error, marginBottom: 8, marginLeft: 4 },
   requirements: { backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginBottom: 20, borderWidth: 1, borderColor: Colors.border },
-  reqTitle: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600', marginBottom: 8 },
+  reqTitle: { fontSize: 13, color: Colors.textSecondary, fontFamily: 'Inter_600SemiBold', marginBottom: 8 },
   button: { borderRadius: 12, marginBottom: 8 },
   buttonContent: { height: 50 },
   cancelButton: { marginTop: 4 },

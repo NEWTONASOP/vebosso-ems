@@ -9,6 +9,7 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useAuthStore } from '../../store/authStore';
 import { APP_NAME, APP_TAGLINE } from '../../constants/roles';
 import { Feather } from '@expo/vector-icons';
+import { Colors } from '../../constants/colors';
 
 export default function LoginScreen() {
   const [employeeId, setEmployeeId] = useState('');
@@ -47,7 +48,7 @@ export default function LoginScreen() {
         {/* Logo / Branding */}
         <Animated.View entering={FadeInDown.duration(800).delay(200)} style={styles.brandSection}>
           <View style={styles.logoContainer}>
-            <Feather name="layers" size={32} color="#FFFFFF" />
+            <Feather name="layers" size={32} color={Colors.white} />
           </View>
           <Text style={styles.appName}>{APP_NAME}</Text>
           <Text style={styles.tagline}>{APP_TAGLINE}</Text>
@@ -69,15 +70,15 @@ export default function LoginScreen() {
             }}
             autoCapitalize="characters"
             style={styles.input}
-            outlineColor="#E5E7EB"
-            activeOutlineColor="#000000"
-            textColor="#1C1C1E"
+            outlineColor={Colors.border}
+            activeOutlineColor={Colors.accent}
+            textColor={Colors.textPrimary}
             outlineStyle={styles.inputOutline}
-            left={<TextInput.Icon icon="badge-account" color="#8E8E93" />}
+            left={<TextInput.Icon icon="badge-account" color={Colors.textSecondary} />}
             theme={{
               colors: {
-                onSurfaceVariant: '#AEAEB2',
-                surface: '#F4F4F6',
+                onSurfaceVariant: Colors.textTertiary,
+                surface: Colors.systemGray6,
               },
             }}
           />
@@ -92,22 +93,22 @@ export default function LoginScreen() {
             }}
             secureTextEntry={!showPassword}
             style={styles.input}
-            outlineColor="#E5E7EB"
-            activeOutlineColor="#000000"
-            textColor="#1C1C1E"
+            outlineColor={Colors.border}
+            activeOutlineColor={Colors.accent}
+            textColor={Colors.textPrimary}
             outlineStyle={styles.inputOutline}
-            left={<TextInput.Icon icon="lock-outline" color="#8E8E93" />}
+            left={<TextInput.Icon icon="lock-outline" color={Colors.textSecondary} />}
             right={
               <TextInput.Icon
                 icon={showPassword ? 'eye-off' : 'eye'}
-                color="#8E8E93"
+                color={Colors.textSecondary}
                 onPress={() => setShowPassword(!showPassword)}
               />
             }
             theme={{
               colors: {
-                onSurfaceVariant: '#AEAEB2',
-                surface: '#F4F4F6',
+                onSurfaceVariant: Colors.textTertiary,
+                surface: Colors.systemGray6,
               },
             }}
           />
@@ -123,14 +124,14 @@ export default function LoginScreen() {
             disabled={isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
+              <ActivityIndicator color={Colors.white} size="small" />
             ) : (
               <Text style={styles.loginBtnText}>Sign In</Text>
             )}
           </Pressable>
 
           <View style={styles.helpSection}>
-            <Feather name="info" size={14} color="#AEAEB2" />
+            <Feather name="info" size={14} color={Colors.textTertiary} />
             <Text style={styles.helpText}>
               Don&apos;t have an account? Contact your admin.
             </Text>
@@ -148,7 +149,7 @@ export default function LoginScreen() {
         onDismiss={() => setSnackError('')}
         duration={4000}
         style={styles.snackbar}
-        action={{ label: 'OK', textColor: '#000000' }}
+        action={{ label: 'OK', textColor: Colors.accent }}
       >
         {snackError}
       </Snackbar>
@@ -163,7 +164,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EDEDED', // Premium Fintech light grey
+    backgroundColor: Colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -182,58 +183,50 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 22,
-    backgroundColor: '#000000', // Solid black squircle logo
+    backgroundColor: Colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    ...Colors.shadow,
   },
   appName: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 30,
-    color: '#000000',
+    color: Colors.textPrimary,
     letterSpacing: 4,
   },
   tagline: {
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     marginTop: 4,
     letterSpacing: 0.5,
   },
   formSection: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 24,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04,
-    shadowRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
+    borderColor: Colors.border,
     marginBottom: 20,
-    elevation: 3,
+    ...Colors.shadow,
   },
   welcomeText: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 22,
-    color: '#1C1C1E',
+    color: Colors.textPrimary,
     letterSpacing: -0.5,
     marginBottom: 4,
   },
   welcomeSubtext: {
     fontFamily: 'Inter_500Medium',
     fontSize: 13,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     marginBottom: 24,
   },
   input: {
     marginBottom: 16,
-    backgroundColor: '#F4F4F6', // System Gray 6
+    backgroundColor: Colors.systemGray6,
     fontSize: 15,
   },
   inputOutline: {
@@ -244,7 +237,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000000',
+    backgroundColor: Colors.accent,
     borderRadius: 24,
     width: '100%',
     height: 48,
@@ -254,14 +247,14 @@ const styles = StyleSheet.create({
   loginBtnText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 14,
-    color: '#FFFFFF',
+    color: Colors.white,
   },
   btnPressed: {
     transform: [{ scale: 0.97 }],
     opacity: 0.9,
   },
   btnDisabled: {
-    backgroundColor: '#AEAEB2',
+    backgroundColor: Colors.surfaceLighter,
   },
   helpSection: {
     flexDirection: 'row',
@@ -273,17 +266,17 @@ const styles = StyleSheet.create({
   helpText: {
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: '#AEAEB2',
+    color: Colors.textTertiary,
     textAlign: 'center',
   },
   version: {
     fontFamily: 'Inter_500Medium',
     textAlign: 'center',
     fontSize: 11,
-    color: '#AEAEB2',
+    color: Colors.textTertiary,
   },
   snackbar: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
   },
 });

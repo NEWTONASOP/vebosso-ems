@@ -65,6 +65,52 @@ function AuthGuard() {
   const { isAuthenticated, isInitialized, profile, isLoading } = useAuthStore();
 
   useEffect(() => {
+    if (isAuthenticated && profile?.id) {
+      let active = true;
+      let cleanup: (() => void) | undefined;
+
+      const setupNotifications = async () => {
+        try {
+          const { 
+            registerForPushNotificationsAsync, 
+            savePushToken, 
+            addNotificationResponseListener, 
+            addNotificationReceivedListener 
+          } = await import('../lib/notifications');
+          
+          const token = await registerForPushNotificationsAsync();
+          if (token && active) {
+            await savePushToken(profile.id, token);
+          }
+
+          if (active) {
+            const responseSub = addNotificationResponseListener((response) => {
+              console.log('Notification tapped:', response.notification.request.content.data);
+            });
+            const receivedSub = addNotificationReceivedListener((notification) => {
+              console.log('Notification received in foreground:', notification);
+            });
+
+            cleanup = () => {
+              responseSub.remove();
+              receivedSub.remove();
+            };
+          }
+        } catch (error) {
+          console.error('Failed to setup push notifications:', error);
+        }
+      };
+
+      setupNotifications();
+
+      return () => {
+        active = false;
+        if (cleanup) cleanup();
+      };
+    }
+  }, [isAuthenticated, profile?.id]);
+
+  useEffect(() => {
     if (!rootNavigationState?.key) return;
     if (!isInitialized || isLoading) return;
 

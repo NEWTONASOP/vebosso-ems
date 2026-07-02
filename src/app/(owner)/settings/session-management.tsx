@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 36,
+    paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingBottom: 12,
     gap: 12,
   },
@@ -197,11 +197,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   skeletonContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     marginTop: 14,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 40,
     width: '100%',
     maxWidth: 600,

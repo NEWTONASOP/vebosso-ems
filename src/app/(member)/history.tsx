@@ -13,6 +13,7 @@ import { WorkLogDetail } from '../../components/WorkLogDetail';
 import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
 import { Feather } from '@expo/vector-icons';
 import { PageTransition } from '../../components/PageTransition';
+import { Colors } from '../../constants/colors';
 
 export default function MemberHistoryScreen() {
   const { profile } = useAuthStore();
@@ -58,7 +59,7 @@ export default function MemberHistoryScreen() {
             onPress={() => setCurrentMonth((p) => new Date(p.getFullYear(), p.getMonth() - 1))}
             activeOpacity={0.7}
           >
-            <Feather name="chevron-left" size={18} color="#1C1C1E" />
+            <Feather name="chevron-left" size={18} color={Colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.monthTitle}>{format(currentMonth, 'MMMM yyyy')}</Text>
           <TouchableOpacity
@@ -66,7 +67,7 @@ export default function MemberHistoryScreen() {
             onPress={() => setCurrentMonth((p) => new Date(p.getFullYear(), p.getMonth() + 1))}
             activeOpacity={0.7}
           >
-            <Feather name="chevron-right" size={18} color="#1C1C1E" />
+            <Feather name="chevron-right" size={18} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
@@ -167,21 +168,21 @@ export default function MemberHistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EDEDED', // Premium Fintech light grey
+    backgroundColor: Colors.background,
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 36,
+    paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingBottom: 8,
   },
   title: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 28,
-    color: '#1C1C1E',
+    color: Colors.textPrimary,
     letterSpacing: -0.7,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 110,
     width: '100%',
     maxWidth: 600,
@@ -198,38 +199,30 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-    elevation: 1,
+    borderColor: Colors.border,
+    ...Colors.shadow,
   },
   monthTitle: {
     fontFamily: 'Inter_700Bold',
     fontSize: 17,
-    color: '#1C1C1E',
+    color: Colors.textPrimary,
     letterSpacing: -0.2,
   },
   // Unified Summary Card
   summaryCard: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     paddingVertical: 18,
     alignItems: 'center',
     justifyContent: 'space-around',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    elevation: 3,
+    borderColor: Colors.border,
+    ...Colors.shadow,
     marginBottom: 20,
   },
   summaryCol: {
@@ -239,46 +232,42 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 20,
-    color: '#000000',
+    color: Colors.textPrimary,
     letterSpacing: -0.3,
   },
   summaryLabel: {
     fontFamily: 'Inter_500Medium',
     fontSize: 11,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
     marginTop: 3,
   },
   summaryDivider: {
     width: 1,
     height: 32,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: Colors.divider,
   },
   // Grouped Calendar Card
   calendarCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    elevation: 3,
+    borderColor: Colors.border,
+    ...Colors.shadow,
   },
   weekdayRow: {
     flexDirection: 'row',
     marginBottom: 8,
     paddingBottom: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
+    borderColor: Colors.divider,
   },
   weekdayLabel: {
     flex: 1,
     textAlign: 'center',
     fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
-    color: '#AEAEB2',
+    color: Colors.textTertiary,
   },
   calendarGrid: {
     flexDirection: 'row',
@@ -293,18 +282,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   todayCell: {
-    borderColor: '#000000',
+    borderColor: Colors.memberAccent,
     borderWidth: 1.5,
-    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    backgroundColor: Colors.memberAccent + '12',
   },
   dayNumber: {
     fontFamily: 'Inter_500Medium',
     fontSize: 14,
-    color: '#1C1C1E',
+    color: Colors.textPrimary,
   },
   todayText: {
     fontFamily: 'Inter_700Bold',
-    color: '#000000',
+    color: Colors.memberAccent,
   },
   dayHours: {
     fontFamily: 'Inter_700Bold',
@@ -313,7 +302,7 @@ const styles = StyleSheet.create({
   },
   legendDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: Colors.divider,
     marginVertical: 14,
   },
   legend: {
@@ -336,6 +325,6 @@ const styles = StyleSheet.create({
   legendText: {
     fontFamily: 'Inter_500Medium',
     fontSize: 11,
-    color: '#8E8E93',
+    color: Colors.textSecondary,
   },
 });

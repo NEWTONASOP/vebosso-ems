@@ -5,7 +5,7 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, View, Platform, Pressable } from 'react-native';
-import { Button, Snackbar, Text, TextInput } from 'react-native-paper';
+import { Snackbar, Text, TextInput } from 'react-native-paper';
 import { Feather } from '@expo/vector-icons';
 import { AnnouncementCard } from '../../../components/AnnouncementCard';
 import { EmptyState } from '../../../components/EmptyState';
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 36,
+    paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingBottom: 12,
     gap: 12,
   },
@@ -267,11 +267,7 @@ const styles = StyleSheet.create({
   },
   segmentBtnActive: {
     backgroundColor: Colors.surface,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    ...Colors.shadow,
   },
   segmentText: {
     fontFamily: 'Inter_600SemiBold',
@@ -297,5 +293,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.white,
   },
-  list: { paddingHorizontal: 16, paddingBottom: 110, paddingTop: 14 },
+  list: { paddingHorizontal: 20, paddingBottom: 110, paddingTop: 14 },
 });
