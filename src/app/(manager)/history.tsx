@@ -1,99 +1,81 @@
 // ============================================================================
-// VEBOSSO EMS — Manager History Screen
+// VEBOSSO EMS — Manager History Screen (Own Attendance Only)
 // ============================================================================
 
+import { Feather } from '@expo/vector-icons';
 import { eachDayOfInterval, endOfMonth, format, isSameDay, startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Button, Menu, Text } from 'react-native-paper';
-import { EmptyState } from '../../components/EmptyState';
+import { Text } from 'react-native-paper';
 import { WorkLogDetail } from '../../components/WorkLogDetail';
 import { Colors } from '../../constants/colors';
 import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
-import { Profile, WorkLog } from '../../types/database';
-import { Feather } from '@expo/vector-icons';
+import { WorkLog } from '../../types/database';
 
 export default function ManagerHistoryScreen() {
   const { profile } = useAuthStore();
-  const { teamMembers, fetchTeamMembers, fetchWorkHistory } = useWorkStore();
-  const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
-  const [menuVisible, setMenuVisible] = useState(false);
+  const { fetchWorkHistory } = useWorkStore();
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<WorkLog | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const loadHistory = useCallback(async () => {
-    if (!selectedMember) return;
+    if (!profile?.id) return;
     const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
     const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-    const logs = await fetchWorkHistory(selectedMember.id, start, end);
+    const logs = await fetchWorkHistory(profile.id, start, end);
     setWorkLogs(logs);
-  }, [selectedMember, currentMonth, fetchWorkHistory]);
-
-  useEffect(() => {
-    if (profile) fetchTeamMembers(profile.id);
-  }, [profile, fetchTeamMembers]);
+  }, [profile?.id, currentMonth, fetchWorkHistory]);
 
   useEffect(() => {
     // eslint-disable-next-line
-    if (selectedMember) void loadHistory();
-  }, [selectedMember, loadHistory]);
+    if (profile?.id) void loadHistory();
+  }, [profile?.id, loadHistory]);
 
   const daysInMonth = eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) });
   const getLogForDay = (day: Date) => workLogs.find((log) => isSameDay(new Date(log.date), day));
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}><Text style={styles.title}>Team History</Text></View>
-
-      <View style={styles.pickerSection}>
-        <Menu visible={menuVisible} onDismiss={() => setMenuVisible(false)}
-          anchor={<Button mode="outlined" onPress={() => setMenuVisible(true)} style={styles.pickerButton} textColor={Colors.text} icon="account">{selectedMember?.full_name || 'Select member'}</Button>}
-          contentStyle={styles.menuContent}>
-          {teamMembers.map((m) => (
-            <Menu.Item key={m.id} title={`${m.full_name} (${m.employee_id})`} onPress={() => { setSelectedMember(m); setMenuVisible(false); }} titleStyle={styles.menuItemText} />
-          ))}
-        </Menu>
+      <View style={styles.header}>
+        <Text style={styles.title}>My History</Text>
+        <Text style={styles.subtitle}>Your attendance records</Text>
       </View>
 
-      {!selectedMember ? (
-        <EmptyState icon="calendar-month-outline" title="Select a Member" subtitle="Choose a team member to view their history" />
-      ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.monthNav}>
-            <TouchableOpacity style={styles.navBtn} onPress={() => setCurrentMonth((p) => new Date(p.getFullYear(), p.getMonth() - 1))} activeOpacity={0.7}>
-              <Feather name="chevron-left" size={18} color={Colors.textPrimary} />
-            </TouchableOpacity>
-            <Text style={styles.monthTitle}>{format(currentMonth, 'MMMM yyyy')}</Text>
-            <TouchableOpacity style={styles.navBtn} onPress={() => setCurrentMonth((p) => new Date(p.getFullYear(), p.getMonth() + 1))} activeOpacity={0.7}>
-              <Feather name="chevron-right" size={18} color={Colors.textPrimary} />
-            </TouchableOpacity>
-          </View>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.monthNav}>
+          <TouchableOpacity style={styles.navBtn} onPress={() => setCurrentMonth((p) => new Date(p.getFullYear(), p.getMonth() - 1))} activeOpacity={0.7}>
+            <Feather name="chevron-left" size={18} color={Colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.monthTitle}>{format(currentMonth, 'MMMM yyyy')}</Text>
+          <TouchableOpacity style={styles.navBtn} onPress={() => setCurrentMonth((p) => new Date(p.getFullYear(), p.getMonth() + 1))} activeOpacity={0.7}>
+            <Feather name="chevron-right" size={18} color={Colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
 
-          <View style={styles.weekdayRow}>
-            {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d) => <Text key={d} style={styles.weekdayLabel}>{d}</Text>)}
-          </View>
+        <View style={styles.weekdayRow}>
+          {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d) => <Text key={d} style={styles.weekdayLabel}>{d}</Text>)}
+        </View>
 
-          <View style={styles.calendarGrid}>
-            {Array.from({ length: daysInMonth[0].getDay() }).map((_, i) => <View key={`e-${i}`} style={styles.dayCell} />)}
-            {daysInMonth.map((day) => {
-              const log = getLogForDay(day);
-              const isToday = isSameDay(day, new Date());
-              const statusColor = log ? WORK_LOG_STATUS_CONFIG[log.status]?.color : undefined;
-              return (
-                <TouchableOpacity key={day.toISOString()} style={[styles.dayCell, log && { backgroundColor: WORK_LOG_STATUS_CONFIG[log.status]?.backgroundColor, borderColor: statusColor, borderWidth: 1.5 }, isToday && styles.todayCell]}
-                  onPress={() => { if (log) { setSelectedLog(log); setShowDetail(true); } }} disabled={!log}>
-                  <Text style={[styles.dayNumber, isToday && styles.todayText]}>{format(day, 'd')}</Text>
-                  {log && <Text style={[styles.dayHours, { color: statusColor }]}>{log.total_hours ? `${log.total_hours}h` : '·'}</Text>}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
-      )}
+        <View style={styles.calendarGrid}>
+          {Array.from({ length: daysInMonth[0].getDay() }).map((_, i) => <View key={`e-${i}`} style={styles.dayCell} />)}
+          {daysInMonth.map((day) => {
+            const log = getLogForDay(day);
+            const isToday = isSameDay(day, new Date());
+            const statusColor = log ? WORK_LOG_STATUS_CONFIG[log.status]?.color : undefined;
+            return (
+              <TouchableOpacity key={day.toISOString()} style={[styles.dayCell, log && { backgroundColor: WORK_LOG_STATUS_CONFIG[log.status]?.backgroundColor, borderColor: statusColor, borderWidth: 1.5 }, isToday && styles.todayCell]}
+                onPress={() => { if (log) { setSelectedLog(log); setShowDetail(true); } }} disabled={!log}>
+                <Text style={[styles.dayNumber, isToday && styles.todayText]}>{format(day, 'd')}</Text>
+                {log && <Text style={[styles.dayHours, { color: statusColor }]}>{log.total_hours ? `${log.total_hours}h` : '·'}</Text>}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </ScrollView>
 
       <WorkLogDetail visible={showDetail} onDismiss={() => setShowDetail(false)} workLog={selectedLog} />
     </View>
@@ -104,10 +86,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 8 },
   title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
-  pickerSection: { paddingHorizontal: 20, paddingTop: 12 },
-  pickerButton: { borderColor: Colors.border, borderRadius: 12, justifyContent: 'flex-start' },
-  menuContent: { backgroundColor: Colors.surface },
-  menuItemText: { color: Colors.text, fontSize: 14 },
+  subtitle: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 110 },
   monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16 },
   navBtn: {

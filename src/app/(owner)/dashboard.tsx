@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect } from 'react';
 import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { ApprovalCard } from '../../components/ApprovalCard';
 import { AssignTaskModal } from '../../components/AssignTaskModal';
 import { EmptyState } from '../../components/EmptyState';
@@ -181,12 +182,14 @@ export default function OwnerDashboard() {
 
       {/* Quick Actions */}
       <Text style={styles.sectionTitle}>Quick Actions</Text>
-      <QuickActionCard
-        icon="clipboard-list"
-        title="Assign Task"
-        subtitle="Create a new task"
-        onPress={handleOpenMemberPicker}
-      />
+      <View style={styles.quickActionsContainer}>
+        <QuickActionCard
+          icon="clipboard-list"
+          title="Assign Task"
+          subtitle="Create a new task"
+          onPress={handleOpenMemberPicker}
+        />
+      </View>
 
       {/* Pending Approvals */}
       <View style={styles.sectionHeader}>
@@ -323,14 +326,17 @@ interface QuickActionCardProps {
 
 function QuickActionCard({ icon, title, subtitle, onPress }: QuickActionCardProps) {
   return (
-    <View style={quickActionStyles.container}>
+    <AnimatedPressable 
+      style={quickActionStyles.container}
+      onPress={onPress}
+    >
       <Feather name={icon as any} size={24} color={Colors.accent} style={quickActionStyles.icon} />
       <View style={quickActionStyles.content}>
         <Text style={quickActionStyles.title}>{title}</Text>
         <Text style={quickActionStyles.subtitle}>{subtitle}</Text>
       </View>
       <Feather name="chevron-right" size={22} color={Colors.textTertiary} />
-    </View>
+    </AnimatedPressable>
   );
 }
 
@@ -343,9 +349,7 @@ const quickActionStyles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginHorizontal: 20,
     marginBottom: 8,
-    ...Colors.shadow,
   },
   icon: {
     marginRight: 12,
@@ -431,6 +435,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+    paddingHorizontal: 20,
+  },
+  quickActionsContainer: {
     paddingHorizontal: 20,
   },
   listContainer: {

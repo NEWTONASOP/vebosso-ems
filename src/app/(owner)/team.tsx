@@ -4,12 +4,14 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Platform, RefreshControl, StyleSheet, View } from 'react-native';
-import { Chip, Searchbar, Snackbar, Text } from 'react-native-paper';
+import { Chip, Menu, Searchbar, Snackbar, Text } from 'react-native-paper';
+import { AssignManagerModal } from '../../components/AssignManagerModal';
 import { AssignTaskModal } from '../../components/AssignTaskModal';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { MemberCard } from '../../components/MemberCard';
 import { Colors } from '../../constants/colors';
+import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Profile } from '../../types/database';
@@ -22,9 +24,13 @@ export default function OwnerTeamScreen() {
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [assignTaskModalVisible, setAssignTaskModalVisible] = useState(false);
+  const [assignManagerModalVisible, setAssignManagerModalVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
   const [isAssigningTask, setIsAssigningTask] = useState(false);
+  const [isAssigningManager, setIsAssigningManager] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     fetchTeamMembers();
@@ -36,9 +42,13 @@ export default function OwnerTeamScreen() {
     setRefreshing(false);
   };
 
-  const handleMemberPress = (member: Profile) => {
+  const handleMemberPress = (member: Profile, event: any) => {
+    // Get the position for the menu
+    event.target.measure((x: number, y: number, width: number, height: number, pageX: number, pageY: number) => {
+      setMenuAnchor({ x: pageX, y: pageY + height });
+    });
     setSelectedMember(member);
-    setAssignTaskModalVisible(true);
+    setMenuVisible(true);
   };
 
   const handleAssignTask = async (title: string, description: string | null, dueDate: string | null) => {
@@ -65,8 +75,40 @@ export default function OwnerTeamScreen() {
     }
   };
 
+  const handleAssignManager = async (managerId: string | null) => {
+    if (!selectedMember?.id) return;
+
+    setIsAssigningManager(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ manager_id: managerId })
+        .eq('id', selectedMember.id);
+
+      if (error) throw error;
+
+      setSnackMessage(
+        managerId
+          ? `Manager assigned to ${selectedMember.full_name}`
+          : `Manager removed from ${selectedMember.full_name}`
+      );
+      setAssignManagerModalVisible(false);
+      setSelectedMember(null);
+      // Refresh team members to show updated data
+      await fetchTeamMembers();
+    } catch (error) {
+      console.error('Failed to assign manager:', error);
+      setSnackMessage('Failed to assign manager. Please try again.');
+    } finally {
+      setIsAssigningManager(false);
+    }
+  };
+
   // Get unique departments
   const departments = [...new Set(teamMembers.map((m) => m.department).filter(Boolean))] as string[];
+
+  // Get all managers for assignment
+  const managers = teamMembers.filter((m) => m.role === 'manager');
 
   // Filter members
   const filteredMembers = teamMembers.filter((member) => {
@@ -80,7 +122,7 @@ export default function OwnerTeamScreen() {
   });
 
   const renderMember = useCallback(({ item }: { item: Profile }) => (
-    <MemberCard member={item} onPress={() => handleMemberPress(item)} />
+    <MemberCard member={item} onPress={(e) => handleMemberPress(item, e)} />
   ), []);
 
   return (
@@ -169,6 +211,33 @@ export default function OwnerTeamScreen() {
         />
       )}
 
+      {/* Context Menu */}
+      <Menu
+        visible={menuVisible}
+        onDismiss={() => setMenuVisible(false)}
+        anchor={menuAnchor || { x: 0, y: 0 }}
+        contentStyle={styles.menuContent}
+      >
+        <Menu.Item
+          onPress={() => {
+            setMenuVisible(false);
+            setAssignTaskModalVisible(true);
+          }}
+          title="Assign Task"
+          leadingIcon="clipboard-text-outline"
+          titleStyle={styles.menuItemText}
+        />
+        <Menu.Item
+          onPress={() => {
+            setMenuVisible(false);
+            setAssignManagerModalVisible(true);
+          }}
+          title="Assign Manager"
+          leadingIcon="account-supervisor"
+          titleStyle={styles.menuItemText}
+        />
+      </Menu>
+
       <AssignTaskModal
         visible={assignTaskModalVisible}
         onDismiss={() => {
@@ -178,6 +247,18 @@ export default function OwnerTeamScreen() {
         targetMember={selectedMember}
         onSubmit={handleAssignTask}
         isLoading={isAssigningTask}
+      />
+
+      <AssignManagerModal
+        visible={assignManagerModalVisible}
+        onDismiss={() => {
+          setAssignManagerModalVisible(false);
+          setSelectedMember(null);
+        }}
+        targetMember={selectedMember}
+        managers={managers}
+        onAssign={handleAssignManager}
+        isLoading={isAssigningManager}
       />
 
       <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>
@@ -214,4 +295,12 @@ const styles = StyleSheet.create({
   filterChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600' },
   filterChipTextActive: { color: Colors.accent, fontWeight: '700' },
   list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 110 },
+  menuContent: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+  },
+  menuItemText: {
+    color: Colors.text,
+    fontSize: 14,
+  },
 });
