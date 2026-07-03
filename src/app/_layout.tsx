@@ -149,7 +149,7 @@ function AuthGuard() {
     }
 
     // 2. Role-based Route Guard: Enforce role group correctness (fixes web reload route collisions)
-    if (group) {
+    if (group && group !== '(auth)') {
       const inOwnerGroup = group === '(owner)';
       const inManagerGroup = group === '(manager)';
       const inMemberGroup = group === '(member)';

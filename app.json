@@ -2,7 +2,7 @@
   "expo": {
     "name": "VEBOSSO EMS",
     "slug": "vebosso-ems",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "vebossoems",
@@ -19,7 +19,6 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png",
         "backgroundColor": "#0A0F1E"
       },
-
       "package": "com.vebosso.ems",
       "googleServicesFile": "./google-services.json",
       "predictiveBackGestureEnabled": false
