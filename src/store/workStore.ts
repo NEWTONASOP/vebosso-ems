@@ -356,7 +356,6 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         ? {
             check_out_approved: true,
             check_out_approved_by: approverId,
-            check_out_approved_at: new Date().toISOString(),
             status: 'done' as WorkLogStatus,
           }
         : {
