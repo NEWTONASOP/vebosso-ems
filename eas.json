@@ -22,10 +22,14 @@
     },
     "production": {
       "distribution": "internal",
+      "environment": "production",
       "android": {
         "buildType": "apk"
       },
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "ENVIRONMENT": "production"
+      }
     }
   },
   "submit": {
