@@ -5,6 +5,7 @@
 import type * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { supabase } from './supabase';
 import { isRunningInExpoGo } from 'expo';
 
@@ -60,8 +61,9 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 
   // Get the Expo push token
   try {
+    const projectId = process.env.EXPO_PUBLIC_PROJECT_ID || Constants.expoConfig?.extra?.eas?.projectId;
     const pushToken = await expoNotifications.getExpoPushTokenAsync({
-      projectId: process.env.EXPO_PUBLIC_PROJECT_ID,
+      projectId,
     });
     token = pushToken.data;
   } catch (error) {

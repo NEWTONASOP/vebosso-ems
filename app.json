@@ -19,11 +19,9 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png",
         "backgroundColor": "#0A0F1E"
       },
+
       "package": "com.vebosso.ems",
-      "permissions": [
-        "NOTIFICATIONS",
-        "NOTIFICATIONS"
-      ],
+      "googleServicesFile": "./google-services.json",
       "predictiveBackGestureEnabled": false
     },
     "web": {

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "828241563751",
+    "project_id": "vebosso-ems-ef835",
+    "storage_bucket": "vebosso-ems-ef835.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:828241563751:android:a7312a03841ac8494c04c2",
+        "android_client_info": {
+          "package_name": "com.vebosso.ems"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCyTnZzXCX70OX4L8RcWKJizujJArQp044"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
