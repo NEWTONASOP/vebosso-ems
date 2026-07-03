@@ -86,6 +86,21 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Cache Android NDK & CMake
+        id: cache-ndk-cmake
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/android/sdk/ndk
+            /usr/local/lib/android/sdk/cmake
+          key: ${{ runner.os }}-android-ndk-27.1.12297006-cmake-3.22.1
+
+      - name: Install NDK & CMake (if not cached)
+        if: steps.cache-ndk-cmake.outputs.cache-hit != 'true'
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager --install "ndk;27.1.12297006" "cmake;3.22.1"
+
       - name: Install dependencies
         run: npm ci
 
@@ -95,7 +110,10 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          # Keyed on package-lock.json instead of the generated android/*.gradle files,
+          # since those get rewritten by prebuild every run and would bust the cache
+          # even when nothing actually changed.
+          key: ${{ runner.os }}-gradle-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
 
@@ -113,7 +131,10 @@ jobs:
           echo "Building version: $VERSION"
 
       - name: Generate Android project
-        run: npx expo prebuild --platform android --clean
+        # No --clean: a plain prebuild only rewrites files that actually differ from
+        # the current Expo config, so Gradle's up-to-date checks and our caches below
+        # (Gradle cache + .cxx native build cache) can actually take effect.
+        run: npx expo prebuild --platform android
 
       - name: Decode release keystore
         run: |
@@ -190,11 +211,11 @@ jobs:
           echo "# Build only for arm64-v8a (modern devices)" >> android/gradle.properties
           echo "reactNativeArchitectures=arm64-v8a" >> android/gradle.properties
           echo "" >> android/gradle.properties
-          echo "# Memory tuning for GitHub-hosted runners (7GB RAM total)" >> android/gradle.properties
-          echo "org.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=768m -XX:+HeapDumpOnOutOfMemoryError" >> android/gradle.properties
-          echo "org.gradle.parallel=false" >> android/gradle.properties
-          echo "org.gradle.workers.max=2" >> android/gradle.properties
-          echo "kotlin.incremental=false" >> android/gradle.properties
+          echo "# Memory/parallelism tuning for GitHub-hosted runners (ubuntu-latest: 16GB RAM, 4 cores)" >> android/gradle.properties
+          echo "org.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError" >> android/gradle.properties
+          echo "org.gradle.parallel=true" >> android/gradle.properties
+          echo "org.gradle.workers.max=4" >> android/gradle.properties
+          echo "kotlin.incremental=true" >> android/gradle.properties
           echo "org.gradle.caching=true" >> android/gradle.properties
           cat android/gradle.properties
 
