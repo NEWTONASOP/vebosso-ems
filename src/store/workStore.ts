@@ -413,6 +413,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .from('profiles')
         .select('*')
         .eq('is_active', true)
+        .neq('role', 'owner')
         .order('full_name');
 
       if (managerId) query = query.eq('manager_id', managerId);
