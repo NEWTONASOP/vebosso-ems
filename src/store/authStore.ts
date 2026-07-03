@@ -77,11 +77,46 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (session?.user) {
         const profile = await get().fetchProfile(session.user.id);
+        
+        // If profile doesn't exist (user deleted from database), sign out
+        if (!profile) {
+          console.warn('Profile not found for authenticated user. Signing out...');
+          await supabase.auth.signOut();
+          set({ 
+            session: null,
+            profile: null,
+            isAuthenticated: false,
+            userRole: null,
+            userId: null,
+            isLoading: false,
+            isInitialized: true,
+            error: 'Your account was not found. Please contact your administrator.'
+          });
+          return;
+        }
+        
+        // If profile is inactive, sign out
+        if (!profile.is_active) {
+          console.warn('User account is inactive. Signing out...');
+          await supabase.auth.signOut();
+          set({
+            session: null,
+            profile: null,
+            isAuthenticated: false,
+            userRole: null,
+            userId: null,
+            isLoading: false,
+            isInitialized: true,
+            error: 'Your account has been deactivated. Please contact your administrator.'
+          });
+          return;
+        }
+        
         set({
           session,
           profile,
           isAuthenticated: true,
-          userRole: profile?.role || null,
+          userRole: profile.role,
           userId: session.user.id,
           isLoading: false,
           isInitialized: true,
@@ -96,11 +131,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         if (event === 'SIGNED_IN' && newSession?.user) {
           const profile = await get().fetchProfile(newSession.user.id);
+          
+          // Handle deleted or inactive users
+          if (!profile) {
+            console.warn('Profile not found during sign in. Signing out...');
+            await supabase.auth.signOut();
+            set({
+              session: null,
+              profile: null,
+              isAuthenticated: false,
+              userRole: null,
+              userId: null,
+              isLoading: false,
+              error: 'Your account was not found. Please contact your administrator.'
+            });
+            return;
+          }
+          
+          if (!profile.is_active) {
+            console.warn('User account is inactive during sign in. Signing out...');
+            await supabase.auth.signOut();
+            set({
+              session: null,
+              profile: null,
+              isAuthenticated: false,
+              userRole: null,
+              userId: null,
+              isLoading: false,
+              error: 'Your account has been deactivated. Please contact your administrator.'
+            });
+            return;
+          }
+          
           set({
             session: newSession,
             profile,
             isAuthenticated: true,
-            userRole: profile?.role || null,
+            userRole: profile.role,
             userId: newSession.user.id,
             isLoading: false,
           });
