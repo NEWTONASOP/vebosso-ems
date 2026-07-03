@@ -41,11 +41,13 @@ export function AssignManagerModal({
     await onAssign(selectedManagerId);
   };
 
-  const filteredManagers = managers.filter((m) =>
-    searchQuery === '' ||
-    m.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    m.employee_id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredManagers = managers
+    .filter((m) => !targetMember || m.id !== targetMember.id)
+    .filter((m) =>
+      searchQuery === '' ||
+      m.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.employee_id.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   return (
     <Portal>
