@@ -92,10 +92,13 @@ export default function ManagerLayout() {
       <Tabs.Screen
         name="my-work"
         options={{
-          title: 'My Work',
-          tabBarIcon: ({ color }) => (
-            <Feather name="briefcase" color={color} size={18} />
-          ),
+          href: null, // Hide from tab bar navigation
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          href: null, // Hide from tab bar, accessed via dashboard button
         }}
       />
     </Tabs>

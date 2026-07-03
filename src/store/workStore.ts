@@ -288,17 +288,25 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .in('status', ['pending_approval', 'pending_checkout'])
         .order('check_in_time', { ascending: false });
 
-      // If manager, only fetch team members
+      // If manager, only fetch team members (exclude self)
       if (managerId) {
         const { data: teamIds } = await supabase
           .from('profiles')
           .select('id')
           .eq('manager_id', managerId);
 
-        if (teamIds) {
+        if (teamIds && teamIds.length > 0) {
           const ids = teamIds.map((t) => t.id);
-          ids.push(managerId); // Include self
+          // Don't include manager's own ID - they shouldn't approve their own requests
           query = query.in('user_id', ids);
+        } else {
+          // Manager has no team members, return empty
+          set({
+            pendingApprovals: [],
+            pendingApprovalsCount: 0,
+            isLoadingApprovals: false,
+          });
+          return;
         }
       }
 

@@ -1,16 +1,20 @@
 // ============================================================================
-// VEBOSSO EMS — Manager Dashboard (Focused on Approvals)
+// VEBOSSO EMS — Manager Dashboard (Work Status + Approvals + Tasks)
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
-import { format } from 'date-fns';
+import { differenceInMinutes, format } from 'date-fns';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Button, Snackbar, Text } from 'react-native-paper';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { ApprovalCard } from '../../components/ApprovalCard';
+import { CheckInModal } from '../../components/CheckInModal';
+import { CheckOutModal } from '../../components/CheckOutModal';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
+import { TaskCard } from '../../components/TaskCard';
 import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
@@ -19,21 +23,30 @@ export default function ManagerDashboard() {
   const router = useRouter();
   const { profile } = useAuthStore();
   const {
-    pendingApprovals, isLoadingApprovals,
-    fetchPendingApprovals, fetchSettings,
-    approveCheckIn, rejectCheckIn,
+    pendingApprovals, isLoadingApprovals, todayLog, todayTasks, isLoadingToday,
+    fetchPendingApprovals, fetchSettings, fetchTodayLog, fetchTodayTasks,
+    approveCheckIn, rejectCheckIn, checkIn, checkOut, updateTaskStatus,
     subscribeToRealtime, unsubscribeFromRealtime,
   } = useWorkStore();
 
   const [refreshing, setRefreshing] = React.useState(false);
+  const [showCheckIn, setShowCheckIn] = useState(false);
+  const [showCheckOut, setShowCheckOut] = useState(false);
+  const [checkInLoading, setCheckInLoading] = useState(false);
+  const [snackMessage, setSnackMessage] = useState('');
+  const [elapsed, setElapsed] = useState('');
+
+  const pulseOpacity = useSharedValue(1);
 
   const loadData = useCallback(async () => {
     if (!profile?.id) return;
     await Promise.all([
       fetchPendingApprovals(profile.id),
       fetchSettings(),
+      fetchTodayLog(profile.id),
+      fetchTodayTasks(profile.id),
     ]);
-  }, [profile, fetchPendingApprovals, fetchSettings]);
+  }, [profile, fetchPendingApprovals, fetchSettings, fetchTodayLog, fetchTodayTasks]);
 
   useEffect(() => {
     if (!profile?.id) {
@@ -46,6 +59,31 @@ export default function ManagerDashboard() {
     
     return () => unsubscribeFromRealtime();
   }, [profile, loadData, subscribeToRealtime, unsubscribeFromRealtime]);
+
+  // Pulse animation for pending approval status
+  useEffect(() => {
+    if (todayLog?.status === 'pending_approval') {
+      pulseOpacity.value = withRepeat(withTiming(0.4, { duration: 1000, easing: Easing.inOut(Easing.ease) }), -1, true);
+    }
+  }, [todayLog?.status, pulseOpacity]);
+
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: pulseOpacity.value }));
+
+  // Elapsed time counter
+  useEffect(() => {
+    if (todayLog?.status === 'working' && todayLog.check_in_time) {
+      const interval = setInterval(() => {
+        const mins = differenceInMinutes(new Date(), new Date(todayLog.check_in_time!));
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        setElapsed(`${h}h ${m}m`);
+      }, 60000);
+      // Set initial
+      const mins = differenceInMinutes(new Date(), new Date(todayLog.check_in_time));
+      setElapsed(`${Math.floor(mins / 60)}h ${mins % 60}m`);
+      return () => clearInterval(interval);
+    }
+  }, [todayLog]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -71,6 +109,109 @@ export default function ManagerDashboard() {
     }
   };
 
+  const handleCheckIn = async (plan: string) => {
+    setCheckInLoading(true);
+    const result = await checkIn(plan);
+    setCheckInLoading(false);
+    if (result.success) { 
+      setShowCheckIn(false); 
+      setSnackMessage('Check-in submitted! Waiting for approval.'); 
+    } else {
+      setSnackMessage(result.error || 'Failed');
+    }
+  };
+
+  const handleCheckOut = async (report: string) => {
+    const result = await checkOut(report);
+    if (result.success) { 
+      setShowCheckOut(false); 
+      setSnackMessage('Day ended! Great work today. 🎉'); 
+    } else {
+      setSnackMessage(result.error || 'Failed');
+    }
+  };
+
+  const renderWorkStatus = () => {
+    if (isLoadingToday) return <ListSkeleton count={1} />;
+
+    if (!todayLog) {
+      return (
+        <View style={styles.statusCard}>
+          <Text style={styles.statusEmoji}>☀️</Text>
+          <Text style={styles.statusTitle}>Ready to start?</Text>
+          <Text style={styles.statusSubtitle}>Check in to begin your work day</Text>
+          <Button 
+            mode="contained" 
+            onPress={() => setShowCheckIn(true)} 
+            style={styles.startButton} 
+            contentStyle={styles.startButtonContent} 
+            buttonColor={Colors.accent} 
+            textColor={Colors.white} 
+            icon="play"
+          >
+            Start Day
+          </Button>
+        </View>
+      );
+    }
+
+    if (todayLog.status === 'pending_approval') {
+      return (
+        <Animated.View style={[styles.statusCard, styles.pendingCard, pulseStyle]}>
+          <Text style={styles.statusEmoji}>⏳</Text>
+          <Text style={styles.statusTitle}>Waiting for Approval</Text>
+          <Text style={styles.statusSubtitle}>Your check-in is being reviewed</Text>
+          <View style={styles.pendingDots}>
+            {[0, 1, 2].map((i) => <View key={i} style={[styles.dot, { backgroundColor: Colors.warning }]} />)}
+          </View>
+        </Animated.View>
+      );
+    }
+
+    if (todayLog.status === 'working') {
+      return (
+        <View style={[styles.statusCard, styles.workingCard]}>
+          <Text style={styles.statusEmoji}>💼</Text>
+          <Text style={styles.statusTitle}>You&apos;re Working</Text>
+          <View style={styles.workingInfo}>
+            <View style={styles.workingDetail}>
+              <Text style={styles.workingLabel}>Since</Text>
+              <Text style={styles.workingValue}>{todayLog.check_in_time ? format(new Date(todayLog.check_in_time), 'hh:mm a') : '--'}</Text>
+            </View>
+            <View style={styles.workingDetail}>
+              <Text style={styles.workingLabel}>Elapsed</Text>
+              <Text style={styles.workingValue}>{elapsed}</Text>
+            </View>
+          </View>
+          <Button 
+            mode="contained" 
+            onPress={() => setShowCheckOut(true)} 
+            style={styles.endButton} 
+            buttonColor={Colors.error} 
+            textColor={Colors.white} 
+            icon="stop"
+          >
+            End Day
+          </Button>
+        </View>
+      );
+    }
+
+    if (todayLog.status === 'done') {
+      return (
+        <View style={[styles.statusCard, styles.doneCard]}>
+          <Text style={styles.statusEmoji}>✅</Text>
+          <Text style={styles.statusTitle}>Day Complete</Text>
+          <Text style={styles.statusSubtitle}>
+            {todayLog.total_hours ? `${todayLog.total_hours} hours worked` : 'Great work today!'}
+          </Text>
+        </View>
+      );
+    }
+
+    return null;
+  };
+
   const today = format(new Date(), 'EEEE, MMMM dd');
 
   return (
@@ -88,6 +229,29 @@ export default function ManagerDashboard() {
         <Text style={styles.name}>{profile?.full_name?.split(' ')[0] || 'Manager'} 👋</Text>
         <Text style={styles.date}>{today}</Text>
       </View>
+
+      {/* My Work Status */}
+      <View style={styles.workStatusContainer}>
+        {renderWorkStatus()}
+      </View>
+
+      {/* Today's Tasks */}
+      {todayTasks.length > 0 && (
+        <View style={styles.tasksSection}>
+          <Text style={styles.sectionTitle}>Today&apos;s Tasks</Text>
+          <View style={styles.tasksContainer}>
+            {todayTasks.map((task, index) => (
+              <TaskCard 
+                key={task.id} 
+                task={task} 
+                onStatusChange={updateTaskStatus}
+                isLast={index === todayTasks.length - 1}
+                index={index}
+              />
+            ))}
+          </View>
+        </View>
+      )}
 
       {/* Pending Approvals Count Card */}
       <View style={styles.approvalCountCard}>
@@ -134,6 +298,25 @@ export default function ManagerDashboard() {
           ))
         )}
       </View>
+
+      <CheckInModal 
+        visible={showCheckIn} 
+        onDismiss={() => setShowCheckIn(false)} 
+        onSubmit={handleCheckIn} 
+        isLoading={checkInLoading} 
+      />
+      <CheckOutModal 
+        visible={showCheckOut} 
+        onDismiss={() => setShowCheckOut(false)} 
+        onSubmit={handleCheckOut} 
+      />
+      <Snackbar 
+        visible={!!snackMessage} 
+        onDismiss={() => setSnackMessage('')} 
+        duration={3000}
+      >
+        {snackMessage}
+      </Snackbar>
     </ScrollView>
   );
 }
@@ -240,6 +423,98 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Colors.shadow,
+  },
+  workStatusContainer: {
+    paddingHorizontal: 20,
+    marginTop: 8,
+  },
+  statusCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Colors.shadow,
+  },
+  pendingCard: { 
+    borderColor: Colors.warning,
+  },
+  workingCard: { 
+    borderColor: Colors.success,
+  },
+  doneCard: { 
+    borderColor: Colors.border,
+  },
+  statusEmoji: { 
+    fontSize: 44, 
+    marginBottom: 10,
+  },
+  statusTitle: { 
+    fontSize: 20, 
+    fontFamily: 'Inter_700Bold', 
+    color: Colors.textPrimary,
+  },
+  statusSubtitle: { 
+    fontSize: 14, 
+    fontFamily: 'Inter_500Medium', 
+    color: Colors.textSecondary, 
+    marginTop: 4, 
+    textAlign: 'center',
+  },
+  startButton: { 
+    borderRadius: 14, 
+    marginTop: 20, 
+    width: '100%',
+  },
+  startButtonContent: { 
+    height: 52,
+  },
+  pendingDots: { 
+    flexDirection: 'row', 
+    gap: 6, 
+    marginTop: 16,
+  },
+  dot: { 
+    width: 8, 
+    height: 8, 
+    borderRadius: 4,
+  },
+  workingInfo: { 
+    flexDirection: 'row', 
+    gap: 20, 
+    marginTop: 16, 
+    marginBottom: 16,
+  },
+  workingDetail: { 
+    alignItems: 'center',
+  },
+  workingLabel: { 
+    fontSize: 12, 
+    fontFamily: 'Inter_500Medium', 
+    color: Colors.textSecondary,
+  },
+  workingValue: { 
+    fontSize: 18, 
+    fontFamily: 'Inter_700Bold', 
+    color: Colors.textPrimary, 
+    marginTop: 2,
+  },
+  endButton: { 
+    borderRadius: 14, 
+    width: '100%',
+  },
+  tasksSection: {
+    paddingHorizontal: 20,
+    marginTop: 20,
+  },
+  tasksContainer: {
+    backgroundColor: Colors.surface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
     ...Colors.shadow,
   },
 });

@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Button, HelperText, Modal, Portal, Text, TextInput } from 'react-native-paper';
 import { Colors } from '../constants/colors';
-import { MIN_CHECKIN_PLAN_LENGTH } from '../constants/roles';
 
 interface CheckInModalProps {
   visible: boolean;
@@ -20,11 +19,11 @@ export function CheckInModal({ visible, onDismiss, onSubmit, isLoading }: CheckI
   const [error, setError] = useState('');
 
   const charCount = plan.length;
-  const isValid = charCount >= MIN_CHECKIN_PLAN_LENGTH;
+  const isValid = plan.trim().length > 0; // Just check if not empty
 
   const handleSubmit = async () => {
     if (!isValid) {
-      setError(`Plan must be at least ${MIN_CHECKIN_PLAN_LENGTH} characters`);
+      setError('Please enter your plan for today');
       return;
     }
     
@@ -89,7 +88,7 @@ export function CheckInModal({ visible, onDismiss, onSubmit, isLoading }: CheckI
               </HelperText>
             ) : (
               <Text style={[styles.charCount, isValid && styles.charCountValid]}>
-                {charCount}/{MIN_CHECKIN_PLAN_LENGTH} characters
+                {charCount} characters
               </Text>
             )}
           </View>

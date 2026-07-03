@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "vebossoems",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.vebosso.ems"

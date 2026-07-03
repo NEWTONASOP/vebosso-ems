@@ -19,9 +19,9 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
   const [error, setError] = useState('');
 
   const handleSubmit = async () => {
-    // Validate minimum length
-    if (report.trim().length < 10) {
-      setError('Please provide a more detailed day report (at least 10 characters)');
+    // Just check if not empty
+    if (report.trim().length === 0) {
+      setError('Please provide a day report');
       return;
     }
     

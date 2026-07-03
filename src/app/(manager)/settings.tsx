@@ -3,6 +3,7 @@
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { Alert } from '../../lib/alert';
@@ -12,6 +13,7 @@ import { APP_NAME, ROLE_LABELS } from '../../constants/roles';
 import { useAuthStore } from '../../store/authStore';
 
 export default function ManagerSettingsScreen() {
+  const router = useRouter();
   const { profile, signOut } = useAuthStore();
 
   const handleSignOut = () => {
@@ -50,6 +52,23 @@ export default function ManagerSettingsScreen() {
         </View>
       </View>
 
+      <Text style={styles.sectionLabel}>Security</Text>
+      <View style={styles.groupedCard}>
+        <Pressable
+          style={({ pressed }) => [styles.settingRow, pressed && styles.rowPressed]}
+          onPress={() => router.push('/(auth)/change-password')}
+        >
+          <View style={[styles.iconContainer, { backgroundColor: Colors.accent + '15' }]}> 
+            <Feather name="key" size={18} color={Colors.accent} />
+          </View>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingTitle}>Change Password</Text>
+            <Text style={styles.settingSubtitle}>Update your account password</Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={Colors.textTertiary} />
+        </Pressable>
+      </View>
+
       <Text style={styles.sectionLabel}>Account</Text>
       <View style={styles.groupedCard}>
         <Pressable
@@ -60,7 +79,7 @@ export default function ManagerSettingsScreen() {
             <Feather name="log-out" size={18} color={Colors.error} />
           </View>
           <View style={styles.settingInfo}>
-            <Text style={styles.settingTitle}>Sign Out</Text>
+            <Text style={[styles.settingTitle, styles.destructiveText]}>Sign Out</Text>
             <Text style={styles.settingSubtitle}>Log out of your manager account</Text>
           </View>
         </Pressable>
@@ -171,6 +190,9 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
     fontSize: 15,
     color: Colors.text,
+  },
+  destructiveText: {
+    color: Colors.error,
   },
   settingSubtitle: {
     fontFamily: 'Inter_500Medium',
