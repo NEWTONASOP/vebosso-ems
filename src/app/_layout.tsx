@@ -13,17 +13,18 @@ import { configureFonts, MD3LightTheme, PaperProvider } from 'react-native-paper
 import 'react-native-reanimated';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { UpdateChecker } from '../components/UpdateChecker';
 import { UpdateRequired } from '../components/UpdateRequired';
 import { Colors, PaperThemeColors } from '../constants/colors';
 import { useAuthStore } from '../store/authStore';
 
 import {
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    Inter_800ExtraBold,
-    useFonts,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+  useFonts,
 } from '@expo-google-fonts/inter';
 
 // Keep splash screen visible while we fetch resources
@@ -245,6 +246,7 @@ export default function RootLayout() {
         >
           <StatusBar style="dark" />
           <OfflineBanner />
+          <UpdateChecker />
           <AuthGuard />
           <Stack
             screenOptions={{
