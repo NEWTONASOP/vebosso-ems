@@ -127,28 +127,53 @@ jobs:
           path = Path("android/app/build.gradle")
           text = path.read_text()
 
-          if "signingConfigs {" not in text:
+          release_block = (
+              '        release {\n'
+              '            storeFile file("release.keystore")\n'
+              '            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")\n'
+              '            keyAlias System.getenv("ANDROID_KEY_ALIAS")\n'
+              '            keyPassword System.getenv("ANDROID_KEY_PASSWORD")\n'
+              '        }\n'
+          )
+
+          if "release {" in text.split("signingConfigs {", 1)[-1].split("}", 1)[0] if "signingConfigs {" in text else False:
+              # A release config already exists inside signingConfigs - do nothing.
+              pass
+          elif "signingConfigs {" in text:
+              # signingConfigs block exists (e.g. just "debug") - insert release alongside it.
+              text = text.replace("signingConfigs {", "signingConfigs {\n" + release_block, 1)
+          else:
+              # No signingConfigs block at all - create one with just release.
               text = text.replace(
                   "android {",
-                  'android {\n'
-                  '    signingConfigs {\n'
-                  '        release {\n'
-                  '            storeFile file("release.keystore")\n'
-                  '            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")\n'
-                  '            keyAlias System.getenv("ANDROID_KEY_ALIAS")\n'
-                  '            keyPassword System.getenv("ANDROID_KEY_PASSWORD")\n'
-                  '        }\n'
-                  '    }',
+                  "android {\n    signingConfigs {\n" + release_block + "    }",
                   1,
               )
 
-          text = text.replace(
-              "signingConfig signingConfigs.debug",
-              "signingConfig signingConfigs.release"
-          )
+          # Point the release build type at the release signing config,
+          # regardless of whether it previously referenced debug or nothing.
+          if "signingConfig signingConfigs.debug" in text:
+              text = text.replace(
+                  "signingConfig signingConfigs.debug",
+                  "signingConfig signingConfigs.release"
+              )
+          elif "signingConfig signingConfigs.release" not in text:
+              # buildTypes.release exists but has no signingConfig line - add one.
+              text = text.replace(
+                  "buildTypes {",
+                  "buildTypes {\n        release {\n            signingConfig signingConfigs.release\n        }",
+                  1,
+              )
 
           path.write_text(text)
           PY
+
+      - name: Verify signing config was added
+        run: |
+          echo "---- signingConfigs block ----"
+          sed -n '/signingConfigs {/,/^    }/p' android/app/build.gradle
+          echo "---- signingConfig references ----"
+          grep -n "signingConfig signingConfigs" android/app/build.gradle
 
       - name: Cache CMake/NDK native build
         uses: actions/cache@v4
