@@ -1,106 +1,128 @@
 // ============================================================================
-// VEBOSSO EMS — Error Boundary Component
+// VEBOSSO EMS — Root Error Boundary Component
 // ============================================================================
+// Catches unhandled React render errors. Enhanced with:
+//  - Retry counter (after 3 failed resets, tells user to restart the app)
+//  - resetKeys prop (auto-resets when a key in the array changes)
+//  - Structured error logging (easy to swap in Sentry later)
 
-import { Component, ErrorInfo, ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { Colors } from '../constants/colors';
 
-interface Props {
-  children: ReactNode;
-  fallback?: ReactNode;
-  onError?: (error: Error, errorInfo: ErrorInfo) => void;
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+  /**
+   * When any value in this array changes, the boundary automatically resets.
+   * Useful to reset when navigation changes or a critical prop changes.
+   */
+  resetKeys?: unknown[];
+  /** Optional callback fired when an error is caught. Useful for logging. */
+  onError?: (error: Error, info: React.ErrorInfo) => void;
 }
 
-interface State {
+interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
-  errorInfo: ErrorInfo | null;
+  errorInfo: React.ErrorInfo | null;
+  retryCount: number;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
+const MAX_RETRIES = 3;
+
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
       hasError: false,
       error: null,
       errorInfo: null,
+      retryCount: 0,
     };
   }
 
-  static getDerivedStateFromError(error: Error): State {
-    return {
-      hasError: true,
-      error,
-      errorInfo: null,
-    };
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
+    return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
-    this.setState({
-      error,
-      errorInfo,
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    this.setState({ errorInfo: info });
+
+    // Structured error log — replace console.error with Sentry.captureException for production
+    console.error('[ErrorBoundary] Caught unhandled error:', {
+      message: error.message,
+      stack: error.stack,
+      componentStack: info.componentStack,
     });
 
-    // Call optional error handler
-    this.props.onError?.(error, errorInfo);
+    // Fire the optional onError callback (e.g. for analytics)
+    this.props.onError?.(error, info);
   }
 
-  handleReset = () => {
-    this.setState({
+  componentDidUpdate(prevProps: ErrorBoundaryProps) {
+    // Auto-reset when any value in resetKeys changes
+    const { resetKeys } = this.props;
+    if (
+      this.state.hasError &&
+      resetKeys &&
+      prevProps.resetKeys &&
+      resetKeys.some((key, idx) => key !== prevProps.resetKeys![idx])
+    ) {
+      this.reset();
+    }
+  }
+
+  reset = () => {
+    this.setState((prev) => ({
       hasError: false,
       error: null,
       errorInfo: null,
-    });
+      retryCount: prev.retryCount + 1,
+    }));
   };
 
   render() {
-    if (this.state.hasError) {
-      // Use custom fallback if provided
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
-
-      // Default error UI
-      return (
-        <View style={styles.container}>
-          <ScrollView contentContainerStyle={styles.content}>
-            <Text style={styles.emoji}>⚠️</Text>
-            <Text style={styles.title}>Something went wrong</Text>
-            <Text style={styles.message}>
-              We&apos;re sorry for the inconvenience. The app encountered an unexpected error.
-            </Text>
-
-            {__DEV__ && this.state.error && (
-              <View style={styles.errorDetails}>
-                <Text style={styles.errorTitle}>Error Details (Dev Mode):</Text>
-                <Text style={styles.errorText}>{this.state.error.toString()}</Text>
-                {this.state.errorInfo && (
-                  <Text style={styles.errorStack}>
-                    {this.state.errorInfo.componentStack}
-                  </Text>
-                )}
-              </View>
-            )}
-
-            <Button
-              mode="contained"
-              onPress={this.handleReset}
-              style={styles.button}
-              buttonColor={Colors.accent}
-              textColor={Colors.white}
-            >
-              Try Again
-            </Button>
-          </ScrollView>
-        </View>
-      );
+    if (!this.state.hasError) {
+      return this.props.children;
     }
 
-    return this.props.children;
+    const isExhausted = this.state.retryCount >= MAX_RETRIES;
+
+    return (
+      <View style={styles.container}>
+        <Text style={styles.emoji}>{isExhausted ? '💀' : '⚠️'}</Text>
+
+        <Text style={styles.title}>
+          {isExhausted ? 'Something went seriously wrong' : 'Something went wrong'}
+        </Text>
+
+        <Text style={styles.message}>
+          {isExhausted
+            ? 'The app has crashed multiple times. Please close and restart it.'
+            : (this.state.error?.message || 'An unexpected error occurred.')}
+        </Text>
+
+        {!isExhausted && (
+          <Button
+            mode="contained"
+            onPress={this.reset}
+            style={styles.button}
+            buttonColor={Colors.accent}
+            textColor={Colors.white}
+          >
+            Try Again ({MAX_RETRIES - this.state.retryCount} attempts left)
+          </Button>
+        )}
+
+        {/* Always show details in dev for debugging */}
+        {__DEV__ && this.state.errorInfo && (
+          <Text style={styles.devInfo} numberOfLines={8}>
+            {this.state.error?.stack}
+          </Text>
+        )}
+      </View>
+    );
   }
 }
 
@@ -108,59 +130,43 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    justifyContent: 'center',
+    padding: 32,
   },
   emoji: {
-    fontSize: 64,
+    fontSize: 56,
     marginBottom: 16,
   },
   title: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 28,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 22,
     color: Colors.text,
-    marginBottom: 8,
-    letterSpacing: -0.7,
+    textAlign: 'center',
+    marginBottom: 12,
+    letterSpacing: -0.5,
   },
   message: {
-    fontSize: 16,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 15,
     color: Colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 24,
-  },
-  errorDetails: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: Colors.error,
-  },
-  errorTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.error,
-    marginBottom: 8,
-  },
-  errorText: {
-    fontSize: 12,
-    color: Colors.text,
-    fontFamily: 'monospace',
-    marginBottom: 8,
-  },
-  errorStack: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    fontFamily: 'monospace',
+    lineHeight: 22,
+    marginBottom: 32,
   },
   button: {
     borderRadius: 12,
-    paddingHorizontal: 32,
+    paddingHorizontal: 8,
+  },
+  devInfo: {
+    marginTop: 24,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 10,
+    color: Colors.textTertiary,
+    textAlign: 'left',
+    alignSelf: 'stretch',
+    backgroundColor: Colors.surfaceLight,
+    padding: 8,
+    borderRadius: 8,
   },
 });

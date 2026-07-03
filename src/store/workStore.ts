@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { create } from 'zustand';
 import { sendPushNotification } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
+import { parseSupabaseError } from '../lib/errors';
 import {
     AnnouncementWithCreator,
     AppSetting,
@@ -26,22 +27,33 @@ interface WorkState {
   todayLog: WorkLog | null;
   todayTasks: Task[];
   isLoadingToday: boolean;
+  errorToday: string | null;
+  /** Alias for errorToday */
+  todayError: string | null;
 
   // Approvals
   pendingApprovals: WorkLogWithProfile[];
   pendingApprovalsCount: number;
   isLoadingApprovals: boolean;
+  errorApprovals: string | null;
+  /** Alias for errorApprovals */
+  approvalsError: string | null;
 
   // Team data (for owner/manager)
   teamMembers: Profile[];
   isLoadingTeam: boolean;
+  errorTeam: string | null;
+  /** Alias for errorTeam */
+  teamError: string | null;
 
   // Announcements
   announcements: AnnouncementWithCreator[];
   isLoadingAnnouncements: boolean;
+  errorAnnouncements: string | null;
 
   // App settings
   settings: Record<string, string>;
+  errorSettings: string | null;
 
   // Stats
   stats: {
@@ -50,6 +62,7 @@ interface WorkState {
     onLeaveToday: number;
     pendingApprovals: number;
   };
+  statsError: string | null;
 
   // Realtime channels
   channels: RealtimeChannel[];
@@ -57,28 +70,28 @@ interface WorkState {
   // Actions — Member
   checkIn: (plan: string) => Promise<{ success: boolean; error?: string }>;
   checkOut: (report: string) => Promise<{ success: boolean; error?: string }>;
-  fetchTodayLog: (userId: string) => Promise<void>;
-  fetchTodayTasks: (userId: string) => Promise<void>;
-  updateTaskStatus: (taskId: string, status: 'pending' | 'in_progress' | 'done') => Promise<void>;
+  fetchTodayLog: (userId: string) => Promise<{ success: boolean; error?: string }>;
+  fetchTodayTasks: (userId: string) => Promise<{ success: boolean; error?: string }>;
+  updateTaskStatus: (taskId: string, status: 'pending' | 'in_progress' | 'done') => Promise<{ success: boolean; error?: string }>;
 
   // Actions — Owner/Manager
-  fetchPendingApprovals: (managerId?: string) => Promise<void>;
-  approveCheckIn: (workLogId: string, approverId: string, tasks?: TaskInsert[]) => Promise<void>;
-  rejectCheckIn: (workLogId: string, approverId: string, reason: string) => Promise<void>;
-  fetchTeamMembers: (managerId?: string) => Promise<void>;
-  fetchStats: (managerId?: string) => Promise<void>;
-  addTask: (task: TaskInsert) => Promise<void>;
+  fetchPendingApprovals: (managerId?: string) => Promise<{ success: boolean; error?: string }>;
+  approveCheckIn: (workLogId: string, approverId: string, tasks?: TaskInsert[]) => Promise<{ success: boolean; error?: string }>;
+  rejectCheckIn: (workLogId: string, approverId: string, reason: string) => Promise<{ success: boolean; error?: string }>;
+  fetchTeamMembers: (managerId?: string) => Promise<{ success: boolean; error?: string }>;
+  fetchStats: (managerId?: string) => Promise<{ success: boolean; error?: string }>;
+  addTask: (task: TaskInsert) => Promise<{ success: boolean; error?: string }>;
 
   // Actions — Announcements
-  fetchAnnouncements: (role: string, userId: string) => Promise<void>;
-  createAnnouncement: (announcement: { title: string; body: string; target_role?: string; target_user_id?: string; created_by: string }) => Promise<void>;
+  fetchAnnouncements: (role: string, userId: string) => Promise<{ success: boolean; error?: string }>;
+  createAnnouncement: (announcement: { title: string; body: string; target_role?: string; target_user_id?: string; created_by: string }) => Promise<{ success: boolean; error?: string }>;
 
   // Actions — Settings
-  fetchSettings: () => Promise<void>;
-  updateSetting: (key: string, value: string) => Promise<void>;
+  fetchSettings: () => Promise<{ success: boolean; error?: string }>;
+  updateSetting: (key: string, value: string) => Promise<{ success: boolean; error?: string }>;
 
   // Actions — Work History
-  fetchWorkHistory: (userId: string, startDate?: string, endDate?: string) => Promise<WorkLog[]>;
+  fetchWorkHistory: (userId: string, startDate?: string, endDate?: string) => Promise<{ data: WorkLog[], success: boolean; error?: string }>;
 
   // Realtime
   subscribeToRealtime: (userId: string, role: string, managerId?: string) => void;
@@ -93,15 +106,24 @@ export const useWorkStore = create<WorkState>((set, get) => ({
   todayLog: null,
   todayTasks: [],
   isLoadingToday: false,
+  errorToday: null,
+  todayError: null,
   pendingApprovals: [],
   pendingApprovalsCount: 0,
   isLoadingApprovals: false,
+  errorApprovals: null,
+  approvalsError: null,
   teamMembers: [],
   isLoadingTeam: false,
+  errorTeam: null,
+  teamError: null,
   announcements: [],
   isLoadingAnnouncements: false,
+  errorAnnouncements: null,
   settings: {},
+  errorSettings: null,
   stats: { totalMembers: 0, activeNow: 0, onLeaveToday: 0, pendingApprovals: 0 },
+  statsError: null,
   channels: [],
 
   // ============================================================================
@@ -127,16 +149,10 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .select()
         .single();
 
-      if (error) {
-        if (error.code === '23505') {
-          return { success: false, error: 'You have already checked in today.' };
-        }
-        return { success: false, error: error.message };
-      }
+      if (error) return { success: false, error: error.message };
 
       set({ todayLog: data as WorkLog });
 
-      // Notify manager/owner
       const { data: profile } = await supabase
         .from('profiles')
         .select('full_name, manager_id')
@@ -152,7 +168,6 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         );
       }
 
-      // Also notify owner(s)
       const { data: owners } = await supabase
         .from('profiles')
         .select('id')
@@ -170,8 +185,8 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       });
 
       return { success: true };
-    } catch {
-      return { success: false, error: 'Failed to check in. Please try again.' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to check in.' };
     }
   },
 
@@ -195,20 +210,18 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .select()
         .single();
 
-      if (error) {
-        return { success: false, error: error.message };
-      }
+      if (error) return { success: false, error: error.message };
 
       set({ todayLog: data as WorkLog });
       return { success: true };
-    } catch {
-      return { success: false, error: 'Failed to check out. Please try again.' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to check out.' };
     }
   },
 
   fetchTodayLog: async (userId: string) => {
     try {
-      set({ isLoadingToday: true });
+      set({ isLoadingToday: true, errorToday: null, todayError: null });
       const today = format(new Date(), 'yyyy-MM-dd');
 
       const { data, error } = await supabase
@@ -218,13 +231,16 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .eq('date', today)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.error('Fetch today log error:', error);
+      if (error && error.code !== 'PGRST116') {
+        set({ errorToday: error.message, todayError: error.message, isLoadingToday: false });
+        return { success: false, error: error.message };
       }
 
       set({ todayLog: data ? (data as unknown as WorkLog) : null, isLoadingToday: false });
-    } catch {
-      set({ isLoadingToday: false });
+      return { success: true };
+    } catch (err: any) {
+      set({ errorToday: err.message, todayError: err.message, isLoadingToday: false });
+      return { success: false, error: err.message };
     }
   },
 
@@ -239,14 +255,12 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .or(`due_date.eq.${today},due_date.is.null`)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Fetch tasks error:', error);
-        return;
-      }
+      if (error) return { success: false, error: error.message };
 
       set({ todayTasks: (data as Task[]) || [] });
-    } catch (error) {
-      console.error('Fetch tasks error:', error);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   },
 
@@ -257,17 +271,16 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .update({ status })
         .eq('id', taskId);
 
-      if (error) throw error;
+      if (error) return { success: false, error: error.message };
 
-      // Update local state
       set((state) => ({
         todayTasks: state.todayTasks.map((t) =>
           t.id === taskId ? { ...t, status } : t
         ),
       }));
-    } catch (error) {
-      console.error('Update task status error:', error);
-      throw error;
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   },
 
@@ -277,7 +290,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
   fetchPendingApprovals: async (managerId?: string) => {
     try {
-      set({ isLoadingApprovals: true });
+      set({ isLoadingApprovals: true, errorApprovals: null });
 
       let query = supabase
         .from('work_logs')
@@ -288,7 +301,6 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .in('status', ['pending_approval', 'pending_checkout'])
         .order('check_in_time', { ascending: false });
 
-      // If manager, only fetch team members (exclude self)
       if (managerId) {
         const { data: teamIds } = await supabase
           .from('profiles')
@@ -296,26 +308,18 @@ export const useWorkStore = create<WorkState>((set, get) => ({
           .eq('manager_id', managerId);
 
         if (teamIds && teamIds.length > 0) {
-          const ids = teamIds.map((t) => t.id);
-          // Don't include manager's own ID - they shouldn't approve their own requests
-          query = query.in('user_id', ids);
+          query = query.in('user_id', teamIds.map((t) => t.id));
         } else {
-          // Manager has no team members, return empty
-          set({
-            pendingApprovals: [],
-            pendingApprovalsCount: 0,
-            isLoadingApprovals: false,
-          });
-          return;
+          set({ pendingApprovals: [], pendingApprovalsCount: 0, isLoadingApprovals: false });
+          return { success: true };
         }
       }
 
       const { data, error } = await query;
 
       if (error) {
-        console.error('Fetch approvals error:', error);
-        set({ isLoadingApprovals: false });
-        return;
+        set({ errorApprovals: error.message, approvalsError: error.message, isLoadingApprovals: false });
+        return { success: false, error: error.message };
       }
 
       const approvals = (data || []) as unknown as WorkLogWithProfile[];
@@ -323,9 +327,13 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         pendingApprovals: approvals,
         pendingApprovalsCount: approvals.length,
         isLoadingApprovals: false,
+        approvalsError: null,
+        errorApprovals: null,
       });
-    } catch {
-      set({ isLoadingApprovals: false });
+      return { success: true };
+    } catch (err: any) {
+      set({ errorApprovals: err.message, approvalsError: err.message, isLoadingApprovals: false });
+      return { success: false, error: err.message };
     }
   },
 
@@ -343,18 +351,12 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .select('user_id')
         .single();
 
-      if (error) throw error;
+      if (error) return { success: false, error: error.message };
 
-      // Create tasks if provided
       if (tasks && tasks.length > 0) {
-        const tasksWithWorkLog = tasks.map((t) => ({
-          ...t,
-          work_log_id: workLogId,
-        }));
-        await supabase.from('tasks').insert(tasksWithWorkLog);
+        await supabase.from('tasks').insert(tasks.map((t) => ({ ...t, work_log_id: workLogId })));
       }
 
-      // Notify member
       if (data) {
         sendPushNotification(
           data.user_id,
@@ -364,11 +366,10 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         );
       }
 
-      // Refresh approvals
       await get().fetchPendingApprovals();
-    } catch (error) {
-      console.error('Approve check-in error:', error);
-      throw error;
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   },
 
@@ -386,7 +387,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .select('user_id')
         .single();
 
-      if (error) throw error;
+      if (error) return { success: false, error: error.message };
 
       if (data) {
         sendPushNotification(
@@ -398,15 +399,15 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       }
 
       await get().fetchPendingApprovals();
-    } catch (error) {
-      console.error('Reject check-in error:', error);
-      throw error;
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   },
 
   fetchTeamMembers: async (managerId?: string) => {
     try {
-      set({ isLoadingTeam: true });
+      set({ isLoadingTeam: true, errorTeam: null, teamError: null });
 
       let query = supabase
         .from('profiles')
@@ -414,84 +415,41 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .eq('is_active', true)
         .order('full_name');
 
-      if (managerId) {
-        query = query.eq('manager_id', managerId);
-      }
+      if (managerId) query = query.eq('manager_id', managerId);
 
       const { data, error } = await query;
-
       if (error) {
-        console.error('Fetch team error:', error);
-        set({ isLoadingTeam: false });
-        return;
+        set({ errorTeam: error.message, teamError: error.message, isLoadingTeam: false });
+        return { success: false, error: error.message };
       }
 
-      set({ teamMembers: (data as Profile[]) || [], isLoadingTeam: false });
-    } catch {
-      set({ isLoadingTeam: false });
+      set({ teamMembers: (data as Profile[]) || [], isLoadingTeam: false, errorTeam: null, teamError: null });
+      return { success: true };
+    } catch (err: any) {
+      set({ errorTeam: err.message, teamError: err.message, isLoadingTeam: false });
+      return { success: false, error: err.message };
     }
   },
 
   fetchStats: async (managerId?: string) => {
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
-
-      // Get team member IDs for filtering
       let memberFilter: string[] | null = null;
       if (managerId) {
-        const { data: team } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('manager_id', managerId);
+        const { data: team } = await supabase.from('profiles').select('id').eq('manager_id', managerId);
         memberFilter = team?.map((t) => t.id) || [];
       }
 
-      // Total members
-      let membersQuery = supabase
-        .from('profiles')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_active', true)
-        .neq('role', 'owner');
+      const getCount = async (table: string, filterBy: string | null = null) => {
+        let q = supabase.from(table).select('id', { count: 'exact', head: true });
+        if (memberFilter) q = q.in('user_id', memberFilter);
+        return await q;
+      };
 
-      if (memberFilter) {
-        membersQuery = membersQuery.in('id', memberFilter);
-      }
-      const { count: totalMembers } = await membersQuery;
-
-      // Active now (status = working)
-      let activeQuery = supabase
-        .from('work_logs')
-        .select('id', { count: 'exact', head: true })
-        .eq('date', today)
-        .eq('status', 'working');
-
-      if (memberFilter) {
-        activeQuery = activeQuery.in('user_id', memberFilter);
-      }
-      const { count: activeNow } = await activeQuery;
-
-      // On leave today
-      let leaveQuery = supabase
-        .from('leave_requests')
-        .select('id', { count: 'exact', head: true })
-        .eq('date', today)
-        .eq('status', 'approved');
-
-      if (memberFilter) {
-        leaveQuery = leaveQuery.in('user_id', memberFilter);
-      }
-      const { count: onLeaveToday } = await leaveQuery;
-
-      // Pending approvals
-      let approvalsQuery = supabase
-        .from('work_logs')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'pending_approval');
-
-      if (memberFilter) {
-        approvalsQuery = approvalsQuery.in('user_id', memberFilter);
-      }
-      const { count: pendingApprovals } = await approvalsQuery;
+      const { count: totalMembers } = await supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_active', true).neq('role', 'owner');
+      const { count: activeNow } = await supabase.from('work_logs').select('id', { count: 'exact', head: true }).eq('date', today).eq('status', 'working');
+      const { count: onLeaveToday } = await supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('date', today).eq('status', 'approved');
+      const { count: pendingApprovals } = await supabase.from('work_logs').select('id', { count: 'exact', head: true }).eq('status', 'pending_approval');
 
       set({
         stats: {
@@ -501,26 +459,21 @@ export const useWorkStore = create<WorkState>((set, get) => ({
           pendingApprovals: pendingApprovals || 0,
         },
       });
-    } catch (error) {
-      console.error('Fetch stats error:', error);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   },
 
   addTask: async (task: TaskInsert) => {
     try {
       const { error } = await supabase.from('tasks').insert(task);
-      if (error) throw error;
+      if (error) return { success: false, error: error.message };
 
-      // Notify assignee
-      sendPushNotification(
-        task.assigned_to,
-        'New Task Assigned 📋',
-        task.title,
-        { type: 'task_assigned', task_title: task.title }
-      );
-    } catch (error) {
-      console.error('Add task error:', error);
-      throw error;
+      sendPushNotification(task.assigned_to, 'New Task Assigned 📋', task.title, { type: 'task_assigned', task_title: task.title });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   },
 
@@ -530,39 +483,33 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
   fetchAnnouncements: async (role: string, userId: string) => {
     try {
-      set({ isLoadingAnnouncements: true });
-
+      set({ isLoadingAnnouncements: true, errorAnnouncements: null });
       const { data, error } = await supabase
         .from('announcements')
-        .select(`
-          *,
-          creator:profiles!announcements_created_by_fkey (full_name, role)
-        `)
+        .select('*, creator:profiles!announcements_created_by_fkey (full_name, role)')
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) {
-        console.error('Fetch announcements error:', error);
-        set({ isLoadingAnnouncements: false });
-        return;
+        set({ errorAnnouncements: error.message, isLoadingAnnouncements: false });
+        return { success: false, error: error.message };
       }
 
-      set({
-        announcements: (data || []) as unknown as AnnouncementWithCreator[],
-        isLoadingAnnouncements: false,
-      });
-    } catch {
-      set({ isLoadingAnnouncements: false });
+      set({ announcements: (data || []) as unknown as AnnouncementWithCreator[], isLoadingAnnouncements: false });
+      return { success: true };
+    } catch (err: any) {
+      set({ errorAnnouncements: err.message, isLoadingAnnouncements: false });
+      return { success: false, error: err.message };
     }
   },
 
   createAnnouncement: async (announcement) => {
     try {
       const { error } = await supabase.from('announcements').insert(announcement);
-      if (error) throw error;
-    } catch (error) {
-      console.error('Create announcement error:', error);
-      throw error;
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   },
 
@@ -573,34 +520,25 @@ export const useWorkStore = create<WorkState>((set, get) => ({
   fetchSettings: async () => {
     try {
       const { data, error } = await supabase.from('app_settings').select('*');
-      if (error) throw error;
+      if (error) return { success: false, error: error.message };
 
       const settingsMap: Record<string, string> = {};
-      (data || []).forEach((s: AppSetting) => {
-        settingsMap[s.key] = s.value;
-      });
-
+      (data || []).forEach((s: AppSetting) => settingsMap[s.key] = s.value);
       set({ settings: settingsMap });
-    } catch (error) {
-      console.error('Fetch settings error:', error);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   },
 
   updateSetting: async (key: string, value: string) => {
     try {
-      const { error } = await supabase
-        .from('app_settings')
-        .update({ value })
-        .eq('key', key);
-
-      if (error) throw error;
-
-      set((state) => ({
-        settings: { ...state.settings, [key]: value },
-      }));
-    } catch (error) {
-      console.error('Update setting error:', error);
-      throw error;
+      const { error } = await supabase.from('app_settings').update({ value }).eq('key', key);
+      if (error) return { success: false, error: error.message };
+      set((state) => ({ settings: { ...state.settings, [key]: value } }));
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   },
 
@@ -610,22 +548,15 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
   fetchWorkHistory: async (userId: string, startDate?: string, endDate?: string) => {
     try {
-      let query = supabase
-        .from('work_logs')
-        .select('*')
-        .eq('user_id', userId)
-        .order('date', { ascending: false });
-
+      let query = supabase.from('work_logs').select('*').eq('user_id', userId).order('date', { ascending: false });
       if (startDate) query = query.gte('date', startDate);
       if (endDate) query = query.lte('date', endDate);
 
       const { data, error } = await query;
-      if (error) throw error;
-
-      return (data || []) as WorkLog[];
-    } catch (error) {
-      console.error('Fetch work history error:', error);
-      return [];
+      if (error) return { data: [], success: false, error: error.message };
+      return { data: (data || []) as WorkLog[], success: true };
+    } catch (err: any) {
+      return { data: [], success: false, error: err.message };
     }
   },
 
@@ -634,84 +565,38 @@ export const useWorkStore = create<WorkState>((set, get) => ({
   // ============================================================================
 
   subscribeToRealtime: (userId: string, role: string, managerId?: string) => {
-    // Prevent duplicate subscriptions — if channels already exist, bail out early
-    const existingChannels = get().channels;
-    if (existingChannels.length > 0) {
-      console.log('[Realtime] Already subscribed, skipping duplicate');
-      return;
-    }
+    if (get().channels.length > 0) return;
     
     const channels: RealtimeChannel[] = [];
     const channelId = Math.random().toString(36).substring(7);
 
-    // Subscribe to work_logs changes
     const workLogsChannel = supabase
       .channel(`work_logs_changes_${channelId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'work_logs' },
-        (payload) => {
-          console.log('Work log change:', payload.eventType);
-
-          // Refresh relevant data based on role
-          if (role === 'owner') {
-            get().fetchPendingApprovals();
-            get().fetchStats();
-          } else if (role === 'manager') {
-            get().fetchPendingApprovals(managerId);
-            get().fetchStats(managerId);
-          }
-
-          // If it's the user's own log, refresh today's log
-          const record = payload.new as WorkLog;
-          if (record && record.user_id === userId) {
-            get().fetchTodayLog(userId);
-          }
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'work_logs' }, () => {
+        if (role === 'owner') { get().fetchPendingApprovals(); get().fetchStats(); }
+        else if (role === 'manager') { get().fetchPendingApprovals(managerId); get().fetchStats(managerId); }
+        get().fetchTodayLog(userId);
+      })
       .subscribe();
 
     channels.push(workLogsChannel);
-
-    // Subscribe to tasks changes
     const tasksChannel = supabase
       .channel(`tasks_changes_${channelId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'tasks' },
-        (payload) => {
-          const record = payload.new as Task;
-          if (record && record.assigned_to === userId) {
-            get().fetchTodayTasks(userId);
-          }
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => get().fetchTodayTasks(userId))
       .subscribe();
 
     channels.push(tasksChannel);
-
-    // Subscribe to announcements
     const announcementsChannel = supabase
       .channel(`announcements_changes_${channelId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'announcements' },
-        () => {
-          get().fetchAnnouncements(role, userId);
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, () => get().fetchAnnouncements(role, userId))
       .subscribe();
 
     channels.push(announcementsChannel);
-
     set({ channels });
   },
 
   unsubscribeFromRealtime: () => {
-    const { channels } = get();
-    channels.forEach((channel) => {
-      supabase.removeChannel(channel);
-    });
+    get().channels.forEach((c) => supabase.removeChannel(c));
     set({ channels: [] });
   },
 

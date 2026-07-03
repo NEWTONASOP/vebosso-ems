@@ -8,17 +8,19 @@ import { Chip, Menu, Searchbar, Snackbar, Text } from 'react-native-paper';
 import { AssignManagerModal } from '../../components/AssignManagerModal';
 import { AssignTaskModal } from '../../components/AssignTaskModal';
 import { EmptyState } from '../../components/EmptyState';
+import { InlineError } from '../../components/InlineError';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { MemberCard } from '../../components/MemberCard';
 import { Colors } from '../../constants/colors';
 import { supabase } from '../../lib/supabase';
+import { parseSupabaseError } from '../../lib/errors';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Profile } from '../../types/database';
 
 export default function OwnerTeamScreen() {
   const { profile } = useAuthStore();
-  const { teamMembers, isLoadingTeam, fetchTeamMembers, addTask } = useWorkStore();
+  const { teamMembers, isLoadingTeam, teamError, fetchTeamMembers, addTask } = useWorkStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
@@ -42,11 +44,7 @@ export default function OwnerTeamScreen() {
     setRefreshing(false);
   };
 
-  const handleMemberPress = (member: Profile, event: any) => {
-    // Get the position for the menu
-    event.target.measure((x: number, y: number, width: number, height: number, pageX: number, pageY: number) => {
-      setMenuAnchor({ x: pageX, y: pageY + height });
-    });
+  const handleMemberPress = (member: Profile) => {
     setSelectedMember(member);
     setMenuVisible(true);
   };
@@ -55,23 +53,22 @@ export default function OwnerTeamScreen() {
     if (!profile?.id || !selectedMember?.id) return;
 
     setIsAssigningTask(true);
-    try {
-      await addTask({
-        assigned_to: selectedMember.id,
-        assigned_by: profile.id,
-        title,
-        description,
-        due_date: dueDate,
-        status: 'pending',
-      });
-      setSnackMessage(`Task assigned to ${selectedMember.full_name}`);
+    const result = await addTask({
+      assigned_to: selectedMember.id,
+      assigned_by: profile.id,
+      title,
+      description,
+      due_date: dueDate,
+      status: 'pending',
+    });
+    setIsAssigningTask(false);
+
+    if (result.success) {
+      setSnackMessage(`Task assigned to ${selectedMember.full_name} ✅`);
       setAssignTaskModalVisible(false);
       setSelectedMember(null);
-    } catch (error) {
-      console.error('Failed to assign task:', error);
-      setSnackMessage('Failed to assign task. Please try again.');
-    } finally {
-      setIsAssigningTask(false);
+    } else {
+      setSnackMessage(result.error || 'Failed to assign task. Please try again.');
     }
   };
 
@@ -89,16 +86,14 @@ export default function OwnerTeamScreen() {
 
       setSnackMessage(
         managerId
-          ? `Manager assigned to ${selectedMember.full_name}`
+          ? `Manager assigned to ${selectedMember.full_name} ✅`
           : `Manager removed from ${selectedMember.full_name}`
       );
       setAssignManagerModalVisible(false);
       setSelectedMember(null);
-      // Refresh team members to show updated data
       await fetchTeamMembers();
     } catch (error) {
-      console.error('Failed to assign manager:', error);
-      setSnackMessage('Failed to assign manager. Please try again.');
+      setSnackMessage(parseSupabaseError(error));
     } finally {
       setIsAssigningManager(false);
     }
@@ -122,7 +117,7 @@ export default function OwnerTeamScreen() {
   });
 
   const renderMember = useCallback(({ item }: { item: Profile }) => (
-    <MemberCard member={item} onPress={(e) => handleMemberPress(item, e)} />
+    <MemberCard member={item} onPress={() => handleMemberPress(item)} />
   ), []);
 
   return (
@@ -192,6 +187,10 @@ export default function OwnerTeamScreen() {
 
       {isLoadingTeam ? (
         <ListSkeleton count={5} />
+      ) : teamError ? (
+        <View style={{ paddingHorizontal: 20 }}>
+          <InlineError message={teamError} onRetry={() => fetchTeamMembers()} />
+        </View>
       ) : (
         <FlatList
           data={filteredMembers}

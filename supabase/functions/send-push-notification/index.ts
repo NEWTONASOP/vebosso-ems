@@ -30,27 +30,45 @@ interface ExpoPushMessage {
   priority: 'high';
 }
 
+/** Returns a consistent JSON error response. */
+function errorResponse(message: string, status: number, code?: string): Response {
+  return new Response(
+    JSON.stringify({ error: message, ...(code ? { code } : {}) }),
+    { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  // Validate required environment variables
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error('Missing required environment variables');
+    return errorResponse('Server configuration error. Please contact support.', 500, 'ENV_MISSING');
+  }
+
+  try {
     const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const payload: PushNotificationBody = await req.json();
+    // Parse request body — separate catch for malformed JSON
+    let payload: PushNotificationBody;
+    try {
+      payload = await req.json();
+    } catch {
+      return errorResponse('Invalid request body. Expected JSON.', 400, 'INVALID_JSON');
+    }
+
     const { user_id, title, body: messageBody, data } = payload;
 
     if (!user_id || !title || !messageBody) {
-      return new Response(
-        JSON.stringify({ error: 'user_id, title, and body are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return errorResponse('user_id, title, and body are required', 400, 'VALIDATION_ERROR');
     }
 
     // Get the user's Expo push token
@@ -60,21 +78,37 @@ serve(async (req) => {
       .eq('id', user_id)
       .single();
 
-    if (profileError || !profile?.expo_push_token) {
+    if (profileError) {
+      console.error('Profile fetch error:', profileError);
+      return new Response(
+        JSON.stringify({ success: false, message: 'Failed to fetch user profile', user_id }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!profile?.expo_push_token) {
       console.warn(`No push token found for user ${user_id}`);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'No push token found for user',
-          user_id 
-        }),
+        JSON.stringify({ success: false, message: 'No push token found for user', user_id }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate Expo push token format
+    const token = profile.expo_push_token as string;
+    if (!token.startsWith('ExponentPushToken[') && !token.startsWith('ExpoPushToken[')) {
+      console.warn(`Invalid push token format for user ${user_id}: ${token}`);
+      // Clear the invalid token
+      await adminClient.from('profiles').update({ expo_push_token: null }).eq('id', user_id);
+      return new Response(
+        JSON.stringify({ success: false, message: 'Invalid push token format — token cleared', user_id }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Construct Expo push message
     const message: ExpoPushMessage = {
-      to: profile.expo_push_token,
+      to: token,
       title,
       body: messageBody,
       data: data || {},
@@ -93,13 +127,24 @@ serve(async (req) => {
       body: JSON.stringify(message),
     });
 
+    if (!pushResponse.ok) {
+      const rawText = await pushResponse.text();
+      console.error('Expo push API HTTP error:', pushResponse.status, rawText);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Expo push API error', code: 'EXPO_HTTP_ERROR' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const pushResult = await pushResponse.json();
 
     if (pushResult.data?.status === 'error') {
-      console.error('Push notification error:', pushResult.data);
+      console.error('Push notification delivery error:', pushResult.data);
       
-      // If the token is invalid, clear it from the profile
-      if (pushResult.data.details?.error === 'DeviceNotRegistered') {
+      const expoErrorCode = pushResult.data.details?.error;
+
+      // If the token is invalid or device unregistered, clear it from the profile
+      if (expoErrorCode === 'DeviceNotRegistered' || expoErrorCode === 'InvalidCredentials') {
         await adminClient
           .from('profiles')
           .update({ expo_push_token: null })
@@ -110,7 +155,7 @@ serve(async (req) => {
         JSON.stringify({ 
           success: false, 
           error: pushResult.data.message,
-          details: pushResult.data.details 
+          code: expoErrorCode || 'PUSH_DELIVERY_ERROR',
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -121,10 +166,7 @@ serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Push notification error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error('Push notification unexpected error:', error);
+    return errorResponse('Internal server error', 500, 'INTERNAL_ERROR');
   }
 });

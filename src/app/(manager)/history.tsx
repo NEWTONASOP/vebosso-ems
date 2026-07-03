@@ -26,8 +26,8 @@ export default function ManagerHistoryScreen() {
     if (!profile?.id) return;
     const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
     const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-    const logs = await fetchWorkHistory(profile.id, start, end);
-    setWorkLogs(logs);
+    const result = await fetchWorkHistory(profile.id, start, end);
+    setWorkLogs(result.data);
   }, [profile?.id, currentMonth, fetchWorkHistory]);
 
   useEffect(() => {

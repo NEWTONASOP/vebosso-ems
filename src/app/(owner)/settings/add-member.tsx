@@ -9,6 +9,7 @@ import { Colors } from '../../../constants/colors';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../../lib/supabase';
+import { parseFunctionError } from '../../../lib/errors';
 import { useWorkStore } from '../../../store/workStore';
 import { EMPLOYEE_ID_PREFIX } from '../../../constants/roles';
 import { Feather } from '@expo/vector-icons';
@@ -82,7 +83,7 @@ export default function AddMemberScreen() {
       });
 
       if (error) {
-        setSnackMessage(error.message || 'Failed to create member');
+        setSnackMessage(parseFunctionError(error));
         setIsLoading(false);
         return;
       }
@@ -100,7 +101,7 @@ export default function AddMemberScreen() {
       setSnackMessage('Member created successfully! 🎉');
       fetchTeamMembers();
     } catch (e: any) {
-      setSnackMessage(e.message || 'Failed to create member');
+      setSnackMessage(e.message || 'Failed to create member. Please try again.');
     } finally {
       setIsLoading(false);
     }

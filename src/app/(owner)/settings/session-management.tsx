@@ -5,11 +5,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, Platform, Pressable } from 'react-native';
 import { Alert } from '../../../lib/alert';
-import { Text } from 'react-native-paper';
+import { Snackbar, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '../../../lib/supabase';
+import { parseFunctionError } from '../../../lib/errors';
 import { EmptyState } from '../../../components/EmptyState';
+import { InlineError } from '../../../components/InlineError';
 import { ListSkeleton } from '../../../components/LoadingSkeleton';
 import { Feather } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
@@ -28,9 +30,12 @@ export default function SessionManagementScreen() {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [snackMessage, setSnackMessage] = useState('');
 
   const fetchSessions = async () => {
     try {
+      setFetchError(null);
       const { data, error } = await supabase
         .from('sessions')
         .select(`
@@ -43,6 +48,7 @@ export default function SessionManagementScreen() {
       if (error) throw error;
       setSessions((data || []) as unknown as SessionInfo[]);
     } catch (e) {
+      setFetchError('Failed to load sessions. Please try again.');
       console.error('Fetch sessions error:', e);
     } finally {
       setIsLoading(false);
@@ -71,12 +77,21 @@ export default function SessionManagementScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const { error } = await supabase.functions.invoke('force-logout', {
+              const { data, error } = await supabase.functions.invoke('force-logout', {
                 body: { user_id: session.user_id, session_id: session.id },
               });
-              if (error) throw error;
+              if (error) {
+                setSnackMessage(parseFunctionError(error));
+                return;
+              }
+              if (data?.error) {
+                setSnackMessage(data.error);
+                return;
+              }
+              setSnackMessage(`${session.profiles.full_name} has been logged out.`);
               fetchSessions();
             } catch (e) {
+              setSnackMessage('Failed to force logout. Please try again.');
               console.error(e);
             }
           },
@@ -104,6 +119,13 @@ export default function SessionManagementScreen() {
       {isLoading ? (
         <View style={styles.skeletonContainer}>
           <ListSkeleton count={3} />
+        </View>
+      ) : fetchError ? (
+        <View style={{ paddingHorizontal: 20, marginTop: 14 }}>
+          <InlineError
+            message={fetchError}
+            onRetry={async () => { setIsLoading(true); await fetchSessions(); }}
+          />
         </View>
       ) : (
         <ScrollView
@@ -157,6 +179,14 @@ export default function SessionManagementScreen() {
           )}
         </ScrollView>
       )}
+
+      <Snackbar
+        visible={!!snackMessage}
+        onDismiss={() => setSnackMessage('')}
+        duration={4000}
+      >
+        {snackMessage}
+      </Snackbar>
     </View>
   );
 }

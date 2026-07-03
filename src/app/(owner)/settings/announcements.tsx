@@ -39,22 +39,22 @@ export default function AnnouncementsScreen() {
     if (!profile) return;
 
     setIsLoading(true);
-    try {
-      await createAnnouncement({
-        title: title.trim(),
-        body: body.trim(),
-        target_role: targetRole as any,
-        created_by: profile.id,
-      });
+    const result = await createAnnouncement({
+      title: title.trim(),
+      body: body.trim(),
+      target_role: targetRole as any,
+      created_by: profile.id,
+    });
+    setIsLoading(false);
+
+    if (result.success) {
       setSnackMessage('Announcement sent! 📢');
       setTitle('');
       setBody('');
       setShowForm(false);
       fetchAnnouncements(profile.role, profile.id);
-    } catch {
-      setSnackMessage('Failed to send announcement');
-    } finally {
-      setIsLoading(false);
+    } else {
+      setSnackMessage(result.error || 'Failed to send announcement. Please try again.');
     }
   };
 

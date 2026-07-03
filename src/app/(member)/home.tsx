@@ -8,6 +8,7 @@ import { RefreshControl, ScrollView, StyleSheet, View, Platform } from 'react-na
 import { Snackbar, Text } from 'react-native-paper';
 import { CheckInModal } from '../../components/CheckInModal';
 import { CheckOutModal } from '../../components/CheckOutModal';
+import { InlineError } from '../../components/InlineError';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { TaskCard } from '../../components/TaskCard';
 import { useAuthStore } from '../../store/authStore';
@@ -15,14 +16,13 @@ import { useWorkStore } from '../../store/workStore';
 import { Feather } from '@expo/vector-icons';
 import { TaskStatus } from '../../types/database';
 import { Colors } from '../../constants/colors';
-
 import { PageTransition } from '../../components/PageTransition';
 import { AnimatedPressable } from '../../components/AnimatedPressable';
 
 export default function MemberHomeScreen() {
   const { profile } = useAuthStore();
   const {
-    todayLog, todayTasks, isLoadingToday,
+    todayLog, todayTasks, isLoadingToday, todayError,
     fetchTodayLog, fetchTodayTasks, fetchSettings,
     checkIn, checkOut, updateTaskStatus,
     subscribeToRealtime, unsubscribeFromRealtime,
@@ -103,11 +103,11 @@ export default function MemberHomeScreen() {
   };
 
   const handleStatusChange = async (taskId: string, status: TaskStatus) => {
-    try {
-      await updateTaskStatus(taskId, status);
+    const result = await updateTaskStatus(taskId, status);
+    if (result.success) {
       setSnackMessage(status === 'done' ? 'Task completed! ✅' : 'Task updated');
-    } catch {
-      setSnackMessage('Failed to update task');
+    } else {
+      setSnackMessage(result.error || 'Failed to update task.');
     }
   };
 
@@ -280,7 +280,14 @@ export default function MemberHomeScreen() {
 
       {/* Primary Dashboard Card */}
       <View style={styles.content}>
-        {renderStatusCard()}
+        {todayError && !isLoadingToday ? (
+          <InlineError
+            message={todayError}
+            onRetry={() => profile?.id && fetchTodayLog(profile.id)}
+          />
+        ) : (
+          renderStatusCard()
+        )}
       </View>
 
       {/* Today's Tasks in unified Grouped Card */}

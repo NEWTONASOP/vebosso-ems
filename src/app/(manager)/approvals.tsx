@@ -7,6 +7,7 @@ import { FlatList, Platform, RefreshControl, StyleSheet, View } from 'react-nati
 import { Snackbar, Text } from 'react-native-paper';
 import { ApprovalCard } from '../../components/ApprovalCard';
 import { EmptyState } from '../../components/EmptyState';
+import { InlineError } from '../../components/InlineError';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
@@ -15,9 +16,11 @@ import { WorkLogWithProfile } from '../../types/database';
 
 export default function ManagerApprovalsScreen() {
   const { profile } = useAuthStore();
-  const { pendingApprovals, isLoadingApprovals, fetchPendingApprovals, approveCheckIn, rejectCheckIn } = useWorkStore();
+  const { pendingApprovals, isLoadingApprovals, approvalsError, fetchPendingApprovals, approveCheckIn, rejectCheckIn } = useWorkStore();
   const [refreshing, setRefreshing] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (profile) fetchPendingApprovals(profile.id);
@@ -31,17 +34,31 @@ export default function ManagerApprovalsScreen() {
 
   const handleApprove = useCallback(async (workLogId: string) => {
     if (!profile) return;
-    try { await approveCheckIn(workLogId, profile.id); setSnackMessage('Approved ✅'); } catch { setSnackMessage('Failed'); }
+    setApprovingId(workLogId);
+    const result = await approveCheckIn(workLogId, profile.id);
+    setApprovingId(null);
+    if (result.success) { setSnackMessage('Approved ✅'); } 
+    else { setSnackMessage(result.error || 'Failed to approve. Please try again.'); }
   }, [profile, approveCheckIn]);
 
   const handleReject = useCallback(async (workLogId: string) => {
     if (!profile) return;
-    try { await rejectCheckIn(workLogId, profile.id, 'Please revise'); setSnackMessage('Rejected'); } catch { setSnackMessage('Failed'); }
+    setRejectingId(workLogId);
+    const result = await rejectCheckIn(workLogId, profile.id, 'Please revise');
+    setRejectingId(null);
+    if (result.success) { setSnackMessage('Rejected'); } 
+    else { setSnackMessage(result.error || 'Failed to reject. Please try again.'); }
   }, [profile, rejectCheckIn]);
 
   const renderItem = useCallback(({ item }: { item: WorkLogWithProfile }) => (
-    <ApprovalCard workLog={item} onApprove={handleApprove} onReject={handleReject} />
-  ), [handleApprove, handleReject]);
+    <ApprovalCard 
+      workLog={item} 
+      onApprove={handleApprove} 
+      onReject={handleReject}
+      isApproving={approvingId === item.id}
+      isRejecting={rejectingId === item.id}
+    />
+  ), [handleApprove, handleReject, approvingId, rejectingId]);
 
   return (
     <View style={styles.container}>
@@ -51,6 +68,13 @@ export default function ManagerApprovalsScreen() {
       </View>
       {isLoadingApprovals ? (
         <View style={styles.content}><ListSkeleton count={3} /></View>
+      ) : approvalsError ? (
+        <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
+          <InlineError
+            message={approvalsError}
+            onRetry={() => profile && fetchPendingApprovals(profile.id)}
+          />
+        </View>
       ) : (
         <FlatList
           data={pendingApprovals}

@@ -31,8 +31,8 @@ export default function OwnerHistoryScreen() {
     setIsLoading(true);
     const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
     const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-    const logs = await fetchWorkHistory(selectedMember.id, start, end);
-    setWorkLogs(logs);
+    const result = await fetchWorkHistory(selectedMember.id, start, end);
+    setWorkLogs(result.data);
     setIsLoading(false);
   }, [selectedMember, currentMonth, fetchWorkHistory]);
 

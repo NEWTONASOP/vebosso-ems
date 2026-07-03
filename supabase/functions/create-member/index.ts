@@ -23,23 +23,35 @@ interface CreateMemberBody {
   password: string;
 }
 
+/** Returns a consistent JSON error response. */
+function errorResponse(message: string, status: number, code?: string): Response {
+  return new Response(
+    JSON.stringify({ error: message, ...(code ? { code } : {}) }),
+    { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Validate required environment variables on each request
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
+    console.error('Missing required environment variables');
+    return errorResponse('Server configuration error. Please contact support.', 500, 'ENV_MISSING');
+  }
+
   try {
+    // Validate Authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return errorResponse('Missing authorization header', 401, 'AUTH_MISSING');
     }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     // Verify caller is owner
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
@@ -48,10 +60,7 @@ serve(async (req) => {
 
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return errorResponse('Invalid or expired token. Please sign in again.', 401, 'AUTH_INVALID');
     }
 
     const { data: callerProfile } = await userClient
@@ -61,28 +70,29 @@ serve(async (req) => {
       .single();
 
     if (callerProfile?.role !== 'owner') {
-      return new Response(
-        JSON.stringify({ error: 'Only owners can create members' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return errorResponse('Only owners can create members', 403, 'FORBIDDEN');
     }
 
-    // Parse and validate body
-    const body: CreateMemberBody = await req.json();
+    // Parse and validate request body — separate catch for bad JSON
+    let body: CreateMemberBody;
+    try {
+      body = await req.json();
+    } catch {
+      return errorResponse('Invalid request body. Expected JSON.', 400, 'INVALID_JSON');
+    }
+
     const { full_name, employee_id, role, department, manager_id, password } = body;
 
     if (!full_name || !employee_id || !role || !password) {
-      return new Response(
-        JSON.stringify({ error: 'full_name, employee_id, role, and password are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return errorResponse('full_name, employee_id, role, and password are required', 400, 'VALIDATION_ERROR');
+    }
+
+    if (password.length < 6) {
+      return errorResponse('Password must be at least 6 characters', 400, 'VALIDATION_ERROR');
     }
 
     if (!['manager', 'member'].includes(role)) {
-      return new Response(
-        JSON.stringify({ error: 'Role must be "manager" or "member"' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return errorResponse('Role must be "manager" or "member"', 400, 'VALIDATION_ERROR');
     }
 
     // Create admin client
@@ -98,10 +108,7 @@ serve(async (req) => {
       .single();
 
     if (existingProfile) {
-      return new Response(
-        JSON.stringify({ error: `Employee ID "${employee_id}" already exists` }),
-        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return errorResponse(`Employee ID "${employee_id}" already exists`, 409, 'DUPLICATE_EMPLOYEE_ID');
     }
 
     // Generate a unique email from employee_id (used for Supabase Auth)
@@ -120,10 +127,7 @@ serve(async (req) => {
 
     if (authError) {
       console.error('Auth create error:', authError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to create auth user', details: authError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return errorResponse('Failed to create auth user: ' + authError.message, 500, 'AUTH_CREATE_FAILED');
     }
 
     // Create profile row
@@ -147,10 +151,7 @@ serve(async (req) => {
       // Rollback: delete the auth user if profile creation fails
       await adminClient.auth.admin.deleteUser(authData.user.id);
       console.error('Profile create error:', profileError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to create profile', details: profileError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return errorResponse('Failed to create profile: ' + profileError.message, 500, 'PROFILE_CREATE_FAILED');
     }
 
     return new Response(
@@ -162,20 +163,17 @@ serve(async (req) => {
           employee_id: profile.employee_id,
           role: profile.role,
           department: profile.department,
-          email, // Internal email used for auth
+          email,
         },
         credentials: {
           employee_id: profile.employee_id,
-          password, // Return so owner can share with member
+          password,
         },
       }),
       { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Create member error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error('Create member unexpected error:', error);
+    return errorResponse('Internal server error', 500, 'INTERNAL_ERROR');
   }
 });

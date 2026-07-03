@@ -10,6 +10,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { WorkLog } from '../../types/database';
 import { WorkLogDetail } from '../../components/WorkLogDetail';
+import { InlineError } from '../../components/InlineError';
 import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
 import { Feather } from '@expo/vector-icons';
 import { PageTransition } from '../../components/PageTransition';
@@ -22,13 +23,20 @@ export default function MemberHistoryScreen() {
   const [selectedLog, setSelectedLog] = useState<WorkLog | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const loadHistory = useCallback(async () => {
     if (!profile) return;
+    setFetchError(null);
     const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
     const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-    const logs = await fetchWorkHistory(profile.id, start, end);
-    setWorkLogs(logs);
+    const result = await fetchWorkHistory(profile.id, start, end);
+    if (result.success) {
+      setWorkLogs(result.data);
+    } else {
+      setFetchError(result.error || 'Failed to load work history.');
+      setWorkLogs([]);
+    }
   }, [profile, currentMonth, fetchWorkHistory]);
 
   useEffect(() => {
@@ -70,6 +78,14 @@ export default function MemberHistoryScreen() {
             <Feather name="chevron-right" size={18} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
+
+        {fetchError && (
+          <InlineError
+            message={fetchError}
+            onRetry={loadHistory}
+            compact
+          />
+        )}
 
         {/* Unified Summary Stats Card */}
         <View style={styles.summaryCard}>

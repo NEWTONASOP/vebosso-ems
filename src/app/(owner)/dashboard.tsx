@@ -12,6 +12,7 @@ import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { ApprovalCard } from '../../components/ApprovalCard';
 import { AssignTaskModal } from '../../components/AssignTaskModal';
 import { EmptyState } from '../../components/EmptyState';
+import { InlineError } from '../../components/InlineError';
 import { ListSkeleton, StatsSkeleton } from '../../components/LoadingSkeleton';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
 import { Colors } from '../../constants/colors';
@@ -26,6 +27,7 @@ export default function OwnerDashboard() {
     stats,
     pendingApprovals,
     isLoadingApprovals,
+    approvalsError,
     teamMembers,
     fetchStats,
     fetchPendingApprovals,
@@ -43,6 +45,8 @@ export default function OwnerDashboard() {
   const [assignTaskModalVisible, setAssignTaskModalVisible] = React.useState(false);
   const [selectedMember, setSelectedMember] = React.useState<Profile | null>(null);
   const [isAssigningTask, setIsAssigningTask] = React.useState(false);
+  const [approvingId, setApprovingId] = React.useState<string | null>(null);
+  const [rejectingId, setRejectingId] = React.useState<string | null>(null);
   const [snackMessage, setSnackMessage] = React.useState('');
 
   const loadData = useCallback(async () => {
@@ -74,19 +78,21 @@ export default function OwnerDashboard() {
 
   const handleApprove = async (workLogId: string) => {
     if (!profile?.id) return;
-    try {
-      await approveCheckIn(workLogId, profile.id);
-    } catch (e) {
-      console.error('Approve error:', e);
+    setApprovingId(workLogId);
+    const result = await approveCheckIn(workLogId, profile.id);
+    setApprovingId(null);
+    if (!result.success) {
+      setSnackMessage(result.error || 'Failed to approve check-in. Please try again.');
     }
   };
 
   const handleReject = async (workLogId: string) => {
     if (!profile?.id) return;
-    try {
-      await rejectCheckIn(workLogId, profile.id, 'Please revise your plan');
-    } catch (e) {
-      console.error('Reject error:', e);
+    setRejectingId(workLogId);
+    const result = await rejectCheckIn(workLogId, profile.id, 'Please revise your plan');
+    setRejectingId(null);
+    if (!result.success) {
+      setSnackMessage(result.error || 'Failed to reject check-in. Please try again.');
     }
   };
 
@@ -104,23 +110,22 @@ export default function OwnerDashboard() {
     if (!profile?.id || !selectedMember?.id) return;
 
     setIsAssigningTask(true);
-    try {
-      await addTask({
-        assigned_to: selectedMember.id,
-        assigned_by: profile.id,
-        title,
-        description,
-        due_date: dueDate,
-        status: 'pending',
-      });
-      setSnackMessage(`Task assigned to ${selectedMember.full_name}`);
+    const result = await addTask({
+      assigned_to: selectedMember.id,
+      assigned_by: profile.id,
+      title,
+      description,
+      due_date: dueDate,
+      status: 'pending',
+    });
+    setIsAssigningTask(false);
+
+    if (result.success) {
+      setSnackMessage(`Task assigned to ${selectedMember.full_name} ✅`);
       setAssignTaskModalVisible(false);
       setSelectedMember(null);
-    } catch (error) {
-      console.error('Failed to assign task:', error);
-      setSnackMessage('Failed to assign task. Please try again.');
-    } finally {
-      setIsAssigningTask(false);
+    } else {
+      setSnackMessage(result.error || 'Failed to assign task. Please try again.');
     }
   };
 
@@ -206,6 +211,11 @@ export default function OwnerDashboard() {
       <View style={styles.listContainer}>
         {isLoadingApprovals ? (
           <ListSkeleton count={2} />
+        ) : approvalsError ? (
+          <InlineError
+            message={approvalsError}
+            onRetry={() => fetchPendingApprovals()}
+          />
         ) : pendingApprovals.length === 0 ? (
           <View style={styles.emptyCard}>
             <EmptyState
@@ -221,6 +231,8 @@ export default function OwnerDashboard() {
               workLog={workLog}
               onApprove={handleApprove}
               onReject={handleReject}
+              isApproving={approvingId === workLog.id}
+              isRejecting={rejectingId === workLog.id}
             />
           ))
         )}

@@ -20,9 +20,11 @@ interface ApprovalCardProps {
   onApprove: (workLogId: string) => void;
   onReject: (workLogId: string) => void;
   index?: number;
+  isApproving?: boolean;
+  isRejecting?: boolean;
 }
 
-export function ApprovalCard({ workLog, onApprove, onReject, index = 0 }: ApprovalCardProps) {
+export function ApprovalCard({ workLog, onApprove, onReject, index = 0, isApproving = false, isRejecting = false }: ApprovalCardProps) {
   const profile = workLog.profiles;
   const statusConfig = WORK_LOG_STATUS_CONFIG[workLog.status];
   

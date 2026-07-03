@@ -13,6 +13,7 @@ import { ApprovalCard } from '../../components/ApprovalCard';
 import { CheckInModal } from '../../components/CheckInModal';
 import { CheckOutModal } from '../../components/CheckOutModal';
 import { EmptyState } from '../../components/EmptyState';
+import { InlineError } from '../../components/InlineError';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { TaskCard } from '../../components/TaskCard';
 import { Colors } from '../../constants/colors';
@@ -23,7 +24,7 @@ export default function ManagerDashboard() {
   const router = useRouter();
   const { profile } = useAuthStore();
   const {
-    pendingApprovals, isLoadingApprovals, todayLog, todayTasks, isLoadingToday,
+    pendingApprovals, isLoadingApprovals, approvalsError, todayLog, todayTasks, isLoadingToday,
     fetchPendingApprovals, fetchSettings, fetchTodayLog, fetchTodayTasks,
     approveCheckIn, rejectCheckIn, checkIn, checkOut, updateTaskStatus,
     subscribeToRealtime, unsubscribeFromRealtime,
@@ -35,6 +36,8 @@ export default function ManagerDashboard() {
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
   const [elapsed, setElapsed] = useState('');
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
 
   const pulseOpacity = useSharedValue(1);
 
@@ -93,19 +96,21 @@ export default function ManagerDashboard() {
 
   const handleApprove = async (workLogId: string) => {
     if (!profile?.id) return;
-    try {
-      await approveCheckIn(workLogId, profile.id);
-    } catch (e) {
-      console.error('Approve error:', e);
+    setApprovingId(workLogId);
+    const result = await approveCheckIn(workLogId, profile.id);
+    setApprovingId(null);
+    if (!result.success) {
+      setSnackMessage(result.error || 'Failed to approve check-in. Please try again.');
     }
   };
 
   const handleReject = async (workLogId: string) => {
     if (!profile?.id) return;
-    try {
-      await rejectCheckIn(workLogId, profile.id, 'Please revise your plan');
-    } catch (e) {
-      console.error('Reject error:', e);
+    setRejectingId(workLogId);
+    const result = await rejectCheckIn(workLogId, profile.id, 'Please revise your plan');
+    setRejectingId(null);
+    if (!result.success) {
+      setSnackMessage(result.error || 'Failed to reject check-in. Please try again.');
     }
   };
 
@@ -115,9 +120,9 @@ export default function ManagerDashboard() {
     setCheckInLoading(false);
     if (result.success) { 
       setShowCheckIn(false); 
-      setSnackMessage('Check-in submitted! Waiting for approval.'); 
+      setSnackMessage('Check-in submitted! Waiting for approval. ⏳'); 
     } else {
-      setSnackMessage(result.error || 'Failed');
+      setSnackMessage(result.error || 'Failed to check in. Please try again.');
     }
   };
 
@@ -127,7 +132,14 @@ export default function ManagerDashboard() {
       setShowCheckOut(false); 
       setSnackMessage('Day ended! Great work today. 🎉'); 
     } else {
-      setSnackMessage(result.error || 'Failed');
+      setSnackMessage(result.error || 'Failed to check out. Please try again.');
+    }
+  };
+
+  const handleStatusChange = async (taskId: string, status: 'pending' | 'in_progress' | 'done') => {
+    const result = await updateTaskStatus(taskId, status);
+    if (!result.success) {
+      setSnackMessage(result.error || 'Failed to update task.');
     }
   };
 
@@ -244,7 +256,7 @@ export default function ManagerDashboard() {
               <TaskCard 
                 key={task.id} 
                 task={task} 
-                onStatusChange={updateTaskStatus}
+                onStatusChange={handleStatusChange}
                 isLast={index === todayTasks.length - 1}
                 index={index}
               />
@@ -279,6 +291,11 @@ export default function ManagerDashboard() {
       <View style={styles.listContainer}>
         {isLoadingApprovals ? (
           <ListSkeleton count={2} />
+        ) : approvalsError ? (
+          <InlineError
+            message={approvalsError}
+            onRetry={() => profile?.id && fetchPendingApprovals(profile.id)}
+          />
         ) : pendingApprovals.length === 0 ? (
           <View style={styles.emptyCard}>
             <EmptyState
@@ -294,6 +311,8 @@ export default function ManagerDashboard() {
               workLog={workLog}
               onApprove={handleApprove}
               onReject={handleReject}
+              isApproving={approvingId === workLog.id}
+              isRejecting={rejectingId === workLog.id}
             />
           ))
         )}

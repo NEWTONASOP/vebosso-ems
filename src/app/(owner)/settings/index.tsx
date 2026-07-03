@@ -5,8 +5,8 @@
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, View, Platform, Pressable } from 'react-native';
 import { Alert } from '../../../lib/alert';
-import { Switch, Text } from 'react-native-paper';
-
+import { Snackbar, Switch, Text } from 'react-native-paper';
+import React from 'react';
 import { APP_NAME } from '../../../constants/roles';
 import { useAuthStore } from '../../../store/authStore';
 import { useWorkStore } from '../../../store/workStore';
@@ -19,13 +19,14 @@ export default function OwnerSettingsScreen() {
   const { signOut, profile } = useAuthStore();
   const { settings, updateSetting } = useWorkStore();
 
+  const [snackMessage, setSnackMessage] = React.useState('');
+
   const requireCheckoutApproval = settings['require_checkout_approval'] === 'true';
 
   const handleToggleCheckout = async () => {
-    try {
-      await updateSetting('require_checkout_approval', requireCheckoutApproval ? 'false' : 'true');
-    } catch (e) {
-      console.error(e);
+    const result = await updateSetting('require_checkout_approval', requireCheckoutApproval ? 'false' : 'true');
+    if (!result.success) {
+      setSnackMessage(result.error || 'Failed to update setting. Please try again.');
     }
   };
 
@@ -47,6 +48,7 @@ export default function OwnerSettingsScreen() {
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
@@ -153,6 +155,15 @@ export default function OwnerSettingsScreen() {
         <Text style={styles.appVersion}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
       </View>
     </ScrollView>
+
+    <Snackbar
+      visible={!!snackMessage}
+      onDismiss={() => setSnackMessage('')}
+      duration={4000}
+    >
+      {snackMessage}
+    </Snackbar>
+    </View>
   );
 }
 
