@@ -8,7 +8,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 
 /**
  * Structured application error with a code, message, and recoverability flag.
- * Use this when you need to carry extra context beyond a plain string.
+ * Use this  when you need to carry extra context beyond a plain string.
  */
 export class AppError extends Error {
   constructor(
