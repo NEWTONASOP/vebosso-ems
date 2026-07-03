@@ -198,11 +198,15 @@ export function AssignTaskModal({
               <Chip
                 selected={dueDate === today}
                 onPress={() => handleQuickDateSelect(0)}
-                style={styles.chip}
+                style={[
+                  styles.chip,
+                  dueDate === today ? styles.chipActive : styles.chipInactive,
+                ]}
                 textStyle={[
                   styles.chipText,
                   dueDate === today && styles.chipTextSelected,
                 ]}
+                selectedColor={Colors.white}
                 mode={dueDate === today ? 'flat' : 'outlined'}
               >
                 Today
@@ -210,11 +214,15 @@ export function AssignTaskModal({
               <Chip
                 selected={dueDate === tomorrow}
                 onPress={() => handleQuickDateSelect(1)}
-                style={styles.chip}
+                style={[
+                  styles.chip,
+                  dueDate === tomorrow ? styles.chipActive : styles.chipInactive,
+                ]}
                 textStyle={[
                   styles.chipText,
                   dueDate === tomorrow && styles.chipTextSelected,
                 ]}
+                selectedColor={Colors.white}
                 mode={dueDate === tomorrow ? 'flat' : 'outlined'}
               >
                 Tomorrow
@@ -222,16 +230,34 @@ export function AssignTaskModal({
               <Chip
                 selected={dueDate === null}
                 onPress={() => handleQuickDateSelect(null)}
-                style={styles.chip}
+                style={[
+                  styles.chip,
+                  dueDate === null ? styles.chipActive : styles.chipInactive,
+                ]}
                 textStyle={[
                   styles.chipText,
                   dueDate === null && styles.chipTextSelected,
                 ]}
+                selectedColor={Colors.white}
                 mode={dueDate === null ? 'flat' : 'outlined'}
               >
                 No Date
               </Chip>
             </View>
+
+            {/* Custom Date Trigger Button */}
+            {!showDateInput && (!dueDate || dueDate === today || dueDate === tomorrow) && (
+              <Button
+                mode="text"
+                compact
+                icon="calendar-plus"
+                textColor={Colors.accent}
+                onPress={() => setShowDateInput(true)}
+                style={styles.customDateTrigger}
+              >
+                Or select custom date...
+              </Button>
+            )}
 
             {/* Custom Date Input */}
             {!showDateInput && dueDate && dueDate !== today && dueDate !== tomorrow && (
@@ -404,6 +430,14 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 12,
   },
+  chipActive: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  chipInactive: {
+    backgroundColor: Colors.surface,
+    borderColor: Colors.border,
+  },
   chipText: {
     fontSize: 12,
     fontFamily: 'Inter_500Medium',
@@ -411,6 +445,11 @@ const styles = StyleSheet.create({
   },
   chipTextSelected: {
     color: Colors.white,
+  },
+  customDateTrigger: {
+    alignSelf: 'flex-start',
+    marginTop: -4,
+    marginBottom: 8,
   },
   customDateDisplay: {
     flexDirection: 'row',

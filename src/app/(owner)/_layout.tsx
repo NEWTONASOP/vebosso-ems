@@ -98,6 +98,12 @@ export default function OwnerLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="member/[id]"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

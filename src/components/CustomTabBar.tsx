@@ -6,6 +6,7 @@ import React from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { Colors } from '../constants/colors';
 
 // Map route names to icons
 const ICON_MAP: Record<string, string> = {
@@ -48,6 +49,17 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
         <View style={styles.innerContainer}>
           {state.routes.map((route, index) => {
             const { options } = descriptors[route.key];
+            
+            // Skip hidden tabs (Expo Router uses href: null to hide tabs, or dynamic sub-routes)
+            if (
+              (options as any).href === null || 
+              !ICON_MAP[route.name] || 
+              route.name.includes('[') || 
+              route.name.includes('/')
+            ) {
+              return null;
+            }
+
             const label =
               (options.tabBarLabel as string) ||
               (options.title as string) ||
@@ -117,7 +129,7 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress }: TabItemPro
     scale.value = withSpring(1, { damping: 10, stiffness: 300 });
   };
 
-  const color = isFocused ? '#000000' : '#8E8E93';
+  const color = isFocused ? Colors.tabActive : Colors.tabInactive;
   const iconElement = renderIcon
     ? renderIcon({ focused: isFocused, color, size: 18 })
     : <Feather name={iconName as any} size={18} color={color} />;
@@ -217,9 +229,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   labelActive: {
-    color: '#000000',
+    color: Colors.tabActive,
   },
   labelInactive: {
-    color: '#8E8E93',
+    color: Colors.tabInactive,
   },
 });

@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Platform, RefreshControl, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Chip, Menu, Searchbar, Snackbar, Text } from 'react-native-paper';
 import { AssignManagerModal } from '../../components/AssignManagerModal';
 import { AssignTaskModal } from '../../components/AssignTaskModal';
@@ -19,6 +20,7 @@ import { useWorkStore } from '../../store/workStore';
 import { Profile } from '../../types/database';
 
 export default function OwnerTeamScreen() {
+  const router = useRouter();
   const { profile } = useAuthStore();
   const { teamMembers, isLoadingTeam, teamError, fetchTeamMembers, addTask } = useWorkStore();
   const [searchQuery, setSearchQuery] = useState('');
@@ -233,6 +235,17 @@ export default function OwnerTeamScreen() {
           }}
           title="Assign Manager"
           leadingIcon="account-supervisor"
+          titleStyle={styles.menuItemText}
+        />
+        <Menu.Item
+          onPress={() => {
+            setMenuVisible(false);
+            if (selectedMember) {
+              router.push(`/(owner)/member/${selectedMember.id}` as any);
+            }
+          }}
+          title="Manage Profile"
+          leadingIcon="account-cog-outline"
           titleStyle={styles.menuItemText}
         />
       </Menu>

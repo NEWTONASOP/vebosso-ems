@@ -26,14 +26,14 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
 export const WORK_LOG_STATUS_CONFIG = {
   pending_approval: {
     label: 'Pending Approval',
-    color: '#D97706',
-    backgroundColor: 'rgba(217, 119, 6, 0.08)',
+    color: '#B45309',
+    backgroundColor: 'rgba(180, 83, 9, 0.08)',
     icon: 'clock-outline',
   },
   working: {
     label: 'Working',
-    color: '#059669',
-    backgroundColor: 'rgba(5, 150, 105, 0.08)',
+    color: '#047857',
+    backgroundColor: 'rgba(4, 120, 87, 0.08)',
     icon: 'briefcase-outline',
   },
   pending_checkout: {
@@ -50,8 +50,8 @@ export const WORK_LOG_STATUS_CONFIG = {
   },
   rejected: {
     label: 'Rejected',
-    color: '#DC2626',
-    backgroundColor: 'rgba(220, 38, 38, 0.08)',
+    color: '#B91C1C',
+    backgroundColor: 'rgba(185, 28, 28, 0.08)',
     icon: 'close-circle-outline',
   },
 } as const;
@@ -59,8 +59,8 @@ export const WORK_LOG_STATUS_CONFIG = {
 export const TASK_STATUS_CONFIG = {
   pending: {
     label: 'Pending',
-    color: '#D97706',
-    backgroundColor: 'rgba(217, 119, 6, 0.08)',
+    color: '#B45309',
+    backgroundColor: 'rgba(180, 83, 9, 0.08)',
     icon: 'circle-outline',
   },
   in_progress: {
@@ -71,8 +71,8 @@ export const TASK_STATUS_CONFIG = {
   },
   done: {
     label: 'Done',
-    color: '#059669',
-    backgroundColor: 'rgba(5, 150, 105, 0.08)',
+    color: '#047857',
+    backgroundColor: 'rgba(4, 120, 87, 0.08)',
     icon: 'check-circle',
   },
 } as const;
@@ -80,18 +80,18 @@ export const TASK_STATUS_CONFIG = {
 export const LEAVE_STATUS_CONFIG = {
   pending: {
     label: 'Pending',
-    color: '#D97706',
-    backgroundColor: 'rgba(217, 119, 6, 0.08)',
+    color: '#B45309',
+    backgroundColor: 'rgba(180, 83, 9, 0.08)',
   },
   approved: {
     label: 'Approved',
-    color: '#059669',
-    backgroundColor: 'rgba(5, 150, 105, 0.08)',
+    color: '#047857',
+    backgroundColor: 'rgba(4, 120, 87, 0.08)',
   },
   rejected: {
     label: 'Rejected',
-    color: '#DC2626',
-    backgroundColor: 'rgba(220, 38, 38, 0.08)',
+    color: '#B91C1C',
+    backgroundColor: 'rgba(185, 28, 28, 0.08)',
   },
 } as const;
 

@@ -12,14 +12,14 @@ export const Colors = {
   accentSubtle: 'rgba(0, 0, 0, 0.04)', // Subtle tint for backgrounds
 
   // Status colors (Muted, premium hues)
-  success: '#17B877',         // Crisp Emerald - approved, done
-  successLight: 'rgba(23, 184, 119, 0.1)',
-  warning: '#F5A623',         // Vibrant Amber - pending, in progress
-  warningLight: 'rgba(245, 166, 35, 0.1)',
-  error: '#F43F5E',           // Rose Red - rejected, error
-  errorLight: 'rgba(244, 63, 94, 0.1)',
-  info: '#3B82F6',            // Bright Blue - info, announcements
-  infoLight: 'rgba(59, 130, 246, 0.1)',
+  success: '#047857',         // Crisp Emerald - approved, done
+  successLight: 'rgba(4, 120, 87, 0.1)',
+  warning: '#B45309',         // Vibrant Amber - pending, in progress
+  warningLight: 'rgba(180, 83, 9, 0.1)',
+  error: '#BE123C',           // Rose Red - rejected, error
+  errorLight: 'rgba(190, 18, 60, 0.1)',
+  info: '#2563EB',            // Bright Blue - info, announcements
+  infoLight: 'rgba(37, 99, 235, 0.1)',
 
   // Surface colors
   surface: '#FFFFFF',         // Card/surface background
@@ -32,8 +32,8 @@ export const Colors = {
   // Text colors
   text: '#111827',            // Deep charcoal for primary text
   textPrimary: '#1C1C1E',     // Premium text primary
-  textSecondary: '#6B7280',   // Medium gray for secondary
-  textTertiary: '#9CA3AF',    // Light gray for muted text
+  textSecondary: '#5E6672',   // Darker gray for secondary (WCAG AA compliant on background)
+  textTertiary: '#6B7280',    // Medium gray for muted text (WCAG AA compliant on white)
   textInverse: '#FFFFFF',     // Text on dark backgrounds
 
   // Background colors
@@ -43,7 +43,7 @@ export const Colors = {
   // Tab bar
   tabBar: 'rgba(255, 255, 255, 0.85)', // Translucent white
   tabBarBorder: '#E5E7EB',    
-  tabInactive: '#9CA3AF',     
+  tabInactive: '#6B7280',     
   tabActive: '#111827',       
 
   // Specific UI elements
@@ -53,7 +53,7 @@ export const Colors = {
   inputBackground: '#FFFFFF', 
   inputBorder: '#E5E7EB',     
   inputFocusBorder: '#111827', 
-  placeholder: '#9CA3AF',     
+  placeholder: '#6B7280',     
   systemGray: '#8E8E93',      // Default system gray
   systemGray6: '#F4F4F6',     // Light system gray
   surfacePressed: '#F2F2F7',  // Pressed state for surfaces
@@ -61,13 +61,13 @@ export const Colors = {
   // Gradients (as arrays for LinearGradient) - Softer transitions
   gradientPrimary: ['#FFFFFF', '#F9FAFB'] as const,
   gradientAccent: ['#333333', '#000000'] as const,
-  gradientSuccess: ['#34D399', '#17B877'] as const,
+  gradientSuccess: ['#34D399', '#047857'] as const,
   gradientCard: ['rgba(255,255,255,0.8)', 'rgba(255,255,255,0.4)'] as const, // Glass effect
 
   // Role-specific accent colors
-  ownerAccent: '#8B5CF6',     // Violet
-  managerAccent: '#3B82F6',   // Blue
-  memberAccent: '#17B877',    // Emerald
+  ownerAccent: '#7C3AED',     // Violet
+  managerAccent: '#2563EB',   // Blue
+  memberAccent: '#047857',    // Emerald
 
   // Shadow properties for elevated surfaces (Premium soft shadows)
   shadow: {
