@@ -62,10 +62,12 @@ export default function LoginScreen() {
           <TextInput
             mode="outlined"
             label="Employee ID"
-            placeholder="e.g. VB-0001"
+            placeholder="0002"
             value={employeeId}
             onChangeText={(text) => {
-              setEmployeeId(text.toUpperCase());
+              // Strip VB- prefix if they manually typed or pasted it
+              const cleaned = text.replace(/^VB-?/i, '');
+              setEmployeeId(cleaned.toUpperCase());
               clearError();
             }}
             autoCapitalize="characters"
@@ -74,7 +76,7 @@ export default function LoginScreen() {
             activeOutlineColor={Colors.accent}
             textColor={Colors.textPrimary}
             outlineStyle={styles.inputOutline}
-            left={<TextInput.Icon icon="badge-account" color={Colors.textSecondary} />}
+            left={<TextInput.Affix text="VB-" />}
             theme={{
               colors: {
                 onSurfaceVariant: Colors.textTertiary,

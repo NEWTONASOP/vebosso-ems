@@ -16,6 +16,10 @@ import { EmptyState } from '../../components/EmptyState';
 import { InlineError } from '../../components/InlineError';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { TaskCard } from '../../components/TaskCard';
+import { MemberPickerModal } from '../../components/MemberPickerModal';
+import { AssignTaskModal } from '../../components/AssignTaskModal';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
+import { Profile } from '../../types/database';
 import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
@@ -28,6 +32,7 @@ export default function ManagerDashboard() {
     fetchPendingApprovals, fetchSettings, fetchTodayLog, fetchTodayTasks,
     approveCheckIn, rejectCheckIn, checkIn, checkOut, updateTaskStatus,
     subscribeToRealtime, unsubscribeFromRealtime,
+    teamMembers, fetchTeamMembers, addTask,
   } = useWorkStore();
 
   const [refreshing, setRefreshing] = React.useState(false);
@@ -38,6 +43,10 @@ export default function ManagerDashboard() {
   const [elapsed, setElapsed] = useState('');
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [memberPickerVisible, setMemberPickerVisible] = useState(false);
+  const [assignTaskModalVisible, setAssignTaskModalVisible] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
+  const [isAssigningTask, setIsAssigningTask] = useState(false);
 
   const pulseOpacity = useSharedValue(1);
 
@@ -48,8 +57,9 @@ export default function ManagerDashboard() {
       fetchSettings(),
       fetchTodayLog(profile.id),
       fetchTodayTasks(profile.id),
+      fetchTeamMembers(profile.id),
     ]);
-  }, [profile, fetchPendingApprovals, fetchSettings, fetchTodayLog, fetchTodayTasks]);
+  }, [profile, fetchPendingApprovals, fetchSettings, fetchTodayLog, fetchTodayTasks, fetchTeamMembers]);
 
   useEffect(() => {
     if (!profile?.id) {
@@ -139,7 +149,40 @@ export default function ManagerDashboard() {
   const handleStatusChange = async (taskId: string, status: 'pending' | 'in_progress' | 'done') => {
     const result = await updateTaskStatus(taskId, status);
     if (!result.success) {
-      setSnackMessage(result.error || 'Failed to update task.');
+      setSnackMessage(result.error || 'Failed to update task status');
+    }
+  };
+
+  const handleOpenMemberPicker = () => {
+    setMemberPickerVisible(true);
+  };
+
+  const handleSelectMember = (member: Profile) => {
+    setSelectedMember(member);
+    setMemberPickerVisible(false);
+    setAssignTaskModalVisible(true);
+  };
+
+  const handleAssignTask = async (title: string, description: string | null, dueDate: string | null) => {
+    if (!profile?.id || !selectedMember?.id) return;
+
+    setIsAssigningTask(true);
+    const result = await addTask({
+      assigned_to: selectedMember.id,
+      assigned_by: profile.id,
+      title,
+      description,
+      due_date: dueDate,
+      status: 'pending',
+    });
+    setIsAssigningTask(false);
+
+    if (result.success) {
+      setSnackMessage(`Task assigned to ${selectedMember.full_name} ✅`);
+      setAssignTaskModalVisible(false);
+      setSelectedMember(null);
+    } else {
+      setSnackMessage(result.error || 'Failed to assign task. Please try again.');
     }
   };
 
@@ -227,6 +270,7 @@ export default function ManagerDashboard() {
   const today = format(new Date(), 'EEEE, MMMM dd');
 
   return (
+    <>
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
@@ -274,6 +318,23 @@ export default function ManagerDashboard() {
           <Text style={styles.approvalCountValue}>{pendingApprovals.length}</Text>
           <Text style={styles.approvalCountLabel}>Pending Approvals</Text>
         </View>
+      </View>
+
+      {/* Quick Actions */}
+      <Text style={styles.sectionTitle}>Quick Actions</Text>
+      <View style={styles.quickActionsContainer}>
+        <QuickActionCard
+          icon="clipboard"
+          title="Assign Task"
+          subtitle="Create a new task"
+          onPress={handleOpenMemberPicker}
+        />
+        <QuickActionCard
+          icon="check-square"
+          title="Track Tasks"
+          subtitle="View tasks given to team"
+          onPress={() => router.push('/(manager)/tasks')}
+        />
       </View>
 
       {/* Pending Approvals */}
@@ -338,6 +399,29 @@ export default function ManagerDashboard() {
         {snackMessage}
       </Snackbar>
     </ScrollView>
+
+    <MemberPickerModal
+      visible={memberPickerVisible}
+      onDismiss={() => {
+        setMemberPickerVisible(false);
+        setSelectedMember(null);
+      }}
+      members={teamMembers}
+      selectedMember={selectedMember}
+      onSelectMember={handleSelectMember}
+    />
+
+    <AssignTaskModal
+      visible={assignTaskModalVisible}
+      onDismiss={() => {
+        setAssignTaskModalVisible(false);
+        setSelectedMember(null);
+      }}
+      targetMember={selectedMember}
+      onSubmit={handleAssignTask}
+      isLoading={isAssigningTask}
+    />
+    </>
   );
 }
 
@@ -536,5 +620,65 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     overflow: 'hidden',
     ...Colors.shadow,
+  },
+  quickActionsContainer: {
+    paddingHorizontal: 20,
+  },
+});
+
+// ============================================================================
+// Quick Action Card component
+// ============================================================================
+
+interface QuickActionCardProps {
+  icon: string;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}
+
+function QuickActionCard({ icon, title, subtitle, onPress }: QuickActionCardProps) {
+  return (
+    <AnimatedPressable 
+      style={quickActionStyles.container}
+      onPress={onPress}
+    >
+      <Feather name={icon as any} size={24} color={Colors.accent} style={quickActionStyles.icon} />
+      <View style={quickActionStyles.content}>
+        <Text style={quickActionStyles.title}>{title}</Text>
+        <Text style={quickActionStyles.subtitle}>{subtitle}</Text>
+      </View>
+      <Feather name="chevron-right" size={22} color={Colors.textTertiary} />
+    </AnimatedPressable>
+  );
+}
+
+const quickActionStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 8,
+  },
+  icon: {
+    marginRight: 12,
+  },
+  content: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 15,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  subtitle: {
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    color: Colors.textSecondary,
   },
 });

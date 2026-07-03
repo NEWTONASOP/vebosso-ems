@@ -194,6 +194,12 @@ export default function OwnerDashboard() {
           subtitle="Create a new task"
           onPress={handleOpenMemberPicker}
         />
+        <QuickActionCard
+          icon="check-square"
+          title="Track Tasks"
+          subtitle="View tasks given to team"
+          onPress={() => router.push('/(owner)/tasks')}
+        />
       </View>
 
       {/* Pending Approvals */}
@@ -285,43 +291,50 @@ function StatCard({ icon, iconColor, value, label }: StatCardProps) {
       <View style={[statStyles.iconBg, { backgroundColor: iconColor + '12' }]}>
         <Feather name={icon as any} size={18} color={iconColor} />
       </View>
-      <Text style={statStyles.value}>{value}</Text>
-      <Text style={statStyles.label}>{label}</Text>
+      <View style={statStyles.info}>
+        <Text style={statStyles.value}>{value}</Text>
+        <Text style={statStyles.label}>{label}</Text>
+      </View>
     </View>
   );
 }
 
 const statStyles = StyleSheet.create({
   card: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    padding: 16,
+    flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    minWidth: '44%',
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 12,
     borderWidth: 1,
     borderColor: Colors.border,
     ...Colors.shadow,
   },
   iconBg: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginRight: 10,
+  },
+  info: {
+    flex: 1,
+    justifyContent: 'center',
   },
   value: {
-    fontSize: 24,
+    fontSize: 18,
     fontFamily: 'Inter_800ExtraBold',
     color: Colors.text,
-    letterSpacing: -0.5,
+    lineHeight: 22,
   },
   label: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'Inter_500Medium',
     color: Colors.textSecondary,
-    marginTop: 2,
+    marginTop: 1,
   },
 });
 

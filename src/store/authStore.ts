@@ -195,12 +195,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
 
+      // Normalize employee ID (e.g. "2" -> "VB-0002", "VB-2" -> "VB-0002")
+      let normalizedId = employeeId.trim().toUpperCase();
+      if (/^\d+$/.test(normalizedId)) {
+        normalizedId = `VB-${normalizedId.padStart(4, '0')}`;
+      } else if (/^VB-?\d+$/i.test(normalizedId)) {
+        const numPart = normalizedId.replace(/[^0-9]/g, '');
+        normalizedId = `VB-${numPart.padStart(4, '0')}`;
+      }
+
       // First, look up the employee's email by their employee_id
       // We need to construct the internal email format used by create-member
-      let internalEmail = `${employeeId.toLowerCase().replace(/[^a-z0-9]/g, '')}@vebosso.local`;
+      let internalEmail = `${normalizedId.toLowerCase().replace(/[^a-z0-9]/g, '')}@vebosso.local`;
 
       // Special mapping for the seeded owner account
-      const normalizedId = employeeId.trim().toUpperCase();
       if (normalizedId === 'VB-0001' || normalizedId === 'OWNER') {
         internalEmail = 'owner@vebosso.com';
       }

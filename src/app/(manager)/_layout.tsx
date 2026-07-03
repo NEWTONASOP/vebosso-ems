@@ -96,6 +96,12 @@ export default function ManagerLayout() {
           href: null, // Hide from tab bar, accessed via dashboard button
         }}
       />
+      <Tabs.Screen
+        name="tasks"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

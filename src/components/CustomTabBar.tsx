@@ -50,12 +50,19 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
           {state.routes.map((route, index) => {
             const { options } = descriptors[route.key];
             
+            const hasDashboard = state.routes.some((r) => r.name === 'dashboard');
+            const hasMyTeam = state.routes.some((r) => r.name === 'my-team');
+
             // Skip hidden tabs (Expo Router uses href: null to hide tabs, or dynamic sub-routes)
             if (
               (options as any).href === null || 
               !ICON_MAP[route.name] || 
               route.name.includes('[') || 
-              route.name.includes('/')
+              route.name.includes('/') ||
+              // Hide tasks from bottom tab bar in Owner/Manager layouts (they access it via Dashboard)
+              (route.name === 'tasks' && hasDashboard) ||
+              // Hide settings from bottom tab bar in Manager layout
+              (route.name === 'settings' && hasMyTeam)
             ) {
               return null;
             }
@@ -131,8 +138,8 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress }: TabItemPro
 
   const color = isFocused ? Colors.tabActive : Colors.tabInactive;
   const iconElement = renderIcon
-    ? renderIcon({ focused: isFocused, color, size: 18 })
-    : <Feather name={iconName as any} size={18} color={color} />;
+    ? renderIcon({ focused: isFocused, color, size: 22 })
+    : <Feather name={iconName as any} size={22} color={color} />;
 
   return (
     <Pressable
@@ -166,9 +173,9 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress }: TabItemPro
 const styles = StyleSheet.create({
   outerContainer: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 28 : 24,
-    left: 20,
-    right: 20,
+    bottom: Platform.OS === 'ios' ? 32 : 28,
+    left: 16,
+    right: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
@@ -179,12 +186,12 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   blurContainer: {
-    borderRadius: 32,
+    borderRadius: 36,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.05)',
     width: '100%',
-    maxWidth: 500,
+    maxWidth: 550,
     backgroundColor: Platform.OS === 'web' 
       ? 'rgba(255, 255, 255, 0.85)' 
       : Platform.OS === 'android' 
@@ -201,24 +208,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   tabButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 60,
+    minWidth: 64,
   },
   pillContainer: {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 20,
-    minHeight: 56,
-    gap: 3,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 24,
+    minHeight: 64,
+    gap: 4,
   },
   pillActive: {
     backgroundColor: 'rgba(0, 0, 0, 0.05)', // Light grey active capsule background
@@ -228,7 +235,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: -0.1,
     textAlign: 'center',
   },
