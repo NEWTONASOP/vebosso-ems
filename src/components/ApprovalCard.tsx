@@ -93,8 +93,19 @@ export function ApprovalCard({ workLog, onApprove, onReject, index = 0, isApprov
         </View>
       )}
 
+      {/* Checkout Day Report */}
+      {workLog.status === 'pending_checkout' && workLog.day_report && (
+        <View style={styles.planSection}>
+          <View style={styles.planLabelRow}>
+            <Feather name="file-text" size={14} color="#007AFF" />
+            <Text style={styles.planLabel}> Day Report</Text>
+          </View>
+          <Text style={styles.planText}>{workLog.day_report}</Text>
+        </View>
+      )}
+
       {/* Actions (Approve/Reject) */}
-      {workLog.status === 'pending_approval' && (
+      {(workLog.status === 'pending_approval' || workLog.status === 'pending_checkout') && (
         <View style={styles.actions}>
           <AnimatedPressable
             style={({ pressed }) => [
@@ -123,17 +134,6 @@ export function ApprovalCard({ workLog, onApprove, onReject, index = 0, isApprov
             <Feather name="check" size={14} color="#FFFFFF" />
             <Text style={styles.approveBtnText}>Approve</Text>
           </AnimatedPressable>
-        </View>
-      )}
-
-      {/* Checkout Day Report */}
-      {workLog.status === 'pending_checkout' && workLog.day_report && (
-        <View style={styles.planSection}>
-          <View style={styles.planLabelRow}>
-            <Feather name="file-text" size={14} color="#007AFF" />
-            <Text style={styles.planLabel}> Day Report</Text>
-          </View>
-          <Text style={styles.planText}>{workLog.day_report}</Text>
         </View>
       )}
     </Animated.View>

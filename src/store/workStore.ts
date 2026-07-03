@@ -339,31 +339,62 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
   approveCheckIn: async (workLogId: string, approverId: string, tasks?: TaskInsert[]) => {
     try {
+      let isCheckout = false;
+      const existing = get().pendingApprovals.find((w) => w.id === workLogId);
+      if (existing) {
+        isCheckout = existing.status === 'pending_checkout';
+      } else {
+        const { data: wl } = await supabase
+          .from('work_logs')
+          .select('status')
+          .eq('id', workLogId)
+          .single();
+        if (wl) isCheckout = wl.status === 'pending_checkout';
+      }
+
+      const updateData = isCheckout
+        ? {
+            check_out_approved: true,
+            check_out_approved_by: approverId,
+            check_out_approved_at: new Date().toISOString(),
+            status: 'done' as WorkLogStatus,
+          }
+        : {
+            check_in_approved: true,
+            check_in_approved_by: approverId,
+            check_in_approved_at: new Date().toISOString(),
+            status: 'working' as WorkLogStatus,
+          };
+
       const { data, error } = await supabase
         .from('work_logs')
-        .update({
-          check_in_approved: true,
-          check_in_approved_by: approverId,
-          check_in_approved_at: new Date().toISOString(),
-          status: 'working' as WorkLogStatus,
-        })
+        .update(updateData)
         .eq('id', workLogId)
         .select('user_id')
         .single();
 
       if (error) return { success: false, error: error.message };
 
-      if (tasks && tasks.length > 0) {
+      if (!isCheckout && tasks && tasks.length > 0) {
         await supabase.from('tasks').insert(tasks.map((t) => ({ ...t, work_log_id: workLogId })));
       }
 
       if (data) {
-        sendPushNotification(
-          data.user_id,
-          'Check-in Approved! ✅',
-          'Your check-in has been approved. Have a productive day!',
-          { type: 'check_in_approved', work_log_id: workLogId }
-        );
+        if (isCheckout) {
+          sendPushNotification(
+            data.user_id,
+            'Checkout Approved! 🎉',
+            'Your checkout and day report have been approved. Great work!',
+            { type: 'check_out_approved', work_log_id: workLogId }
+          );
+        } else {
+          sendPushNotification(
+            data.user_id,
+            'Check-in Approved! ✅',
+            'Your check-in has been approved. Have a productive day!',
+            { type: 'check_in_approved', work_log_id: workLogId }
+          );
+        }
       }
 
       await get().fetchPendingApprovals();
@@ -375,14 +406,35 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
   rejectCheckIn: async (workLogId: string, approverId: string, reason: string) => {
     try {
+      let isCheckout = false;
+      const existing = get().pendingApprovals.find((w) => w.id === workLogId);
+      if (existing) {
+        isCheckout = existing.status === 'pending_checkout';
+      } else {
+        const { data: wl } = await supabase
+          .from('work_logs')
+          .select('status')
+          .eq('id', workLogId)
+          .single();
+        if (wl) isCheckout = wl.status === 'pending_checkout';
+      }
+
+      const updateData = isCheckout
+        ? {
+            status: 'working' as WorkLogStatus,
+            rejection_reason: reason,
+            check_out_approved_by: approverId,
+          }
+        : {
+            status: 'rejected' as WorkLogStatus,
+            rejection_reason: reason,
+            check_in_approved_by: approverId,
+            check_in_approved_at: new Date().toISOString(),
+          };
+
       const { data, error } = await supabase
         .from('work_logs')
-        .update({
-          status: 'rejected' as WorkLogStatus,
-          rejection_reason: reason,
-          check_in_approved_by: approverId,
-          check_in_approved_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', workLogId)
         .select('user_id')
         .single();
@@ -390,12 +442,21 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       if (error) return { success: false, error: error.message };
 
       if (data) {
-        sendPushNotification(
-          data.user_id,
-          'Check-in Rejected ❌',
-          `Your check-in was rejected: ${reason}`,
-          { type: 'check_in_rejected', work_log_id: workLogId }
-        );
+        if (isCheckout) {
+          sendPushNotification(
+            data.user_id,
+            'Checkout Rejected ❌',
+            `Your checkout was rejected: ${reason}. Please update your report and check out again.`,
+            { type: 'check_out_rejected', work_log_id: workLogId }
+          );
+        } else {
+          sendPushNotification(
+            data.user_id,
+            'Check-in Rejected ❌',
+            `Your check-in was rejected: ${reason}`,
+            { type: 'check_in_rejected', work_log_id: workLogId }
+          );
+        }
       }
 
       await get().fetchPendingApprovals();
