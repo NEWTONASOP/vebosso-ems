@@ -3,9 +3,11 @@
 // ============================================================================
 // Manager's own check-in, tasks, and day report (same UX as member home)
 
+import { Feather } from '@expo/vector-icons';
 import { differenceInMinutes, format } from 'date-fns';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Snackbar, Text } from 'react-native-paper';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { CheckInModal } from '../../components/CheckInModal';
@@ -17,6 +19,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 
 export default function ManagerMyWorkScreen() {
+  const router = useRouter();
   const { profile } = useAuthStore();
   const { todayLog, todayTasks, isLoadingToday, fetchTodayLog, fetchTodayTasks, checkIn, checkOut, updateTaskStatus } = useWorkStore();
   const [showCheckIn, setShowCheckIn] = useState(false);
@@ -152,8 +155,13 @@ export default function ManagerMyWorkScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Work</Text>
-        <Text style={styles.headerDate}>{format(new Date(), 'EEEE, MMMM dd')}</Text>
+        <View>
+          <Text style={styles.headerTitle}>My Work</Text>
+          <Text style={styles.headerDate}>{format(new Date(), 'EEEE, MMMM dd')}</Text>
+        </View>
+        <Pressable style={({ pressed }) => [styles.headerAction, pressed && styles.headerActionPressed]} onPress={() => router.push('/(manager)/settings')}>
+          <Feather name="settings" size={20} color={Colors.textSecondary} />
+        </Pressable>
       </View>
 
       <View style={styles.content}>{renderStatus()}</View>
@@ -178,6 +186,17 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 12 },
   headerTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
   headerDate: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  headerAction: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surface,
+  },
+  headerActionPressed: {
+    backgroundColor: Colors.surfacePressed,
+  },
   content: { paddingHorizontal: 20 },
   sectionTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: Colors.text, marginTop: 20, marginBottom: 12 },
   statusCard: {
@@ -189,6 +208,17 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     marginTop: 8,
     ...Colors.shadow,
+  },
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surface,
+  },
+  settingsButtonPressed: {
+    backgroundColor: Colors.surfacePressed,
   },
   pendingCard: { borderColor: Colors.warning },
   workingCard: { borderColor: Colors.success },

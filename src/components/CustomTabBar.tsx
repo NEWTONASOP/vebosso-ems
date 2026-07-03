@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
-import { BottomTabBarProps } from 'expo-router/tabs';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import { BottomTabBarProps } from 'expo-router/tabs';
 import React from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
@@ -18,6 +18,8 @@ const ICON_MAP: Record<string, string> = {
   team: 'users',
   approvals: 'check-circle',
   settings: 'settings',
+  'my-team': 'users',
+  'my-work': 'briefcase',
 };
 
 // Map route names to user-friendly labels
@@ -31,6 +33,8 @@ const LABEL_MAP: Record<string, string> = {
   team: 'Team',
   approvals: 'Approvals',
   settings: 'Settings',
+  'my-team': 'My Team',
+  'my-work': 'My Work',
 };
 
 export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
@@ -44,7 +48,11 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
         <View style={styles.innerContainer}>
           {state.routes.map((route, index) => {
             const { options } = descriptors[route.key];
-            const label = LABEL_MAP[route.name] || route.name;
+            const label =
+              (options.tabBarLabel as string) ||
+              (options.title as string) ||
+              LABEL_MAP[route.name] ||
+              route.name;
             const isFocused = state.index === index;
 
             const iconName = ICON_MAP[route.name] || 'circle';

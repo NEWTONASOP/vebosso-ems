@@ -3,21 +3,28 @@
 // ============================================================================
 
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View, Platform } from 'react-native';
-import { Chip, Searchbar, Text } from 'react-native-paper';
+import { FlatList, Platform, RefreshControl, StyleSheet, View } from 'react-native';
+import { Chip, Searchbar, Snackbar, Text } from 'react-native-paper';
+import { AssignTaskModal } from '../../components/AssignTaskModal';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { MemberCard } from '../../components/MemberCard';
 import { Colors } from '../../constants/colors';
+import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Profile } from '../../types/database';
 
 export default function OwnerTeamScreen() {
-  const { teamMembers, isLoadingTeam, fetchTeamMembers } = useWorkStore();
+  const { profile } = useAuthStore();
+  const { teamMembers, isLoadingTeam, fetchTeamMembers, addTask } = useWorkStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [assignTaskModalVisible, setAssignTaskModalVisible] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
+  const [isAssigningTask, setIsAssigningTask] = useState(false);
+  const [snackMessage, setSnackMessage] = useState('');
 
   useEffect(() => {
     fetchTeamMembers();
@@ -27,6 +34,35 @@ export default function OwnerTeamScreen() {
     setRefreshing(true);
     await fetchTeamMembers();
     setRefreshing(false);
+  };
+
+  const handleMemberPress = (member: Profile) => {
+    setSelectedMember(member);
+    setAssignTaskModalVisible(true);
+  };
+
+  const handleAssignTask = async (title: string, description: string | null, dueDate: string | null) => {
+    if (!profile?.id || !selectedMember?.id) return;
+
+    setIsAssigningTask(true);
+    try {
+      await addTask({
+        assigned_to: selectedMember.id,
+        assigned_by: profile.id,
+        title,
+        description,
+        due_date: dueDate,
+        status: 'pending',
+      });
+      setSnackMessage(`Task assigned to ${selectedMember.full_name}`);
+      setAssignTaskModalVisible(false);
+      setSelectedMember(null);
+    } catch (error) {
+      console.error('Failed to assign task:', error);
+      setSnackMessage('Failed to assign task. Please try again.');
+    } finally {
+      setIsAssigningTask(false);
+    }
   };
 
   // Get unique departments
@@ -44,7 +80,7 @@ export default function OwnerTeamScreen() {
   });
 
   const renderMember = useCallback(({ item }: { item: Profile }) => (
-    <MemberCard member={item} />
+    <MemberCard member={item} onPress={() => handleMemberPress(item)} />
   ), []);
 
   return (
@@ -132,6 +168,21 @@ export default function OwnerTeamScreen() {
           }
         />
       )}
+
+      <AssignTaskModal
+        visible={assignTaskModalVisible}
+        onDismiss={() => {
+          setAssignTaskModalVisible(false);
+          setSelectedMember(null);
+        }}
+        targetMember={selectedMember}
+        onSubmit={handleAssignTask}
+        isLoading={isAssigningTask}
+      />
+
+      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>
+        {snackMessage}
+      </Snackbar>
     </View>
   );
 }

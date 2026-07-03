@@ -2,18 +2,21 @@
 // VEBOSSO EMS — Owner Dashboard (Premium Fintech Aesthetic)
 // ============================================================================
 
+import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View, Platform } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Snackbar, Text } from 'react-native-paper';
 import { ApprovalCard } from '../../components/ApprovalCard';
+import { AssignTaskModal } from '../../components/AssignTaskModal';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton, StatsSkeleton } from '../../components/LoadingSkeleton';
+import { MemberPickerModal } from '../../components/MemberPickerModal';
+import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
-import { Feather } from '@expo/vector-icons';
-import { Colors } from '../../constants/colors';
-import { useRouter } from 'expo-router';
+import { Profile } from '../../types/database';
 
 export default function OwnerDashboard() {
   const router = useRouter();
@@ -22,24 +25,33 @@ export default function OwnerDashboard() {
     stats,
     pendingApprovals,
     isLoadingApprovals,
+    teamMembers,
     fetchStats,
     fetchPendingApprovals,
     fetchSettings,
+    fetchTeamMembers,
     approveCheckIn,
     rejectCheckIn,
     subscribeToRealtime,
     unsubscribeFromRealtime,
+    addTask,
   } = useWorkStore();
 
   const [refreshing, setRefreshing] = React.useState(false);
+  const [memberPickerVisible, setMemberPickerVisible] = React.useState(false);
+  const [assignTaskModalVisible, setAssignTaskModalVisible] = React.useState(false);
+  const [selectedMember, setSelectedMember] = React.useState<Profile | null>(null);
+  const [isAssigningTask, setIsAssigningTask] = React.useState(false);
+  const [snackMessage, setSnackMessage] = React.useState('');
 
   const loadData = useCallback(async () => {
     await Promise.all([
       fetchStats(),
       fetchPendingApprovals(),
       fetchSettings(),
+      fetchTeamMembers(),
     ]);
-  }, [fetchStats, fetchPendingApprovals, fetchSettings]);
+  }, [fetchStats, fetchPendingApprovals, fetchSettings, fetchTeamMembers]);
 
   useEffect(() => {
     if (!profile?.id) {
@@ -77,10 +89,45 @@ export default function OwnerDashboard() {
     }
   };
 
+  const handleOpenMemberPicker = () => {
+    setMemberPickerVisible(true);
+  };
+
+  const handleSelectMember = (member: Profile) => {
+    setSelectedMember(member);
+    setMemberPickerVisible(false);
+    setAssignTaskModalVisible(true);
+  };
+
+  const handleAssignTask = async (title: string, description: string | null, dueDate: string | null) => {
+    if (!profile?.id || !selectedMember?.id) return;
+
+    setIsAssigningTask(true);
+    try {
+      await addTask({
+        assigned_to: selectedMember.id,
+        assigned_by: profile.id,
+        title,
+        description,
+        due_date: dueDate,
+        status: 'pending',
+      });
+      setSnackMessage(`Task assigned to ${selectedMember.full_name}`);
+      setAssignTaskModalVisible(false);
+      setSelectedMember(null);
+    } catch (error) {
+      console.error('Failed to assign task:', error);
+      setSnackMessage('Failed to assign task. Please try again.');
+    } finally {
+      setIsAssigningTask(false);
+    }
+  };
+
   const today = format(new Date(), 'EEEE, MMMM dd');
 
   return (
-    <ScrollView
+    <>
+      <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
       refreshControl={
@@ -132,6 +179,15 @@ export default function OwnerDashboard() {
         </View>
       )}
 
+      {/* Quick Actions */}
+      <Text style={styles.sectionTitle}>Quick Actions</Text>
+      <QuickActionCard
+        icon="clipboard-list"
+        title="Assign Task"
+        subtitle="Create a new task"
+        onPress={handleOpenMemberPicker}
+      />
+
       {/* Pending Approvals */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>
@@ -166,7 +222,34 @@ export default function OwnerDashboard() {
           ))
         )}
       </View>
-    </ScrollView>
+      </ScrollView>
+
+      <MemberPickerModal
+        visible={memberPickerVisible}
+        onDismiss={() => {
+          setMemberPickerVisible(false);
+          setSelectedMember(null);
+        }}
+        members={teamMembers}
+        selectedMember={selectedMember}
+        onSelectMember={handleSelectMember}
+      />
+
+      <AssignTaskModal
+        visible={assignTaskModalVisible}
+        onDismiss={() => {
+          setAssignTaskModalVisible(false);
+          setSelectedMember(null);
+        }}
+        targetMember={selectedMember}
+        onSubmit={handleAssignTask}
+        isLoading={isAssigningTask}
+      />
+
+      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>
+        {snackMessage}
+      </Snackbar>
+    </>
   );
 }
 
@@ -224,6 +307,62 @@ const statStyles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+});
+
+// ============================================================================
+// Quick Action Card component
+// ============================================================================
+
+interface QuickActionCardProps {
+  icon: string;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}
+
+function QuickActionCard({ icon, title, subtitle, onPress }: QuickActionCardProps) {
+  return (
+    <View style={quickActionStyles.container}>
+      <Feather name={icon as any} size={24} color={Colors.accent} style={quickActionStyles.icon} />
+      <View style={quickActionStyles.content}>
+        <Text style={quickActionStyles.title}>{title}</Text>
+        <Text style={quickActionStyles.subtitle}>{subtitle}</Text>
+      </View>
+      <Feather name="chevron-right" size={22} color={Colors.textTertiary} />
+    </View>
+  );
+}
+
+const quickActionStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginHorizontal: 20,
+    marginBottom: 8,
+    ...Colors.shadow,
+  },
+  icon: {
+    marginRight: 12,
+  },
+  content: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 15,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  subtitle: {
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    color: Colors.textSecondary,
   },
 });
 

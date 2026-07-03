@@ -2,12 +2,11 @@
 // VEBOSSO EMS — Manager Tab Layout (Floating Premium Navigation)
 // ============================================================================
 
-import React from 'react';
-import { Tabs } from 'expo-router';
-import { useWorkStore } from '../../store/workStore';
-import { View, Text, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
+import { StyleSheet, Text, View } from 'react-native';
 import { Colors } from '../../constants/colors';
+import { useWorkStore } from '../../store/workStore';
 
 import { CustomTabBar } from '../../components/CustomTabBar';
 
