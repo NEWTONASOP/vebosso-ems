@@ -4,56 +4,15 @@
  
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import * as SQLite from 'expo-sqlite';
+import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 
-// SQLite-based storage adapter for persistent auth sessions (Mobile)
-class SupabaseStorage {
-  private db: SQLite.SQLiteDatabase | null = null;
-  private initPromise: Promise<SQLite.SQLiteDatabase> | null = null;
-  private isInitializing: boolean = false;
-
-  private async getDb(): Promise<SQLite.SQLiteDatabase> {
-    // Return existing database if already initialized
-    if (this.db) {
-      return this.db;
-    }
-    
-    // Wait for ongoing initialization
-    if (this.initPromise) {
-      return this.initPromise;
-    }
-    
-    // Start new initialization
-    this.isInitializing = true;
-    this.initPromise = (async () => {
-      try {
-        const database = await SQLite.openDatabaseAsync('supabase-auth.db');
-        await database.execAsync(
-          'CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT);'
-        );
-        this.db = database;
-        return database;
-      } catch (error) {
-        console.error('SQLite initialization error:', error);
-        throw error;
-      } finally {
-        this.isInitializing = false;
-        this.initPromise = null;
-      }
-    })();
-    return this.initPromise;
-  }
-
+// SecureStore-based storage adapter for persistent auth sessions (Mobile)
+class ExpoSecureStoreAdapter {
   async getItem(key: string): Promise<string | null> {
     try {
-      const db = await this.getDb();
-      const result = await db.getFirstAsync<{ value: string }>(
-        'SELECT value FROM kv_store WHERE key = ?;',
-        [key]
-      );
-      return result?.value ?? null;
+      return await SecureStore.getItemAsync(key);
     } catch {
       return null;
     }
@@ -61,22 +20,17 @@ class SupabaseStorage {
 
   async setItem(key: string, value: string): Promise<void> {
     try {
-      const db = await this.getDb();
-      await db.runAsync(
-        'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?);',
-        [key, value]
-      );
+      await SecureStore.setItemAsync(key, value);
     } catch (error) {
-      console.error('SupabaseStorage setItem error:', error);
+      console.error('SecureStore setItem error:', error);
     }
   }
 
   async removeItem(key: string): Promise<void> {
     try {
-      const db = await this.getDb();
-      await db.runAsync('DELETE FROM kv_store WHERE key = ?;', [key]);
+      await SecureStore.deleteItemAsync(key);
     } catch (error) {
-      console.error('SupabaseStorage removeItem error:', error);
+      console.error('SecureStore removeItem error:', error);
     }
   }
 }
@@ -120,7 +74,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('⚠️ Development mode: App will fail without proper Supabase configuration.');
 }
 
-const storage = Platform.OS === 'web' ? new WebStorage() : new SupabaseStorage();
+const storage = Platform.OS === 'web' ? new WebStorage() : new ExpoSecureStoreAdapter();
 
 // Use 'any' generic to prevent 'never' errors from manual schema types.
 // Our Database interface still provides IDE intellisense via explicit casts.
