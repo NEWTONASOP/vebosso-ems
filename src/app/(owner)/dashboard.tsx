@@ -189,7 +189,7 @@ export default function OwnerDashboard() {
       <Text style={styles.sectionTitle}>Quick Actions</Text>
       <View style={styles.quickActionsContainer}>
         <QuickActionCard
-          icon="clipboard-list"
+          icon="clipboard"
           title="Assign Task"
           subtitle="Create a new task"
           onPress={handleOpenMemberPicker}
