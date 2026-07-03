@@ -290,11 +290,11 @@ export default function MemberHomeScreen() {
         )}
       </View>
 
-      {/* Today's Tasks in unified Grouped Card */}
+      {/* Today's Tasks */}
       {todayTasks.length > 0 && (
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Today&apos;s Tasks</Text>
-          <View style={styles.groupedCard}>
+          <View style={styles.tasksContainer}>
             {todayTasks.map((task, index) => (
               <TaskCard
                 key={task.id}
@@ -388,12 +388,12 @@ const styles = StyleSheet.create({
   },
   statusCard: {
     backgroundColor: Colors.surface,
-    borderRadius: 24,
+    borderRadius: 28,
     padding: 24,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    borderColor: 'rgba(0, 0, 0, 0.04)',
+    ...Colors.shadowHeavy,
   },
   statusEmoji: {
     fontSize: 48,
@@ -499,12 +499,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
-  groupedCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+  tasksContainer: {
+    paddingTop: 4,
   },
 });

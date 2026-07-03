@@ -166,7 +166,7 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress }: TabItemPro
 const styles = StyleSheet.create({
   outerContainer: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 28 : 20,
+    bottom: Platform.OS === 'ios' ? 28 : 24,
     left: 20,
     right: 20,
     alignItems: 'center',
@@ -185,7 +185,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 0, 0, 0.05)',
     width: '100%',
     maxWidth: 500,
-    backgroundColor: Platform.OS === 'web' ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: Platform.OS === 'web' 
+      ? 'rgba(255, 255, 255, 0.85)' 
+      : Platform.OS === 'android' 
+        ? 'rgba(255, 255, 255, 0.75)' 
+        : 'rgba(255, 255, 255, 0.2)',
     ...Platform.select({
       web: {
         backdropFilter: 'blur(20px)',

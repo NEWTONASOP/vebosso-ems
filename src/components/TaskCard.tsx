@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 
 import { Task, TaskStatus } from '../types/database';
 import { Feather } from '@expo/vector-icons';
+import { Colors } from '../constants/colors';
 
 interface TaskCardProps {
   task: Task;
@@ -105,6 +106,7 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
         {/* Right Action Button/Badge */}
         {nextLabel && onStatusChange ? (
           <AnimatedPressable
+            scaleTo={0.92}
             style={({ pressed }) => [
               styles.actionBtn,
               nextStatus === 'in_progress' ? styles.startBtn : styles.completeBtn,
@@ -129,7 +131,6 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
           </View>
         )}
       </View>
-      {!isLast && <View style={styles.separator} />}
     </Animated.View>
   );
 }
@@ -137,6 +138,11 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
 const styles = StyleSheet.create({
   rowWrapper: {
     backgroundColor: '#FFFFFF',
+    marginVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.04)',
+    ...Colors.shadow,
   },
   rowContent: {
     flexDirection: 'row',
@@ -183,8 +189,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   actionBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
@@ -218,10 +224,5 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 11,
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    marginLeft: 62, // 16 (padding) + 32 (icon) + 14 (margin) = 62px inset
   },
 });
