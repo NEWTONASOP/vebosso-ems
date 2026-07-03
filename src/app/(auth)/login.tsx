@@ -3,7 +3,7 @@
 // ============================================================================
 
 import React, { useState } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable, ActivityIndicator, Image } from 'react-native';
 import { TextInput, Text, Snackbar } from 'react-native-paper';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useAuthStore } from '../../store/authStore';
@@ -47,9 +47,10 @@ export default function LoginScreen() {
       >
         {/* Logo / Branding */}
         <Animated.View entering={FadeInDown.duration(800).delay(200)} style={styles.brandSection}>
-          <View style={styles.logoContainer}>
-            <Feather name="layers" size={32} color={Colors.white} />
-          </View>
+          <Image
+            source={require('../../../assets/images/vb_logo.png')}
+            style={styles.logoImage}
+          />
           <Text style={styles.appName}>{APP_NAME}</Text>
           <Text style={styles.tagline}>{APP_TAGLINE}</Text>
         </Animated.View>
@@ -181,13 +182,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 32,
   },
-  logoContainer: {
+  logoImage: {
     width: 72,
     height: 72,
     borderRadius: 22,
-    backgroundColor: Colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: 'hidden',
     marginBottom: 16,
     ...Colors.shadow,
   },
