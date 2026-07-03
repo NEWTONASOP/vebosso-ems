@@ -213,6 +213,47 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       if (error) return { success: false, error: error.message };
 
       set({ todayLog: data as WorkLog });
+
+      // If pending checkout approval, notify manager and owners
+      if (newStatus === 'pending_checkout' && data) {
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, manager_id')
+            .eq('id', todayLog.user_id)
+            .single();
+
+          if (profile) {
+            if (profile.manager_id) {
+              sendPushNotification(
+                profile.manager_id,
+                'Checkout Request',
+                `${profile.full_name} has checked out and is waiting for approval`,
+                { type: 'checkout_request', work_log_id: data.id }
+              );
+            }
+
+            const { data: owners } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('role', 'owner');
+
+            owners?.forEach((owner) => {
+              if (owner.id !== profile.manager_id) {
+                sendPushNotification(
+                  owner.id,
+                  'Checkout Request',
+                  `${profile.full_name} has checked out and is waiting for approval`,
+                  { type: 'checkout_request', work_log_id: data.id }
+                );
+              }
+            });
+          }
+        } catch (notifErr) {
+          console.warn('Failed to send checkout notifications:', notifErr);
+        }
+      }
+
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed to check out.' };
@@ -568,6 +609,38 @@ export const useWorkStore = create<WorkState>((set, get) => ({
     try {
       const { error } = await supabase.from('announcements').insert(announcement);
       if (error) return { success: false, error: error.message };
+
+      // Dispatch notifications to the target audience asynchronously
+      try {
+        const { target_role, target_user_id, title, body, created_by } = announcement;
+        
+        let query = supabase
+          .from('profiles')
+          .select('id')
+          .eq('is_active', true);
+          
+        if (target_user_id) {
+          query = query.eq('id', target_user_id);
+        } else if (target_role) {
+          query = query.eq('role', target_role);
+        } else {
+          // Broadcast to everyone except the creator
+          query = query.neq('id', created_by);
+        }
+        
+        const { data: users } = await query;
+        users?.forEach((u) => {
+          sendPushNotification(
+            u.id,
+            `New Announcement: ${title}`,
+            body,
+            { type: 'announcement' }
+          );
+        });
+      } catch (notifErr) {
+        console.warn('Failed to send announcement notifications:', notifErr);
+      }
+
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
