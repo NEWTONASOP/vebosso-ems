@@ -92,7 +92,10 @@ export default function OwnerHistoryScreen() {
         onDismiss={() => setPickerVisible(false)}
         members={teamMembers}
         selectedMember={selectedMember}
-        onSelectMember={setSelectedMember}
+        onSelectMember={(member) => {
+          setSelectedMember(member);
+          setPickerVisible(false);
+        }}
       />
 
       {!selectedMember ? (
