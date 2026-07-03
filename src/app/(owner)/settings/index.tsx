@@ -160,6 +160,7 @@ export default function OwnerSettingsScreen() {
       visible={!!snackMessage}
       onDismiss={() => setSnackMessage('')}
       duration={4000}
+      wrapperStyle={{ marginBottom: 90 }}
     >
       {snackMessage}
     </Snackbar>

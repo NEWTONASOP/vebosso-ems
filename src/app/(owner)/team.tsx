@@ -273,7 +273,7 @@ export default function OwnerTeamScreen() {
         isLoading={isAssigningManager}
       />
 
-      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>
+      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>
         {snackMessage}
       </Snackbar>
     </View>

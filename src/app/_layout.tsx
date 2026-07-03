@@ -115,7 +115,8 @@ function AuthGuard() {
     if (!rootNavigationState?.key) return;
     if (!isInitialized || isLoading) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
+    const group = segments[0];
+    const inAuthGroup = group === '(auth)';
 
     if (!isAuthenticated && !inAuthGroup) {
       router.replace('/(auth)/login');
@@ -131,6 +132,7 @@ function AuthGuard() {
 
     const isChangePassword = segments[1] === 'change-password';
 
+    // 1. If in auth group (e.g. just logged in), redirect to correct dashboard
     if (inAuthGroup && !isChangePassword) {
       switch (profile.role) {
         case 'owner':
@@ -142,6 +144,22 @@ function AuthGuard() {
         case 'member':
           router.replace('/(member)/home');
           break;
+      }
+      return;
+    }
+
+    // 2. Role-based Route Guard: Enforce role group correctness (fixes web reload route collisions)
+    if (group) {
+      const inOwnerGroup = group === '(owner)';
+      const inManagerGroup = group === '(manager)';
+      const inMemberGroup = group === '(member)';
+
+      if (profile.role === 'owner' && !inOwnerGroup) {
+        router.replace('/(owner)/dashboard');
+      } else if (profile.role === 'manager' && !inManagerGroup) {
+        router.replace('/(manager)/dashboard');
+      } else if (profile.role === 'member' && !inMemberGroup) {
+        router.replace('/(member)/home');
       }
     }
   }, [
