@@ -11,6 +11,7 @@ import { APP_NAME, ROLE_LABELS } from '../../constants/roles';
 import { useAuthStore } from '../../store/authStore';
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import Constants from 'expo-constants';
 
 import { PageTransition } from '../../components/PageTransition';
 
@@ -116,7 +117,7 @@ export default function MemberProfileScreen() {
       {/* App Info */}
       <View style={styles.appInfo}>
         <Text style={styles.appName}>{APP_NAME} EMS</Text>
-        <Text style={styles.appVersion}>v1.0.0</Text>
+        <Text style={styles.appVersion}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
       </View>
     </ScrollView>
     </PageTransition>

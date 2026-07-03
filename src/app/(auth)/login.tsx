@@ -10,6 +10,7 @@ import { useAuthStore } from '../../store/authStore';
 import { APP_NAME, APP_TAGLINE } from '../../constants/roles';
 import { Feather } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
+import Constants from 'expo-constants';
 
 export default function LoginScreen() {
   const [employeeId, setEmployeeId] = useState('');
@@ -143,7 +144,7 @@ export default function LoginScreen() {
 
         {/* App Version */}
         <Animated.View entering={FadeInUp.duration(800).delay(600)}>
-          <Text style={styles.version}>v1.0.0</Text>
+          <Text style={styles.version}>v{Constants.expoConfig?.version || '1.0.0'}</Text>
         </Animated.View>
       </ScrollView>
 

@@ -115,6 +115,43 @@ jobs:
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean
 
+      - name: Decode release keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+
+      - name: Configure release signing
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("android/app/build.gradle")
+          text = path.read_text()
+
+          if "signingConfigs {" not in text:
+              text = text.replace(
+                  "android {",
+                  """android {
+
+      signingConfigs {
+          release {
+              storeFile file("release.keystore")
+              storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+              keyAlias System.getenv("ANDROID_KEY_ALIAS")
+              keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+          }
+      }
+""",
+                  1,
+              )
+
+          text = text.replace(
+              "signingConfig signingConfigs.debug",
+              "signingConfig signingConfigs.release"
+          )
+
+          path.write_text(text)
+          PY
+
       - name: Cache CMake/NDK native build
         uses: actions/cache@v4
         with:
@@ -143,6 +180,10 @@ jobs:
 
       - name: Build Release APK
         working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Rename APK

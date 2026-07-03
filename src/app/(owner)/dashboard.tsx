@@ -63,10 +63,10 @@ export default function OwnerDashboard() {
       console.warn('Profile not loaded yet');
       return;
     }
-    
+
     loadData();
     subscribeToRealtime(profile.id, 'owner');
-    
+
     return () => unsubscribeFromRealtime();
   }, [profile?.id, loadData, subscribeToRealtime, unsubscribeFromRealtime]);
 
@@ -134,115 +134,119 @@ export default function OwnerDashboard() {
   return (
     <>
       <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />
-      }
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header Greeting */}
-      <View style={styles.header}>
-        <Text style={styles.greeting}>
-          Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'},
-        </Text>
-        <Text style={styles.name}>{profile?.full_name?.split(' ')[0] || 'Owner'} 👋</Text>
-        <Text style={styles.date}>{today}</Text>
-      </View>
-
-      {/* Stats Cards Dashboard widgets */}
-      <Text style={styles.sectionTitle}>Overview</Text>
-      {isLoadingApprovals && stats.totalMembers === 0 ? (
-        <View style={styles.statsSkeletonContainer}>
-          <StatsSkeleton />
-        </View>
-      ) : (
-        <View style={styles.statsGrid}>
-          <StatCard
-            icon="users"
-            iconColor={Colors.info}
-            value={stats.totalMembers.toString()}
-            label="Total Members"
-          />
-          <StatCard
-            icon="check-circle"
-            iconColor={Colors.success}
-            value={stats.activeNow.toString()}
-            label="Active Now"
-          />
-          <StatCard
-            icon="sun"
-            iconColor={Colors.warning}
-            value={stats.onLeaveToday.toString()}
-            label="On Leave"
-          />
-          <StatCard
-            icon="clock"
-            iconColor="#5856D6"
-            value={stats.pendingApprovals.toString()}
-            label="Pending"
-          />
-        </View>
-      )}
-
-      {/* Quick Actions */}
-      <Text style={styles.sectionTitle}>Quick Actions</Text>
-      <View style={styles.quickActionsContainer}>
-        <QuickActionCard
-          icon="clipboard"
-          title="Assign Task"
-          subtitle="Create a new task"
-          onPress={handleOpenMemberPicker}
-        />
-        <QuickActionCard
-          icon="check-square"
-          title="Track Tasks"
-          subtitle="View tasks given to team"
-          onPress={() => router.push('/(owner)/tasks')}
-        />
-      </View>
-
-      {/* Pending Approvals */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>
-          Pending Approvals {pendingApprovals.length > 0 ? `(${pendingApprovals.length})` : ''}
-        </Text>
-        {pendingApprovals.length > 5 && (
-          <Text style={styles.viewAllBtn} onPress={() => router.push('/(owner)/approvals')}>
-            View All
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header Greeting */}
+        <View style={styles.header}>
+          <Text style={styles.greeting}>
+            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'},
           </Text>
-        )}
-      </View>
+          <Text style={styles.name}>{profile?.full_name?.split(' ')[0] || 'Owner'} 👋</Text>
+          <Text style={styles.date}>{today}</Text>
+        </View>
 
-      <View style={styles.listContainer}>
-        {isLoadingApprovals ? (
-          <ListSkeleton count={2} />
-        ) : approvalsError ? (
-          <InlineError
-            message={approvalsError}
-            onRetry={() => fetchPendingApprovals()}
-          />
-        ) : pendingApprovals.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <EmptyState
-              icon="checkbox-marked-circle-outline"
-              title="All caught up!"
-              subtitle="No pending approvals at the moment"
-            />
+        {/* Stats Cards Dashboard widgets */}
+        <Text style={styles.sectionTitle}>Overview</Text>
+        {isLoadingApprovals && stats.totalMembers === 0 ? (
+          <View style={styles.statsSkeletonContainer}>
+            <StatsSkeleton />
           </View>
         ) : (
-          pendingApprovals.slice(0, 5).map((workLog) => (
-            <ApprovalCard
-              key={workLog.id}
-              workLog={workLog}
-              onApprove={handleApprove}
-              onReject={handleReject}
-              isApproving={approvingId === workLog.id}
-              isRejecting={rejectingId === workLog.id}
-            />
-          ))
+          <View style={styles.statsGrid}>
+            <View style={styles.statsRow}>
+              <StatCard
+                icon="users"
+                iconColor={Colors.info}
+                value={stats.totalMembers.toString()}
+                label="Total Members"
+              />
+              <StatCard
+                icon="check-circle"
+                iconColor={Colors.success}
+                value={stats.activeNow.toString()}
+                label="Active Now"
+              />
+            </View>
+            <View style={styles.statsRow}>
+              <StatCard
+                icon="sun"
+                iconColor={Colors.warning}
+                value={stats.onLeaveToday.toString()}
+                label="On Leave"
+              />
+              <StatCard
+                icon="clock"
+                iconColor="#5856D6"
+                value={stats.pendingApprovals.toString()}
+                label="Pending"
+              />
+            </View>
+          </View>
         )}
-      </View>
+
+        {/* Quick Actions */}
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <View style={styles.quickActionsContainer}>
+          <QuickActionCard
+            icon="clipboard"
+            title="Assign Task"
+            subtitle="Create a new task"
+            onPress={handleOpenMemberPicker}
+          />
+          <QuickActionCard
+            icon="check-square"
+            title="Track Tasks"
+            subtitle="View tasks given to team"
+            onPress={() => router.push('/(owner)/tasks')}
+          />
+        </View>
+
+        {/* Pending Approvals */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            Pending Approvals {pendingApprovals.length > 0 ? `(${pendingApprovals.length})` : ''}
+          </Text>
+          {pendingApprovals.length > 5 && (
+            <Text style={styles.viewAllBtn} onPress={() => router.push('/(owner)/approvals')}>
+              View All
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.listContainer}>
+          {isLoadingApprovals ? (
+            <ListSkeleton count={2} />
+          ) : approvalsError ? (
+            <InlineError
+              message={approvalsError}
+              onRetry={() => fetchPendingApprovals()}
+            />
+          ) : pendingApprovals.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <EmptyState
+                icon="checkbox-marked-circle-outline"
+                title="All caught up!"
+                subtitle="No pending approvals at the moment"
+              />
+            </View>
+          ) : (
+            pendingApprovals.slice(0, 5).map((workLog) => (
+              <ApprovalCard
+                key={workLog.id}
+                workLog={workLog}
+                onApprove={handleApprove}
+                onReject={handleReject}
+                isApproving={approvingId === workLog.id}
+                isRejecting={rejectingId === workLog.id}
+              />
+            ))
+          )}
+        </View>
       </ScrollView>
 
       <MemberPickerModal
@@ -351,7 +355,7 @@ interface QuickActionCardProps {
 
 function QuickActionCard({ icon, title, subtitle, onPress }: QuickActionCardProps) {
   return (
-    <AnimatedPressable 
+    <AnimatedPressable
       style={quickActionStyles.container}
       onPress={onPress}
     >
@@ -457,10 +461,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
     paddingHorizontal: 20,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
   },
   quickActionsContainer: {
     paddingHorizontal: 20,

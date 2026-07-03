@@ -11,6 +11,7 @@ import { Alert } from '../../lib/alert';
 import { Colors } from '../../constants/colors';
 import { APP_NAME, ROLE_LABELS } from '../../constants/roles';
 import { useAuthStore } from '../../store/authStore';
+import Constants from 'expo-constants';
 
 export default function ManagerSettingsScreen() {
   const router = useRouter();
@@ -87,7 +88,7 @@ export default function ManagerSettingsScreen() {
 
       <View style={styles.appInfo}>
         <Text style={styles.appName}>{APP_NAME} EMS</Text>
-        <Text style={styles.appVersion}>v1.0.0</Text>
+        <Text style={styles.appVersion}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
       </View>
     </ScrollView>
   );
