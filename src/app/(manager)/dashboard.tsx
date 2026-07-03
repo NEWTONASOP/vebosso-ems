@@ -333,6 +333,7 @@ export default function ManagerDashboard() {
         visible={!!snackMessage} 
         onDismiss={() => setSnackMessage('')} 
         duration={3000}
+        wrapperStyle={{ marginBottom: 90 }}
       >
         {snackMessage}
       </Snackbar>

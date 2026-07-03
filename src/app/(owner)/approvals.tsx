@@ -110,7 +110,7 @@ export default function OwnerApprovalsScreen() {
         visible={!!snackMessage}
         onDismiss={() => setSnackMessage('')}
         duration={3000}
-        style={{ bottom: 80 }}
+        wrapperStyle={{ marginBottom: 90 }}
       >
         {snackMessage}
       </Snackbar>

@@ -178,7 +178,7 @@ export default function AddMemberScreen() {
           </View>
         </ScrollView>
 
-        <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>{snackMessage}</Snackbar>
+        <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>{snackMessage}</Snackbar>
       </View>
     );
   }
@@ -318,7 +318,7 @@ export default function AddMemberScreen() {
         </View>
       </ScrollView>
 
-      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>{snackMessage}</Snackbar>
+      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>{snackMessage}</Snackbar>
     </KeyboardAvoidingView>
   );
 }

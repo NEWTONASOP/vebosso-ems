@@ -89,12 +89,7 @@ export default function ManagerLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="my-work"
-        options={{
-          href: null, // Hide from tab bar navigation
-        }}
-      />
+
       <Tabs.Screen
         name="settings"
         options={{

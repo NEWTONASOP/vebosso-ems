@@ -573,7 +573,7 @@ export default function MemberProfileManagementScreen() {
         </View>
       </ScrollView>
 
-      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000}>
+      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>
         {snackMessage}
       </Snackbar>
     </KeyboardAvoidingView>
