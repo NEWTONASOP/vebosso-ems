@@ -47,6 +47,8 @@ export default function ManagerDashboard() {
   const [assignTaskModalVisible, setAssignTaskModalVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
   const [isAssigningTask, setIsAssigningTask] = useState(false);
+  const [assignTargetWorkLog, setAssignTargetWorkLog] = useState<any>(null);
+  const [selectedMemberForApproval, setSelectedMemberForApproval] = useState<Profile | null>(null);
 
   const pulseOpacity = useSharedValue(1);
 
@@ -183,6 +185,55 @@ export default function ManagerDashboard() {
       setSelectedMember(null);
     } else {
       setSnackMessage(result.error || 'Failed to assign task. Please try again.');
+    }
+  };
+
+  const handleAssignAndApprove = (workLog: any) => {
+    // Build a Profile-compatible object from the joined profiles data
+    const targetMember = {
+      id: workLog.user_id,
+      full_name: workLog.profiles.full_name,
+      employee_id: workLog.profiles.employee_id,
+      role: workLog.profiles.role,
+      department: workLog.profiles.department,
+      avatar_url: workLog.profiles.avatar_url,
+      is_active: true,
+      manager_id: null,
+      expo_push_token: null,
+      must_change_password: false,
+      created_at: '',
+      updated_at: '',
+      created_by: null,
+    };
+    setSelectedMemberForApproval(targetMember);
+    setAssignTargetWorkLog(workLog);
+    setAssignTaskModalVisible(true);
+  };
+
+  const handleAssignTaskFromApproval = async (title: string, description: string | null, dueDate: string | null) => {
+    if (!profile?.id || !assignTargetWorkLog) return;
+
+    setIsAssigningTask(true);
+    const result = await approveCheckIn(assignTargetWorkLog.id, profile.id, [
+      {
+        assigned_to: assignTargetWorkLog.user_id,
+        assigned_by: profile.id,
+        work_log_id: assignTargetWorkLog.id,
+        title,
+        description,
+        due_date: dueDate,
+        status: 'pending',
+      },
+    ]);
+    setIsAssigningTask(false);
+
+    if (result.success) {
+      setSnackMessage(`Approved & task assigned ✅`);
+      setAssignTaskModalVisible(false);
+      setSelectedMemberForApproval(null);
+      setAssignTargetWorkLog(null);
+    } else {
+      setSnackMessage(result.error || 'Failed to approve. Please try again.');
     }
   };
 
@@ -372,6 +423,7 @@ export default function ManagerDashboard() {
               workLog={workLog}
               onApprove={handleApprove}
               onReject={handleReject}
+              onAssignAndApprove={handleAssignAndApprove}
               isApproving={approvingId === workLog.id}
               isRejecting={rejectingId === workLog.id}
             />
@@ -416,9 +468,11 @@ export default function ManagerDashboard() {
       onDismiss={() => {
         setAssignTaskModalVisible(false);
         setSelectedMember(null);
+        setSelectedMemberForApproval(null);
+        setAssignTargetWorkLog(null);
       }}
-      targetMember={selectedMember}
-      onSubmit={handleAssignTask}
+      targetMember={selectedMember || selectedMemberForApproval}
+      onSubmit={assignTargetWorkLog ? handleAssignTaskFromApproval : handleAssignTask}
       isLoading={isAssigningTask}
     />
     </>

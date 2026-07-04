@@ -2,18 +2,18 @@
 // VEBOSSO EMS — Approval Card Component (Premium Fintech Aesthetic)
 // ============================================================================
 
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { format } from 'date-fns';
+import { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { Dialog, Portal, Text } from 'react-native-paper';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { AnimatedPressable } from './AnimatedPressable';
-import { Text } from 'react-native-paper';
-import { format } from 'date-fns';
 
-import { WorkLogWithProfile } from '../types/database';
-import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
 import { Feather } from '@expo/vector-icons';
-import { Colors } from '../constants/colors';
 import * as Haptics from 'expo-haptics';
+import { Colors } from '../constants/colors';
+import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
+import { WorkLogWithProfile } from '../types/database';
 
 interface ApprovalCardProps {
   workLog: WorkLogWithProfile;
@@ -26,6 +26,8 @@ interface ApprovalCardProps {
 }
 
 export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove, index = 0, isApproving = false, isRejecting = false }: ApprovalCardProps) {
+  const [showTaskDialog, setShowTaskDialog] = useState(false);
+  
   const profile = workLog.profiles;
   const statusConfig = WORK_LOG_STATUS_CONFIG[workLog.status];
   
@@ -44,6 +46,28 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
   };
 
   const avatarColors = getAvatarColors();
+
+  const handleApproveClick = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    
+    // For check-in approvals, show option to assign task
+    if (workLog.status === 'pending_approval' && onAssignAndApprove) {
+      setShowTaskDialog(true);
+    } else {
+      // For checkout approvals, directly approve
+      onApprove(workLog.id);
+    }
+  };
+
+  const handleApproveOnly = () => {
+    setShowTaskDialog(false);
+    onApprove(workLog.id);
+  };
+
+  const handleApproveWithTask = () => {
+    setShowTaskDialog(false);
+    onAssignAndApprove?.(workLog);
+  };
 
   return (
     <Animated.View 
@@ -117,58 +141,59 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
               onReject(workLog.id);
             }}
+            disabled={isApproving || isRejecting}
           >
             <Feather name="x" size={14} color="#FF3B30" />
-            <Text style={styles.rejectBtnText}>Reject</Text>
+            <Text style={styles.rejectBtnText}>
+              {isRejecting ? 'Rejecting...' : 'Reject'}
+            </Text>
           </AnimatedPressable>
 
-          {workLog.status === 'pending_approval' && onAssignAndApprove ? (
-            <>
-              <AnimatedPressable
-                style={({ pressed }) => [
-                  styles.approveQuickBtn,
-                  pressed && styles.btnPressed
-                ]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  onApprove(workLog.id);
-                }}
-              >
-                <Feather name="check" size={14} color="#000000" />
-                <Text style={styles.approveQuickBtnText}>Approve</Text>
-              </AnimatedPressable>
-
-              <AnimatedPressable
-                style={({ pressed }) => [
-                  styles.approveBtn,
-                  pressed && styles.btnPressed
-                ]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-                  onAssignAndApprove(workLog);
-                }}
-              >
-                <Feather name="clipboard" size={13} color="#FFFFFF" />
-                <Text style={styles.approveBtnText}>Assign Task</Text>
-              </AnimatedPressable>
-            </>
-          ) : (
-            <AnimatedPressable
-              style={({ pressed }) => [
-                styles.approveBtn,
-                pressed && styles.btnPressed
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                onApprove(workLog.id);
-              }}
-            >
-              <Feather name="check" size={14} color="#FFFFFF" />
-              <Text style={styles.approveBtnText}>Approve</Text>
-            </AnimatedPressable>
-          )}
+          <AnimatedPressable
+            style={({ pressed }) => [
+              styles.approveBtn,
+              pressed && styles.btnPressed
+            ]}
+            onPress={handleApproveClick}
+            disabled={isApproving || isRejecting}
+          >
+            <Feather name="check" size={14} color="#FFFFFF" />
+            <Text style={styles.approveBtnText}>
+              {isApproving ? 'Approving...' : 'Approve'}
+            </Text>
+          </AnimatedPressable>
         </View>
       )}
+
+      {/* Task Assignment Dialog */}
+      <Portal>
+        <Dialog 
+          visible={showTaskDialog} 
+          onDismiss={() => setShowTaskDialog(false)}
+          style={styles.dialog}
+        >
+          <Dialog.Title style={styles.dialogTitle}>Assign a Task?</Dialog.Title>
+          <Dialog.Content>
+            <Text style={styles.dialogText}>
+              Would you like to assign a task to {profile.full_name} along with the approval?
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions style={styles.dialogActions}>
+            <AnimatedPressable 
+              onPress={handleApproveOnly}
+              style={styles.dialogButtonSecondary}
+            >
+              <Text style={styles.dialogButtonSecondaryText}>Just Approve</Text>
+            </AnimatedPressable>
+            <AnimatedPressable 
+              onPress={handleApproveWithTask}
+              style={styles.dialogButtonPrimary}
+            >
+              <Text style={styles.dialogButtonPrimaryText}>Assign Task</Text>
+            </AnimatedPressable>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </Animated.View>
   );
 }
@@ -314,25 +339,58 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#FFFFFF',
   },
-  approveQuickBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-    borderRadius: 20,
-    height: 40,
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: '#000000',
-  },
-  approveQuickBtnText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 13,
-    color: '#000000',
-  },
   btnPressed: {
     transform: [{ scale: 0.97 }],
     opacity: 0.9,
+  },
+  dialog: {
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+  },
+  dialogTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 20,
+    color: Colors.text,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+  },
+  dialogText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 15,
+    color: Colors.textSecondary,
+    lineHeight: 22,
+    paddingHorizontal: 24,
+  },
+  dialogActions: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 16,
+    gap: 10,
+  },
+  dialogButtonSecondary: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: Colors.systemGray6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dialogButtonSecondaryText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: Colors.textPrimary,
+  },
+  dialogButtonPrimary: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dialogButtonPrimaryText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: '#FFFFFF',
   },
 });
