@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   description: {
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
-    color: '#AEAEB2',
+    color: '#6B7280', // Raised from #AEAEB2 — passes WCAG AA at 4.6:1
     flex: 1,
   },
   actionBtn: {
@@ -227,10 +227,13 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   completeBtn: {
-    backgroundColor: 'rgba(52, 199, 89, 0.12)', // Soft Green
+    backgroundColor: 'rgba(4, 120, 87, 0.08)', // Soft emerald tint
+    borderWidth: 1.5,
+    borderColor: '#047857',  // Solid emerald border for contrast
+    borderRadius: 14,
   },
   completeBtnText: {
-    color: '#34C759',
+    color: '#047857', // Deeper emerald — passes WCAG AA at 4.5:1 on white tint
   },
   actionBtnText: {
     fontFamily: 'Inter_700Bold',

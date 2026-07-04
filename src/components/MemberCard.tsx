@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   },
   roleLabel: {
     fontSize: 10,
-    color: Colors.textTertiary,
+    color: Colors.textSecondary, // Changed from textTertiary for better small text contrast
     fontWeight: '500',
   },
 });

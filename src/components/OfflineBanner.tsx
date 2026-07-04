@@ -55,12 +55,14 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.warning,
-    paddingVertical: 8,
+    backgroundColor: '#FEF3C7', // Soft premium amber
+    paddingVertical: 10,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderColor: '#FDE68A', // Light border
     zIndex: 1000,
   },
   icon: {
@@ -68,8 +70,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   text: {
-    color: Colors.textInverse,
+    color: '#78350F', // Dark amber text (high contrast and matching tone)
     fontSize: 13,
     fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
   },
 });
+

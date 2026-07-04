@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   meta: {
     fontFamily: 'Inter_500Medium',
     fontSize: 11,
-    color: '#8E8E93',
+    color: '#5E6672', // Raised from #8E8E93 for WCAG AA compliance (4.5:1+)
     marginTop: 2,
   },
   targetBadge: {
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
   targetText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 10,
-    color: '#8E8E93',
+    color: '#5E6672', // Raised from #8E8E93 for WCAG AA compliance (4.5:1+)
   },
   body: {
     fontFamily: 'Inter_400Regular',

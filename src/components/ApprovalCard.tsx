@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   employeeId: {
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: '#8E8E93',
+    color: '#5E6672', // Raised from #8E8E93 for readable contrast
     marginTop: 2,
   },
   statusBadge: {
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   timeLabel: {
     fontFamily: 'Inter_500Medium',
     fontSize: 11,
-    color: '#8E8E93',
+    color: '#5E6672', // Raised from #8E8E93 for contrast on Gray 6 background
     marginBottom: 4,
   },
   timeValue: {

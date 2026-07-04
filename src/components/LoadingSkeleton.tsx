@@ -28,7 +28,7 @@ export function Skeleton({ width = '100%', height = 16, borderRadius = 8, style 
   }, [shimmer]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(shimmer.value, [0, 1], [0.3, 0.7]),
+    opacity: interpolate(shimmer.value, [0, 1], [0.4, 0.85]),
   }));
 
   return (
@@ -38,7 +38,7 @@ export function Skeleton({ width = '100%', height = 16, borderRadius = 8, style 
           width: width as any,
           height,
           borderRadius,
-          backgroundColor: Colors.skeleton,
+          backgroundColor: '#E5E7EB', // Elevated grey for better contrast on white surfaces
         },
         animatedStyle,
         style,
