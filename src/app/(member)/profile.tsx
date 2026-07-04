@@ -63,11 +63,7 @@ export default function MemberProfileScreen() {
           </View>
         </View>
         <Text style={styles.headerTitle}>Profile</Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.headerBtn} activeOpacity={0.7}>
-            <Feather name="bell" size={18} color={Colors.textPrimary} />
-          </TouchableOpacity>
-        </View>
+        <View style={styles.headerRight} />
       </View>
 
       {/* Hero Code/Balance View */}
@@ -79,7 +75,6 @@ export default function MemberProfileScreen() {
         <View style={styles.badgeContainer}>
           <View style={[styles.rolePill, { backgroundColor: Colors.accent }]}>
             <Text style={styles.rolePillText}>{ROLE_LABELS[profile.role]}</Text>
-            <Feather name="chevron-right" size={10} color={Colors.white} style={styles.roleChevron} />
           </View>
         </View>
       </View>
@@ -311,8 +306,7 @@ const styles = StyleSheet.create({
   rolePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: 12,
-    paddingRight: 8,
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 16,
   },
