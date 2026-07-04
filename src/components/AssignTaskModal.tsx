@@ -5,7 +5,7 @@
 import { Feather } from '@expo/vector-icons';
 import { addDays, format, isValid, parseISO } from 'date-fns';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Chip, HelperText, Icon, Modal, Portal, Text, TextInput } from 'react-native-paper';
 import { Colors } from '../constants/colors';
 import { ROLE_LABELS } from '../constants/roles';
@@ -121,6 +121,11 @@ export function AssignTaskModal({
         contentContainerStyle={styles.container}
       >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            bounces={false}
+          >
           {/* Member Info Header */}
           {targetMember && (
             <View style={styles.memberHeader}>
@@ -342,6 +347,7 @@ export function AssignTaskModal({
               Assign Task
             </Button>
           </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
     </Portal>
@@ -356,6 +362,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: Colors.border,
+    maxHeight: '85%',
     ...Colors.shadowHeavy,
   },
   memberHeader: {

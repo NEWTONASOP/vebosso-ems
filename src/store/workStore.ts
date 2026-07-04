@@ -45,6 +45,13 @@ interface WorkState {
   errorTeam: string | null;
   /** Alias for errorTeam */
   teamError: string | null;
+  /** Map of userId → today's live status snapshot */
+  memberLiveStatus: Record<string, {
+    status: WorkLogStatus | 'offline' | 'on_leave';
+    checkInTime: string | null;
+    checkInPlan: string | null;
+    pendingTaskCount: number;
+  }>;
 
   // Announcements
   announcements: AnnouncementWithCreator[];
@@ -130,6 +137,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
   isLoadingTeam: false,
   errorTeam: null,
   teamError: null,
+  memberLiveStatus: {},
   announcements: [],
   isLoadingAnnouncements: false,
   errorAnnouncements: null,
@@ -192,16 +200,18 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .select('id')
         .eq('role', 'owner');
 
-      owners?.forEach((owner) => {
-        if (owner.id !== profile?.manager_id) {
-          sendPushNotification(
-            owner.id,
-            'Check-in Request',
-            `${profile?.full_name} has checked in and is waiting for approval`,
-            { type: 'check_in_request', work_log_id: data.id }
-          );
-        }
-      });
+      await Promise.all(
+        (owners || [])
+          .filter((owner) => owner.id !== profile?.manager_id && owner.id !== user.id)
+          .map((owner) =>
+            sendPushNotification(
+              owner.id,
+              'Check-in Request',
+              `${profile?.full_name} has checked in and is waiting for approval`,
+              { type: 'check_in_request', work_log_id: data.id }
+            )
+          )
+      );
 
       return { success: true };
     } catch (err: any) {
@@ -233,44 +243,50 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
       set({ todayLog: data as WorkLog });
 
-      // If pending checkout approval, notify manager and owners
-      if (newStatus === 'pending_checkout' && data) {
-        try {
-          const { data: profile } = await supabase
+      // Always notify manager and owners on checkout — message differs based on whether approval is needed
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, manager_id')
+          .eq('id', todayLog.user_id)
+          .single();
+
+        if (profile) {
+          const title = requireCheckoutApproval ? 'Checkout Request' : 'Checked Out';
+          const body = requireCheckoutApproval
+            ? `${profile.full_name} has checked out and is waiting for approval`
+            : `${profile.full_name} has checked out for the day`;
+          const notifType = requireCheckoutApproval ? 'checkout_request' : 'checkout_done';
+
+          if (profile.manager_id) {
+            sendPushNotification(
+              profile.manager_id,
+              title,
+              body,
+              { type: notifType, work_log_id: data.id }
+            );
+          }
+
+          const { data: owners } = await supabase
             .from('profiles')
-            .select('full_name, manager_id')
-            .eq('id', todayLog.user_id)
-            .single();
+            .select('id')
+            .eq('role', 'owner');
 
-          if (profile) {
-            if (profile.manager_id) {
-              sendPushNotification(
-                profile.manager_id,
-                'Checkout Request',
-                `${profile.full_name} has checked out and is waiting for approval`,
-                { type: 'checkout_request', work_log_id: data.id }
-              );
-            }
-
-            const { data: owners } = await supabase
-              .from('profiles')
-              .select('id')
-              .eq('role', 'owner');
-
-            owners?.forEach((owner) => {
-              if (owner.id !== profile.manager_id) {
+          await Promise.all(
+            (owners || [])
+              .filter((owner) => owner.id !== profile.manager_id && owner.id !== todayLog.user_id)
+              .map((owner) =>
                 sendPushNotification(
                   owner.id,
-                  'Checkout Request',
-                  `${profile.full_name} has checked out and is waiting for approval`,
-                  { type: 'checkout_request', work_log_id: data.id }
-                );
-              }
-            });
-          }
-        } catch (notifErr) {
-          console.warn('Failed to send checkout notifications:', notifErr);
+                  title,
+                  body,
+                  { type: notifType, work_log_id: data.id }
+                )
+              )
+          );
         }
+      } catch (notifErr) {
+        console.warn('Failed to send checkout notifications:', notifErr);
       }
 
       return { success: true };
@@ -575,7 +591,61 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         return { success: false, error: error.message };
       }
 
-      set({ teamMembers: (data as Profile[]) || [], isLoadingTeam: false, errorTeam: null, teamError: null });
+      const members = (data as Profile[]) || [];
+
+      // Fetch today's work logs + pending task counts in parallel
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const memberIds = members.map((m) => m.id);
+
+      const [logsRes, tasksRes, leavesRes] = await Promise.all([
+        memberIds.length > 0
+          ? supabase
+              .from('work_logs')
+              .select('user_id, status, check_in_time, check_in_plan')
+              .eq('date', today)
+              .in('user_id', memberIds)
+          : Promise.resolve({ data: [], error: null }),
+        memberIds.length > 0
+          ? supabase
+              .from('tasks')
+              .select('assigned_to, status')
+              .in('assigned_to', memberIds)
+              .eq('status', 'pending')
+          : Promise.resolve({ data: [], error: null }),
+        memberIds.length > 0
+          ? supabase
+              .from('leave_requests')
+              .select('user_id')
+              .eq('date', today)
+              .eq('status', 'approved')
+              .in('user_id', memberIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      // Build lookup maps
+      const logMap: Record<string, any> = {};
+      for (const log of (logsRes.data || [])) logMap[log.user_id] = log;
+
+      const taskCountMap: Record<string, number> = {};
+      for (const task of (tasksRes.data || [])) {
+        taskCountMap[task.assigned_to] = (taskCountMap[task.assigned_to] || 0) + 1;
+      }
+
+      const onLeaveSet = new Set((leavesRes.data || []).map((l: any) => l.user_id));
+
+      // Build memberLiveStatus map
+      const liveStatus: Record<string, any> = {};
+      for (const m of members) {
+        const log = logMap[m.id];
+        liveStatus[m.id] = {
+          status: onLeaveSet.has(m.id) ? 'on_leave' : (log?.status ?? 'offline'),
+          checkInTime: log?.check_in_time ?? null,
+          checkInPlan: log?.check_in_plan ?? null,
+          pendingTaskCount: taskCountMap[m.id] ?? 0,
+        };
+      }
+
+      set({ teamMembers: members, memberLiveStatus: liveStatus, isLoadingTeam: false, errorTeam: null, teamError: null });
       return { success: true };
     } catch (err: any) {
       set({ errorTeam: err.message, teamError: err.message, isLoadingTeam: false });
@@ -718,26 +788,26 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         let query = supabase
           .from('profiles')
           .select('id')
-          .eq('is_active', true);
+          .eq('is_active', true)
+          .neq('id', created_by); // always exclude the creator
           
         if (target_user_id) {
           query = query.eq('id', target_user_id);
         } else if (target_role) {
           query = query.eq('role', target_role);
-        } else {
-          // Broadcast to everyone except the creator
-          query = query.neq('id', created_by);
         }
         
         const { data: users } = await query;
-        users?.forEach((u) => {
-          sendPushNotification(
-            u.id,
-            `New Announcement: ${title}`,
-            body,
-            { type: 'announcement' }
-          );
-        });
+        await Promise.all(
+          (users || []).map((u) =>
+            sendPushNotification(
+              u.id,
+              `New Announcement: ${title}`,
+              body,
+              { type: 'announcement' }
+            )
+          )
+        );
       } catch (notifErr) {
         console.warn('Failed to send announcement notifications:', notifErr);
       }
@@ -945,22 +1015,24 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         );
       }
 
-      // If manager or has no manager, notify owners
+      // Notify owners (excluding the requester and their manager who was already notified)
       const { data: owners } = await supabase
         .from('profiles')
         .select('id')
         .eq('role', 'owner');
 
-      owners?.forEach((owner) => {
-        if (owner.id !== userId && owner.id !== profile?.manager_id) {
-          sendPushNotification(
-            owner.id,
-            'Leave Request',
-            `${profile?.full_name} has requested leave for ${date}`,
-            { type: 'leave_request', leave_id: data.id }
-          );
-        }
-      });
+      await Promise.all(
+        (owners || [])
+          .filter((owner) => owner.id !== userId && owner.id !== profile?.manager_id)
+          .map((owner) =>
+            sendPushNotification(
+              owner.id,
+              'Leave Request',
+              `${profile?.full_name} has requested leave for ${date}`,
+              { type: 'leave_request', leave_id: data.id }
+            )
+          )
+      );
 
       // Refresh list
       const currentRole = profile?.role || 'member';

@@ -23,7 +23,7 @@ import { Profile } from '../../../types/database';
 export default function OwnerTeamScreen() {
   const router = useRouter();
   const { profile } = useAuthStore();
-  const { teamMembers, isLoadingTeam, teamError, fetchTeamMembers, addTask } = useWorkStore();
+  const { teamMembers, isLoadingTeam, teamError, fetchTeamMembers, addTask, memberLiveStatus } = useWorkStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
@@ -140,9 +140,19 @@ export default function OwnerTeamScreen() {
     return matchesSearch && matchesRole && matchesDept;
   });
 
-  const renderMember = useCallback(({ item }: { item: Profile }) => (
-    <MemberCard member={item} onPress={(pageY: number) => handleMemberPress(item, pageY)} />
-  ), [handleMemberPress]);
+  const renderMember = useCallback(({ item }: { item: Profile }) => {
+    const live = memberLiveStatus[item.id];
+    return (
+      <MemberCard
+        member={item}
+        currentStatus={live?.status ?? 'offline'}
+        checkInTime={live?.checkInTime}
+        checkInPlan={live?.checkInPlan}
+        pendingTaskCount={live?.pendingTaskCount ?? 0}
+        onPress={(pageY: number) => handleMemberPress(item, pageY)}
+      />
+    );
+  }, [handleMemberPress, memberLiveStatus]);
 
   return (
     <View style={styles.container}>

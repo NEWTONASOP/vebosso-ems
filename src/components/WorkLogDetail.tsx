@@ -4,8 +4,8 @@
 
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { Chip, Divider, IconButton, Modal, Portal, Text } from 'react-native-paper';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Chip, Divider, Modal, Portal, Text } from 'react-native-paper';
 import { Colors } from '../constants/colors';
 import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
 import { Task, WorkLog } from '../types/database';
@@ -35,7 +35,7 @@ export function WorkLogDetail({ visible, onDismiss, workLog, tasks = [] }: WorkL
         onDismiss={onDismiss}
         contentContainerStyle={styles.container}
       >
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <View>
               <Text style={styles.dateTitle}>
@@ -49,12 +49,13 @@ export function WorkLogDetail({ visible, onDismiss, workLog, tasks = [] }: WorkL
                 {statusConfig.label}
               </Chip>
             </View>
-            <IconButton
-              icon="close"
-              iconColor={Colors.textSecondary}
-              size={22}
+            <Pressable
               onPress={onDismiss}
-            />
+              style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.5 }]}
+              hitSlop={8}
+            >
+              <Feather name="x" size={20} color={Colors.textSecondary} />
+            </Pressable>
           </View>
 
           <Divider style={styles.divider} />
@@ -200,21 +201,20 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   dateTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     color: Colors.text,
     marginBottom: 8,
   },
   statusChip: {
     alignSelf: 'flex-start',
-    height: 26,
   },
   statusText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
   },
   divider: {
     backgroundColor: Colors.divider,
@@ -242,12 +242,13 @@ const styles = StyleSheet.create({
   },
   timeLabel: {
     fontSize: 11,
+    fontFamily: 'Inter_500Medium',
     color: Colors.textSecondary,
     marginBottom: 2,
   },
   timeValue: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontFamily: 'Inter_700Bold',
     color: Colors.text,
   },
   section: {
@@ -261,7 +262,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
     color: Colors.textSecondary,
   },
   sectionContent: {
@@ -279,6 +280,14 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   // Tasks
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.surfaceLighter,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   tasksList: {
     gap: 10,
   },
