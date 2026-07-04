@@ -1,0 +1,311 @@
+// ============================================================================
+// VEBOSSO EMS — Leave Request Modal
+// ============================================================================
+
+import { addDays, format, isValid, parseISO } from 'date-fns';
+import React, { useState } from 'react';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { Button, Chip, HelperText, Modal, Portal, Text, TextInput } from 'react-native-paper';
+import { Colors } from '../constants/colors';
+
+interface LeaveRequestModalProps {
+  visible: boolean;
+  onDismiss: () => void;
+  onSubmit: (date: string, reason: string) => Promise<void>;
+  isLoading?: boolean;
+}
+
+export function LeaveRequestModal({
+  visible,
+  onDismiss,
+  onSubmit,
+  isLoading,
+}: LeaveRequestModalProps) {
+  const [dateStr, setDateStr] = useState('');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+  const nextMonday = () => {
+    const todayDate = new Date();
+    const day = todayDate.getDay();
+    const diff = todayDate.getDate() - day + (day === 0 ? 1 : 8); // next Monday
+    return format(new Date(todayDate.setDate(diff)), 'yyyy-MM-dd');
+  };
+
+  const handleQuickDateSelect = (selectedDate: string) => {
+    setDateStr(selectedDate);
+    setError('');
+  };
+
+  const handleDateChange = (text: string) => {
+    // Basic filtering to allow only digits and hyphens
+    const filtered = text.replace(/[^0-9-]/g, '');
+    setDateStr(filtered);
+    setError('');
+
+    // If text reaches 10 chars, validate YYYY-MM-DD
+    if (filtered.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(filtered)) {
+      const parsed = parseISO(filtered);
+      if (!isValid(parsed)) {
+        setError('Invalid date format');
+      } else if (filtered < today) {
+        setError('Leave date cannot be in the past');
+      }
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!dateStr.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      setError('Please enter date as YYYY-MM-DD');
+      return;
+    }
+    const parsed = parseISO(dateStr);
+    if (!isValid(parsed)) {
+      setError('Invalid date format');
+      return;
+    }
+    if (dateStr < today) {
+      setError('Leave date cannot be in the past');
+      return;
+    }
+    if (!reason.trim()) {
+      setError('Please provide a reason for leave');
+      return;
+    }
+
+    setError('');
+    const sanitizedReason = reason.trim().slice(0, 500);
+    await onSubmit(dateStr, sanitizedReason);
+    handleDismiss();
+  };
+
+  const handleDismiss = () => {
+    setDateStr('');
+    setReason('');
+    setError('');
+    onDismiss();
+  };
+
+  return (
+    <Portal>
+      <Modal
+        visible={visible}
+        onDismiss={handleDismiss}
+        contentContainerStyle={styles.container}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.header}>
+            <Text style={styles.emoji}>✈️</Text>
+            <Text style={styles.title}>Request Leave</Text>
+            <Text style={styles.subtitle}>
+              Apply for leave approval from your manager/owner
+            </Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.label}>Select Date</Text>
+            <View style={styles.chipsRow}>
+              <Chip
+                selected={dateStr === today}
+                onPress={() => handleQuickDateSelect(today)}
+                style={styles.chip}
+                selectedColor={Colors.accent}
+                showSelectedOverlay
+              >
+                Today
+              </Chip>
+              <Chip
+                selected={dateStr === tomorrow}
+                onPress={() => handleQuickDateSelect(tomorrow)}
+                style={styles.chip}
+                selectedColor={Colors.accent}
+                showSelectedOverlay
+              >
+                Tomorrow
+              </Chip>
+              <Chip
+                selected={dateStr === nextMonday()}
+                onPress={() => handleQuickDateSelect(nextMonday())}
+                style={styles.chip}
+                selectedColor={Colors.accent}
+                showSelectedOverlay
+              >
+                Next Mon
+              </Chip>
+            </View>
+
+            <TextInput
+              mode="outlined"
+              label="Leave Date (YYYY-MM-DD)"
+              placeholder="e.g. 2026-07-15"
+              value={dateStr}
+              onChangeText={handleDateChange}
+              maxLength={10}
+              style={styles.input}
+              outlineColor={Colors.border}
+              activeOutlineColor={Colors.accent}
+              textColor={Colors.text}
+              placeholderTextColor={Colors.placeholder}
+              theme={{
+                colors: {
+                  onSurfaceVariant: Colors.textTertiary,
+                  surface: Colors.inputBackground,
+                },
+              }}
+            />
+          </View>
+
+          <View style={[styles.section, { marginTop: 12 }]}>
+            <Text style={styles.label}>Reason for Leave</Text>
+            <TextInput
+              mode="outlined"
+              label="Reason"
+              placeholder="E.g. Family function / medical appointment..."
+              value={reason}
+              onChangeText={(text) => {
+                setReason(text);
+                if (error) setError('');
+              }}
+              multiline
+              numberOfLines={3}
+              maxLength={500}
+              style={styles.inputReason}
+              outlineColor={Colors.border}
+              activeOutlineColor={Colors.accent}
+              textColor={Colors.text}
+              placeholderTextColor={Colors.placeholder}
+              theme={{
+                colors: {
+                  onSurfaceVariant: Colors.textTertiary,
+                  surface: Colors.inputBackground,
+                },
+              }}
+            />
+            <View style={styles.charCountRow}>
+              <Text style={styles.charCount}>{reason.length} / 500</Text>
+            </View>
+          </View>
+
+          {error ? (
+            <HelperText type="error" visible={!!error} style={styles.errorText}>
+              {error}
+            </HelperText>
+          ) : null}
+
+          <View style={styles.actions}>
+            <Button
+              mode="outlined"
+              onPress={handleDismiss}
+              style={styles.cancelButton}
+              textColor={Colors.textSecondary}
+            >
+              Cancel
+            </Button>
+            <Button
+              mode="contained"
+              onPress={handleSubmit}
+              loading={isLoading}
+              disabled={isLoading}
+              style={styles.submitButton}
+              buttonColor={Colors.accent}
+              textColor={Colors.white}
+            >
+              Submit Request
+            </Button>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </Portal>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: Colors.surface,
+    margin: 20,
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Colors.shadowHeavy,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  emoji: {
+    fontSize: 40,
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 24,
+    fontFamily: 'Inter_800ExtraBold',
+    color: Colors.text,
+    marginBottom: 4,
+    letterSpacing: -0.6,
+  },
+  subtitle: {
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+  section: {
+    width: '100%',
+  },
+  label: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+    flexWrap: 'wrap',
+  },
+  chip: {
+    backgroundColor: Colors.surfaceLight,
+    borderColor: Colors.border,
+  },
+  input: {
+    backgroundColor: Colors.inputBackground,
+  },
+  inputReason: {
+    backgroundColor: Colors.inputBackground,
+    minHeight: 80,
+  },
+  charCountRow: {
+    alignItems: 'flex-end',
+    marginTop: 4,
+  },
+  charCount: {
+    fontSize: 11,
+    color: Colors.textTertiary,
+    fontFamily: 'Inter_500Medium',
+  },
+  errorText: {
+    color: Colors.error,
+    fontFamily: 'Inter_500Medium',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginTop: 16,
+  },
+  cancelButton: {
+    borderColor: Colors.border,
+    borderRadius: 12,
+  },
+  submitButton: {
+    borderRadius: 12,
+  },
+});

@@ -85,6 +85,11 @@ export default function ManagerSettingsScreen() {
               onPress={() => router.push('/(auth)/change-password')}
             />
             <ActionRow
+              label="Leave Requests"
+              icon="calendar"
+              onPress={() => router.push('/(manager)/leaves')}
+            />
+            <ActionRow
               label="Sign Out"
               icon="log-out"
               onPress={handleSignOut}

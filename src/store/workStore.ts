@@ -18,7 +18,9 @@ import {
     TaskInsert,
     WorkLog,
     WorkLogStatus,
-    WorkLogWithProfile
+    WorkLogWithProfile,
+    LeaveRequestWithProfile,
+    LeaveRequestInsert
 } from '../types/database';
 
 interface WorkState {
@@ -62,6 +64,12 @@ interface WorkState {
     pendingApprovals: number;
   };
   statsError: string | null;
+  
+  // Leave requests state
+  leaveRequests: LeaveRequestWithProfile[];
+  pendingLeavesCount: number;
+  isLoadingLeaves: boolean;
+  leavesError: string | null;
 
   // Realtime channels
   channels: RealtimeChannel[];
@@ -92,6 +100,12 @@ interface WorkState {
 
   // Actions — Work History
   fetchWorkHistory: (userId: string, startDate?: string, endDate?: string) => Promise<{ data: WorkLog[], success: boolean; error?: string }>;
+
+  // Actions — Leave Requests
+  fetchLeaveRequests: (role: string, userId: string) => Promise<{ success: boolean; error?: string }>;
+  submitLeaveRequest: (date: string, reason: string, userId: string) => Promise<{ success: boolean; error?: string }>;
+  approveLeaveRequest: (leaveId: string, approverId: string) => Promise<{ success: boolean; error?: string }>;
+  rejectLeaveRequest: (leaveId: string, approverId: string) => Promise<{ success: boolean; error?: string }>;
 
   // Realtime
   subscribeToRealtime: (userId: string, role: string, managerId?: string) => void;
@@ -125,6 +139,12 @@ export const useWorkStore = create<WorkState>((set, get) => ({
   stats: { totalMembers: 0, activeNow: 0, onLeaveToday: 0, pendingApprovals: 0 },
   statsError: null,
   channels: [],
+
+  // Leaves initial state
+  leaveRequests: [],
+  pendingLeavesCount: 0,
+  isLoadingLeaves: false,
+  leavesError: null,
 
   // ============================================================================
   // MEMBER ACTIONS
@@ -788,6 +808,241 @@ export const useWorkStore = create<WorkState>((set, get) => ({
     set({ channels });
   },
 
+  // ============================================================================
+  // LEAVE REQUESTS ACTIONS
+  // ============================================================================
+
+  fetchLeaveRequests: async (role: string, userId: string) => {
+    try {
+      set({ isLoadingLeaves: true, leavesError: null });
+
+      let query = supabase
+        .from('leave_requests')
+        .select(`
+          *,
+          profiles!leave_requests_user_id_fkey (
+            full_name,
+            employee_id,
+            role,
+            department
+          )
+        `);
+
+      if (role === 'owner') {
+        // Owners see all leave requests
+        query = query.order('date', { ascending: false });
+      } else if (role === 'manager') {
+        // Managers see their own and their team's requests
+        const { data: teamMembers } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('manager_id', userId);
+
+        const teamIds = teamMembers ? teamMembers.map((t) => t.id) : [];
+        query = query
+          .or(`user_id.eq.${userId},user_id.in.(${teamIds.join(',') || userId})`)
+          .order('date', { ascending: false });
+      } else {
+        // Members only see their own requests
+        query = query
+          .eq('user_id', userId)
+          .order('date', { ascending: false });
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        set({ leavesError: error.message, isLoadingLeaves: false });
+        return { success: false, error: error.message };
+      }
+
+      // Count pending leaves that the current user is eligible to review
+      let pendingCount = 0;
+      if (role === 'owner') {
+        // Owners count all pending requests
+        pendingCount = data ? data.filter((l) => l.status === 'pending').length : 0;
+      } else if (role === 'manager') {
+        // Managers count pending requests from their team only (not self)
+        const { data: teamMembers } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('manager_id', userId);
+        const teamIds = teamMembers ? teamMembers.map((t) => t.id) : [];
+        pendingCount = data
+          ? data.filter((l) => l.status === 'pending' && l.user_id !== userId && teamIds.includes(l.user_id)).length
+          : 0;
+      }
+
+      set({
+        leaveRequests: (data || []) as unknown as LeaveRequestWithProfile[],
+        pendingLeavesCount: pendingCount,
+        isLoadingLeaves: false,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      set({ leavesError: err.message, isLoadingLeaves: false });
+      return { success: false, error: err.message };
+    }
+  },
+
+  submitLeaveRequest: async (date: string, reason: string, userId: string) => {
+    try {
+      set({ isLoadingLeaves: true, leavesError: null });
+
+      const { data, error } = await supabase
+        .from('leave_requests')
+        .insert({
+          user_id: userId,
+          date,
+          reason,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (error) {
+        set({ isLoadingLeaves: false });
+        return { success: false, error: error.message };
+      }
+
+      // Get user profile details for notification
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, manager_id, role')
+        .eq('id', userId)
+        .single();
+
+      // If user has a manager, notify manager
+      if (profile?.manager_id) {
+        sendPushNotification(
+          profile.manager_id,
+          'Leave Request',
+          `${profile.full_name} has requested leave for ${date}`,
+          { type: 'leave_request', leave_id: data.id }
+        );
+      }
+
+      // If manager or has no manager, notify owners
+      const { data: owners } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'owner');
+
+      owners?.forEach((owner) => {
+        if (owner.id !== userId && owner.id !== profile?.manager_id) {
+          sendPushNotification(
+            owner.id,
+            'Leave Request',
+            `${profile?.full_name} has requested leave for ${date}`,
+            { type: 'leave_request', leave_id: data.id }
+          );
+        }
+      });
+
+      // Refresh list
+      const currentRole = profile?.role || 'member';
+      await get().fetchLeaveRequests(currentRole, userId);
+
+      return { success: true };
+    } catch (err: any) {
+      set({ leavesError: err.message, isLoadingLeaves: false });
+      return { success: false, error: err.message };
+    }
+  },
+
+  approveLeaveRequest: async (leaveId: string, approverId: string) => {
+    try {
+      set({ isLoadingLeaves: true, leavesError: null });
+
+      const { data, error } = await supabase
+        .from('leave_requests')
+        .update({
+          status: 'approved',
+          reviewed_by: approverId,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', leaveId)
+        .select('user_id, date')
+        .single();
+
+      if (error) {
+        set({ isLoadingLeaves: false });
+        return { success: false, error: error.message };
+      }
+
+      // Notify user
+      if (data) {
+        sendPushNotification(
+          data.user_id,
+          'Leave Approved! 🎉',
+          `Your leave request for ${data.date} has been approved.`,
+          { type: 'leave_approved', leave_id: leaveId }
+        );
+      }
+
+      // Get current user role to refresh correctly
+      const { data: approverProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', approverId)
+        .single();
+
+      await get().fetchLeaveRequests(approverProfile?.role || 'owner', approverId);
+
+      return { success: true };
+    } catch (err: any) {
+      set({ leavesError: err.message, isLoadingLeaves: false });
+      return { success: false, error: err.message };
+    }
+  },
+
+  rejectLeaveRequest: async (leaveId: string, approverId: string) => {
+    try {
+      set({ isLoadingLeaves: true, leavesError: null });
+
+      const { data, error } = await supabase
+        .from('leave_requests')
+        .update({
+          status: 'rejected',
+          reviewed_by: approverId,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', leaveId)
+        .select('user_id, date')
+        .single();
+
+      if (error) {
+        set({ isLoadingLeaves: false });
+        return { success: false, error: error.message };
+      }
+
+      // Notify user
+      if (data) {
+        sendPushNotification(
+          data.user_id,
+          'Leave Rejected ❌',
+          `Your leave request for ${data.date} was rejected.`,
+          { type: 'leave_rejected', leave_id: leaveId }
+        );
+      }
+
+      // Get current user role to refresh correctly
+      const { data: approverProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', approverId)
+        .single();
+
+      await get().fetchLeaveRequests(approverProfile?.role || 'owner', approverId);
+
+      return { success: true };
+    } catch (err: any) {
+      set({ leavesError: err.message, isLoadingLeaves: false });
+      return { success: false, error: err.message };
+    }
+  },
+
   unsubscribeFromRealtime: () => {
     get().channels.forEach((c) => supabase.removeChannel(c));
     set({ channels: [] });
@@ -805,6 +1060,10 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       settings: {},
       stats: { totalMembers: 0, activeNow: 0, onLeaveToday: 0, pendingApprovals: 0 },
       channels: [],
+      leaveRequests: [],
+      pendingLeavesCount: 0,
+      isLoadingLeaves: false,
+      leavesError: null,
     });
   },
 }));
