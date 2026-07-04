@@ -270,18 +270,20 @@ RLS is enabled on all tables. Policies are defined by role (`owner`, `manager`, 
 │   │   │       └── session-management.tsx # Force-logout sessions
 │   │   ├── (manager)/
 │   │   │   ├── dashboard.tsx         # Team stats, pending approvals
-│   │   │   ├── approvals.tsx         # Team check-in/out approvals
+│   │   │   ├── approvals.tsx         # Team check-in/out & leave approvals
 │   │   │   ├── tasks.tsx             # Team task management
 │   │   │   ├── my-team.tsx           # Manager's assigned team
 │   │   │   ├── history.tsx           # Team attendance history
-│   │   │   └── settings.tsx          # Manager profile & password
+│   │   │   ├── settings.tsx          # Manager profile & password
+│   │   │   └── leaves.tsx            # Manager's own leave request history & application
 │   │   └── (member)/
 │   │       ├── home.tsx              # Check-in/checkout + today's status
 │   │       ├── tasks.tsx             # My tasks list
 │   │       ├── history.tsx           # My attendance calendar
 │   │       ├── announcements.tsx     # Announcements feed
-│   │       └── profile.tsx           # My profile & password change
-│   ├── components/                   # 22 shared UI components
+│   │       ├── profile.tsx           # My profile & password change
+│   │       └── leaves.tsx            # My leave request history & application
+│   ├── components/                   # Shared UI components (LeaveCard, LeaveRequestModal, etc.)
 │   ├── lib/
 │   │   ├── supabase.ts               # Supabase client init
 │   │   ├── notifications.ts          # Expo push notification helpers
@@ -308,11 +310,13 @@ RLS is enabled on all tables. Policies are defined by role (`owner`, `manager`, 
 
 | Name | Hex | Usage |
 |---|---|---|
-| Dark Navy | `#0A0F1E` | Primary background |
-| Electric Blue | `#2563EB` | Accent, actions, notifications |
-| Success Green | `#10B981` | Approved, active, working |
-| Warning Amber | `#F59E0B` | Pending states |
-| Error Red | `#EF4444` | Rejected, errors, danger |
+| Light Gray | `#F2F2F7` | Main App background (iOS System Gray 6) |
+| Pure White | `#FFFFFF` | Element & card surfaces |
+| Solid Black | `#000000` | Primary Accent / Button styling |
+| Success Emerald | `#047857` | Approved status, Done, Member Accent |
+| Warning Amber | `#B45309` | Pending states, Leaves Accent |
+| Error Red | `#BE123C` | Rejected status, Errors |
+| Info Blue | `#2563EB` | Announcements, Manager Accent |
 
 ---
 
@@ -323,7 +327,7 @@ Run in order in Supabase SQL Editor:
 1. `supabase/migrations/003_profile_self_read.sql`
 2. `supabase/scripts/fix-owner-account.sql`
 
-Then sign in with `VB-0001` / `VEBOSSO`.
+Then sign in with `VB-0001` / `VbOwner#Reset2026!`.
 
 **Push notifications not arriving?**
 - Ensure `EXPO_PUBLIC_PROJECT_ID` is set in `.env`
