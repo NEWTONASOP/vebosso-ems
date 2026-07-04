@@ -2,9 +2,10 @@
 // VEBOSSO EMS — Owner Team Screen
 // ============================================================================
 
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Platform, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { Chip, Menu, Searchbar, Snackbar, Text } from 'react-native-paper';
 import { AssignManagerModal } from '../../components/AssignManagerModal';
 import { AssignTaskModal } from '../../components/AssignTaskModal';
@@ -146,8 +147,16 @@ export default function OwnerTeamScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Team</Text>
-        <Text style={styles.subtitle}>{teamMembers.length} members</Text>
+        <View>
+          <Text style={styles.title}>Team</Text>
+          <Text style={styles.subtitle}>{teamMembers.length} members</Text>
+        </View>
+        <Pressable
+          style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+          onPress={() => router.push('/(owner)/settings/add-member')}
+        >
+          <Feather name="user-plus" size={18} color={Colors.accent} />
+        </Pressable>
       </View>
 
       <View style={styles.searchSection}>
@@ -227,7 +236,7 @@ export default function OwnerTeamScreen() {
             <EmptyState
               icon="account-search-outline"
               title="No members found"
-              subtitle={searchQuery ? 'Try a different search term' : 'Add members in Settings'}
+              subtitle={searchQuery ? 'Try a different search term' : 'Tap + to add your first member'}
             />
           }
         />
@@ -303,9 +312,29 @@ export default function OwnerTeamScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 8 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 48,
+    paddingBottom: 8,
+  },
   title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
   subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  addButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: Colors.accentSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.accent + '30',
+  },
+  addButtonPressed: {
+    opacity: 0.7,
+  },
   searchSection: { paddingHorizontal: 20, paddingTop: 12 },
   searchbar: {
     backgroundColor: Colors.inputBackground,

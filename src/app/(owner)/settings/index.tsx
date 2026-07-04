@@ -2,17 +2,17 @@
 // VEBOSSO EMS — Owner Settings Screen (Premium Fintech Aesthetic)
 // ============================================================================
 
+import { Feather } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View, Platform, Pressable } from 'react-native';
-import { Alert } from '../../../lib/alert';
-import { Snackbar, Switch, Text } from 'react-native-paper';
 import React from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Snackbar, Switch, Text } from 'react-native-paper';
+import { Colors } from '../../../constants/colors';
 import { APP_NAME } from '../../../constants/roles';
+import { Alert } from '../../../lib/alert';
 import { useAuthStore } from '../../../store/authStore';
 import { useWorkStore } from '../../../store/workStore';
-import { Feather } from '@expo/vector-icons';
-import { Colors } from '../../../constants/colors';
-import Constants from 'expo-constants';
 
 export default function OwnerSettingsScreen() {
   const router = useRouter();
@@ -73,14 +73,6 @@ export default function OwnerSettingsScreen() {
       {/* Team Management Group */}
       <Text style={styles.sectionLabel}>Team Management</Text>
       <View style={styles.groupedCard}>
-        <SettingsRow
-          icon="user-plus"
-          iconColor={Colors.info}
-          title="Add New Member"
-          subtitle="Create employee accounts"
-          onPress={() => router.push('/(owner)/settings/add-member')}
-        />
-        <View style={styles.separator} />
         <SettingsRow
           icon="bell"
           iconColor={Colors.warning}
