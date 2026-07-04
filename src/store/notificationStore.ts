@@ -137,8 +137,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   setupSubscription: (userId: string, onNewNotification?: () => void) => {
+    const channelId = Math.random().toString(36).substring(7);
     const channel = supabase
-      .channel(`user-notifications-${userId}`)
+      .channel(`user-notifications-${userId}-${channelId}`)
       .on(
         'postgres_changes',
         {
