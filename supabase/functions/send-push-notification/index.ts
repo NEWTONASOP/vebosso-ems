@@ -86,10 +86,29 @@ serve(async (req) => {
       );
     }
 
+    // Log the notification to the database for in-app logs
+    try {
+      const { error: dbError } = await adminClient
+        .from('notifications')
+        .insert({
+          user_id,
+          title,
+          body: messageBody,
+          data: data || {},
+          read: false,
+        });
+
+      if (dbError) {
+        console.error('Error logging notification to database:', dbError);
+      }
+    } catch (dbCatchErr) {
+      console.error('Unexpected error logging notification to database:', dbCatchErr);
+    }
+
     if (!profile?.expo_push_token) {
       console.warn(`No push token found for user ${user_id}`);
       return new Response(
-        JSON.stringify({ success: false, message: 'No push token found for user', user_id }),
+        JSON.stringify({ success: false, message: 'No push token found for user — logged to DB', user_id }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

@@ -105,6 +105,17 @@ export interface AppSetting {
   updated_by: string | null;
 }
 
+export interface DbNotification {
+  id: string;
+  user_id: string;
+  title: string;
+  body: string;
+  data: Record<string, unknown> | null;
+  read: boolean;
+  created_at: string;
+}
+
+
 // ============================================================================
 // Insert Types (fields the client sends on create)
 // ============================================================================
@@ -234,6 +245,11 @@ export interface Database {
         Row: AppSetting;
         Insert: Omit<AppSetting, 'updated_at'>;
         Update: Partial<Omit<AppSetting, 'key'>>;
+      };
+      notifications: {
+        Row: DbNotification;
+        Insert: Omit<DbNotification, 'id' | 'created_at'>;
+        Update: Partial<Omit<DbNotification, 'id' | 'user_id' | 'created_at'>>;
       };
     };
   };

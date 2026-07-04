@@ -23,6 +23,8 @@ import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Profile } from '../../types/database';
+import { NotificationBell } from '../../components/NotificationBell';
+
 
 export default function ManagerDashboard() {
   const router = useRouter();
@@ -330,11 +332,14 @@ export default function ManagerDashboard() {
     >
       {/* Header Greeting */}
       <View style={styles.header}>
-        <Text style={styles.greeting}>
-          Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'},
-        </Text>
-        <Text style={styles.name}>{profile?.full_name?.split(' ')[0] || 'Manager'} 👋</Text>
-        <Text style={styles.date}>{today}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.greeting}>
+            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'},
+          </Text>
+          <Text style={styles.name}>{profile?.full_name?.split(' ')[0] || 'Manager'} 👋</Text>
+          <Text style={styles.date}>{today}</Text>
+        </View>
+        <NotificationBell role="manager" />
       </View>
 
       {/* My Work Status */}
@@ -491,6 +496,9 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingBottom: 12,

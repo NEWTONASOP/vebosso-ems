@@ -122,7 +122,6 @@ export default function OwnerSettingsScreen() {
           subtitle="Update your password"
           onPress={() => router.push('/(auth)/change-password')}
         />
-        <View style={styles.separator} />
         <Pressable
           style={({ pressed }) => [
             styles.settingRow,

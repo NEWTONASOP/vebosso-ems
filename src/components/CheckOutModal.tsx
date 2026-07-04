@@ -157,6 +157,16 @@ const styles = StyleSheet.create({
     color: Colors.error,
     fontFamily: 'Inter_500Medium',
   },
+  charCountRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+  },
+  charCount: {
+    fontSize: 12,
+    fontFamily: 'Inter_500Medium',
+    color: Colors.textTertiary,
+  },
   actions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',

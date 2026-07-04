@@ -18,6 +18,8 @@ import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { TaskStatus } from '../../types/database';
+import { NotificationBell } from '../../components/NotificationBell';
+
 
 export default function MemberHomeScreen() {
   const { profile } = useAuthStore();
@@ -280,10 +282,13 @@ export default function MemberHomeScreen() {
     >
       {/* Header Greeting */}
       <View style={styles.header}>
-        <Text style={styles.greeting}>
-          Hello, {profile?.full_name?.split(' ')[0] || 'there'} 👋
-        </Text>
-        <Text style={styles.date}>{format(new Date(), 'EEEE, MMMM dd')}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.greeting}>
+            Hello, {profile?.full_name?.split(' ')[0] || 'there'} 👋
+          </Text>
+          <Text style={styles.date}>{format(new Date(), 'EEEE, MMMM dd')}</Text>
+        </View>
+        <NotificationBell role="member" />
       </View>
 
       {/* Primary Dashboard Card */}
@@ -374,6 +379,9 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingBottom: 12,
