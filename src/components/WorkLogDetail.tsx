@@ -97,7 +97,10 @@ export function WorkLogDetail({ visible, onDismiss, workLog, tasks = [] }: WorkL
           {/* Check-in Plan */}
           {workLog.check_in_plan && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>📋 Plan for the Day</Text>
+              <View style={styles.sectionTitleRow}>
+                <Feather name="clipboard" size={14} color={Colors.textSecondary} />
+                <Text style={styles.sectionTitle}>Plan for the Day</Text>
+              </View>
               <View style={styles.sectionContent}>
                 <Text style={styles.sectionText}>{workLog.check_in_plan}</Text>
               </View>
@@ -107,7 +110,10 @@ export function WorkLogDetail({ visible, onDismiss, workLog, tasks = [] }: WorkL
           {/* Day Report */}
           {workLog.day_report && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>📝 Day Report</Text>
+              <View style={styles.sectionTitleRow}>
+                <Feather name="edit-3" size={14} color={Colors.textSecondary} />
+                <Text style={styles.sectionTitle}>Day Report</Text>
+              </View>
               <View style={styles.sectionContent}>
                 <Text style={styles.sectionText}>{workLog.day_report}</Text>
               </View>
@@ -117,7 +123,10 @@ export function WorkLogDetail({ visible, onDismiss, workLog, tasks = [] }: WorkL
           {/* Rejection Reason */}
           {workLog.rejection_reason && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>❌ Rejection Reason</Text>
+              <View style={styles.sectionTitleRow}>
+                <Feather name="x-circle" size={14} color={Colors.error} />
+                <Text style={styles.sectionTitle}>Rejection Reason</Text>
+              </View>
               <View style={[styles.sectionContent, styles.rejectionContent]}>
                 <Text style={styles.sectionText}>{workLog.rejection_reason}</Text>
               </View>
@@ -127,7 +136,10 @@ export function WorkLogDetail({ visible, onDismiss, workLog, tasks = [] }: WorkL
           {/* Tasks */}
           {tasks.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>📌 Tasks ({tasks.length})</Text>
+              <View style={styles.sectionTitleRow}>
+                <Feather name="list" size={14} color={Colors.textSecondary} />
+                <Text style={styles.sectionTitle}>Tasks ({tasks.length})</Text>
+              </View>
               <View style={styles.tasksList}>
                 {tasks.map((task) => {
                   const tConfig = TASK_STATUS_CONFIG[task.status] || TASK_STATUS_CONFIG.pending;
@@ -147,7 +159,10 @@ export function WorkLogDetail({ visible, onDismiss, workLog, tasks = [] }: WorkL
                       ) : null}
                       {task.completion_note && task.status === 'done' ? (
                         <View style={styles.completionNoteBox}>
-                          <Text style={styles.completionNoteLabel}>✍️ Completion Note:</Text>
+                          <View style={styles.completionNoteHeader}>
+                            <Feather name="check-circle" size={12} color={Colors.success} />
+                            <Text style={styles.completionNoteLabel}>Completion Note</Text>
+                          </View>
                           <Text style={styles.completionNoteText}>{task.completion_note}</Text>
                         </View>
                       ) : null}
@@ -238,11 +253,16 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 16,
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: Colors.textSecondary,
-    marginBottom: 8,
   },
   sectionContent: {
     backgroundColor: Colors.primaryLight,
@@ -326,11 +346,16 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderLeftColor: Colors.success,
   },
+  completionNoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
   completionNoteLabel: {
     fontSize: 11,
     fontFamily: 'Inter_600SemiBold',
     color: Colors.textSecondary,
-    marginBottom: 4,
   },
   completionNoteText: {
     fontSize: 12,

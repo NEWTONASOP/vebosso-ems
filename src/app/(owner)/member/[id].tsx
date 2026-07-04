@@ -7,14 +7,14 @@ import { formatDistanceToNow } from 'date-fns';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  Alert as RNAlert,
-  ScrollView,
-  StyleSheet,
-  View,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    Alert as RNAlert,
+    ScrollView,
+    StyleSheet,
+    View,
 } from 'react-native';
 import { Button, Divider, IconButton, Snackbar, Switch, Text, TextInput } from 'react-native-paper';
 import { InlineError } from '../../../components/InlineError';
@@ -179,7 +179,7 @@ export default function MemberProfileManagementScreen() {
         return;
       }
 
-      setSnackMessage('Password updated successfully! 🔐');
+      setSnackMessage('Password updated successfully!');
       setNewPassword('');
     } catch (err: any) {
       setSnackMessage(err.message || 'Failed to update password');

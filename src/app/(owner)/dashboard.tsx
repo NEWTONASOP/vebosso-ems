@@ -138,7 +138,7 @@ export default function OwnerDashboard() {
     setIsAssigningTask(false);
 
     if (result.success) {
-      setSnackMessage(`Approved & task assigned ✅`);
+      setSnackMessage('Approved & task assigned');
       setAssignTaskModalVisible(false);
       setSelectedMemberForApproval(null);
       setAssignTargetWorkLog(null);
@@ -172,7 +172,7 @@ export default function OwnerDashboard() {
     setIsAssigningTask(false);
 
     if (result.success) {
-      setSnackMessage(`Task assigned to ${selectedMember.full_name} ✅`);
+      setSnackMessage(`Task assigned to ${selectedMember.full_name}`);
       setAssignTaskModalVisible(false);
       setSelectedMember(null);
     } else {

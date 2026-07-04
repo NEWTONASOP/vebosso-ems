@@ -86,7 +86,7 @@ export default function MemberHomeScreen() {
     setCheckInLoading(false);
     if (result.success) {
       setShowCheckIn(false);
-      setSnackMessage('Check-in submitted! Waiting for approval. ⏳');
+      setSnackMessage('Check-in submitted! Waiting for approval.');
     } else {
       setSnackMessage(result.error || 'Failed to check in');
     }
@@ -96,7 +96,7 @@ export default function MemberHomeScreen() {
     const result = await checkOut(report);
     if (result.success) {
       setShowCheckOut(false);
-      setSnackMessage('Day ended! Great work today. 🎉');
+      setSnackMessage('Day ended! Great work today.');
     } else {
       setSnackMessage(result.error || 'Failed to check out');
     }
@@ -105,7 +105,7 @@ export default function MemberHomeScreen() {
   const handleStatusChange = async (taskId: string, status: TaskStatus, completionNote?: string) => {
     const result = await updateTaskStatus(taskId, status, completionNote);
     if (result.success) {
-      setSnackMessage(status === 'done' ? 'Task completed! ✅' : 'Task updated');
+      setSnackMessage(status === 'done' ? 'Task completed!' : 'Task updated');
     } else {
       setSnackMessage(result.error || 'Failed to update task.');
     }
@@ -127,7 +127,9 @@ export default function MemberHomeScreen() {
     if (!todayLog) {
       return (
         <View style={styles.statusCard}>
-          <Text style={styles.statusEmoji}>☀️</Text>
+          <View style={styles.statusIconCircle}>
+            <Feather name="sun" size={32} color={Colors.warning} />
+          </View>
           <Text style={styles.statusTitle}>Good {new Date().getHours() < 12 ? 'morning' : 'afternoon'}!</Text>
           <Text style={styles.statusSubtitle}>Ready to start your work day?</Text>
           <AnimatedPressable
@@ -145,7 +147,9 @@ export default function MemberHomeScreen() {
     if (todayLog.status === 'pending_approval') {
       return (
         <View style={styles.statusCard}>
-          <Text style={styles.statusEmoji}>⏳</Text>
+          <View style={styles.statusIconCircle}>
+            <Feather name="clock" size={32} color={Colors.warning} />
+          </View>
           <Text style={styles.heroLabel}>CHECK-IN REQUEST</Text>
           <Text style={styles.heroValue}>Awaiting Approval</Text>
           <Text style={styles.statusSubtitle}>Your check-in plan is being reviewed by your manager.</Text>
@@ -210,7 +214,9 @@ export default function MemberHomeScreen() {
     if (todayLog.status === 'rejected') {
       return (
         <View style={styles.statusCard}>
-          <Text style={styles.statusEmoji}>❌</Text>
+          <View style={styles.statusIconCircle}>
+            <Feather name="x-circle" size={32} color={Colors.error} />
+          </View>
           <Text style={styles.heroLabel}>CHECK-IN REJECTED</Text>
           <Text style={styles.heroValue}>Try Again</Text>
           {todayLog.rejection_reason && (
@@ -233,7 +239,9 @@ export default function MemberHomeScreen() {
       const formattedHours = todayLog.total_hours ? `${Math.floor(todayLog.total_hours)}h ${Math.round((todayLog.total_hours % 1) * 60)}m` : '--';
       return (
         <View style={styles.statusCard}>
-          <Text style={styles.statusEmoji}>🎉</Text>
+          <View style={styles.statusIconCircle}>
+            <Feather name="check-circle" size={32} color={Colors.success} />
+          </View>
           <Text style={styles.heroLabel}>TOTAL HOURS LOGGED</Text>
           <Text style={styles.heroValue}>{formattedHours}</Text>
           
@@ -395,8 +403,13 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 0, 0, 0.04)',
     ...Colors.shadowHeavy,
   },
-  statusEmoji: {
-    fontSize: 48,
+  statusIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 12,
   },
   statusTitle: {

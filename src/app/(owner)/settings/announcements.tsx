@@ -2,11 +2,11 @@
 // VEBOSSO EMS — Announcements Management Screen
 // ============================================================================
 
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, View, Platform, Pressable } from 'react-native';
+import { FlatList, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Snackbar, Text, TextInput } from 'react-native-paper';
-import { Feather } from '@expo/vector-icons';
 import { AnnouncementCard } from '../../../components/AnnouncementCard';
 import { EmptyState } from '../../../components/EmptyState';
 import { Colors } from '../../../constants/colors';
@@ -48,7 +48,7 @@ export default function AnnouncementsScreen() {
     setIsLoading(false);
 
     if (result.success) {
-      setSnackMessage('Announcement sent! 📢');
+      setSnackMessage('Announcement sent!');
       setTitle('');
       setBody('');
       setShowForm(false);

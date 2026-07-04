@@ -2,9 +2,10 @@
 // VEBOSSO EMS — Voluntary Change Password Screen
 // ============================================================================
 
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View, Platform } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, IconButton, ProgressBar, Snackbar, Text, TextInput } from 'react-native-paper';
 import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
@@ -82,7 +83,9 @@ export default function ChangePasswordScreen() {
       </View>
 
       <View style={styles.header}>
-        <Text style={styles.emoji}>🔐</Text>
+        <View style={styles.iconCircle}>
+          <Feather name="lock" size={28} color={Colors.accent} />
+        </View>
         <Text style={styles.title}>Update Your Password</Text>
         <Text style={styles.subtitle}>
           Choose a strong password to keep your account secure
@@ -230,7 +233,15 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   header: { alignItems: 'center', marginBottom: 24 },
-  emoji: { fontSize: 48, marginBottom: 12 },
+  iconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.accentSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
   title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, marginBottom: 8, letterSpacing: -0.7 },
   subtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 },
   formSection: { backgroundColor: Colors.surface, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.border, ...Colors.shadow },

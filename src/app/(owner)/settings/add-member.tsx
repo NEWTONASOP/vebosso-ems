@@ -2,17 +2,17 @@
 // VEBOSSO EMS — Add Member Screen (Premium Fintech Aesthetic)
 // ============================================================================
 
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Platform, Pressable, ActivityIndicator, KeyboardAvoidingView } from 'react-native';
-import { TextInput, Text, Snackbar } from 'react-native-paper';
-import { Colors } from '../../../constants/colors';
-import { useRouter } from 'expo-router';
-import * as Clipboard from 'expo-clipboard';
-import { supabase } from '../../../lib/supabase';
-import { parseFunctionError } from '../../../lib/errors';
-import { useWorkStore } from '../../../store/workStore';
-import { EMPLOYEE_ID_PREFIX } from '../../../constants/roles';
 import { Feather } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Snackbar, Text, TextInput } from 'react-native-paper';
+import { Colors } from '../../../constants/colors';
+import { EMPLOYEE_ID_PREFIX } from '../../../constants/roles';
+import { parseFunctionError } from '../../../lib/errors';
+import { supabase } from '../../../lib/supabase';
+import { useWorkStore } from '../../../store/workStore';
 
 export default function AddMemberScreen() {
   const router = useRouter();
@@ -98,7 +98,7 @@ export default function AddMemberScreen() {
         employeeId: data.credentials.employee_id,
         password: data.credentials.password,
       });
-      setSnackMessage('Member created successfully! 🎉');
+      setSnackMessage('Member created successfully!');
       fetchTeamMembers();
     } catch (e: any) {
       setSnackMessage(e.message || 'Failed to create member. Please try again.');

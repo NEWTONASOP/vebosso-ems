@@ -2,6 +2,7 @@
 // VEBOSSO EMS — Assign Task Modal
 // ============================================================================
 
+import { Feather } from '@expo/vector-icons';
 import { addDays, format, isValid, parseISO } from 'date-fns';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
@@ -138,7 +139,9 @@ export function AssignTaskModal({
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.emoji}>📋</Text>
+            <View style={styles.iconCircle}>
+              <Feather name="clipboard" size={24} color={Colors.accent} />
+            </View>
             <Text style={styles.title}>Assign Task</Text>
             <Text style={styles.subtitle}>
               Create a new task for{' '}
@@ -387,8 +390,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  emoji: {
-    fontSize: 44,
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.accentSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 12,
   },
   title: {

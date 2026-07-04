@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View, Platform, Pressable } from 'react-native';
+import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
-import { Alert } from '../../lib/alert';
 import { ApprovalCard } from '../../components/ApprovalCard';
-import { LeaveCard } from '../../components/LeaveCard';
 import { AssignTaskModal } from '../../components/AssignTaskModal';
 import { EmptyState } from '../../components/EmptyState';
+import { LeaveCard } from '../../components/LeaveCard';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { Colors } from '../../constants/colors';
+import { Alert } from '../../lib/alert';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
-import { WorkLogWithProfile, LeaveRequestWithProfile } from '../../types/database';
+import { LeaveRequestWithProfile, WorkLogWithProfile } from '../../types/database';
 
 export default function OwnerApprovalsScreen() {
   const { profile } = useAuthStore();
@@ -58,7 +58,7 @@ export default function OwnerApprovalsScreen() {
     if (!profile) return;
     try {
       await approveCheckIn(workLogId, profile.id);
-      setSnackMessage('Check-in approved ✅');
+      setSnackMessage('Check-in approved');
     } catch {
       setSnackMessage('Failed to approve. Please try again.');
     }
@@ -94,7 +94,7 @@ export default function OwnerApprovalsScreen() {
     const res = await approveLeaveRequest(id, profile.id);
     setApprovingLeaveId(null);
     if (res.success) {
-      setSnackMessage('Leave request approved ✅');
+      setSnackMessage('Leave request approved');
     } else {
       setSnackMessage(res.error || 'Failed to approve leave request.');
     }
@@ -115,7 +115,7 @@ export default function OwnerApprovalsScreen() {
             const res = await rejectLeaveRequest(id, profile.id);
             setRejectingLeaveId(null);
             if (res.success) {
-              setSnackMessage('Leave request rejected ❌');
+              setSnackMessage('Leave request rejected');
             } else {
               setSnackMessage(res.error || 'Failed to reject leave request.');
             }
@@ -151,7 +151,7 @@ export default function OwnerApprovalsScreen() {
         },
       ]);
       if (result.success) {
-        setSnackMessage('Approved & task assigned ✅');
+        setSnackMessage('Approved & task assigned');
       } else {
         setSnackMessage(result.error || 'Failed to approve.');
       }

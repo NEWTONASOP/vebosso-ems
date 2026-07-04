@@ -80,17 +80,15 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
             }}
           />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 4 }}>
-            <Text style={{ fontSize: 12, fontFamily: 'Inter_500Medium', color: Colors.textTertiary }}>
-              {report.length} / 3000
-            </Text>
+          <View style={styles.charCountRow}>
+            {error ? (
+              <HelperText type="error" visible={!!error} style={styles.errorText}>
+                {error}
+              </HelperText>
+            ) : (
+              <Text style={styles.charCount}>{report.length} / 3000</Text>
+            )}
           </View>
-
-          {error ? (
-            <HelperText type="error" visible={!!error} style={styles.errorText}>
-              {error}
-            </HelperText>
-          ) : null}
 
           <View style={styles.actions}>
             <Button
@@ -105,7 +103,7 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
               mode="contained"
               onPress={handleSubmit}
               loading={isLoading}
-              disabled={isLoading}
+              disabled={isLoading || report.trim().length === 0}
               style={styles.submitButton}
               buttonColor={Colors.accent}
               textColor={Colors.white}

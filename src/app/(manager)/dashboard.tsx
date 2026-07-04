@@ -132,7 +132,7 @@ export default function ManagerDashboard() {
     setCheckInLoading(false);
     if (result.success) { 
       setShowCheckIn(false); 
-      setSnackMessage('Check-in submitted! Waiting for approval. ⏳'); 
+      setSnackMessage('Check-in submitted! Waiting for approval.'); 
     } else {
       setSnackMessage(result.error || 'Failed to check in. Please try again.');
     }
@@ -142,7 +142,7 @@ export default function ManagerDashboard() {
     const result = await checkOut(report);
     if (result.success) { 
       setShowCheckOut(false); 
-      setSnackMessage('Day ended! Great work today. 🎉'); 
+      setSnackMessage('Day ended! Great work today.'); 
     } else {
       setSnackMessage(result.error || 'Failed to check out. Please try again.');
     }
@@ -180,7 +180,7 @@ export default function ManagerDashboard() {
     setIsAssigningTask(false);
 
     if (result.success) {
-      setSnackMessage(`Task assigned to ${selectedMember.full_name} ✅`);
+      setSnackMessage(`Task assigned to ${selectedMember.full_name}`);
       setAssignTaskModalVisible(false);
       setSelectedMember(null);
     } else {
@@ -228,7 +228,7 @@ export default function ManagerDashboard() {
     setIsAssigningTask(false);
 
     if (result.success) {
-      setSnackMessage(`Approved & task assigned ✅`);
+      setSnackMessage('Approved & task assigned');
       setAssignTaskModalVisible(false);
       setSelectedMemberForApproval(null);
       setAssignTargetWorkLog(null);

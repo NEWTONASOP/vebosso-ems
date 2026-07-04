@@ -68,7 +68,7 @@ export default function OwnerTeamScreen() {
     setIsAssigningTask(false);
 
     if (result.success) {
-      setSnackMessage(`Task assigned to ${selectedMember.full_name} ✅`);
+      setSnackMessage(`Task assigned to ${selectedMember.full_name}`);
       setAssignTaskModalVisible(false);
       setSelectedMember(null);
     } else {
@@ -100,7 +100,7 @@ export default function OwnerTeamScreen() {
           const { sendPushNotification } = await import('../../lib/notifications');
           sendPushNotification(
             selectedMember.id,
-            'Manager Assigned 👥',
+            'Manager Assigned',
             `${managerProfile.full_name} is now your manager`,
             { type: 'manager_assigned', manager_id: managerId }
           );
@@ -109,7 +109,7 @@ export default function OwnerTeamScreen() {
 
       setSnackMessage(
         managerId
-          ? `Manager assigned to ${selectedMember.full_name} ✅`
+          ? `Manager assigned to ${selectedMember.full_name}`
           : `Manager removed from ${selectedMember.full_name}`
       );
       setAssignManagerModalVisible(false);

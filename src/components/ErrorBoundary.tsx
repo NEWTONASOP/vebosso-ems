@@ -6,6 +6,7 @@
 //  - resetKeys prop (auto-resets when a key in the array changes)
 //  - Structured error logging (easy to swap in Sentry later)
 
+import { Feather } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
@@ -91,7 +92,13 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
     return (
       <View style={styles.container}>
-        <Text style={styles.emoji}>{isExhausted ? '💀' : '⚠️'}</Text>
+        <View style={styles.iconContainer}>
+          <Feather 
+            name={isExhausted ? 'x-octagon' : 'alert-triangle'} 
+            size={48} 
+            color={isExhausted ? Colors.error : Colors.warning} 
+          />
+        </View>
 
         <Text style={styles.title}>
           {isExhausted ? 'Something went seriously wrong' : 'Something went wrong'}
@@ -134,8 +141,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 32,
   },
-  emoji: {
-    fontSize: 56,
+  iconContainer: {
     marginBottom: 16,
   },
   title: {

@@ -34,7 +34,7 @@ export default function MemberTasksScreen() {
   const handleStatusChange = async (taskId: string, status: TaskStatus, completionNote?: string) => {
     try {
       await updateTaskStatus(taskId, status, completionNote);
-      setSnackMessage(status === 'done' ? 'Task completed! ✅' : 'Task updated');
+      setSnackMessage(status === 'done' ? 'Task completed!' : 'Task updated');
     } catch {
       setSnackMessage('Failed to update task');
     }

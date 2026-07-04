@@ -2,6 +2,7 @@
 // VEBOSSO EMS — Force Change Password Screen
 // ============================================================================
 
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -73,7 +74,9 @@ export default function ForceChangePasswordScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.header}>
-        <Text style={styles.emoji}>🔐</Text>
+        <View style={styles.iconCircle}>
+          <Feather name="lock" size={28} color={Colors.accent} />
+        </View>
         <Text style={styles.title}>Change Your Password</Text>
         <Text style={styles.subtitle}>
           Your admin has set a temporary password. Please create a new secure password to continue.
@@ -198,7 +201,15 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
   header: { alignItems: 'center', marginBottom: 32 },
-  emoji: { fontSize: 48, marginBottom: 12 },
+  iconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.accentSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
   title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, marginBottom: 8, letterSpacing: -0.7 },
   subtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 },
   formSection: { backgroundColor: Colors.surface, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.border, ...Colors.shadow },

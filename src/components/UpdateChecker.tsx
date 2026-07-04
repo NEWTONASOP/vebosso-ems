@@ -31,7 +31,7 @@ export function UpdateChecker() {
 
   const showUpdateAlert = (version: string) => {
     Alert.alert(
-      '🎉 Update Available',
+      'Update Available',
       `Version ${version} is now available! Download and install the latest version to get new features and improvements.`,
       [
         {
