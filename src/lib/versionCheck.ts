@@ -1,5 +1,5 @@
 // ============================================================================
-// VEBOSSO EMS — Version Check & Forced Update
+// VEBOSSO EMS — Version Check & Optional Update
 // ============================================================================
 
 import * as Application from 'expo-application';
@@ -10,10 +10,7 @@ import { supabase } from './supabase';
 interface VersionCheckResult {
   needsUpdate: boolean;
   currentVersion: string;
-  minimumVersion: string;
   latestVersion: string;
-  forceUpdate: boolean;
-  updateMessage?: string;
 }
 
 /**
@@ -47,8 +44,8 @@ export function compareVersions(v1: string, v2: string): number {
 }
 
 /**
- * Check if the current app version is compatible with the minimum required version
- * Fetches minimum_app_version and latest_app_version from app_settings table
+ * Check if the current app version is below the latest version
+ * Fetches latest_app_version and apk_download_url from app_settings table
  */
 export async function checkAppVersion(): Promise<VersionCheckResult> {
   try {
@@ -62,7 +59,7 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
     const queryPromise = supabase
       .from('app_settings')
       .select('key, value')
-      .in('key', ['minimum_app_version', 'latest_app_version', 'update_message']);
+      .in('key', ['latest_app_version', 'apk_download_url']);
 
     const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
@@ -72,9 +69,7 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
       return {
         needsUpdate: false,
         currentVersion,
-        minimumVersion: currentVersion,
         latestVersion: currentVersion,
-        forceUpdate: false,
       };
     }
 
@@ -83,12 +78,7 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
       settings[item.key] = item.value;
     });
 
-    const minimumVersion = settings['minimum_app_version'] || '1.0.0';
     const latestVersion = settings['latest_app_version'] || '1.0.0';
-    const updateMessage = settings['update_message'] || 'A new version is available. Please update to continue.';
-
-    // Check if current version is below minimum (force update)
-    const isBelowMinimum = compareVersions(currentVersion, minimumVersion) < 0;
 
     // Check if current version is below latest (optional update)
     const isBelowLatest = compareVersions(currentVersion, latestVersion) < 0;
@@ -96,10 +86,7 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
     return {
       needsUpdate: isBelowLatest,
       currentVersion,
-      minimumVersion,
       latestVersion,
-      forceUpdate: isBelowMinimum,
-      updateMessage,
     };
   } catch (error) {
     console.error('Version check failed:', error);
@@ -108,20 +95,17 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
     return {
       needsUpdate: false,
       currentVersion,
-      minimumVersion: currentVersion,
       latestVersion: currentVersion,
-      forceUpdate: false,
     };
   }
 }
 
 /**
- * Open the app store for update
+ * Open GitHub to download the latest APK
  * Downloads APK directly from GitHub releases or configured URL
  */
 export async function openAppStore(): Promise<void> {
   try {
-    
     // Get download URL from database settings
     const { data } = await supabase
       .from('app_settings')

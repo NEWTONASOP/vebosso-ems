@@ -107,6 +107,35 @@ serve(async (req) => {
         return errorResponse('Failed to update member password: ' + updateError.message, 500, 'PASSWORD_UPDATE_FAILED');
       }
 
+      // Send notification to user about password change
+      try {
+        const { data: profile } = await adminClient
+          .from('profiles')
+          .select('expo_push_token, full_name')
+          .eq('id', user_id)
+          .single();
+
+        if (profile?.expo_push_token) {
+          // Call send-push-notification edge function
+          await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({
+              user_id: user_id,
+              title: 'Password Updated 🔐',
+              body: 'Your password has been updated by admin. Please sign in with your new password.',
+              data: { type: 'password_updated' }
+            }),
+          });
+        }
+      } catch (notifError) {
+        console.warn('Failed to send password update notification:', notifError);
+        // Non-fatal, continue
+      }
+
       return new Response(
         JSON.stringify({ success: true, message: 'Password updated successfully' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

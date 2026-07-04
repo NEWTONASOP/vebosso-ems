@@ -88,6 +88,25 @@ export default function OwnerTeamScreen() {
 
       if (error) throw error;
 
+      // Send notification to employee about manager assignment
+      if (managerId) {
+        const { data: managerProfile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', managerId)
+          .single();
+
+        if (managerProfile) {
+          const { sendPushNotification } = await import('../../lib/notifications');
+          sendPushNotification(
+            selectedMember.id,
+            'Manager Assigned 👥',
+            `${managerProfile.full_name} is now your manager`,
+            { type: 'manager_assigned', manager_id: managerId }
+          );
+        }
+      }
+
       setSnackMessage(
         managerId
           ? `Manager assigned to ${selectedMember.full_name} ✅`

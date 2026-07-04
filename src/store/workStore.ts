@@ -11,16 +11,15 @@ import { create } from 'zustand';
 import { sendPushNotification } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
 import {
-    AnnouncementWithCreator,
-    AppSetting,
-    Profile,
-    Task,
-    TaskInsert,
-    WorkLog,
-    WorkLogStatus,
-    WorkLogWithProfile,
-    LeaveRequestWithProfile,
-    LeaveRequestInsert
+  AnnouncementWithCreator,
+  AppSetting,
+  LeaveRequestWithProfile,
+  Profile,
+  Task,
+  TaskInsert,
+  WorkLog,
+  WorkLogStatus,
+  WorkLogWithProfile
 } from '../types/database';
 
 interface WorkState {
@@ -341,6 +340,29 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .eq('id', taskId);
 
       if (error) return { success: false, error: error.message };
+
+      // Notify task creator/assigner when task is completed
+      if (status === 'done') {
+        try {
+          const { data: task } = await supabase
+            .from('tasks')
+            .select('assigned_by, title, profiles!tasks_assigned_to_fkey(full_name)')
+            .eq('id', taskId)
+            .single();
+
+          if (task?.assigned_by) {
+            const assigneeName = (task as any).profiles?.full_name || 'A team member';
+            sendPushNotification(
+              task.assigned_by,
+              'Task Completed ✅',
+              `${assigneeName} completed: "${task.title}"`,
+              { type: 'task_completed', task_id: taskId }
+            );
+          }
+        } catch (notifErr) {
+          console.warn('Failed to send task completion notification:', notifErr);
+        }
+      }
 
       set((state) => ({
         todayTasks: state.todayTasks.map((t) =>
