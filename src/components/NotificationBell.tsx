@@ -34,7 +34,7 @@ export function NotificationBell({ role }: NotificationBellProps) {
 
   const handlePress = () => {
     if (role === 'owner') {
-      router.push('/(owner)/settings/notifications' as any);
+      router.push('/(owner)/notifications' as any);
     } else if (role === 'manager') {
       router.push('/(manager)/notifications' as any);
     } else if (role === 'member') {

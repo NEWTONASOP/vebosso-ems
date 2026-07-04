@@ -111,6 +111,12 @@ export default function OwnerLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
