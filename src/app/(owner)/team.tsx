@@ -155,7 +155,8 @@ export default function OwnerTeamScreen() {
           style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
           onPress={() => router.push('/(owner)/settings/add-member')}
         >
-          <Feather name="user-plus" size={18} color={Colors.accent} />
+          <Feather name="user-plus" size={15} color={Colors.white} />
+          <Text style={styles.addButtonText}>Add Member</Text>
         </Pressable>
       </View>
 
@@ -323,17 +324,23 @@ const styles = StyleSheet.create({
   title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
   subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   addButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: Colors.accentSubtle,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.accent + '30',
+    backgroundColor: Colors.accent,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    height: 42,
+    gap: 6,
+  },
+  addButtonText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 13,
+    color: Colors.white,
   },
   addButtonPressed: {
-    opacity: 0.7,
+    transform: [{ scale: 0.97 }],
+    opacity: 0.9,
   },
   searchSection: { paddingHorizontal: 20, paddingTop: 12 },
   searchbar: {
