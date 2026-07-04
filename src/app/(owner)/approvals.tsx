@@ -7,6 +7,7 @@ import { FlatList, RefreshControl, StyleSheet, View, Platform } from 'react-nati
 import { Snackbar, Text } from 'react-native-paper';
 import { Alert } from '../../lib/alert';
 import { ApprovalCard } from '../../components/ApprovalCard';
+import { AssignTaskModal } from '../../components/AssignTaskModal';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { Colors } from '../../constants/colors';
@@ -22,10 +23,13 @@ export default function OwnerApprovalsScreen() {
     fetchPendingApprovals,
     approveCheckIn,
     rejectCheckIn,
+    addTask,
   } = useWorkStore();
 
   const [refreshing, setRefreshing] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
+  const [assignTargetLog, setAssignTargetLog] = useState<WorkLogWithProfile | null>(null);
+  const [isAssigning, setIsAssigning] = useState(false);
 
   useEffect(() => {
     fetchPendingApprovals();
@@ -70,9 +74,71 @@ export default function OwnerApprovalsScreen() {
     );
   }, [profile, rejectCheckIn]);
 
+  /** Opens the assign-task modal for the selected work log */
+  const handleAssignAndApprove = useCallback((workLog: WorkLogWithProfile) => {
+    setAssignTargetLog(workLog);
+  }, []);
+
+  /** Called when the modal form is submitted */
+  const handleAssignModalSubmit = useCallback(async (
+    title: string,
+    description: string | null,
+    dueDate: string | null,
+  ) => {
+    if (!profile || !assignTargetLog) return;
+    setIsAssigning(true);
+    try {
+      const result = await approveCheckIn(assignTargetLog.id, profile.id, [
+        {
+          assigned_to: assignTargetLog.user_id,
+          assigned_by: profile.id,
+          work_log_id: assignTargetLog.id,
+          title,
+          description,
+          due_date: dueDate,
+          status: 'pending',
+        },
+      ]);
+      if (result.success) {
+        setSnackMessage('Approved & task assigned ✅');
+      } else {
+        setSnackMessage(result.error || 'Failed to approve.');
+      }
+    } catch {
+      setSnackMessage('Failed to approve. Please try again.');
+    } finally {
+      setIsAssigning(false);
+      setAssignTargetLog(null);
+    }
+  }, [profile, assignTargetLog, approveCheckIn]);
+
   const renderItem = useCallback(({ item }: { item: WorkLogWithProfile }) => (
-    <ApprovalCard workLog={item} onApprove={handleApprove} onReject={handleReject} />
-  ), [handleApprove, handleReject]);
+    <ApprovalCard
+      workLog={item}
+      onApprove={handleApprove}
+      onReject={handleReject}
+      onAssignAndApprove={handleAssignAndApprove}
+    />
+  ), [handleApprove, handleReject, handleAssignAndApprove]);
+
+  // Build a Profile-compatible object from the joined profiles data on the worklog
+  const assignTargetMember = assignTargetLog
+    ? {
+        id: assignTargetLog.user_id,
+        full_name: assignTargetLog.profiles.full_name,
+        employee_id: assignTargetLog.profiles.employee_id,
+        role: assignTargetLog.profiles.role,
+        department: assignTargetLog.profiles.department,
+        avatar_url: assignTargetLog.profiles.avatar_url,
+        is_active: true,
+        manager_id: null,
+        expo_push_token: null,
+        must_change_password: false,
+        created_at: '',
+        updated_at: '',
+        created_by: null,
+      }
+    : null;
 
   return (
     <View style={styles.container}>
@@ -105,6 +171,15 @@ export default function OwnerApprovalsScreen() {
           }
         />
       )}
+
+      {/* Assign Task Modal — shown when owner taps "Assign Task" on a check-in card */}
+      <AssignTaskModal
+        visible={!!assignTargetLog}
+        onDismiss={() => setAssignTargetLog(null)}
+        onSubmit={handleAssignModalSubmit}
+        targetMember={assignTargetMember}
+        isLoading={isAssigning}
+      />
 
       <Snackbar
         visible={!!snackMessage}

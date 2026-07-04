@@ -19,12 +19,13 @@ interface ApprovalCardProps {
   workLog: WorkLogWithProfile;
   onApprove: (workLogId: string) => void;
   onReject: (workLogId: string) => void;
+  onAssignAndApprove?: (workLog: WorkLogWithProfile) => void;
   index?: number;
   isApproving?: boolean;
   isRejecting?: boolean;
 }
 
-export function ApprovalCard({ workLog, onApprove, onReject, index = 0, isApproving = false, isRejecting = false }: ApprovalCardProps) {
+export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove, index = 0, isApproving = false, isRejecting = false }: ApprovalCardProps) {
   const profile = workLog.profiles;
   const statusConfig = WORK_LOG_STATUS_CONFIG[workLog.status];
   
@@ -120,20 +121,52 @@ export function ApprovalCard({ workLog, onApprove, onReject, index = 0, isApprov
             <Feather name="x" size={14} color="#FF3B30" />
             <Text style={styles.rejectBtnText}>Reject</Text>
           </AnimatedPressable>
-          
-          <AnimatedPressable
-            style={({ pressed }) => [
-              styles.approveBtn,
-              pressed && styles.btnPressed
-            ]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-              onApprove(workLog.id);
-            }}
-          >
-            <Feather name="check" size={14} color="#FFFFFF" />
-            <Text style={styles.approveBtnText}>Approve</Text>
-          </AnimatedPressable>
+
+          {workLog.status === 'pending_approval' && onAssignAndApprove ? (
+            <>
+              <AnimatedPressable
+                style={({ pressed }) => [
+                  styles.approveQuickBtn,
+                  pressed && styles.btnPressed
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  onApprove(workLog.id);
+                }}
+              >
+                <Feather name="check" size={14} color="#000000" />
+                <Text style={styles.approveQuickBtnText}>Approve</Text>
+              </AnimatedPressable>
+
+              <AnimatedPressable
+                style={({ pressed }) => [
+                  styles.approveBtn,
+                  pressed && styles.btnPressed
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                  onAssignAndApprove(workLog);
+                }}
+              >
+                <Feather name="clipboard" size={13} color="#FFFFFF" />
+                <Text style={styles.approveBtnText}>Assign Task</Text>
+              </AnimatedPressable>
+            </>
+          ) : (
+            <AnimatedPressable
+              style={({ pressed }) => [
+                styles.approveBtn,
+                pressed && styles.btnPressed
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                onApprove(workLog.id);
+              }}
+            >
+              <Feather name="check" size={14} color="#FFFFFF" />
+              <Text style={styles.approveBtnText}>Approve</Text>
+            </AnimatedPressable>
+          )}
         </View>
       )}
     </Animated.View>
@@ -280,6 +313,23 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
     fontSize: 13,
     color: '#FFFFFF',
+  },
+  approveQuickBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    borderRadius: 20,
+    height: 40,
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+  },
+  approveQuickBtnText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 13,
+    color: '#000000',
   },
   btnPressed: {
     transform: [{ scale: 0.97 }],

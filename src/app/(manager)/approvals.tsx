@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Platform, RefreshControl, StyleSheet, View } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
 import { ApprovalCard } from '../../components/ApprovalCard';
+import { AssignTaskModal } from '../../components/AssignTaskModal';
 import { EmptyState } from '../../components/EmptyState';
 import { InlineError } from '../../components/InlineError';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
@@ -21,6 +22,8 @@ export default function ManagerApprovalsScreen() {
   const [snackMessage, setSnackMessage] = useState('');
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [assignTargetLog, setAssignTargetLog] = useState<WorkLogWithProfile | null>(null);
+  const [isAssigning, setIsAssigning] = useState(false);
 
   useEffect(() => {
     if (profile) fetchPendingApprovals(profile.id);
@@ -50,15 +53,65 @@ export default function ManagerApprovalsScreen() {
     else { setSnackMessage(result.error || 'Failed to reject. Please try again.'); }
   }, [profile, rejectCheckIn]);
 
+  /** Opens the assign-task modal for the selected work log */
+  const handleAssignAndApprove = useCallback((workLog: WorkLogWithProfile) => {
+    setAssignTargetLog(workLog);
+  }, []);
+
+  /** Called when the modal form is submitted */
+  const handleAssignModalSubmit = useCallback(async (
+    title: string,
+    description: string | null,
+    dueDate: string | null,
+  ) => {
+    if (!profile || !assignTargetLog) return;
+    setIsAssigning(true);
+    const result = await approveCheckIn(assignTargetLog.id, profile.id, [
+      {
+        assigned_to: assignTargetLog.user_id,
+        assigned_by: profile.id,
+        work_log_id: assignTargetLog.id,
+        title,
+        description,
+        due_date: dueDate,
+        status: 'pending',
+      },
+    ]);
+    setIsAssigning(false);
+    setAssignTargetLog(null);
+    if (result.success) { setSnackMessage('Approved & task assigned ✅'); }
+    else { setSnackMessage(result.error || 'Failed to approve.'); }
+  }, [profile, assignTargetLog, approveCheckIn]);
+
   const renderItem = useCallback(({ item }: { item: WorkLogWithProfile }) => (
     <ApprovalCard 
       workLog={item} 
       onApprove={handleApprove} 
       onReject={handleReject}
+      onAssignAndApprove={handleAssignAndApprove}
       isApproving={approvingId === item.id}
       isRejecting={rejectingId === item.id}
     />
-  ), [handleApprove, handleReject, approvingId, rejectingId]);
+  ), [handleApprove, handleReject, handleAssignAndApprove, approvingId, rejectingId]);
+
+  // Build a Profile-compatible object from the joined profiles data
+  const assignTargetMember = assignTargetLog
+    ? {
+        id: assignTargetLog.user_id,
+        full_name: assignTargetLog.profiles.full_name,
+        employee_id: assignTargetLog.profiles.employee_id,
+        role: assignTargetLog.profiles.role,
+        department: assignTargetLog.profiles.department,
+        avatar_url: assignTargetLog.profiles.avatar_url,
+        is_active: true,
+        manager_id: null,
+        expo_push_token: null,
+        must_change_password: false,
+        created_at: '',
+        updated_at: '',
+        created_by: null,
+      }
+    : null;
 
   return (
     <View style={styles.container}>
@@ -85,6 +138,16 @@ export default function ManagerApprovalsScreen() {
           ListEmptyComponent={<EmptyState icon="checkbox-marked-circle-outline" title="All caught up!" subtitle="No pending approvals" />}
         />
       )}
+
+      {/* Assign Task Modal — shown when manager taps "Assign Task" on a check-in card */}
+      <AssignTaskModal
+        visible={!!assignTargetLog}
+        onDismiss={() => setAssignTargetLog(null)}
+        onSubmit={handleAssignModalSubmit}
+        targetMember={assignTargetMember}
+        isLoading={isAssigning}
+      />
+
       <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>{snackMessage}</Snackbar>
     </View>
   );

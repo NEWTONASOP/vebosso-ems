@@ -13,7 +13,8 @@ import { WorkLogDetail } from '../../components/WorkLogDetail';
 import { Colors } from '../../constants/colors';
 import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
 import { useWorkStore } from '../../store/workStore';
-import { Profile, WorkLog } from '../../types/database';
+import { Profile, Task, WorkLog } from '../../types/database';
+import { supabase } from '../../lib/supabase';
 
 export default function OwnerHistoryScreen() {
   const { teamMembers, fetchTeamMembers, fetchWorkHistory } = useWorkStore();
@@ -21,6 +22,7 @@ export default function OwnerHistoryScreen() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<WorkLog | null>(null);
+  const [selectedLogTasks, setSelectedLogTasks] = useState<Task[]>([]);
   const [showDetail, setShowDetail] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
@@ -150,10 +152,21 @@ export default function OwnerHistoryScreen() {
                       log && { borderColor: getDayBorderColor(log), borderWidth: 1.5 },
                       isToday && styles.todayCell,
                     ]}
-                    onPress={() => {
-                      if (log) {
+                    onPress={async () => {
+                      if (log && selectedMember) {
                         setSelectedLog(log);
                         setShowDetail(true);
+                        // Fetch tasks for this work log
+                        try {
+                          const { data } = await supabase
+                            .from('tasks')
+                            .select('*')
+                            .or(`work_log_id.eq.${log.id},and(assigned_to.eq.${selectedMember.id},due_date.eq.${log.date})`)
+                            .order('created_at', { ascending: true });
+                          setSelectedLogTasks((data as Task[]) || []);
+                        } catch {
+                          setSelectedLogTasks([]);
+                        }
                       }
                     }}
                     disabled={!log}
@@ -186,8 +199,12 @@ export default function OwnerHistoryScreen() {
 
       <WorkLogDetail
         visible={showDetail}
-        onDismiss={() => setShowDetail(false)}
+        onDismiss={() => {
+          setShowDetail(false);
+          setSelectedLogTasks([]);
+        }}
         workLog={selectedLog}
+        tasks={selectedLogTasks}
       />
     </View>
   );

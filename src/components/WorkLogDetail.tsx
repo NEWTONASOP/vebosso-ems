@@ -7,7 +7,7 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { Modal, Portal, Text, Chip, Divider, IconButton } from 'react-native-paper';
 import { format } from 'date-fns';
 import { Colors } from '../constants/colors';
-import { WorkLog } from '../types/database';
+import { Task, WorkLog } from '../types/database';
 import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
 import { Feather } from '@expo/vector-icons';
 
@@ -15,9 +15,16 @@ interface WorkLogDetailProps {
   visible: boolean;
   onDismiss: () => void;
   workLog: WorkLog | null;
+  tasks?: Task[];
 }
 
-export function WorkLogDetail({ visible, onDismiss, workLog }: WorkLogDetailProps) {
+const TASK_STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
+  pending: { color: '#8E8E93', bg: '#F4F4F6', label: 'Pending' },
+  in_progress: { color: '#007AFF', bg: 'rgba(0,122,255,0.08)', label: 'In Progress' },
+  done: { color: '#34C759', bg: 'rgba(52,199,89,0.08)', label: 'Done' },
+};
+
+export function WorkLogDetail({ visible, onDismiss, workLog, tasks = [] }: WorkLogDetailProps) {
   if (!workLog) return null;
 
   const statusConfig = WORK_LOG_STATUS_CONFIG[workLog.status];
@@ -117,6 +124,42 @@ export function WorkLogDetail({ visible, onDismiss, workLog }: WorkLogDetailProp
               </View>
             </View>
           )}
+
+          {/* Tasks */}
+          {tasks.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>📌 Tasks ({tasks.length})</Text>
+              <View style={styles.tasksList}>
+                {tasks.map((task) => {
+                  const tConfig = TASK_STATUS_CONFIG[task.status] || TASK_STATUS_CONFIG.pending;
+                  return (
+                    <View key={task.id} style={styles.taskItem}>
+                      <View style={styles.taskHeader}>
+                        <View style={[styles.taskStatusDot, { backgroundColor: tConfig.color }]} />
+                        <Text style={styles.taskTitle} numberOfLines={2}>{task.title}</Text>
+                        <View style={[styles.taskStatusBadge, { backgroundColor: tConfig.bg }]}>
+                          <Text style={[styles.taskStatusText, { color: tConfig.color }]}>
+                            {tConfig.label}
+                          </Text>
+                        </View>
+                      </View>
+                      {task.description ? (
+                        <Text style={styles.taskDesc} numberOfLines={2}>{task.description}</Text>
+                      ) : null}
+                      {task.due_date ? (
+                        <View style={styles.taskDueRow}>
+                          <Feather name="calendar" size={11} color={Colors.textTertiary} />
+                          <Text style={styles.taskDueText}>
+                            Due {format(new Date(task.due_date), 'MMM dd')}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
         </ScrollView>
       </Modal>
     </Portal>
@@ -129,7 +172,7 @@ const styles = StyleSheet.create({
     margin: 16,
     borderRadius: 24,
     padding: 20,
-    maxHeight: '80%',
+    maxHeight: '85%',
     borderWidth: 1,
     borderColor: Colors.border,
     ...Colors.shadow,
@@ -209,5 +252,64 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text,
     lineHeight: 22,
+  },
+  // Tasks
+  tasksList: {
+    gap: 10,
+  },
+  taskItem: {
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  taskHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  taskStatusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    flexShrink: 0,
+  },
+  taskTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.text,
+  },
+  taskStatusBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  taskStatusText: {
+    fontSize: 10,
+    fontFamily: 'Inter_700Bold',
+    textTransform: 'uppercase',
+  },
+  taskDesc: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    marginLeft: 15,
+    marginTop: 2,
+    fontFamily: 'Inter_400Regular',
+  },
+  taskDueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+    marginLeft: 15,
+  },
+  taskDueText: {
+    fontSize: 11,
+    color: Colors.textTertiary,
+    fontFamily: 'Inter_500Medium',
   },
 });
