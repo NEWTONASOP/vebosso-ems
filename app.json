@@ -58,7 +58,12 @@
           "backgroundColor": "#FFFFFF",
           "android": {
             "image": "./assets/images/splash-icon.png",
-            "imageWidth": 120
+            "imageWidth": 120,
+            "resizeMode": "contain"
+          },
+          "ios": {
+            "image": "./assets/images/splash-icon.png",
+            "resizeMode": "contain"
           }
         }
       ]
