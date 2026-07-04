@@ -77,7 +77,8 @@ This guide is split into two parts:
 - [ ] Verify Dashboard stats update in real-time without refreshing
 - [ ] Approve a Manager's leave request
 - [ ] Test the 3 types of Announcements (All, Managers, Specific User)
-- [ ] Test Force Logout on an active user
+- [ ] Test Force Logout on an active user (Deactivate account toggle)
+- [ ] Test logging out a specific individual Session from the member's profile
 - [ ] Delete a user account
 
 ### 👔 Manager Checklist
@@ -90,6 +91,7 @@ This guide is split into two parts:
 - [ ] Approve a check-out
 - [ ] Approve a Member's leave request
 - [ ] Submit your own leave request
+- [ ] Search for a Member in the "My Team" tab
 - [ ] Verify you see "All" and "Manager Only" announcements
 - [ ] Verify Offline banner when internet is off
 
