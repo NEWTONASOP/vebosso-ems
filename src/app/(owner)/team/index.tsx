@@ -7,18 +7,18 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { Chip, Menu, Searchbar, Snackbar, Text } from 'react-native-paper';
-import { AssignManagerModal } from '../../components/AssignManagerModal';
-import { AssignTaskModal } from '../../components/AssignTaskModal';
-import { EmptyState } from '../../components/EmptyState';
-import { InlineError } from '../../components/InlineError';
-import { ListSkeleton } from '../../components/LoadingSkeleton';
-import { MemberCard } from '../../components/MemberCard';
-import { Colors } from '../../constants/colors';
-import { parseSupabaseError } from '../../lib/errors';
-import { supabase } from '../../lib/supabase';
-import { useAuthStore } from '../../store/authStore';
-import { useWorkStore } from '../../store/workStore';
-import { Profile } from '../../types/database';
+import { AssignManagerModal } from '../../../components/AssignManagerModal';
+import { AssignTaskModal } from '../../../components/AssignTaskModal';
+import { EmptyState } from '../../../components/EmptyState';
+import { InlineError } from '../../../components/InlineError';
+import { ListSkeleton } from '../../../components/LoadingSkeleton';
+import { MemberCard } from '../../../components/MemberCard';
+import { Colors } from '../../../constants/colors';
+import { parseSupabaseError } from '../../../lib/errors';
+import { supabase } from '../../../lib/supabase';
+import { useAuthStore } from '../../../store/authStore';
+import { useWorkStore } from '../../../store/workStore';
+import { Profile } from '../../../types/database';
 
 export default function OwnerTeamScreen() {
   const router = useRouter();
@@ -98,7 +98,7 @@ export default function OwnerTeamScreen() {
           .single();
 
         if (managerProfile) {
-          const { sendPushNotification } = await import('../../lib/notifications');
+          const { sendPushNotification } = await import('../../../lib/notifications');
           sendPushNotification(
             selectedMember.id,
             'Manager Assigned',
@@ -153,7 +153,7 @@ export default function OwnerTeamScreen() {
         </View>
         <Pressable
           style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
-          onPress={() => router.push('/(owner)/settings/add-member')}
+          onPress={() => router.push('/(owner)/team/add-member')}
         >
           <Feather name="user-plus" size={15} color={Colors.white} />
           <Text style={styles.addButtonText}>Add Member</Text>

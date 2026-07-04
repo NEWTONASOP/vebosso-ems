@@ -173,7 +173,7 @@ export default function AddMemberScreen() {
               ]}
               onPress={() => router.back()}
             >
-              <Text style={styles.backText}>Back to Settings</Text>
+              <Text style={styles.backText}>Back to Team</Text>
             </Pressable>
           </View>
         </ScrollView>
