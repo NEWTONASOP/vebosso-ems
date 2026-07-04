@@ -2,11 +2,10 @@
 // VEBOSSO EMS — Owner Tab Layout (Floating Premium Navigation)
 // ============================================================================
 
-import React from 'react';
-import { Tabs } from 'expo-router';
-import { useWorkStore } from '../../store/workStore';
-import { View, Text, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
+import { StyleSheet, Text, View } from 'react-native';
+import { useWorkStore } from '../../store/workStore';
 
 import { CustomTabBar } from '../../components/CustomTabBar';
 
@@ -56,8 +55,8 @@ export default function OwnerLayout() {
         name="dashboard"
         options={{
           title: 'Dashboard',
-          tabBarIcon: ({ color }) => (
-            <Feather name="grid" color={color} size={18} />
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="grid" color={color} size={size} />
           ),
         }}
       />
@@ -65,8 +64,8 @@ export default function OwnerLayout() {
         name="team"
         options={{
           title: 'Team',
-          tabBarIcon: ({ color }) => (
-            <Feather name="users" color={color} size={18} />
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="users" color={color} size={size} />
           ),
         }}
       />
@@ -74,9 +73,9 @@ export default function OwnerLayout() {
         name="approvals"
         options={{
           title: 'Approvals',
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ color, size }) => (
             <View style={styles.iconWrapper}>
-              <Feather name="check-circle" color={color} size={18} />
+              <Feather name="check-circle" color={color} size={size} />
               <TabBarBadge count={pendingCount} />
             </View>
           ),
@@ -86,8 +85,8 @@ export default function OwnerLayout() {
         name="history"
         options={{
           title: 'History',
-          tabBarIcon: ({ color }) => (
-            <Feather name="calendar" color={color} size={18} />
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="calendar" color={color} size={size} />
           ),
         }}
       />
@@ -95,8 +94,8 @@ export default function OwnerLayout() {
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color }) => (
-            <Feather name="settings" color={color} size={18} />
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="settings" color={color} size={size} />
           ),
         }}
       />

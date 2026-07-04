@@ -56,8 +56,8 @@ export default function ManagerLayout() {
         name="dashboard"
         options={{
           title: 'Dashboard',
-          tabBarIcon: ({ color }) => (
-            <Feather name="grid" color={color} size={18} />
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="grid" color={color} size={size} />
           ),
         }}
       />
@@ -65,8 +65,8 @@ export default function ManagerLayout() {
         name="my-team"
         options={{
           title: 'My Team',
-          tabBarIcon: ({ color }) => (
-            <Feather name="users" color={color} size={18} />
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="users" color={color} size={size} />
           ),
         }}
       />
@@ -74,9 +74,9 @@ export default function ManagerLayout() {
         name="approvals"
         options={{
           title: 'Approvals',
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ color, size }) => (
             <View style={styles.iconWrapper}>
-              <Feather name="check-circle" color={color} size={18} />
+              <Feather name="check-circle" color={color} size={size} />
               <TabBarBadge count={pendingCount} />
             </View>
           ),
@@ -86,8 +86,8 @@ export default function ManagerLayout() {
         name="history"
         options={{
           title: 'History',
-          tabBarIcon: ({ color }) => (
-            <Feather name="calendar" color={color} size={18} />
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="calendar" color={color} size={size} />
           ),
         }}
       />
@@ -96,8 +96,8 @@ export default function ManagerLayout() {
         name="settings"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => (
-            <Feather name="user" color={color} size={18} />
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="user" color={color} size={size} />
           ),
         }}
       />

@@ -4,7 +4,6 @@ import * as Haptics from 'expo-haptics';
 import { BottomTabBarProps } from 'expo-router/tabs';
 import React from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Colors } from '../constants/colors';
 
@@ -146,9 +145,10 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress }: TabItemPro
   };
 
   const color = isFocused ? Colors.tabActive : Colors.tabInactive;
+  const iconSize = isFocused ? 28 : 26;
   const iconElement = renderIcon
-    ? renderIcon({ focused: isFocused, color, size: 22 })
-    : <Feather name={iconName as any} size={22} color={color} />;
+    ? renderIcon({ focused: isFocused, color, size: iconSize })
+    : <Feather name={iconName as any} size={iconSize} color={color} />;
 
   return (
     <Pressable
@@ -165,15 +165,6 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress }: TabItemPro
         ]}
       >
         {iconElement}
-        <Text
-          numberOfLines={1}
-          style={[
-            styles.label,
-            isFocused ? styles.labelActive : styles.labelInactive,
-          ]}
-        >
-          {label}
-        </Text>
       </Animated.View>
     </Pressable>
   );
@@ -187,12 +178,6 @@ const styles = StyleSheet.create({
     right: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.06,
-    shadowRadius: 20,
-    elevation: 8,
   },
   blurContainer: {
     borderRadius: 36,
@@ -206,6 +191,11 @@ const styles = StyleSheet.create({
       : Platform.OS === 'android' 
         ? 'rgba(255, 255, 255, 0.75)' 
         : 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.06,
+    shadowRadius: 20,
+    elevation: 8,
     ...Platform.select({
       web: {
         backdropFilter: 'blur(20px)',
@@ -230,28 +220,12 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 24,
-    minHeight: 64,
-    gap: 4,
+    minHeight: 56,
   },
   pillActive: {
-    backgroundColor: 'rgba(0, 0, 0, 0.05)', // Light grey active capsule background
-  },
-  iconActive: {
-    // Styling tweak for active icon if needed
-  },
-  label: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
-    letterSpacing: -0.1,
-    textAlign: 'center',
-  },
-  labelActive: {
-    color: Colors.tabActive,
-  },
-  labelInactive: {
-    color: Colors.tabInactive,
+    backgroundColor: 'rgba(0, 0, 0, 0.08)', // Slightly darker for better visibility
   },
 });

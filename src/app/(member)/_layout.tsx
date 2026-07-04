@@ -2,7 +2,6 @@
 // VEBOSSO EMS — Member Tab Layout (Floating Premium Navigation)
 // ============================================================================
 
-import React from 'react';
 import { Tabs } from 'expo-router';
 
 import { Feather } from '@expo/vector-icons';
@@ -21,8 +20,8 @@ export default function MemberLayout() {
         name="home"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => (
-            <Feather name="home" color={color} size={18} />
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="home" color={color} size={size} />
           ),
         }}
       />
@@ -30,8 +29,8 @@ export default function MemberLayout() {
         name="tasks"
         options={{
           title: 'Tasks',
-          tabBarIcon: ({ color }) => (
-            <Feather name="check-square" color={color} size={18} />
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="check-square" color={color} size={size} />
           ),
         }}
       />
@@ -39,8 +38,8 @@ export default function MemberLayout() {
         name="history"
         options={{
           title: 'History',
-          tabBarIcon: ({ color }) => (
-            <Feather name="calendar" color={color} size={18} />
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="calendar" color={color} size={size} />
           ),
         }}
       />
@@ -48,8 +47,8 @@ export default function MemberLayout() {
         name="announcements"
         options={{
           title: 'News',
-          tabBarIcon: ({ color }) => (
-            <Feather name="bell" color={color} size={18} />
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="bell" color={color} size={size} />
           ),
         }}
       />
@@ -57,8 +56,8 @@ export default function MemberLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => (
-            <Feather name="user" color={color} size={18} />
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="user" color={color} size={size} />
           ),
         }}
       />
