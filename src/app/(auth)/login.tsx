@@ -152,8 +152,7 @@ export default function LoginScreen() {
         visible={!!snackError}
         onDismiss={() => setSnackError('')}
         duration={4000}
-        style={styles.snackbar}
-        action={{ label: 'OK', textColor: Colors.accent }}
+        action={{ label: 'OK', textColor: Colors.white }}
       >
         {snackError}
       </Snackbar>
@@ -276,9 +275,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 11,
     color: Colors.textTertiary,
-  },
-  snackbar: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
   },
 });
