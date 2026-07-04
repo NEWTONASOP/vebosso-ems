@@ -186,7 +186,7 @@ export interface AnnouncementWithCreator extends Announcement {
 }
 
 export interface LeaveRequestWithProfile extends LeaveRequest {
-  profiles: Pick<Profile, 'full_name' | 'employee_id' | 'department'>;
+  profiles: Pick<Profile, 'full_name' | 'employee_id' | 'department' | 'role'>;
 }
 
 export interface SessionWithProfile extends Session {

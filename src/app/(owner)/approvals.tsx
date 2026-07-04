@@ -20,7 +20,6 @@ export default function OwnerApprovalsScreen() {
     fetchPendingApprovals,
     approveCheckIn,
     rejectCheckIn,
-    addTask,
     // Leaves store bindings
     leaveRequests,
     isLoadingLeaves,

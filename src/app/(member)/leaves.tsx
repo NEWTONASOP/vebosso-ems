@@ -2,7 +2,7 @@
 // VEBOSSO EMS — User Leave History & Request Screen
 // ============================================================================
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Platform, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Snackbar, Text } from 'react-native-paper';
@@ -22,7 +22,6 @@ export default function LeavesScreen() {
   const {
     leaveRequests,
     isLoadingLeaves,
-    leavesError,
     fetchLeaveRequests,
     submitLeaveRequest,
   } = useWorkStore();
@@ -32,14 +31,14 @@ export default function LeavesScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
 
-  const loadLeaves = async () => {
+  const loadLeaves = useCallback(async () => {
     if (!profile) return;
     await fetchLeaveRequests(profile.role, profile.id);
-  };
+  }, [profile, fetchLeaveRequests]);
 
   useEffect(() => {
     loadLeaves();
-  }, [profile]);
+  }, [loadLeaves]);
 
   const onRefresh = async () => {
     setRefreshing(true);
