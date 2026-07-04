@@ -94,8 +94,8 @@ serve(async (req) => {
     });
 
     if (action === 'update-password') {
-      if (!password || password.length < 6) {
-        return errorResponse('Password must be at least 6 characters', 400, 'VALIDATION_ERROR');
+      if (!password || password.length < 8) {
+        return errorResponse('Password must be at least 8 characters', 400, 'VALIDATION_ERROR');
       }
 
       const { error: updateError } = await adminClient.auth.admin.updateUserById(user_id, {

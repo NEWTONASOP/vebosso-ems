@@ -68,6 +68,7 @@ export function CheckInModal({ visible, onDismiss, onSubmit, isLoading }: CheckI
             }}
             multiline
             numberOfLines={4}
+            maxLength={2000}
             style={styles.input}
             outlineColor={Colors.border}
             activeOutlineColor={Colors.accent}
@@ -88,7 +89,7 @@ export function CheckInModal({ visible, onDismiss, onSubmit, isLoading }: CheckI
               </HelperText>
             ) : (
               <Text style={[styles.charCount, isValid && styles.charCountValid]}>
-                {charCount} characters
+                {charCount} / 2000
               </Text>
             )}
           </View>

@@ -94,6 +94,7 @@ export default function AnnouncementsScreen() {
             label="Title"
             value={title}
             onChangeText={setTitle}
+            maxLength={200}
             style={styles.input}
             outlineColor={Colors.border}
             activeOutlineColor={Colors.textPrimary}
@@ -108,6 +109,7 @@ export default function AnnouncementsScreen() {
             onChangeText={setBody}
             multiline
             numberOfLines={3}
+            maxLength={2000}
             style={styles.input}
             outlineColor={Colors.border}
             activeOutlineColor={Colors.textPrimary}

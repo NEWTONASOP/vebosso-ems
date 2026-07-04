@@ -66,6 +66,7 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
             }}
             multiline
             numberOfLines={5}
+            maxLength={3000}
             style={styles.input}
             outlineColor={Colors.border}
             activeOutlineColor={Colors.accent}
@@ -78,6 +79,12 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
               },
             }}
           />
+
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 4 }}>
+            <Text style={{ fontSize: 12, fontFamily: 'Inter_500Medium', color: Colors.textTertiary }}>
+              {report.length} / 3000
+            </Text>
+          </View>
 
           {error ? (
             <HelperText type="error" visible={!!error} style={styles.errorText}>

@@ -87,8 +87,8 @@ serve(async (req) => {
       return errorResponse('full_name, employee_id, role, and password are required', 400, 'VALIDATION_ERROR');
     }
 
-    if (password.length < 6) {
-      return errorResponse('Password must be at least 6 characters', 400, 'VALIDATION_ERROR');
+    if (password.length < 8) {
+      return errorResponse('Password must be at least 8 characters', 400, 'VALIDATION_ERROR');
     }
 
     if (!['manager', 'member'].includes(role)) {

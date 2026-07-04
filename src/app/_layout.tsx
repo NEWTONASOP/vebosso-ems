@@ -86,10 +86,10 @@ function AuthGuard() {
 
           if (active) {
             const responseSub = addNotificationResponseListener((response) => {
-              console.log('Notification tapped:', response.notification.request.content.data);
+              if (__DEV__) console.log('Notification tapped:', response.notification.request.content.data);
             });
             const receivedSub = addNotificationReceivedListener((notification) => {
-              console.log('Notification received in foreground:', notification);
+              if (__DEV__) console.log('Notification received in foreground:', notification);
             });
 
             cleanup = () => {

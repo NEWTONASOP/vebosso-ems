@@ -154,8 +154,8 @@ export default function MemberProfileManagementScreen() {
 
   const handleUpdatePassword = async () => {
     if (!memberId) return;
-    if (!newPassword.trim() || newPassword.length < 6) {
-      setSnackMessage('Password must be at least 6 characters');
+    if (!newPassword.trim() || newPassword.length < 8) {
+      setSnackMessage('Password must be at least 8 characters');
       return;
     }
 

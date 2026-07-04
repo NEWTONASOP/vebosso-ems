@@ -64,8 +64,8 @@ export default function AddMemberScreen() {
       setSnackMessage('Employee ID is required');
       return;
     }
-    if (!password.trim() || password.length < 6) {
-      setSnackMessage('Password must be at least 6 characters');
+    if (!password.trim() || password.length < 8) {
+      setSnackMessage('Password must be at least 8 characters');
       return;
     }
 
@@ -207,6 +207,7 @@ export default function AddMemberScreen() {
             label="Full Name *"
             value={fullName}
             onChangeText={setFullName}
+            maxLength={100}
             style={styles.input}
             outlineColor={Colors.border}
             activeOutlineColor={Colors.textPrimary}
@@ -220,6 +221,7 @@ export default function AddMemberScreen() {
             label="Designation (e.g. Designer)"
             value={department}
             onChangeText={setDepartment}
+            maxLength={100}
             style={styles.input}
             outlineColor={Colors.border}
             activeOutlineColor={Colors.textPrimary}

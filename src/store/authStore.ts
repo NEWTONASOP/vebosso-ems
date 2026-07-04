@@ -127,7 +127,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // Listen for auth state changes
       authSubscription = supabase.auth.onAuthStateChange(async (event, newSession) => {
-        console.log('Auth state changed:', event);
+        if (__DEV__) console.log('Auth state changed:', event);
 
         if (event === 'SIGNED_IN' && newSession?.user) {
           const profile = await get().fetchProfile(newSession.user.id);
@@ -260,7 +260,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         try {
           await supabase.from('sessions').insert({
             user_id: data.user.id,
-            supabase_session_token: data.session?.access_token || null,
+            supabase_session_token: null, // Never store raw JWT — session tracked by UUID only
             device_info: `Mobile App`,
             last_active: new Date().toISOString(),
             is_active: true,

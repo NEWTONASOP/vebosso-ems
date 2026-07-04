@@ -4,10 +4,12 @@
 -- Run this in your Supabase SQL Editor.
 -- Deletes all old users and recreates the owner account.
 --
+-- ⚠️  IMPORTANT: Change the owner password immediately after first login!
+--     The default password is intentionally strong but must be rotated.
+--
 -- Login credentials:
 --   Employee ID: VB-0001
---   Email:       owner@vebosso.com
---   Password:    VEBOSSO
+--   Password:    VbOwner#Reset2026!  ← CHANGE THIS ON FIRST LOGIN
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -16,7 +18,8 @@ DO $$
 DECLARE
   owner_uid UUID := uuid_generate_v4();
   owner_email TEXT := 'owner@vebosso.com';
-  owner_password TEXT := 'VEBOSSO';
+  -- ⚠️  Change this password immediately after first login via the app.
+  owner_password TEXT := 'VbOwner#Reset2026!';
   encrypted_pw TEXT;
 BEGIN
   -- Delete all existing auth identities and users
@@ -87,6 +90,7 @@ BEGIN
   );
 
   -- Create profile row linked to the user
+  -- must_change_password = true forces a password change on first login
   INSERT INTO public.profiles (
     id,
     full_name,
@@ -102,11 +106,12 @@ BEGIN
     'owner',
     'Management',
     true,
-    false
+    true   -- ← Forces password change on first login
   );
 
-  RAISE NOTICE 'Owner account seeded successfully!';
-  RAISE NOTICE 'Employee ID: VB-0001';
-  RAISE NOTICE 'Email: owner@vebosso.com';
-  RAISE NOTICE 'Password: VEBOSSO';
+  RAISE NOTICE '✅ Owner account seeded successfully!';
+  RAISE NOTICE '   Employee ID : VB-0001';
+  RAISE NOTICE '   Email       : owner@vebosso.com';
+  RAISE NOTICE '   Password    : VbOwner#Reset2026!';
+  RAISE NOTICE '   ⚠️  CHANGE THIS PASSWORD ON FIRST LOGIN!';
 END $$;
