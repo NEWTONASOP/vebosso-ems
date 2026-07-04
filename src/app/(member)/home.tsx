@@ -2,22 +2,22 @@
 // VEBOSSO EMS — Member Home Screen (Premium Fintech / Apple Wallet Aesthetic)
 // ============================================================================
 
+import { Feather } from '@expo/vector-icons';
 import { differenceInMinutes, format } from 'date-fns';
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View, Platform } from 'react-native';
+import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { CheckInModal } from '../../components/CheckInModal';
 import { CheckOutModal } from '../../components/CheckOutModal';
 import { InlineError } from '../../components/InlineError';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
+import { PageTransition } from '../../components/PageTransition';
 import { TaskCard } from '../../components/TaskCard';
+import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
-import { Feather } from '@expo/vector-icons';
 import { TaskStatus } from '../../types/database';
-import { Colors } from '../../constants/colors';
-import { PageTransition } from '../../components/PageTransition';
-import { AnimatedPressable } from '../../components/AnimatedPressable';
 
 export default function MemberHomeScreen() {
   const { profile } = useAuthStore();
@@ -102,8 +102,8 @@ export default function MemberHomeScreen() {
     }
   };
 
-  const handleStatusChange = async (taskId: string, status: TaskStatus) => {
-    const result = await updateTaskStatus(taskId, status);
+  const handleStatusChange = async (taskId: string, status: TaskStatus, completionNote?: string) => {
+    const result = await updateTaskStatus(taskId, status, completionNote);
     if (result.success) {
       setSnackMessage(status === 'done' ? 'Task completed! ✅' : 'Task updated');
     } else {

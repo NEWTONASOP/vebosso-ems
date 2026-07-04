@@ -61,6 +61,8 @@ export interface Task {
   description: string | null;
   status: TaskStatus;
   due_date: string | null;
+  completion_note: string | null;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -161,6 +163,9 @@ export interface TaskUpdate {
   description?: string | null;
   status?: TaskStatus;
   due_date?: string | null;
+  assigned_to?: string;
+  completion_note?: string | null;
+  completed_at?: string | null;
 }
 
 // ============================================================================

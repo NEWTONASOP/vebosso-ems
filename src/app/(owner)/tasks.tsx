@@ -2,22 +2,26 @@
 // VEBOSSO EMS — Owner: Task Tracking & Status Screen
 // ============================================================================
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Platform, Pressable } from 'react-native';
-import { Text, Snackbar, Avatar } from 'react-native-paper';
-import { useAuthStore } from '../../store/authStore';
-import { supabase } from '../../lib/supabase';
-import { ListSkeleton } from '../../components/LoadingSkeleton';
-import { EmptyState } from '../../components/EmptyState';
-import { Task, TaskStatus } from '../../types/database';
-import { PageTransition } from '../../components/PageTransition';
-import { Colors } from '../../constants/colors';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Avatar, Snackbar, Text } from 'react-native-paper';
+import { EmptyState } from '../../components/EmptyState';
+import { ListSkeleton } from '../../components/LoadingSkeleton';
+import { MemberPickerModal } from '../../components/MemberPickerModal';
+import { PageTransition } from '../../components/PageTransition';
+import { TaskDetailModal } from '../../components/TaskDetailModal';
+import { Colors } from '../../constants/colors';
+import { supabase } from '../../lib/supabase';
+import { useAuthStore } from '../../store/authStore';
+import { useWorkStore } from '../../store/workStore';
+import { Task, TaskStatus } from '../../types/database';
 
 interface TaskWithAssignee extends Task {
   assignee: {
+    id: string;
     full_name: string;
     employee_id: string;
     avatar_url: string | null;
@@ -28,11 +32,16 @@ interface TaskWithAssignee extends Task {
 export default function OwnerTaskTrackingScreen() {
   const router = useRouter();
   const { profile } = useAuthStore();
+  const { reassignTask } = useWorkStore();
   const [tasks, setTasks] = useState<TaskWithAssignee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<TaskStatus | 'all'>('all');
   const [snackMessage, setSnackMessage] = useState('');
+  const [selectedTask, setSelectedTask] = useState<TaskWithAssignee | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showMemberPicker, setShowMemberPicker] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
   const fetchAssignedTasks = useCallback(async (silent = false) => {
     if (!profile?.id) return;
@@ -41,7 +50,7 @@ export default function OwnerTaskTrackingScreen() {
     try {
       const { data, error } = await supabase
         .from('tasks')
-        .select('*, assignee:profiles!tasks_assigned_to_fkey(full_name, employee_id, avatar_url, role)')
+        .select('*, assignee:profiles!tasks_assigned_to_fkey(id, full_name, employee_id, avatar_url, role)')
         .eq('assigned_by', profile.id)
         .order('created_at', { ascending: false });
 
@@ -59,12 +68,57 @@ export default function OwnerTaskTrackingScreen() {
 
   useEffect(() => {
     fetchAssignedTasks();
+    fetchTeamMembers();
   }, [fetchAssignedTasks]);
+
+  const fetchTeamMembers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, employee_id, avatar_url, role')
+        .eq('is_active', true)
+        .neq('role', 'owner')
+        .order('full_name');
+
+      if (error) {
+        console.error('Error fetching team members:', error);
+      } else {
+        setTeamMembers(data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching team members:', err);
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchAssignedTasks(true);
     setRefreshing(false);
+  };
+
+  const handleTaskPress = (task: TaskWithAssignee) => {
+    setSelectedTask(task);
+    setShowDetailModal(true);
+  };
+
+  const handleReassignPress = () => {
+    setShowMemberPicker(true);
+  };
+
+  const handleMemberSelect = async (member: any) => {
+    if (!selectedTask || !profile?.id) return;
+    
+    setShowMemberPicker(false);
+    
+    const result = await reassignTask(selectedTask.id, member.id, profile.id);
+    
+    if (result.success) {
+      setSnackMessage('Task reassigned successfully');
+      setShowDetailModal(false);
+      fetchAssignedTasks(true);
+    } else {
+      setSnackMessage(result.error || 'Failed to reassign task');
+    }
   };
 
   const filteredTasks = filter === 'all'
@@ -188,7 +242,14 @@ export default function OwnerTaskTrackingScreen() {
                   const dueDate = getFormattedDate(task.due_date);
                   
                   return (
-                    <View key={task.id} style={styles.taskCard}>
+                    <Pressable
+                      key={task.id}
+                      style={({ pressed }) => [
+                        styles.taskCard,
+                        pressed && styles.taskCardPressed,
+                      ]}
+                      onPress={() => handleTaskPress(task)}
+                    >
                       <View style={styles.taskHeader}>
                         <View style={[styles.statusIconContainer, { backgroundColor: statusConfig.bgColor }]}>
                           <Feather name={statusConfig.icon as any} size={16} color={statusConfig.color} />
@@ -231,7 +292,7 @@ export default function OwnerTaskTrackingScreen() {
                           </View>
                         )}
                       </View>
-                    </View>
+                    </Pressable>
                   );
                 })}
               </View>
@@ -250,6 +311,23 @@ export default function OwnerTaskTrackingScreen() {
         <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>
           {snackMessage}
         </Snackbar>
+
+        {/* Task Detail Modal */}
+        <TaskDetailModal
+          visible={showDetailModal}
+          onDismiss={() => setShowDetailModal(false)}
+          task={selectedTask}
+          onReassign={handleReassignPress}
+        />
+
+        {/* Member Picker Modal for Reassignment */}
+        <MemberPickerModal
+          visible={showMemberPicker}
+          onDismiss={() => setShowMemberPicker(false)}
+          members={teamMembers}
+          selectedMember={null}
+          onSelectMember={handleMemberSelect}
+        />
       </View>
     </PageTransition>
   );
@@ -377,6 +455,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.04)',
     ...Colors.shadow,
+  },
+  taskCardPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.98 }],
   },
   taskHeader: {
     flexDirection: 'row',

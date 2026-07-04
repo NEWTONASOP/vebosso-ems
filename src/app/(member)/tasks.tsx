@@ -2,17 +2,17 @@
 // VEBOSSO EMS — Member Tasks Screen (Premium Fintech / Apple Wallet Aesthetic)
 // ============================================================================
 
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Platform, Pressable } from 'react-native';
-import { Text, Snackbar } from 'react-native-paper';
+import { useEffect, useState } from 'react';
+import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Snackbar, Text } from 'react-native-paper';
+import { EmptyState } from '../../components/EmptyState';
+import { ListSkeleton } from '../../components/LoadingSkeleton';
+import { PageTransition } from '../../components/PageTransition';
+import { TaskCard } from '../../components/TaskCard';
+import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
-import { TaskCard } from '../../components/TaskCard';
-import { ListSkeleton } from '../../components/LoadingSkeleton';
-import { EmptyState } from '../../components/EmptyState';
 import { TaskStatus } from '../../types/database';
-import { PageTransition } from '../../components/PageTransition';
-import { Colors } from '../../constants/colors';
 
 export default function MemberTasksScreen() {
   const { profile } = useAuthStore();
@@ -31,9 +31,9 @@ export default function MemberTasksScreen() {
     setRefreshing(false);
   };
 
-  const handleStatusChange = async (taskId: string, status: TaskStatus) => {
+  const handleStatusChange = async (taskId: string, status: TaskStatus, completionNote?: string) => {
     try {
-      await updateTaskStatus(taskId, status);
+      await updateTaskStatus(taskId, status, completionNote);
       setSnackMessage(status === 'done' ? 'Task completed! ✅' : 'Task updated');
     } catch {
       setSnackMessage('Failed to update task');

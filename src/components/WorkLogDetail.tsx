@@ -2,14 +2,13 @@
 // VEBOSSO EMS — Work Log Detail Component
 // ============================================================================
 
-import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Modal, Portal, Text, Chip, Divider, IconButton } from 'react-native-paper';
-import { format } from 'date-fns';
-import { Colors } from '../constants/colors';
-import { Task, WorkLog } from '../types/database';
-import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
 import { Feather } from '@expo/vector-icons';
+import { format } from 'date-fns';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Chip, Divider, IconButton, Modal, Portal, Text } from 'react-native-paper';
+import { Colors } from '../constants/colors';
+import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
+import { Task, WorkLog } from '../types/database';
 
 interface WorkLogDetailProps {
   visible: boolean;
@@ -145,6 +144,12 @@ export function WorkLogDetail({ visible, onDismiss, workLog, tasks = [] }: WorkL
                       </View>
                       {task.description ? (
                         <Text style={styles.taskDesc} numberOfLines={2}>{task.description}</Text>
+                      ) : null}
+                      {task.completion_note && task.status === 'done' ? (
+                        <View style={styles.completionNoteBox}>
+                          <Text style={styles.completionNoteLabel}>✍️ Completion Note:</Text>
+                          <Text style={styles.completionNoteText}>{task.completion_note}</Text>
+                        </View>
                       ) : null}
                       {task.due_date ? (
                         <View style={styles.taskDueRow}>
@@ -311,5 +316,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textTertiary,
     fontFamily: 'Inter_500Medium',
+  },
+  completionNoteBox: {
+    backgroundColor: 'rgba(52, 199, 89, 0.08)',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+    marginLeft: 15,
+    borderLeftWidth: 2,
+    borderLeftColor: Colors.success,
+  },
+  completionNoteLabel: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.textSecondary,
+    marginBottom: 4,
+  },
+  completionNoteText: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: Colors.text,
+    lineHeight: 18,
   },
 });

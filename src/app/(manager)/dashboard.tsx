@@ -9,20 +9,20 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Snackbar, Text } from 'react-native-paper';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { ApprovalCard } from '../../components/ApprovalCard';
+import { AssignTaskModal } from '../../components/AssignTaskModal';
 import { CheckInModal } from '../../components/CheckInModal';
 import { CheckOutModal } from '../../components/CheckOutModal';
 import { EmptyState } from '../../components/EmptyState';
 import { InlineError } from '../../components/InlineError';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
-import { TaskCard } from '../../components/TaskCard';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
-import { AssignTaskModal } from '../../components/AssignTaskModal';
-import { AnimatedPressable } from '../../components/AnimatedPressable';
-import { Profile } from '../../types/database';
+import { TaskCard } from '../../components/TaskCard';
 import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
+import { Profile } from '../../types/database';
 
 export default function ManagerDashboard() {
   const router = useRouter();
@@ -146,8 +146,8 @@ export default function ManagerDashboard() {
     }
   };
 
-  const handleStatusChange = async (taskId: string, status: 'pending' | 'in_progress' | 'done') => {
-    const result = await updateTaskStatus(taskId, status);
+  const handleStatusChange = async (taskId: string, status: 'pending' | 'in_progress' | 'done', completionNote?: string) => {
+    const result = await updateTaskStatus(taskId, status, completionNote);
     if (!result.success) {
       setSnackMessage(result.error || 'Failed to update task status');
     }

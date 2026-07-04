@@ -2,25 +2,28 @@
 // VEBOSSO EMS — Task Card Row Component (Fintech Aesthetic)
 // ============================================================================
 
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { format } from 'date-fns';
+import { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { AnimatedPressable } from './AnimatedPressable';
-import { format } from 'date-fns';
+import { TaskCompleteModal } from './TaskCompleteModal';
 
-import { Task, TaskStatus } from '../types/database';
 import { Feather } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
+import { Task, TaskStatus } from '../types/database';
 
 interface TaskCardProps {
   task: Task;
-  onStatusChange?: (taskId: string, status: TaskStatus) => void;
+  onStatusChange?: (taskId: string, status: TaskStatus, completionNote?: string) => void;
   isLast?: boolean;
   index?: number;
 }
 
 export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardProps) {
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+
   const getNextStatus = (): TaskStatus | null => {
     if (task.status === 'pending') return 'in_progress';
     if (task.status === 'in_progress') return 'done';
@@ -57,7 +60,19 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
 
   const handleAction = () => {
     if (onStatusChange && nextStatus) {
-      onStatusChange(task.id, nextStatus);
+      // If completing the task, show the completion modal
+      if (nextStatus === 'done') {
+        setShowCompleteModal(true);
+      } else {
+        // Otherwise, just change status directly
+        onStatusChange(task.id, nextStatus);
+      }
+    }
+  };
+
+  const handleComplete = (note: string) => {
+    if (onStatusChange) {
+      onStatusChange(task.id, 'done', note);
     }
   };
 
@@ -73,65 +88,75 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
   const dueDate = getFormattedDate();
 
   return (
-    <Animated.View 
-      entering={FadeInDown.delay(index * 50).springify()} 
-      layout={LinearTransition.springify()}
-      style={styles.rowWrapper}
-    >
-      <View style={styles.rowContent}>
-        {/* Left Status Icon Container */}
-        <View style={[styles.iconContainer, { backgroundColor: statusStyle.bgColor }]}>
-          <Feather name={statusStyle.icon as any} size={16} color={statusStyle.color} />
-        </View>
-
-        {/* Center Text Column */}
-        <View style={styles.textContainer}>
-          <Text style={[styles.title, task.status === 'done' && styles.titleDone]} numberOfLines={1}>
-            {task.title}
-          </Text>
-          <View style={styles.metaRow}>
-            {dueDate && (
-              <Text style={styles.metaText}>
-                Due {dueDate}
-              </Text>
-            )}
-            {task.description && (
-              <Text style={styles.description} numberOfLines={1}>
-                {dueDate ? ` • ${task.description}` : task.description}
-              </Text>
-            )}
+    <>
+      <Animated.View 
+        entering={FadeInDown.delay(index * 50).springify()} 
+        layout={LinearTransition.springify()}
+        style={styles.rowWrapper}
+      >
+        <View style={styles.rowContent}>
+          {/* Left Status Icon Container */}
+          <View style={[styles.iconContainer, { backgroundColor: statusStyle.bgColor }]}>
+            <Feather name={statusStyle.icon as any} size={16} color={statusStyle.color} />
           </View>
-        </View>
 
-        {/* Right Action Button/Badge */}
-        {nextLabel && onStatusChange ? (
-          <AnimatedPressable
-            scaleTo={0.92}
-            style={({ pressed }) => [
-              styles.actionBtn,
-              nextStatus === 'in_progress' ? styles.startBtn : styles.completeBtn,
-              pressed && styles.btnPressed,
-            ]}
-            onPress={handleAction}
-          >
-            <Text
-              style={[
-                styles.actionBtnText,
-                nextStatus === 'in_progress' ? styles.startBtnText : styles.completeBtnText,
+          {/* Center Text Column */}
+          <View style={styles.textContainer}>
+            <Text style={[styles.title, task.status === 'done' && styles.titleDone]} numberOfLines={1}>
+              {task.title}
+            </Text>
+            <View style={styles.metaRow}>
+              {dueDate && (
+                <Text style={styles.metaText}>
+                  Due {dueDate}
+                </Text>
+              )}
+              {task.description && (
+                <Text style={styles.description} numberOfLines={1}>
+                  {dueDate ? ` • ${task.description}` : task.description}
+                </Text>
+              )}
+            </View>
+          </View>
+
+          {/* Right Action Button/Badge */}
+          {nextLabel && onStatusChange ? (
+            <AnimatedPressable
+              scaleTo={0.92}
+              style={({ pressed }) => [
+                styles.actionBtn,
+                nextStatus === 'in_progress' ? styles.startBtn : styles.completeBtn,
+                pressed && styles.btnPressed,
               ]}
+              onPress={handleAction}
             >
-              {nextLabel}
-            </Text>
-          </AnimatedPressable>
-        ) : (
-          <View style={[styles.statusBadge, { backgroundColor: statusStyle.bgColor }]}>
-            <Text style={[styles.statusBadgeText, { color: statusStyle.color }]}>
-              {task.status === 'done' ? 'Done' : task.status === 'in_progress' ? 'Running' : 'Pending'}
-            </Text>
-          </View>
-        )}
-      </View>
-    </Animated.View>
+              <Text
+                style={[
+                  styles.actionBtnText,
+                  nextStatus === 'in_progress' ? styles.startBtnText : styles.completeBtnText,
+                ]}
+              >
+                {nextLabel}
+              </Text>
+            </AnimatedPressable>
+          ) : (
+            <View style={[styles.statusBadge, { backgroundColor: statusStyle.bgColor }]}>
+              <Text style={[styles.statusBadgeText, { color: statusStyle.color }]}>
+                {task.status === 'done' ? 'Done' : task.status === 'in_progress' ? 'Running' : 'Pending'}
+              </Text>
+            </View>
+          )}
+        </View>
+      </Animated.View>
+
+      {/* Completion Modal */}
+      <TaskCompleteModal
+        visible={showCompleteModal}
+        taskTitle={task.title}
+        onDismiss={() => setShowCompleteModal(false)}
+        onComplete={handleComplete}
+      />
+    </>
   );
 }
 

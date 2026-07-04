@@ -10,7 +10,6 @@ import { format } from 'date-fns';
 import { create } from 'zustand';
 import { sendPushNotification } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
-import { parseSupabaseError } from '../lib/errors';
 import {
     AnnouncementWithCreator,
     AppSetting,
@@ -72,7 +71,7 @@ interface WorkState {
   checkOut: (report: string) => Promise<{ success: boolean; error?: string }>;
   fetchTodayLog: (userId: string) => Promise<{ success: boolean; error?: string }>;
   fetchTodayTasks: (userId: string) => Promise<{ success: boolean; error?: string }>;
-  updateTaskStatus: (taskId: string, status: 'pending' | 'in_progress' | 'done') => Promise<{ success: boolean; error?: string }>;
+  updateTaskStatus: (taskId: string, status: 'pending' | 'in_progress' | 'done', completionNote?: string) => Promise<{ success: boolean; error?: string }>;
 
   // Actions — Owner/Manager
   fetchPendingApprovals: (managerId?: string) => Promise<{ success: boolean; error?: string }>;
@@ -81,6 +80,7 @@ interface WorkState {
   fetchTeamMembers: (managerId?: string) => Promise<{ success: boolean; error?: string }>;
   fetchStats: (managerId?: string) => Promise<{ success: boolean; error?: string }>;
   addTask: (task: TaskInsert) => Promise<{ success: boolean; error?: string }>;
+  reassignTask: (taskId: string, newAssigneeId: string, assignerId: string) => Promise<{ success: boolean; error?: string }>;
 
   // Actions — Announcements
   fetchAnnouncements: (role: string, userId: string) => Promise<{ success: boolean; error?: string }>;
@@ -305,18 +305,26 @@ export const useWorkStore = create<WorkState>((set, get) => ({
     }
   },
 
-  updateTaskStatus: async (taskId: string, status) => {
+  updateTaskStatus: async (taskId: string, status, completionNote?: string) => {
     try {
+      const updateData: any = { status };
+      
+      // If marking as done, also save completion note and timestamp
+      if (status === 'done') {
+        updateData.completion_note = completionNote || null;
+        updateData.completed_at = new Date().toISOString();
+      }
+
       const { error } = await supabase
         .from('tasks')
-        .update({ status })
+        .update(updateData)
         .eq('id', taskId);
 
       if (error) return { success: false, error: error.message };
 
       set((state) => ({
         todayTasks: state.todayTasks.map((t) =>
-          t.id === taskId ? { ...t, status } : t
+          t.id === taskId ? { ...t, ...updateData } : t
         ),
       }));
       return { success: true };
@@ -573,6 +581,57 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       if (error) return { success: false, error: error.message };
 
       sendPushNotification(task.assigned_to, 'New Task Assigned 📋', task.title, { type: 'task_assigned', task_title: task.title });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  reassignTask: async (taskId: string, newAssigneeId: string, assignerId: string) => {
+    try {
+      // Fetch the task and new assignee details
+      const { data: task, error: taskError } = await supabase
+        .from('tasks')
+        .select('title, assigned_to')
+        .eq('id', taskId)
+        .single();
+
+      if (taskError) return { success: false, error: taskError.message };
+
+      const { data: newAssignee, error: assigneeError } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', newAssigneeId)
+        .single();
+
+      if (assigneeError) return { success: false, error: assigneeError.message };
+
+      // Update the task
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update({ assigned_to: newAssigneeId })
+        .eq('id', taskId);
+
+      if (updateError) return { success: false, error: updateError.message };
+
+      // Send notification to new assignee
+      sendPushNotification(
+        newAssigneeId,
+        'Task Reassigned to You 📋',
+        task.title,
+        { type: 'task_reassigned', task_id: taskId }
+      );
+
+      // Optionally notify the previous assignee
+      if (task.assigned_to && task.assigned_to !== newAssigneeId) {
+        sendPushNotification(
+          task.assigned_to,
+          'Task Reassigned',
+          `"${task.title}" has been reassigned to ${newAssignee.full_name}`,
+          { type: 'task_unassigned', task_id: taskId }
+        );
+      }
+
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
