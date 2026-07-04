@@ -112,12 +112,24 @@ serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else if (action === 'delete-member') {
-      // Delete user from Supabase Auth
+      // Step 1: Nullify assigned_by references in tasks (tasks assigned BY this user to others)
+      // We can't cascade-delete these as it would wipe tasks assigned to innocent members
+      const { error: tasksUpdateError } = await adminClient
+        .from('tasks')
+        .update({ assigned_by: null } as any)
+        .eq('assigned_by', user_id);
+
+      if (tasksUpdateError) {
+        console.warn('Could not nullify assigned_by tasks (non-fatal):', tasksUpdateError.message);
+      }
+
+      // Step 2: Delete user from Supabase Auth — cascades to profiles, which cascades to
+      // work_logs, sessions, leave_requests, tasks(assigned_to), announcements
       const { error: deleteError } = await adminClient.auth.admin.deleteUser(user_id);
 
       if (deleteError) {
         console.error('Auth user delete error:', deleteError);
-        return errorResponse('Failed to delete member from auth: ' + deleteError.message, 500, 'MEMBER_DELETE_FAILED');
+        return errorResponse('Failed to delete member: ' + deleteError.message, 500, 'MEMBER_DELETE_FAILED');
       }
 
       return new Response(

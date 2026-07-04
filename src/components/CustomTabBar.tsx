@@ -39,6 +39,17 @@ const LABEL_MAP: Record<string, string> = {
 };
 
 export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const currentRoute = state.routes[state.index];
+  const currentOptions = descriptors[currentRoute.key]?.options;
+
+  // Hide the tab bar entirely on detail/modal screens (those with href: null or dynamic segments)
+  const shouldHide =
+    (currentOptions as any)?.href === null ||
+    currentRoute.name.includes('[') ||
+    currentRoute.name.includes('/');
+
+  if (shouldHide) return null;
+
   return (
     <View style={styles.outerContainer}>
       <BlurView
@@ -60,9 +71,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
               route.name.includes('[') || 
               route.name.includes('/') ||
               // Hide tasks from bottom tab bar in Owner/Manager layouts (they access it via Dashboard)
-              (route.name === 'tasks' && hasDashboard) ||
-              // Hide settings from bottom tab bar in Manager layout
-              (route.name === 'settings' && hasMyTeam)
+              (route.name === 'tasks' && hasDashboard)
             ) {
               return null;
             }

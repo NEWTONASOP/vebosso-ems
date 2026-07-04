@@ -1,17 +1,18 @@
 // ============================================================================
-// VEBOSSO EMS — Manager Settings Screen
+// VEBOSSO EMS — Manager Profile Screen
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
+import { format } from 'date-fns';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { Alert } from '../../lib/alert';
-
+import { PageTransition } from '../../components/PageTransition';
 import { Colors } from '../../constants/colors';
 import { APP_NAME, ROLE_LABELS } from '../../constants/roles';
+import { Alert } from '../../lib/alert';
 import { useAuthStore } from '../../store/authStore';
-import Constants from 'expo-constants';
 
 export default function ManagerSettingsScreen() {
   const router = useRouter();
@@ -20,79 +21,194 @@ export default function ManagerSettingsScreen() {
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign Out',
-        style: 'destructive',
-        onPress: async () => {
-          await signOut();
-        },
-      },
+      { text: 'Sign Out', style: 'destructive', onPress: () => signOut() },
     ]);
   };
 
   if (!profile) return null;
 
+  const roleColor = Colors.managerAccent;
+
+  const getJoinedDate = () => {
+    try {
+      return format(new Date(profile.created_at), 'MMM d, yyyy');
+    } catch {
+      return new Date(profile.created_at).toLocaleDateString();
+    }
+  };
+
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.header}>
-        <Text style={styles.title}>Settings</Text>
-      </View>
-
-      <View style={styles.profileCard}>
-        <View style={[styles.avatar, { backgroundColor: Colors.managerAccent }]}> 
-          <Text style={styles.avatarText}>{profile.full_name?.substring(0, 2).toUpperCase()}</Text>
+    <PageTransition>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <View style={[styles.miniAvatar, { backgroundColor: roleColor }]}>
+              <Text style={styles.miniAvatarText}>
+                {profile.full_name.substring(0, 1).toUpperCase()}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.headerTitle}>Profile</Text>
+          <View style={styles.headerRight} />
         </View>
-        <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{profile.full_name}</Text>
-          <Text style={styles.profileMeta}>{ROLE_LABELS[profile.role]} • {profile.employee_id}</Text>
-          {profile.department ? <Text style={styles.profileMeta}>{profile.department}</Text> : null}
+
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <Text style={styles.heroLabel}>EMPLOYEE CODE</Text>
+          <Text style={styles.heroValue}>{profile.employee_id}</Text>
+          <View style={styles.badgeContainer}>
+            <View style={[styles.rolePill, { backgroundColor: roleColor }]}>
+              <Text style={styles.rolePillText}>{ROLE_LABELS[profile.role]}</Text>
+            </View>
+          </View>
         </View>
-      </View>
 
-      <Text style={styles.sectionLabel}>Security</Text>
-      <View style={styles.groupedCard}>
-        <Pressable
-          style={({ pressed }) => [styles.settingRow, pressed && styles.rowPressed]}
-          onPress={() => router.push('/(auth)/change-password')}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: Colors.accent + '15' }]}> 
-            <Feather name="key" size={18} color={Colors.accent} />
+        {/* Details Card */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>Details</Text>
+          <View style={styles.groupedCard}>
+            <InfoRow label="Status" value="Active" valueBadge badgeColor={Colors.successLight} badgeTextColor={Colors.success} />
+            <InfoRow label="Full Name" value={profile.full_name} />
+            <InfoRow label="Designation" value={profile.department || 'Not assigned'} />
+            <InfoRow label="Joined" value={getJoinedDate()} isLast />
           </View>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingTitle}>Change Password</Text>
-            <Text style={styles.settingSubtitle}>Update your account password</Text>
-          </View>
-          <Feather name="chevron-right" size={18} color={Colors.textTertiary} />
-        </Pressable>
-      </View>
+        </View>
 
-      <Text style={styles.sectionLabel}>Account</Text>
-      <View style={styles.groupedCard}>
-        <Pressable
-          style={({ pressed }) => [styles.settingRow, pressed && styles.rowPressed]}
-          onPress={handleSignOut}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: Colors.errorLight }]}> 
-            <Feather name="log-out" size={18} color={Colors.error} />
+        {/* Security & Settings Card */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>Security & Settings</Text>
+          <View style={styles.groupedCard}>
+            <ActionRow
+              label="Change Password"
+              icon="key"
+              onPress={() => router.push('/(auth)/change-password')}
+            />
+            <ActionRow
+              label="Sign Out"
+              icon="log-out"
+              onPress={handleSignOut}
+              isDestructive
+              isLast
+            />
           </View>
-          <View style={styles.settingInfo}>
-            <Text style={[styles.settingTitle, styles.destructiveText]}>Sign Out</Text>
-            <Text style={styles.settingSubtitle}>Log out of your manager account</Text>
-          </View>
-        </Pressable>
-      </View>
+        </View>
 
-      <View style={styles.appInfo}>
-        <Text style={styles.appName}>{APP_NAME} EMS</Text>
-        <Text style={styles.appVersion}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
-      </View>
-    </ScrollView>
+        {/* App Info */}
+        <View style={styles.appInfo}>
+          <Text style={styles.appName}>{APP_NAME} EMS</Text>
+          <Text style={styles.appVersion}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
+        </View>
+      </ScrollView>
+    </PageTransition>
   );
 }
+
+// ============================================================================
+// Row Components
+// ============================================================================
+
+interface InfoRowProps {
+  label: string;
+  value: string;
+  isLast?: boolean;
+  valueBadge?: boolean;
+  badgeColor?: string;
+  badgeTextColor?: string;
+}
+
+function InfoRow({ label, value, isLast, valueBadge, badgeColor, badgeTextColor }: InfoRowProps) {
+  return (
+    <View style={rowStyles.rowWrapper}>
+      <View style={rowStyles.rowContent}>
+        <Text style={rowStyles.label}>{label}</Text>
+        {valueBadge ? (
+          <View style={[rowStyles.badge, { backgroundColor: badgeColor }]}>
+            <Text style={[rowStyles.badgeText, { color: badgeTextColor }]}>{value}</Text>
+          </View>
+        ) : (
+          <Text style={rowStyles.value}>{value}</Text>
+        )}
+      </View>
+      {!isLast && <View style={rowStyles.separator} />}
+    </View>
+  );
+}
+
+interface ActionRowProps {
+  label: string;
+  icon: string;
+  onPress: () => void;
+  isDestructive?: boolean;
+  isLast?: boolean;
+}
+
+function ActionRow({ label, icon, onPress, isDestructive, isLast }: ActionRowProps) {
+  return (
+    <Pressable
+      style={({ pressed }) => [rowStyles.rowWrapper, pressed && rowStyles.pressed]}
+      onPress={onPress}
+    >
+      <View style={rowStyles.rowContent}>
+        <Text style={[rowStyles.label, isDestructive && rowStyles.destructiveText]}>
+          {label}
+        </Text>
+        <Feather
+          name={icon as any}
+          size={16}
+          color={isDestructive ? Colors.error : Colors.textSecondary}
+        />
+      </View>
+      {!isLast && <View style={rowStyles.separator} />}
+    </Pressable>
+  );
+}
+
+const rowStyles = StyleSheet.create({
+  rowWrapper: {
+    backgroundColor: Colors.surface,
+  },
+  pressed: {
+    backgroundColor: Colors.surfacePressed,
+  },
+  rowContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    minHeight: 48,
+  },
+  label: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 15,
+    color: Colors.textSecondary,
+  },
+  value: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: Colors.textPrimary,
+    letterSpacing: -0.1,
+  },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  badgeText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+  },
+  destructiveText: {
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.error,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.divider,
+    marginHorizontal: 16,
+  },
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -100,120 +216,108 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   scrollContent: {
-    paddingHorizontal: 20,
     paddingBottom: 110,
     width: '100%',
     maxWidth: 600,
     alignSelf: 'center',
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
-    paddingBottom: 16,
-  },
-  title: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 28,
-    color: Colors.text,
-    letterSpacing: -0.7,
-  },
-  profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 48,
+    paddingBottom: 12,
   },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    alignItems: 'center',
+  headerLeft: {
+    width: 40,
+    alignItems: 'flex-start',
+  },
+  miniAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  avatarText: {
+  miniAvatarText: {
+    fontFamily: 'Inter_700Bold',
     color: Colors.white,
-    fontSize: 24,
+    fontSize: 14,
+  },
+  headerTitle: {
     fontFamily: 'Inter_700Bold',
+    fontSize: 17,
+    color: Colors.textPrimary,
   },
-  profileInfo: {
-    marginLeft: 16,
-    flex: 1,
+  headerRight: {
+    width: 40,
+    alignItems: 'flex-end',
   },
-  profileName: {
+  heroSection: {
+    alignItems: 'center',
+    paddingVertical: 28,
+  },
+  heroLabel: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 18,
-    color: Colors.text,
+    fontSize: 12,
+    color: Colors.textSecondary,
+    letterSpacing: 1,
   },
-  profileMeta: {
-    fontFamily: 'Inter_500Medium',
+  heroValue: {
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 42,
+    color: Colors.textPrimary,
+    letterSpacing: -1,
+    marginVertical: 4,
+  },
+  badgeContainer: {
+    marginTop: 6,
+  },
+  rolePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  rolePillText: {
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.white,
+    fontSize: 12,
+  },
+  sectionContainer: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+  },
+  sectionTitle: {
+    fontFamily: 'Inter_700Bold',
     fontSize: 13,
     color: Colors.textSecondary,
-    marginTop: 4,
-  },
-  sectionLabel: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 16,
-    color: Colors.text,
-    marginTop: 28,
-    marginBottom: 12,
+    marginBottom: 8,
+    marginLeft: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   groupedCard: {
     backgroundColor: Colors.surface,
     borderRadius: 24,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: Colors.border,
-    overflow: 'hidden',
     ...Colors.shadow,
   },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  rowPressed: {
-    backgroundColor: Colors.surfacePressed,
-  },
-  iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  settingInfo: {
-    flex: 1,
-  },
-  settingTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 15,
-    color: Colors.text,
-  },
-  destructiveText: {
-    color: Colors.error,
-  },
-  settingSubtitle: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 4,
-  },
   appInfo: {
-    marginTop: 40,
     alignItems: 'center',
+    paddingVertical: 36,
   },
   appName: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 16,
-    color: Colors.textSecondary,
+    fontSize: 12,
+    color: Colors.textTertiary,
   },
   appVersion: {
-    marginTop: 4,
     fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: Colors.textSecondary,
+    fontSize: 10,
+    color: Colors.textTertiary,
+    marginTop: 2,
   },
 });

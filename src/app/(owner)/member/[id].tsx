@@ -3,28 +3,28 @@
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState, useCallback } from 'react';
+import { formatDistanceToNow } from 'date-fns';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert as RNAlert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  Alert as RNAlert,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
-import { Button, Divider, IconButton, Portal, Snackbar, Switch, Text, TextInput } from 'react-native-paper';
-import { useWorkStore } from '../../../store/workStore';
-import { useAuthStore } from '../../../store/authStore';
-import { supabase } from '../../../lib/supabase';
-import { parseSupabaseError, parseFunctionError } from '../../../lib/errors';
+import { Button, Divider, IconButton, Snackbar, Switch, Text, TextInput } from 'react-native-paper';
+import { InlineError } from '../../../components/InlineError';
 import { Colors } from '../../../constants/colors';
 import { ROLE_LABELS } from '../../../constants/roles';
+import { parseFunctionError, parseSupabaseError } from '../../../lib/errors';
+import { supabase } from '../../../lib/supabase';
+import { useAuthStore } from '../../../store/authStore';
+import { useWorkStore } from '../../../store/workStore';
 import { Profile } from '../../../types/database';
-import { InlineError } from '../../../components/InlineError';
-import { formatDistanceToNow } from 'date-fns';
 
 interface SessionInfo {
   id: string;
@@ -233,7 +233,22 @@ export default function MemberProfileManagementScreen() {
   };
 
   const handleDeleteMember = () => {
-    if (!member) return;
+    console.log('[Delete] Button pressed, member:', member?.id, 'isDeleting:', isDeleting);
+    if (!member) {
+      setSnackMessage('Error: No member loaded');
+      return;
+    }
+
+    const confirmed = Platform.OS === 'web'
+      ? window.confirm(`Permanently delete ${member.full_name}?\n\nThis will delete their account, check-in logs, tasks, and all related records. This cannot be undone.`)
+      : true; // on native, we show the Alert below instead
+
+    if (Platform.OS === 'web') {
+      if (!confirmed) return;
+      performDelete();
+      return;
+    }
+
     RNAlert.alert(
       'PERMANENT DELETE',
       `Are you absolutely sure you want to permanently delete ${member.full_name}?\n\nThis will completely delete their account and CASCADE delete all their check-in logs, completed tasks, and historical records. This cannot be undone.`,
@@ -242,47 +257,50 @@ export default function MemberProfileManagementScreen() {
         {
           text: 'Delete Permanently',
           style: 'destructive',
-          onPress: async () => {
-            setIsDeleting(true);
-            try {
-              const { data, error } = await supabase.functions.invoke('admin-update-member', {
-                body: {
-                  action: 'delete-member',
-                  user_id: memberId,
-                },
-              });
-
-              if (error) {
-                setSnackMessage(parseFunctionError(error));
-                setIsDeleting(false);
-                return;
-              }
-
-              if (data?.error) {
-                setSnackMessage(data.error);
-                setIsDeleting(false);
-                return;
-              }
-
-              RNAlert.alert('Deleted', 'Member has been deleted successfully.', [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    router.back();
-                    fetchTeamMembers();
-                  },
-                },
-              ]);
-            } catch (err: any) {
-              setSnackMessage(err.message || 'Failed to delete member');
-              setIsDeleting(false);
-            }
-          },
+          onPress: performDelete,
         },
       ]
     );
   };
 
+  const performDelete = async () => {
+    setIsDeleting(true);
+    setSnackMessage('Deleting member...');
+    try {
+      console.log('[Delete] Invoking edge function for user_id:', memberId);
+      const { data, error } = await supabase.functions.invoke('admin-update-member', {
+        body: {
+          action: 'delete-member',
+          user_id: memberId,
+        },
+      });
+
+      console.log('[Delete] Response — data:', JSON.stringify(data), 'error:', JSON.stringify(error));
+
+      if (error) {
+        const msg = parseFunctionError(error);
+        console.error('[Delete] Function invoke error:', error);
+        setSnackMessage('Delete failed: ' + msg);
+        setIsDeleting(false);
+        return;
+      }
+
+      if (data?.error) {
+        console.error('[Delete] Function returned error:', data.error);
+        setSnackMessage('Delete failed: ' + data.error);
+        setIsDeleting(false);
+        return;
+      }
+
+      // Success — go back and refresh team
+      await fetchTeamMembers();
+      router.back();
+    } catch (err: any) {
+      console.error('[Delete] Unexpected error:', err);
+      setSnackMessage('Delete failed: ' + (err?.message || 'Unknown error'));
+      setIsDeleting(false);
+    }
+  };
   const getSelectedManagerName = () => {
     const mgr = managers.find((m) => m.id === managerId);
     return mgr ? mgr.full_name : 'No manager assigned';
@@ -618,7 +636,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 50,
+    paddingBottom: 120,
   },
   heroCard: {
     flexDirection: 'row',

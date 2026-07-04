@@ -2,9 +2,9 @@
 // VEBOSSO EMS — Owner Team Screen
 // ============================================================================
 
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Platform, RefreshControl, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Chip, Menu, Searchbar, Snackbar, Text } from 'react-native-paper';
 import { AssignManagerModal } from '../../components/AssignManagerModal';
 import { AssignTaskModal } from '../../components/AssignTaskModal';
@@ -13,8 +13,8 @@ import { InlineError } from '../../components/InlineError';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { MemberCard } from '../../components/MemberCard';
 import { Colors } from '../../constants/colors';
-import { supabase } from '../../lib/supabase';
 import { parseSupabaseError } from '../../lib/errors';
+import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Profile } from '../../types/database';
@@ -46,10 +46,12 @@ export default function OwnerTeamScreen() {
     setRefreshing(false);
   };
 
-  const handleMemberPress = (member: Profile) => {
+  const handleMemberPress = useCallback((member: Profile, pageY: number) => {
     setSelectedMember(member);
-    setMenuVisible(true);
-  };
+    setMenuAnchor({ x: 20, y: pageY });
+    setMenuVisible(false); // reset first so the menu re-mounts cleanly
+    setTimeout(() => setMenuVisible(true), 0);
+  }, []);
 
   const handleAssignTask = async (title: string, description: string | null, dueDate: string | null) => {
     if (!profile?.id || !selectedMember?.id) return;
@@ -119,8 +121,8 @@ export default function OwnerTeamScreen() {
   });
 
   const renderMember = useCallback(({ item }: { item: Profile }) => (
-    <MemberCard member={item} onPress={() => handleMemberPress(item)} />
-  ), []);
+    <MemberCard member={item} onPress={(pageY: number) => handleMemberPress(item, pageY)} />
+  ), [handleMemberPress]);
 
   return (
     <View style={styles.container}>

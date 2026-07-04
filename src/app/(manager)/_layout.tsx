@@ -93,7 +93,10 @@ export default function ManagerLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          href: null, // Hide from tab bar, accessed via dashboard button
+          title: 'Profile',
+          tabBarIcon: ({ color }) => (
+            <Feather name="user" color={color} size={18} />
+          ),
         }}
       />
       <Tabs.Screen

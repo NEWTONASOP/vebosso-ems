@@ -2,24 +2,28 @@
 // VEBOSSO EMS — Member Card Component
 // ============================================================================
 
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, Avatar, Icon } from 'react-native-paper';
+import { StyleSheet, View } from 'react-native';
+import { Avatar, Icon, Text } from 'react-native-paper';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
-import { AnimatedPressable } from './AnimatedPressable';
 import { Colors } from '../constants/colors';
+import { ROLE_LABELS, WORK_LOG_STATUS_CONFIG } from '../constants/roles';
 import { Profile, WorkLogStatus } from '../types/database';
-import { WORK_LOG_STATUS_CONFIG, ROLE_LABELS } from '../constants/roles';
+import { AnimatedPressable } from './AnimatedPressable';
 
 interface MemberCardProps {
   member: Profile;
   currentStatus?: WorkLogStatus | 'offline' | 'on_leave';
   checkInTime?: string;
-  onPress?: () => void;
+  onPress?: (pageY: number) => void;
   index?: number;
 }
 
 export function MemberCard({ member, currentStatus = 'offline', checkInTime, onPress, index = 0 }: MemberCardProps) {
+  const handlePress = (e: any) => {
+    if (!onPress) return;
+    const pageY = e?.nativeEvent?.pageY ?? 200;
+    onPress(pageY);
+  };
   const getStatusDisplay = () => {
     if (currentStatus === 'offline') {
       return { label: 'Offline', color: Colors.textTertiary, bg: Colors.surfaceLight };
@@ -50,7 +54,7 @@ export function MemberCard({ member, currentStatus = 'offline', checkInTime, onP
     >
       <AnimatedPressable
         style={styles.card}
-        onPress={onPress}
+        onPress={handlePress}
       >
       <Avatar.Text
         size={44}
