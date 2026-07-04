@@ -105,6 +105,12 @@ export default function ManagerLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="leaves"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

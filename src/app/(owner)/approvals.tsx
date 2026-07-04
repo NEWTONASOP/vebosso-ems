@@ -1,19 +1,16 @@
-// ============================================================================
-// VEBOSSO EMS — Owner Approvals Screen
-// ============================================================================
-
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View, Platform } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, View, Platform, Pressable } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
 import { Alert } from '../../lib/alert';
 import { ApprovalCard } from '../../components/ApprovalCard';
+import { LeaveCard } from '../../components/LeaveCard';
 import { AssignTaskModal } from '../../components/AssignTaskModal';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
-import { WorkLogWithProfile } from '../../types/database';
+import { WorkLogWithProfile, LeaveRequestWithProfile } from '../../types/database';
 
 export default function OwnerApprovalsScreen() {
   const { profile } = useAuthStore();
@@ -24,20 +21,37 @@ export default function OwnerApprovalsScreen() {
     approveCheckIn,
     rejectCheckIn,
     addTask,
+    // Leaves store bindings
+    leaveRequests,
+    isLoadingLeaves,
+    fetchLeaveRequests,
+    approveLeaveRequest,
+    rejectLeaveRequest,
   } = useWorkStore();
 
+  const [activeTab, setActiveTab] = useState<'attendance' | 'leaves'>('attendance');
   const [refreshing, setRefreshing] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
   const [assignTargetLog, setAssignTargetLog] = useState<WorkLogWithProfile | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [approvingLeaveId, setApprovingLeaveId] = useState<string | null>(null);
+  const [rejectingLeaveId, setRejectingLeaveId] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    if (!profile) return;
+    await Promise.all([
+      fetchPendingApprovals(),
+      fetchLeaveRequests(profile.role, profile.id),
+    ]);
+  }, [profile, fetchPendingApprovals, fetchLeaveRequests]);
 
   useEffect(() => {
-    fetchPendingApprovals();
-  }, [fetchPendingApprovals]);
+    loadData();
+  }, [loadData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchPendingApprovals();
+    await loadData();
     setRefreshing(false);
   };
 
@@ -73,6 +87,44 @@ export default function OwnerApprovalsScreen() {
       ]
     );
   }, [profile, rejectCheckIn]);
+
+  /** Leave approvals */
+  const handleApproveLeave = useCallback(async (id: string) => {
+    if (!profile) return;
+    setApprovingLeaveId(id);
+    const res = await approveLeaveRequest(id, profile.id);
+    setApprovingLeaveId(null);
+    if (res.success) {
+      setSnackMessage('Leave request approved ✅');
+    } else {
+      setSnackMessage(res.error || 'Failed to approve leave request.');
+    }
+  }, [profile, approveLeaveRequest]);
+
+  const handleRejectLeave = useCallback((id: string) => {
+    if (!profile) return;
+    Alert.alert(
+      'Reject Leave Request',
+      'Are you sure you want to reject this leave request?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: async () => {
+            setRejectingLeaveId(id);
+            const res = await rejectLeaveRequest(id, profile.id);
+            setRejectingLeaveId(null);
+            if (res.success) {
+              setSnackMessage('Leave request rejected ❌');
+            } else {
+              setSnackMessage(res.error || 'Failed to reject leave request.');
+            }
+          }
+        }
+      ]
+    );
+  }, [profile, rejectLeaveRequest]);
 
   /** Opens the assign-task modal for the selected work log */
   const handleAssignAndApprove = useCallback((workLog: WorkLogWithProfile) => {
@@ -121,6 +173,17 @@ export default function OwnerApprovalsScreen() {
     />
   ), [handleApprove, handleReject, handleAssignAndApprove]);
 
+  const renderLeaveItem = useCallback(({ item, index }: { item: LeaveRequestWithProfile; index: number }) => (
+    <LeaveCard
+      leave={item}
+      onApprove={handleApproveLeave}
+      onReject={handleRejectLeave}
+      isApproving={approvingLeaveId === item.id}
+      isRejecting={rejectingLeaveId === item.id}
+      index={index}
+    />
+  ), [handleApproveLeave, handleRejectLeave, approvingLeaveId, rejectingLeaveId]);
+
   // Build a Profile-compatible object from the joined profiles data on the worklog
   const assignTargetMember = assignTargetLog
     ? {
@@ -140,20 +203,40 @@ export default function OwnerApprovalsScreen() {
       }
     : null;
 
+  const pendingLeaves = leaveRequests.filter((l) => l.status === 'pending');
+  const isLoading = activeTab === 'attendance' ? isLoadingApprovals : isLoadingLeaves;
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Approvals</Text>
-        <Text style={styles.subtitle}>
-          {pendingApprovals.length} pending request{pendingApprovals.length !== 1 ? 's' : ''}
-        </Text>
+        
+        {/* Tab Selector */}
+        <View style={styles.segmentedContainer}>
+          <Pressable
+            style={[styles.segmentBtn, activeTab === 'attendance' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('attendance')}
+          >
+            <Text style={[styles.segmentText, activeTab === 'attendance' && styles.segmentTextActive]}>
+              Attendance ({pendingApprovals.length})
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.segmentBtn, activeTab === 'leaves' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('leaves')}
+          >
+            <Text style={[styles.segmentText, activeTab === 'leaves' && styles.segmentTextActive]}>
+              Leaves ({pendingLeaves.length})
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
-      {isLoadingApprovals ? (
+      {isLoading && !refreshing ? (
         <View style={styles.content}>
           <ListSkeleton count={3} />
         </View>
-      ) : (
+      ) : activeTab === 'attendance' ? (
         <FlatList
           data={pendingApprovals}
           renderItem={renderItem}
@@ -166,7 +249,24 @@ export default function OwnerApprovalsScreen() {
             <EmptyState
               icon="checkbox-marked-circle-outline"
               title="All caught up!"
-              subtitle="No pending approvals at the moment. Check back later."
+              subtitle="No pending attendance approvals at the moment."
+            />
+          }
+        />
+      ) : (
+        <FlatList
+          data={pendingLeaves}
+          renderItem={renderLeaveItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />
+          }
+          ListEmptyComponent={
+            <EmptyState
+              icon="calendar-check"
+              title="No Pending Leaves"
+              subtitle="No pending leave requests at the moment."
             />
           }
         />
@@ -185,6 +285,7 @@ export default function OwnerApprovalsScreen() {
         visible={!!snackMessage}
         onDismiss={() => setSnackMessage('')}
         duration={3000}
+        theme={{ colors: { inverseSurface: '#1C1C1E', inverseOnSurface: '#FFFFFF' } }}
         wrapperStyle={{ marginBottom: 90 }}
       >
         {snackMessage}
@@ -196,8 +297,33 @@ export default function OwnerApprovalsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 12 },
-  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
-  subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7, marginBottom: 12 },
   content: { paddingHorizontal: 20 },
   list: { paddingHorizontal: 20, paddingBottom: 110 },
+  segmentedContainer: {
+    flexDirection: 'row',
+    backgroundColor: Colors.systemGray6,
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
+  },
+  segmentBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  segmentBtnActive: {
+    backgroundColor: Colors.surface,
+    ...Colors.shadow,
+  },
+  segmentText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  segmentTextActive: {
+    color: Colors.accent,
+  },
 });

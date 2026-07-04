@@ -62,6 +62,12 @@ export default function MemberLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="leaves"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

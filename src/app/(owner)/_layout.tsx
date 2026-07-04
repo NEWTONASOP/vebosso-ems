@@ -41,7 +41,9 @@ const badgeStyles = StyleSheet.create({
 });
 
 export default function OwnerLayout() {
-  const pendingCount = useWorkStore((s) => s.pendingApprovalsCount);
+  const pendingApprovalsCount = useWorkStore((s) => s.pendingApprovalsCount);
+  const pendingLeavesCount = useWorkStore((s) => s.pendingLeavesCount);
+  const pendingCount = pendingApprovalsCount + pendingLeavesCount;
 
   return (
     <Tabs
