@@ -5,22 +5,25 @@
 import { useEffect, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 import { checkAppVersion, openAppStore } from '../lib/versionCheck';
+import { useAuthStore } from '../store/authStore';
 
 export function UpdateChecker() {
   const [checked, setChecked] = useState(false);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   useEffect(() => {
-    if (Platform.OS !== 'android' || checked) return;
-    
-    checkForOptionalUpdate();
+    // Only run on Android, only once, and only after the user is authenticated
+    // (ensures Supabase RLS is satisfied and the query won't fail silently)
+    if (Platform.OS !== 'android' || checked || !isAuthenticated) return;
+
     setChecked(true);
-  }, [checked]);
+    checkForOptionalUpdate();
+  }, [isAuthenticated, checked]);
 
   const checkForOptionalUpdate = async () => {
     try {
       const result = await checkAppVersion();
 
-      // Show dialog if update is available
       if (result.needsUpdate) {
         showUpdateAlert(result.latestVersion);
       }
@@ -50,5 +53,5 @@ export function UpdateChecker() {
     );
   };
 
-  return null; // This component doesn't render anything
+  return null;
 }

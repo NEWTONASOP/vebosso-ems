@@ -59,7 +59,7 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
     const queryPromise = supabase
       .from('app_settings')
       .select('key, value')
-      .in('key', ['latest_app_version', 'apk_download_url']);
+      .in('key', ['latest_version', 'download_url']);
 
     const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
@@ -78,7 +78,7 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
       settings[item.key] = item.value;
     });
 
-    const latestVersion = settings['latest_app_version'] || '1.0.0';
+    const latestVersion = settings['latest_version'] || '1.0.0';
 
     // Check if current version is below latest (optional update)
     const isBelowLatest = compareVersions(currentVersion, latestVersion) < 0;
@@ -110,7 +110,7 @@ export async function openAppStore(): Promise<void> {
     const { data } = await supabase
       .from('app_settings')
       .select('value')
-      .eq('key', 'apk_download_url')
+      .eq('key', 'download_url')
       .single();
 
     const downloadUrl = data?.value || '';

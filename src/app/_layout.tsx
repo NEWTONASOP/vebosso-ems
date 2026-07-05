@@ -12,6 +12,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { configureFonts, MD3LightTheme, PaperProvider } from 'react-native-paper';
 import 'react-native-reanimated';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { LoadingScreen } from '../components/LoadingScreen';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { UpdateChecker } from '../components/UpdateChecker';
 import { Colors, PaperThemeColors } from '../constants/colors';
@@ -176,6 +177,7 @@ function AuthGuard() {
 
 export default function RootLayout() {
   const initialize = useAuthStore((s) => s.initialize);
+  const isInitialized = useAuthStore((s) => s.isInitialized);
 
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
@@ -212,13 +214,17 @@ export default function RootLayout() {
           <OfflineBanner />
           <UpdateChecker />
           <AuthGuard />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: Colors.background },
-              animation: 'slide_from_right',
-            }}
-          />
+          {!isInitialized ? (
+            <LoadingScreen />
+          ) : (
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: Colors.background },
+                animation: 'slide_from_right',
+              }}
+            />
+          )}
         </PaperProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
