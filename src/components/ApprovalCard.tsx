@@ -5,7 +5,7 @@
 import { format } from 'date-fns';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Dialog, Portal, Text } from 'react-native-paper';
+import { Button, Dialog, Portal, Text } from 'react-native-paper';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { AnimatedPressable } from './AnimatedPressable';
 
@@ -179,18 +179,28 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
             </Text>
           </Dialog.Content>
           <View style={styles.dialogActions}>
-            <AnimatedPressable 
+            <Button 
+              mode="contained"
               onPress={handleApproveOnly}
               style={styles.dialogButtonSecondary}
+              contentStyle={styles.dialogButtonContent}
+              buttonColor={Colors.systemGray6}
+              textColor={Colors.textPrimary}
+              labelStyle={styles.dialogButtonSecondaryText}
             >
-              <Text style={styles.dialogButtonSecondaryText}>Just Approve</Text>
-            </AnimatedPressable>
-            <AnimatedPressable 
+              Just Approve
+            </Button>
+            <Button 
+              mode="contained"
               onPress={handleApproveWithTask}
               style={styles.dialogButtonPrimary}
+              contentStyle={styles.dialogButtonContent}
+              buttonColor={Colors.accent}
+              textColor="#FFFFFF"
+              labelStyle={styles.dialogButtonPrimaryText}
             >
-              <Text style={styles.dialogButtonPrimaryText}>Assign Task</Text>
-            </AnimatedPressable>
+              Assign Task
+            </Button>
           </View>
         </Dialog>
       </Portal>
@@ -368,30 +378,23 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     gap: 10,
   },
+  dialogButtonContent: {
+    height: 44,
+  },
   dialogButtonSecondary: {
     flex: 1,
-    height: 44,
     borderRadius: 14,
-    backgroundColor: Colors.systemGray6,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   dialogButtonSecondaryText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
-    color: Colors.textPrimary,
   },
   dialogButtonPrimary: {
     flex: 1,
-    height: 44,
     borderRadius: 14,
-    backgroundColor: Colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   dialogButtonPrimaryText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
-    color: '#FFFFFF',
   },
 });

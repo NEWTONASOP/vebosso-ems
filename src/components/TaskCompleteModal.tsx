@@ -5,9 +5,8 @@
 import { Feather } from '@expo/vector-icons';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
-import { Modal, Portal, Text } from 'react-native-paper';
+import { Button, Modal, Portal, Text } from 'react-native-paper';
 import { Colors } from '../constants/colors';
-import { AnimatedPressable } from './AnimatedPressable';
 
 interface TaskCompleteModalProps {
   visible: boolean;
@@ -82,23 +81,28 @@ export function TaskCompleteModal({
 
             {/* Buttons */}
             <View style={styles.buttonRow}>
-              <AnimatedPressable
-                scaleTo={0.95}
-                style={styles.skipButton}
+              <Button
+                mode="outlined"
                 onPress={handleSkip}
+                style={styles.skipButton}
+                contentStyle={styles.buttonContent}
+                textColor={Colors.textSecondary}
+                labelStyle={styles.skipButtonText}
               >
-                <Text style={styles.skipButtonText}>Skip</Text>
-              </AnimatedPressable>
+                Skip
+              </Button>
 
-              <AnimatedPressable
-                scaleTo={0.95}
-                style={styles.submitButton}
+              <Button
+                mode="contained"
                 onPress={handleSubmit}
+                style={styles.submitButton}
+                contentStyle={styles.buttonContent}
+                buttonColor={Colors.success}
+                textColor={Colors.white}
+                labelStyle={styles.submitButtonText}
               >
-                <Text style={styles.submitButtonText}>
-                  {note.trim() ? 'Submit' : 'Mark Done'}
-                </Text>
-              </AnimatedPressable>
+                {note.trim() ? 'Submit' : 'Mark Done'}
+              </Button>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -189,14 +193,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
+  buttonContent: {
+    height: 48,
+  },
   skipButton: {
     flex: 1,
-    backgroundColor: Colors.primaryLight,
     borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
     borderColor: Colors.border,
   },
   skipButtonText: {
@@ -207,11 +209,7 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     flex: 1,
-    backgroundColor: Colors.success,
     borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   submitButtonText: {
     fontFamily: 'Inter_700Bold',
