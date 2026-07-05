@@ -242,12 +242,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   groupedCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    paddingTop: 2,
   },
   emptyCard: {
     backgroundColor: Colors.surface,

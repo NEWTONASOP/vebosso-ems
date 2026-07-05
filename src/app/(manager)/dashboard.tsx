@@ -676,12 +676,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   tasksContainer: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
-    ...Colors.shadow,
+    paddingTop: 2,
   },
   quickActionsContainer: {
     paddingHorizontal: 20,

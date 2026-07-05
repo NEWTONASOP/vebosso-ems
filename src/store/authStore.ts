@@ -286,9 +286,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       set({ isLoading: true });
 
-      // Deactivate current session
+      // Deactivate current session and clear push token
       const userId = get().userId;
       if (userId) {
+        // Clear push token from database first so they don't receive notifications anymore
+        await supabase
+          .from('profiles')
+          .update({ expo_push_token: null } as any)
+          .eq('id', userId);
+
         await supabase
           .from('sessions')
           .update({ is_active: false })
