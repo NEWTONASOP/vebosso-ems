@@ -178,7 +178,7 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
               Would you like to assign a task to {profile.full_name} along with the approval?
             </Text>
           </Dialog.Content>
-          <Dialog.Actions style={styles.dialogActions}>
+          <View style={styles.dialogActions}>
             <AnimatedPressable 
               onPress={handleApproveOnly}
               style={styles.dialogButtonSecondary}
@@ -191,7 +191,7 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
             >
               <Text style={styles.dialogButtonPrimaryText}>Assign Task</Text>
             </AnimatedPressable>
-          </Dialog.Actions>
+          </View>
         </Dialog>
       </Portal>
     </Animated.View>
@@ -362,6 +362,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   dialogActions: {
+    flexDirection: 'row',
     paddingHorizontal: 20,
     paddingBottom: 20,
     paddingTop: 16,
