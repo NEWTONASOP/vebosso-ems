@@ -44,7 +44,7 @@ export function TaskCompleteModal({
         contentContainerStyle={styles.modalContainer}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.keyboardView}
         >
           <View style={styles.container}>
@@ -110,7 +110,7 @@ export function TaskCompleteModal({
 const styles = StyleSheet.create({
   modalContainer: {
     marginHorizontal: 20,
-    marginVertical: 'auto',
+    justifyContent: 'center',
   },
   keyboardView: {
     width: '100%',

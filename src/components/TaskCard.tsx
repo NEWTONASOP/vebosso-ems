@@ -11,7 +11,6 @@ import { AnimatedPressable } from './AnimatedPressable';
 import { TaskCompleteModal } from './TaskCompleteModal';
 
 import { Feather } from '@expo/vector-icons';
-import { Colors } from '../constants/colors';
 import { Task, TaskStatus } from '../types/database';
 
 interface TaskCardProps {
@@ -163,11 +162,17 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
 const styles = StyleSheet.create({
   rowWrapper: {
     backgroundColor: '#FFFFFF',
-    marginVertical: 6,
+    marginVertical: 4,
+    marginHorizontal: 2,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.04)',
-    ...Colors.shadow,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+    // Use lighter shadow to avoid Android elevation bleeding between cards
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   rowContent: {
     flexDirection: 'row',
