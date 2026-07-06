@@ -286,7 +286,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
           );
         }
       } catch (notifErr) {
-        console.warn('Failed to send checkout notifications:', notifErr);
+        if (__DEV__) console.warn('Failed to send checkout notifications:', notifErr);
       }
 
       return { success: true };
@@ -376,7 +376,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
             );
           }
         } catch (notifErr) {
-          console.warn('Failed to send task completion notification:', notifErr);
+          if (__DEV__) console.warn('Failed to send task completion notification:', notifErr);
         }
       }
 
@@ -809,7 +809,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
           )
         );
       } catch (notifErr) {
-        console.warn('Failed to send announcement notifications:', notifErr);
+        if (__DEV__) console.warn('Failed to send announcement notifications:', notifErr);
       }
 
       return { success: true };

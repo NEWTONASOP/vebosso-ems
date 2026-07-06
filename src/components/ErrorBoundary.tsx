@@ -51,11 +51,13 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     this.setState({ errorInfo: info });
 
     // Structured error log — replace console.error with Sentry.captureException for production
-    console.error('[ErrorBoundary] Caught unhandled error:', {
-      message: error.message,
-      stack: error.stack,
-      componentStack: info.componentStack,
-    });
+    if (__DEV__) {
+      console.error('[ErrorBoundary] Caught unhandled error:', {
+        message: error.message,
+        stack: error.stack,
+        componentStack: info.componentStack,
+      });
+    }
 
     // Fire the optional onError callback (e.g. for analytics)
     this.props.onError?.(error, info);

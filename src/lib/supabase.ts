@@ -22,7 +22,7 @@ class ExpoSecureStoreAdapter {
     try {
       await SecureStore.setItemAsync(key, value);
     } catch (error) {
-      console.error('SecureStore setItem error:', error);
+      if (__DEV__) console.error('SecureStore setItem error:', error);
     }
   }
 
@@ -30,7 +30,7 @@ class ExpoSecureStoreAdapter {
     try {
       await SecureStore.deleteItemAsync(key);
     } catch (error) {
-      console.error('SecureStore removeItem error:', error);
+      if (__DEV__) console.error('SecureStore removeItem error:', error);
     }
   }
 }
@@ -62,16 +62,16 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
   const errorMessage = '⚠️ Supabase URL or Anon Key is missing. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in your .env file.';
-  console.error(errorMessage);
+  if (__DEV__) console.error(errorMessage);
   
   // In production, log error but don't throw to prevent crash on startup
   // The app will handle auth failures gracefully
   if (process.env.NODE_ENV === 'production') {
-    console.error('Missing Supabase configuration. App may not function correctly.');
+    if (__DEV__) console.error('Missing Supabase configuration. App may not function correctly.');
   }
   
   // In development, show clear warning but allow continuation for setup
-  console.warn('⚠️ Development mode: App will fail without proper Supabase configuration.');
+  if (__DEV__) console.warn('⚠️ Development mode: App will fail without proper Supabase configuration.');
 }
 
 const storage = Platform.OS === 'web' ? new WebStorage() : new ExpoSecureStoreAdapter();

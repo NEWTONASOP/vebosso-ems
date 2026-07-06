@@ -98,7 +98,7 @@ function AuthGuard() {
             };
           }
         } catch (error) {
-          console.error('Failed to setup push notifications:', error);
+          if (__DEV__) console.error('Failed to setup push notifications:', error);
         }
       };
 

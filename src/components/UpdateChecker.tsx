@@ -28,7 +28,7 @@ export function UpdateChecker() {
         showUpdateAlert(result.latestVersion);
       }
     } catch (error) {
-      console.error('Error checking for updates:', error);
+      if (__DEV__) console.error('Error checking for updates:', error);
     }
   };
 
@@ -44,9 +44,9 @@ export function UpdateChecker() {
         {
           text: 'Download Now',
           onPress: () => {
-            openAppStore().catch((err) =>
-              console.error('Failed to open download URL:', err)
-            );
+            openAppStore().catch((err) => {
+              if (__DEV__) console.error('Failed to open download URL:', err);
+            });
           },
         },
       ]

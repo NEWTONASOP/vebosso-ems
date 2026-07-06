@@ -49,7 +49,7 @@ export default function SessionManagementScreen() {
       setSessions((data || []) as unknown as SessionInfo[]);
     } catch (e) {
       setFetchError('Failed to load sessions. Please try again.');
-      console.error('Fetch sessions error:', e);
+      if (__DEV__) console.error('Fetch sessions error:', e);
     } finally {
       setIsLoading(false);
     }
@@ -92,7 +92,7 @@ export default function SessionManagementScreen() {
               fetchSessions();
             } catch (e) {
               setSnackMessage('Failed to force logout. Please try again.');
-              console.error(e);
+              if (__DEV__) console.error(e);
             }
           },
         },

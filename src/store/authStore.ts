@@ -70,7 +70,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       ]);
 
       if (sessionError) {
-        console.error('Session error:', sessionError);
+        if (__DEV__) console.error('Session error:', sessionError);
         set({ isLoading: false, isInitialized: true, error: sessionError.message });
         return;
       }
@@ -185,7 +185,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
       });
     } catch (error) {
-      console.error('Auth initialization error:', error);
+      if (__DEV__) console.error('Auth initialization error:', error);
       set({ isLoading: false, isInitialized: true, error: 'Failed to initialize authentication' });
     }
   },
@@ -266,7 +266,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             is_active: true,
           });
         } catch (e) {
-          console.warn('Could not track session:', e);
+          if (__DEV__) console.warn('Could not track session:', e);
         }
 
         return { success: true };
@@ -314,7 +314,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         error: null,
       });
     } catch (error) {
-      console.error('Sign out error:', error);
+      if (__DEV__) console.error('Sign out error:', error);
       set({ isLoading: false });
     }
   },
@@ -329,13 +329,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         .single();
 
       if (error) {
-        console.error('Fetch profile error:', error);
+        if (__DEV__) console.error('Fetch profile error:', error);
         return null;
       }
 
       return data as Profile;
     } catch (error) {
-      console.error('Fetch profile error:', error);
+      if (__DEV__) console.error('Fetch profile error:', error);
       return null;
     }
   },
@@ -356,7 +356,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         .single();
 
       if (error) {
-        console.error('Update profile error:', error);
+        if (__DEV__) console.error('Update profile error:', error);
         return { success: false, error: error.message || 'Failed to update profile' };
       }
 
@@ -364,7 +364,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return { success: true };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to update profile';
-      console.error('Update profile error:', error);
+      if (__DEV__) console.error('Update profile error:', error);
       return { success: false, error: errorMsg };
     }
   },

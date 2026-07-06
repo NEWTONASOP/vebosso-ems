@@ -83,12 +83,12 @@ export default function ManagerTaskTrackingScreen() {
         .order('full_name');
 
       if (error) {
-        console.error('Error fetching team members:', error);
+        if (__DEV__) console.error('Error fetching team members:', error);
       } else {
         setTeamMembers(data || []);
       }
     } catch (err) {
-      console.error('Error fetching team members:', err);
+      if (__DEV__) console.error('Error fetching team members:', err);
     }
   };
 

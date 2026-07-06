@@ -76,7 +76,7 @@ export default function MemberHomeScreen() {
         fetchTodayTasks(profile.id),
       ]);
     } catch (error) {
-      console.error('Refresh error:', error);
+      if (__DEV__) console.error('Refresh error:', error);
     } finally {
       setRefreshing(false);
     }

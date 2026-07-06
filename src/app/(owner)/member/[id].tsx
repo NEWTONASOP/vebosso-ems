@@ -233,7 +233,7 @@ export default function MemberProfileManagementScreen() {
   };
 
   const handleDeleteMember = () => {
-    console.log('[Delete] Button pressed, member:', member?.id, 'isDeleting:', isDeleting);
+    if (__DEV__) console.log('[Delete] Button pressed, member:', member?.id, 'isDeleting:', isDeleting);
     if (!member) {
       setSnackMessage('Error: No member loaded');
       return;
@@ -267,7 +267,7 @@ export default function MemberProfileManagementScreen() {
     setIsDeleting(true);
     setSnackMessage('Deleting member...');
     try {
-      console.log('[Delete] Invoking edge function for user_id:', memberId);
+      if (__DEV__) console.log('[Delete] Invoking edge function for user_id:', memberId);
       const { data, error } = await supabase.functions.invoke('admin-update-member', {
         body: {
           action: 'delete-member',
@@ -275,18 +275,18 @@ export default function MemberProfileManagementScreen() {
         },
       });
 
-      console.log('[Delete] Response — data:', JSON.stringify(data), 'error:', JSON.stringify(error));
+      if (__DEV__) console.log('[Delete] Response — data:', JSON.stringify(data), 'error:', JSON.stringify(error));
 
       if (error) {
         const msg = parseFunctionError(error);
-        console.error('[Delete] Function invoke error:', error);
+        if (__DEV__) console.error('[Delete] Function invoke error:', error);
         setSnackMessage('Delete failed: ' + msg);
         setIsDeleting(false);
         return;
       }
 
       if (data?.error) {
-        console.error('[Delete] Function returned error:', data.error);
+        if (__DEV__) console.error('[Delete] Function returned error:', data.error);
         setSnackMessage('Delete failed: ' + data.error);
         setIsDeleting(false);
         return;
@@ -296,7 +296,7 @@ export default function MemberProfileManagementScreen() {
       await fetchTeamMembers();
       router.back();
     } catch (err: any) {
-      console.error('[Delete] Unexpected error:', err);
+      if (__DEV__) console.error('[Delete] Unexpected error:', err);
       setSnackMessage('Delete failed: ' + (err?.message || 'Unknown error'));
       setIsDeleting(false);
     }

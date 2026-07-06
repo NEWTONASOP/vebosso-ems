@@ -64,7 +64,7 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
     const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
     if (error) {
-      console.error('Version check error:', error);
+      if (__DEV__) console.error('Version check error:', error);
       // If we can't check, allow app to continue (graceful degradation)
       return {
         needsUpdate: false,
@@ -89,7 +89,7 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
       latestVersion,
     };
   } catch (error) {
-    console.error('Version check failed:', error);
+    if (__DEV__) console.error('Version check failed:', error);
     // Graceful degradation
     const currentVersion = getCurrentVersion();
     return {
@@ -120,12 +120,12 @@ export async function openAppStore(): Promise<void> {
       if (canOpen) {
         await Linking.openURL(downloadUrl);
       } else {
-        console.error('Cannot open download URL');
+        if (__DEV__) console.error('Cannot open download URL');
       }
     } else {
-      console.error('No APK download URL configured');
+      if (__DEV__) console.error('No APK download URL configured');
     }
   } catch (error) {
-    console.error('Error opening download URL:', error);
+    if (__DEV__) console.error('Error opening download URL:', error);
   }
 }

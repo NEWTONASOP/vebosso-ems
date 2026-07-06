@@ -96,7 +96,7 @@ export default function NotificationLogScreen() {
         }
       }
     } catch (err) {
-      console.error('Error handling notification tap:', err);
+      if (__DEV__) console.error('Error handling notification tap:', err);
     }
   };
 

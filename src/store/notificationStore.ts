@@ -41,7 +41,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
       set({ notifications: items, unreadCount: unread });
     } catch (err: any) {
-      console.error('Error fetching notifications:', err);
+      if (__DEV__) console.error('Error fetching notifications:', err);
       set({ error: err.message || 'Failed to load notifications' });
     } finally {
       set({ isLoading: false });
@@ -64,7 +64,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
       if (error) throw error;
     } catch (err) {
-      console.error('Error marking notification as read:', err);
+      if (__DEV__) console.error('Error marking notification as read:', err);
       set({
         notifications: previousNotifications,
         unreadCount: previousNotifications.filter((n) => !n.read).length,
@@ -86,7 +86,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
       if (error) throw error;
     } catch (err) {
-      console.error('Error marking all notifications as read:', err);
+      if (__DEV__) console.error('Error marking all notifications as read:', err);
       set({
         notifications: previousNotifications,
         unreadCount: previousNotifications.filter((n) => !n.read).length,
@@ -108,7 +108,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
       if (error) throw error;
     } catch (err) {
-      console.error('Error deleting notification:', err);
+      if (__DEV__) console.error('Error deleting notification:', err);
       set({
         notifications: previousNotifications,
         unreadCount: previousNotifications.filter((n) => !n.read).length,
@@ -128,7 +128,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
       if (error) throw error;
     } catch (err) {
-      console.error('Error clearing notifications:', err);
+      if (__DEV__) console.error('Error clearing notifications:', err);
       set({
         notifications: previousNotifications,
         unreadCount: previousNotifications.filter((n) => !n.read).length,

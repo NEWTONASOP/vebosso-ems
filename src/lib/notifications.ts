@@ -67,7 +67,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     });
     token = pushToken.data;
   } catch (error) {
-    console.error('Error getting push token:', error);
+    if (__DEV__) console.error('Error getting push token:', error);
     return null;
   }
 
@@ -122,10 +122,10 @@ export async function savePushToken(userId: string, token: string): Promise<void
       .eq('id', userId);
 
     if (error) {
-      console.error('Error saving push token:', error);
+      if (__DEV__) console.error('Error saving push token:', error);
     }
   } catch (error) {
-    console.error('Error saving push token:', error);
+    if (__DEV__) console.error('Error saving push token:', error);
   }
 }
 
@@ -144,10 +144,10 @@ export async function sendPushNotification(
     });
 
     if (error) {
-      console.error('Error sending push notification:', error);
+      if (__DEV__) console.error('Error sending push notification:', error);
     }
   } catch (error) {
-    console.error('Error sending push notification:', error);
+    if (__DEV__) console.error('Error sending push notification:', error);
   }
 }
 
