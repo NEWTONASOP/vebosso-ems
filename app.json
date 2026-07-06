@@ -2,7 +2,7 @@
   "expo": {
     "name": "VEBOSSO EMS",
     "slug": "vebosso-ems",
-    "version": "1.2.2",
+    "version": "1.2.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "vebossoems",
@@ -23,7 +23,8 @@
       "googleServicesFile": "./google-services.json",
       "predictiveBackGestureEnabled": false,
       "allowBackup": false,
-      "minSdkVersion": 29
+      "minSdkVersion": 29,
+      "permissions": []
     },
     "web": {
       "output": "static",
