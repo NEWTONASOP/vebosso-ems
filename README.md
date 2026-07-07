@@ -25,23 +25,25 @@ VEBOSSO EMS is a mobile-first internal tool that lets a company manage employee 
 ### Core Workflows
 - ✅ **Daily Check-in** — Submit a work plan; waits for Owner/Manager approval
 - ⏳ **Approval Workflow** — Approve or reject check-ins and check-outs with rejection reasons
-- 📝 **Day-end Checkout** — Submit end-of-day summary; total hours auto-calculated
+- 📝 **Day-end Checkout** — Submit end-of-day summary with photo evidence; total hours auto-calculated
+- 📸 **Checkout Photos** — Attach photos at checkout, stored in a private Supabase Storage bucket
 - 📋 **Task Management** — Create, assign, track, and complete tasks with notes
 - 📢 **Announcements** — Targeted to all, managers, members, or a specific user
 - 📅 **Attendance History** — Calendar view of all work logs per user
+- 🕗 **Attendance Backfill** — Owner grants a one-time permission for a user to log a missed day
 - 🏖️ **Leave Requests** — Submit, approve, or reject leave requests
 - 📊 **Real-time Dashboard** — Live stats via Supabase Realtime subscriptions
-- 🔔 **Push Notifications** — Expo Push Service for check-in/task alerts
-- 🔒 **Force Logout & Session Management** — Owner can remotely invalidate sessions
+- 🔔 **Push + In-App Notifications** — Expo Push Service plus a persisted in-app notification center (bell + log)
+- 🔒 **Force Logout & Session Management** — Owner can remotely invalidate sessions (edge function + DB RPC)
 - 🔄 **Forced App Updates** — Version gate with minimum version enforcement
 - 👥 **Member Management** — Owner can add, edit, delete members, assign managers
 - 🌐 **Offline Detection** — Banner shown when network is unavailable
 
 ### Technical Highlights
-- Supabase Realtime for live work log / task / announcement updates
-- Row Level Security (RLS) on all 7 database tables
+- Supabase Realtime for live work log / task / announcement / notification updates
+- Row Level Security (RLS) on all 9 database tables + Storage bucket policies
 - 4 Deno Edge Functions for privileged operations
-- Zustand v5 global state with typed stores
+- Zustand v5 global state with typed stores (auth, work, notifications)
 - Auth session persisted via Expo SQLite
 - React Native Reanimated 4 animations
 - Inter font (400–800) with Material Design 3 via React Native Paper
@@ -59,14 +61,19 @@ VEBOSSO EMS is a mobile-first internal tool that lets a company manage employee 
 | React Native | 0.85.3 | UI framework |
 | React | 19.2.3 | UI runtime |
 | TypeScript | ~6.0.3 | Type safety |
-| Supabase JS | ^2.108.2 | Auth, Database, Realtime, Edge Functions |
+| Supabase JS | ^2.108.2 | Auth, Database, Realtime, Storage, Edge Functions |
 | Zustand | ^5.0.14 | Global state management |
 | React Native Paper | ^5.15.3 | Material Design 3 components |
-| Expo Router | ~56.2.11 | File-based navigation |
+| Expo Router | ~56.2.11 | File-based navigation (typed routes) |
 | React Native Reanimated | 4.3.1 | Animations |
+| Expo Notifications | ~56.0.18 | Push + in-app notifications |
+| Expo Image Picker | ~56.0.20 | Checkout photo capture |
+| Expo Updates | ~56.0.19 | Over-the-air updates |
 | date-fns | ^4.4.0 | Date formatting |
 | @expo-google-fonts/inter | ^0.4.2 | Typography |
 | NetInfo | 12.0.1 | Offline detection |
+
+> Current app version: **1.2.4** (bundle `com.vebosso.ems`, min Android SDK 29).
 
 ---
 
@@ -106,14 +113,20 @@ EXPO_PUBLIC_PROJECT_ID=your-expo-project-id
 Run the following migrations **in order** in your Supabase SQL Editor:
 
 ```
-supabase/migrations/001_initial_schema.sql      — Tables, indexes, triggers
-supabase/migrations/002_rls_policies.sql        — Row Level Security policies
-supabase/migrations/003_profile_self_read.sql   — Profile self-read fix
-supabase/migrations/003_manager_assignment_updates.sql — Manager assignment support
-supabase/migrations/004_app_update_system.sql   — Version control & forced updates
-supabase/migrations/005_task_completion_notes.sql — Task completion notes & timestamps
+supabase/migrations/001_initial_schema.sql               — Tables, indexes, triggers
+supabase/migrations/002_rls_policies.sql                 — Row Level Security policies
+supabase/migrations/003_add_version_control.sql          — Version control columns
+supabase/migrations/003_profile_self_read.sql            — Profile self-read fix
+supabase/migrations/003_manager_assignment_updates.sql   — Manager assignment support
+supabase/migrations/004_app_update_system.sql            — Version control & forced updates
+supabase/migrations/005_task_completion_notes.sql        — Task completion notes & timestamps
 supabase/migrations/006_fix_tasks_assigned_by_cascade.sql — Soft-delete for assigned_by
-supabase/migrations/007_security_hardening.sql  — RLS triggers, privilege escalation prevention, constraints
+supabase/migrations/007_security_hardening.sql           — RLS triggers, privilege escalation prevention, constraints
+supabase/migrations/008_fix_total_hours_security.sql     — Secure total-hours computation trigger
+supabase/migrations/009_notifications.sql                — In-app notifications table + realtime
+supabase/migrations/010_add_checkout_photos.sql          — Checkout photos column + private storage bucket
+supabase/migrations/011_attendance_backfills.sql         — Backfill permissions table + insert trigger
+supabase/migrations/011_force_logout_rpc.sql             — force_logout_user() DB function
 ```
 
 Then run the seed to create the owner account:
@@ -128,8 +141,15 @@ In Supabase Dashboard → **Database → Replication**, enable Realtime on:
 - `work_logs`
 - `tasks`
 - `announcements`
+- `notifications`
 
-### 5. Deploy Edge Functions
+> `notifications` is added to the `supabase_realtime` publication automatically by `009_notifications.sql`.
+
+### 5. Storage Bucket
+
+Migration `010_add_checkout_photos.sql` creates a **private** `checkouts` storage bucket (10 MB limit, image MIME types only) with RLS policies so a user can upload to their own folder and owners/managers can read. No manual setup is required — just confirm the bucket exists in **Storage** after running the migration.
+
+### 6. Deploy Edge Functions
 
 ```bash
 supabase functions deploy create-member
@@ -138,7 +158,7 @@ supabase functions deploy force-logout
 supabase functions deploy send-push-notification
 ```
 
-### 6. Run the App
+### 7. Run the App
 
 ```bash
 npx expo start
@@ -231,21 +251,23 @@ Set these in Supabase Dashboard → Table Editor → `app_settings`.
 | Table | Purpose |
 |---|---|
 | `profiles` | Employee data, roles, manager assignments |
-| `work_logs` | Daily check-in/check-out records with approval state |
+| `work_logs` | Daily check-in/check-out records with approval state + `check_out_photos` |
 | `tasks` | Task assignments with status and completion notes |
 | `announcements` | Broadcasts targeted by role or individual user |
 | `leave_requests` | Leave submissions with approval workflow |
+| `notifications` | Per-user in-app notification feed (read/unread) |
+| `backfill_permissions` | One-time owner-granted permission to log a missed attendance day |
 | `sessions` | Active session tracking for force-logout |
 | `app_settings` | Global config including version control settings |
 
-RLS is enabled on all tables. Policies are defined by role (`owner`, `manager`, `member`) with helper functions `is_owner()`, `get_user_role()`, and `is_manager_of(uuid)`.
+RLS is enabled on all tables. Policies are defined by role (`owner`, `manager`, `member`) with helper functions `is_owner()`, `get_user_role()`, and `is_manager_of(uuid)`. The private `checkouts` Storage bucket has its own RLS policies. A `SECURITY DEFINER` RPC `force_logout_user(uuid)` clears a target user's Supabase Auth sessions and refresh tokens.
 
 ---
 
 ## Project Structure
 
 ```
-├── app.json                          # Expo config (v1.1, bundle: com.vebosso.ems)
+├── app.json                          # Expo config (v1.2.4, bundle: com.vebosso.ems)
 ├── eas.json                          # EAS build profiles
 ├── .env.example                      # Environment variable template
 ├── src/
@@ -260,12 +282,14 @@ RLS is enabled on all tables. Policies are defined by role (`owner`, `manager`, 
 │   │   │   ├── dashboard.tsx         # Live stats, team overview
 │   │   │   ├── approvals.tsx         # Pending check-in/out approvals
 │   │   │   ├── tasks.tsx             # All tasks across company
-│   │   │   ├── team.tsx              # Full team member list
 │   │   │   ├── history.tsx           # Company-wide attendance history
+│   │   │   ├── notifications.tsx     # In-app notification log
 │   │   │   ├── member/[id].tsx       # Member detail + admin actions
+│   │   │   ├── team/
+│   │   │   │   ├── index.tsx         # Full team member list
+│   │   │   │   └── add-member.tsx    # Create new member form
 │   │   │   └── settings/
 │   │   │       ├── index.tsx         # App settings screen
-│   │   │       ├── add-member.tsx    # Create new member form
 │   │   │       ├── announcements.tsx # Create/manage announcements
 │   │   │       └── session-management.tsx # Force-logout sessions
 │   │   ├── (manager)/
@@ -274,6 +298,7 @@ RLS is enabled on all tables. Policies are defined by role (`owner`, `manager`, 
 │   │   │   ├── tasks.tsx             # Team task management
 │   │   │   ├── my-team.tsx           # Manager's assigned team
 │   │   │   ├── history.tsx           # Team attendance history
+│   │   │   ├── notifications.tsx     # In-app notification log
 │   │   │   ├── settings.tsx          # Manager profile & password
 │   │   │   └── leaves.tsx            # Manager's own leave request history & application
 │   │   └── (member)/
@@ -281,9 +306,11 @@ RLS is enabled on all tables. Policies are defined by role (`owner`, `manager`, 
 │   │       ├── tasks.tsx             # My tasks list
 │   │       ├── history.tsx           # My attendance calendar
 │   │       ├── announcements.tsx     # Announcements feed
+│   │       ├── notifications.tsx     # In-app notification log
 │   │       ├── profile.tsx           # My profile & password change
 │   │       └── leaves.tsx            # My leave request history & application
-│   ├── components/                   # Shared UI components (LeaveCard, LeaveRequestModal, etc.)
+│   ├── components/                   # Shared UI (CheckInModal, CheckOutModal, TaskDetailModal,
+│   │                                 #   NotificationBell, BackfillModal, LeaveCard, etc.)
 │   ├── lib/
 │   │   ├── supabase.ts               # Supabase client init
 │   │   ├── notifications.ts          # Expo push notification helpers
@@ -292,12 +319,13 @@ RLS is enabled on all tables. Policies are defined by role (`owner`, `manager`, 
 │   │   └── alert.ts                  # Cross-platform alert utility
 │   ├── store/
 │   │   ├── authStore.ts              # Auth state, sign in/out, profile
-│   │   └── workStore.ts              # Work logs, tasks, approvals, announcements
+│   │   ├── workStore.ts              # Work logs, tasks, approvals, announcements
+│   │   └── notificationStore.ts      # In-app notifications state
 │   ├── constants/                    # Colors, roles
 │   ├── types/                        # TypeScript types (database, app)
 │   └── theme/                        # Theme config
 ├── supabase/
-│   ├── migrations/                   # 6 ordered SQL migrations
+│   ├── migrations/                   # 14 ordered SQL migrations
 │   ├── functions/                    # 4 Deno edge functions
 │   ├── scripts/                      # Helper SQL scripts
 │   └── seed.sql                      # Owner account seed
