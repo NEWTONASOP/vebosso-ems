@@ -33,6 +33,7 @@ export default function MemberHomeScreen() {
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showCheckOut, setShowCheckOut] = useState(false);
   const [checkInLoading, setCheckInLoading] = useState(false);
+  const [checkOutLoading, setCheckOutLoading] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [tick, setTick] = useState(0);
@@ -94,8 +95,10 @@ export default function MemberHomeScreen() {
     }
   };
 
-  const handleCheckOut = async (report: string) => {
-    const result = await checkOut(report);
+  const handleCheckOut = async (report: string, photoUris: string[]) => {
+    setCheckOutLoading(true);
+    const result = await checkOut(report, photoUris);
+    setCheckOutLoading(false);
     if (result.success) {
       setShowCheckOut(false);
       setSnackMessage('Day ended! Great work today.');
@@ -321,7 +324,7 @@ export default function MemberHomeScreen() {
       )}
 
       <CheckInModal visible={showCheckIn} onDismiss={() => setShowCheckIn(false)} onSubmit={handleCheckIn} isLoading={checkInLoading} />
-      <CheckOutModal visible={showCheckOut} onDismiss={() => setShowCheckOut(false)} onSubmit={handleCheckOut} />
+      <CheckOutModal visible={showCheckOut} onDismiss={() => setShowCheckOut(false)} onSubmit={handleCheckOut} isLoading={checkOutLoading} />
       <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>{snackMessage}</Snackbar>
     </ScrollView>
     </PageTransition>

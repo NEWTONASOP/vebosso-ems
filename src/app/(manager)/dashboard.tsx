@@ -41,6 +41,7 @@ export default function ManagerDashboard() {
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showCheckOut, setShowCheckOut] = useState(false);
   const [checkInLoading, setCheckInLoading] = useState(false);
+  const [checkOutLoading, setCheckOutLoading] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
   const [elapsed, setElapsed] = useState('');
   const [approvingId, setApprovingId] = useState<string | null>(null);
@@ -140,8 +141,10 @@ export default function ManagerDashboard() {
     }
   };
 
-  const handleCheckOut = async (report: string) => {
-    const result = await checkOut(report);
+  const handleCheckOut = async (report: string, photoUris: string[]) => {
+    setCheckOutLoading(true);
+    const result = await checkOut(report, photoUris);
+    setCheckOutLoading(false);
     if (result.success) { 
       setShowCheckOut(false); 
       setSnackMessage('Day ended! Great work today.'); 
@@ -446,6 +449,7 @@ export default function ManagerDashboard() {
         visible={showCheckOut} 
         onDismiss={() => setShowCheckOut(false)} 
         onSubmit={handleCheckOut} 
+        isLoading={checkOutLoading}
       />
       <Snackbar 
         visible={!!snackMessage} 

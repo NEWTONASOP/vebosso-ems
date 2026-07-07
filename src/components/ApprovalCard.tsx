@@ -3,9 +3,9 @@
 // ============================================================================
 
 import { format } from 'date-fns';
-import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Button, Dialog, Portal, Text } from 'react-native-paper';
+import { useEffect, useState } from 'react';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Button, Dialog, Modal, Portal, Text } from 'react-native-paper';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { AnimatedPressable } from './AnimatedPressable';
 
@@ -14,6 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
 import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
 import { WorkLogWithProfile } from '../types/database';
+import { supabase } from '../lib/supabase';
 
 interface ApprovalCardProps {
   workLog: WorkLogWithProfile;
@@ -27,6 +28,42 @@ interface ApprovalCardProps {
 
 export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove, index = 0, isApproving = false, isRejecting = false }: ApprovalCardProps) {
   const [showTaskDialog, setShowTaskDialog] = useState(false);
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+
+  // Reset state during render when workLog changes
+  const [prevWorkLogId, setPrevWorkLogId] = useState<string | undefined>(undefined);
+  if (workLog?.id !== prevWorkLogId) {
+    setPrevWorkLogId(workLog?.id);
+    setPhotoUrls([]);
+  }
+
+  useEffect(() => {
+    if (workLog?.check_out_photos && workLog.check_out_photos.length > 0) {
+      let isMounted = true;
+      const loadPhotos = async () => {
+        try {
+          const urls = await Promise.all(
+            workLog.check_out_photos!.map(async (path) => {
+              const { data } = await supabase.storage
+                .from('checkouts')
+                .createSignedUrl(path, 3600); // 1 hour
+              return data?.signedUrl || '';
+            })
+          );
+          if (isMounted) {
+            setPhotoUrls(urls.filter(Boolean));
+          }
+        } catch (err) {
+          console.error('Failed to load signed URLs:', err);
+        }
+      };
+      loadPhotos();
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [workLog?.check_out_photos]);
   
   const profile = workLog.profiles;
   const statusConfig = WORK_LOG_STATUS_CONFIG[workLog.status];
@@ -126,6 +163,24 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
             <Text style={styles.planLabel}> Day Report</Text>
           </View>
           <Text style={styles.planText}>{workLog.day_report}</Text>
+
+          {photoUrls.length > 0 && (
+            <View style={styles.photosSection}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosScroll}>
+                <View style={styles.photosContainer}>
+                  {photoUrls.map((url, index) => (
+                    <Pressable
+                      key={index}
+                      onPress={() => setSelectedPhoto(url)}
+                      style={({ pressed }) => [styles.photoWrapper, pressed && { opacity: 0.9 }]}
+                    >
+                      <Image source={{ uri: url }} style={styles.photo} />
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          )}
         </View>
       )}
 
@@ -203,6 +258,27 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
             </Button>
           </View>
         </Dialog>
+      </Portal>
+
+      {/* Full-screen Photo Modal */}
+      <Portal>
+        <Modal
+          visible={!!selectedPhoto}
+          onDismiss={() => setSelectedPhoto(null)}
+          contentContainerStyle={styles.fullImageModal}
+        >
+          {selectedPhoto && (
+            <View style={styles.fullImageWrapper}>
+              <Image source={{ uri: selectedPhoto }} style={styles.fullImage} resizeMode="contain" />
+              <Pressable
+                onPress={() => setSelectedPhoto(null)}
+                style={styles.closeFullImageBtn}
+              >
+                <Feather name="x" size={24} color={Colors.white} />
+              </Pressable>
+            </View>
+          )}
+        </Modal>
       </Portal>
     </Animated.View>
   );
@@ -396,5 +472,58 @@ const styles = StyleSheet.create({
   dialogButtonPrimaryText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
+  },
+  photosSection: {
+    marginTop: 8,
+  },
+  photosScroll: {
+    marginVertical: 4,
+  },
+  photosContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  photoWrapper: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  photo: {
+    width: '100%',
+    height: '100%',
+  },
+  fullImageModal: {
+    margin: 0,
+    padding: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+  },
+  fullImageWrapper: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  fullImage: {
+    width: '90%',
+    height: '80%',
+  },
+  closeFullImageBtn: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

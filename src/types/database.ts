@@ -48,6 +48,7 @@ export interface WorkLog {
   status: WorkLogStatus;
   rejection_reason: string | null;
   total_hours: number | null;
+  check_out_photos: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -167,6 +168,7 @@ export interface WorkLogUpdate {
   status?: WorkLogStatus;
   rejection_reason?: string;
   total_hours?: number;
+  check_out_photos?: string[];
 }
 
 export interface TaskUpdate {

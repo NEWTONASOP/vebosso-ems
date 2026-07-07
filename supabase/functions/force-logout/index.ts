@@ -91,8 +91,10 @@ serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Sign out the target user using admin API
-    const { error: signOutError } = await adminClient.auth.admin.signOut(user_id);
+    // Sign out the target user by revoking sessions in database
+    const { error: signOutError } = await adminClient.rpc('force_logout_user', {
+      target_user_id: user_id,
+    });
 
     if (signOutError) {
       console.error('Sign out error:', signOutError);

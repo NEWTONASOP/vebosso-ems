@@ -10,6 +10,8 @@ import { format } from 'date-fns';
 import { create } from 'zustand';
 import { sendPushNotification } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
+import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 import {
   AnnouncementWithCreator,
   AppSetting,
@@ -82,7 +84,7 @@ interface WorkState {
 
   // Actions — Member
   checkIn: (plan: string) => Promise<{ success: boolean; error?: string }>;
-  checkOut: (report: string) => Promise<{ success: boolean; error?: string }>;
+  checkOut: (report: string, photoUris?: string[]) => Promise<{ success: boolean; error?: string }>;
   fetchTodayLog: (userId: string) => Promise<{ success: boolean; error?: string }>;
   fetchTodayTasks: (userId: string) => Promise<{ success: boolean; error?: string }>;
   updateTaskStatus: (taskId: string, status: 'pending' | 'in_progress' | 'done', completionNote?: string) => Promise<{ success: boolean; error?: string }>;
@@ -120,6 +122,101 @@ interface WorkState {
   // General
   reset: () => void;
 }
+
+const uploadCheckoutPhoto = async (path: string, uri: string, ext: string) => {
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    let iframe: HTMLIFrameElement | null = null;
+    try {
+      // 1. Get binary data using parent window's fetch to support blob: URLs on web
+      let arrayBuffer: ArrayBuffer;
+      let contentType = 'image/jpeg';
+
+      if (uri.startsWith('data:image')) {
+        const base64Data = uri.split(',')[1];
+        contentType = uri.split(';')[0].split(':')[1] || 'image/jpeg';
+        const binaryString = atob(base64Data);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let j = 0; j < len; j++) {
+          bytes[j] = binaryString.charCodeAt(j);
+        }
+        arrayBuffer = bytes.buffer;
+      } else {
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        arrayBuffer = await blob.arrayBuffer();
+        contentType = blob.type || 'image/jpeg';
+      }
+
+      // 2. Retrieve native window objects from clean iframe to bypass RN Web polyfills
+      iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+      const NativeBlob = (iframe.contentWindow as any).Blob;
+      const NativeFormData = (iframe.contentWindow as any).FormData;
+
+      if (NativeBlob && NativeFormData) {
+        // 3. Create a native Blob and native FormData
+        const nativeBlob = new NativeBlob([arrayBuffer], { type: contentType });
+        const formData = new NativeFormData();
+        formData.append('file', nativeBlob, `photo.${ext}`);
+
+        // 4. Upload the FormData directly
+        const { data, error } = await supabase.storage
+          .from('checkouts')
+          .upload(path, formData);
+
+        if (error) throw error;
+        return data;
+      }
+    } catch (e) {
+      console.warn('Web native upload failed, trying fallback:', e);
+    } finally {
+      if (iframe && iframe.parentNode) {
+        document.body.removeChild(iframe);
+      }
+    }
+  }
+
+  // Fallback / Native Mobile Path
+  let body: ArrayBuffer;
+  const extLower = ext.toLowerCase();
+  let contentType = extLower === 'png' ? 'image/png' : extLower === 'webp' ? 'image/webp' : extLower === 'gif' ? 'image/gif' : 'image/jpeg';
+
+  if (uri.startsWith('data:image')) {
+    const base64Data = uri.split(',')[1];
+    contentType = uri.split(';')[0].split(':')[1] || contentType;
+    const binaryString = atob(base64Data);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let j = 0; j < len; j++) {
+      bytes[j] = binaryString.charCodeAt(j);
+    }
+    body = bytes.buffer;
+  } else {
+    // Read local file as base64 using expo-file-system and convert to ArrayBuffer
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let j = 0; j < len; j++) {
+      bytes[j] = binaryString.charCodeAt(j);
+    }
+    body = bytes.buffer;
+  }
+
+  const { data, error } = await supabase.storage
+    .from('checkouts')
+    .upload(path, body, {
+      contentType,
+      upsert: true,
+    });
+
+  if (error) throw error;
+  return data;
+};
 
 export const useWorkStore = create<WorkState>((set, get) => ({
   // Initial state
@@ -219,7 +316,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
     }
   },
 
-  checkOut: async (report: string) => {
+  checkOut: async (report: string, photoUris?: string[]) => {
     try {
       const todayLog = get().todayLog;
       if (!todayLog) return { success: false, error: 'No active check-in found' };
@@ -228,12 +325,36 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       const requireCheckoutApproval = settings['require_checkout_approval'] === 'true';
       const newStatus: WorkLogStatus = requireCheckoutApproval ? 'pending_checkout' : 'done';
 
+      // 1. Upload checkout photos to Supabase Storage if any
+      const uploadedPaths: string[] = [];
+      if (photoUris && photoUris.length > 0) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { success: false, error: 'Authentication required' };
+
+        for (let i = 0; i < photoUris.length; i++) {
+          const uri = photoUris[i];
+          const ext = uri.split('.').pop()?.split('?')[0] || 'jpg';
+          const path = `${user.id}/${Date.now()}_${i}.${ext}`;
+
+          try {
+            await uploadCheckoutPhoto(path, uri, ext);
+          } catch (uploadError: any) {
+            console.error('Failed to upload image:', uploadError);
+            throw new Error(`Failed to upload photo ${i + 1}: ${uploadError.message || uploadError}`);
+          }
+
+          uploadedPaths.push(path);
+        }
+      }
+
+      // 2. Save log update to DB
       const { data, error } = await supabase
         .from('work_logs')
         .update({
           check_out_time: new Date().toISOString(),
           day_report: report,
           status: newStatus,
+          check_out_photos: uploadedPaths.length > 0 ? uploadedPaths : null,
         })
         .eq('id', todayLog.id)
         .select()
