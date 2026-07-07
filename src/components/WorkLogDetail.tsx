@@ -2,21 +2,25 @@
 // VEBOSSO EMS — Work Log Detail Component
 // ============================================================================
 
-import { useEffect, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import { useEffect, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Chip, Divider, Modal, Portal, Text } from 'react-native-paper';
 import { Colors } from '../constants/colors';
 import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
-import { Task, WorkLog } from '../types/database';
 import { supabase } from '../lib/supabase';
+import { Task, WorkLog } from '../types/database';
 
 interface WorkLogDetailProps {
   visible: boolean;
   onDismiss: () => void;
   workLog: WorkLog | null;
   tasks?: Task[];
+  onPrevDay?: () => void;
+  onNextDay?: () => void;
+  hasPrevDay?: boolean;
+  hasNextDay?: boolean;
 }
 
 const TASK_STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
@@ -25,7 +29,16 @@ const TASK_STATUS_CONFIG: Record<string, { color: string; bg: string; label: str
   done: { color: '#34C759', bg: 'rgba(52,199,89,0.08)', label: 'Done' },
 };
 
-export function WorkLogDetail({ visible, onDismiss, workLog, tasks = [] }: WorkLogDetailProps) {
+export function WorkLogDetail({ 
+  visible, 
+  onDismiss, 
+  workLog, 
+  tasks = [],
+  onPrevDay,
+  onNextDay,
+  hasPrevDay = false,
+  hasNextDay = false
+}: WorkLogDetailProps) {
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
@@ -76,8 +89,8 @@ export function WorkLogDetail({ visible, onDismiss, workLog, tasks = [] }: WorkL
       >
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <View>
-              <Text style={styles.dateTitle}>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text style={styles.dateTitle} numberOfLines={1}>
                 {format(new Date(workLog.date), 'EEEE, MMMM dd, yyyy')}
               </Text>
               <Chip
@@ -88,13 +101,43 @@ export function WorkLogDetail({ visible, onDismiss, workLog, tasks = [] }: WorkL
                 {statusConfig.label}
               </Chip>
             </View>
-            <Pressable
-              onPress={onDismiss}
-              style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.5 }]}
-              hitSlop={8}
-            >
-              <Feather name="x" size={20} color={Colors.textSecondary} />
-            </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {onPrevDay && (
+                <Pressable
+                  onPress={onPrevDay}
+                  disabled={!hasPrevDay}
+                  style={({ pressed }) => [
+                    styles.closeBtn,
+                    !hasPrevDay && { opacity: 0.3 },
+                    pressed && hasPrevDay && { opacity: 0.5 }
+                  ]}
+                  hitSlop={12}
+                >
+                  <Feather name="chevron-left" size={26} color={Colors.textSecondary} />
+                </Pressable>
+              )}
+              {onNextDay && (
+                <Pressable
+                  onPress={onNextDay}
+                  disabled={!hasNextDay}
+                  style={({ pressed }) => [
+                    styles.closeBtn,
+                    !hasNextDay && { opacity: 0.3 },
+                    pressed && hasNextDay && { opacity: 0.5 }
+                  ]}
+                  hitSlop={12}
+                >
+                  <Feather name="chevron-right" size={26} color={Colors.textSecondary} />
+                </Pressable>
+              )}
+              <Pressable
+                onPress={onDismiss}
+                style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.5 }]}
+                hitSlop={12}
+              >
+                <Feather name="x" size={24} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
           </View>
 
           <Divider style={styles.divider} />
@@ -364,9 +407,9 @@ const styles = StyleSheet.create({
   },
   // Tasks
   closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: Colors.surfaceLighter,
     alignItems: 'center',
     justifyContent: 'center',

@@ -15,6 +15,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import {
   AnnouncementWithCreator,
   AppSetting,
+  BackfillPermission,
   LeaveRequestWithProfile,
   Profile,
   Task,
@@ -79,6 +80,9 @@ interface WorkState {
   isLoadingLeaves: boolean;
   leavesError: string | null;
 
+  // Backfill permissions state
+  backfillPermissions: BackfillPermission[];
+
   // Realtime channels
   channels: RealtimeChannel[];
 
@@ -108,6 +112,11 @@ interface WorkState {
 
   // Actions — Work History
   fetchWorkHistory: (userId: string, startDate?: string, endDate?: string) => Promise<{ data: WorkLog[], success: boolean; error?: string }>;
+
+  // Actions — Backfill Attendance
+  fetchBackfillPermissions: (userId: string) => Promise<{ success: boolean; error?: string }>;
+  grantBackfillPermission: (userId: string, date: string, ownerId: string) => Promise<{ success: boolean; error?: string }>;
+  submitBackfill: (userId: string, date: string, checkInTime: string, checkInPlan: string, checkOutTime: string, dayReport: string) => Promise<{ success: boolean; error?: string }>;
 
   // Actions — Leave Requests
   fetchLeaveRequests: (role: string, userId: string) => Promise<{ success: boolean; error?: string }>;
@@ -249,6 +258,9 @@ export const useWorkStore = create<WorkState>((set, get) => ({
   pendingLeavesCount: 0,
   isLoadingLeaves: false,
   leavesError: null,
+
+  // Backfill permissions initial state
+  backfillPermissions: [],
 
   // ============================================================================
   // MEMBER ACTIONS
@@ -983,6 +995,179 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       return { data: (data || []) as WorkLog[], success: true };
     } catch (err: any) {
       return { data: [], success: false, error: err.message };
+    }
+  },
+
+  // ============================================================================
+  // BACKFILL ATTENDANCE ACTIONS
+  // ============================================================================
+
+  fetchBackfillPermissions: async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('backfill_permissions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_used', false);
+
+      if (error) return { success: false, error: error.message };
+
+      set({ backfillPermissions: (data as BackfillPermission[]) || [] });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  grantBackfillPermission: async (userId: string, date: string, ownerId: string) => {
+    try {
+      const { error } = await supabase
+        .from('backfill_permissions')
+        .upsert({
+          user_id: userId,
+          date,
+          allowed_by: ownerId,
+          is_used: false,
+          created_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,date'
+        });
+
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  submitBackfill: async (userId: string, date: string, checkInTime: string, checkInPlan: string, checkOutTime: string, dayReport: string) => {
+    try {
+      // 1. Check if there is an active backfill permission for this user and date
+      const { data: permission, error: permError } = await supabase
+        .from('backfill_permissions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .eq('is_used', false)
+        .single();
+
+      if (permError || !permission) {
+        return { success: false, error: 'You are not authorized by the owner to backfill this date.' };
+      }
+
+      // 2. See if a work log already exists for this date
+      const { data: existingLog } = await supabase
+        .from('work_logs')
+        .select('id, status')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .single();
+
+      const settings = get().settings;
+      const requireCheckoutApproval = settings['require_checkout_approval'] === 'true';
+      const newStatus: WorkLogStatus = requireCheckoutApproval ? 'pending_checkout' : 'done';
+
+      let logId: string;
+
+      if (existingLog) {
+        // Update existing log
+        const { data: updatedLog, error: updateError } = await supabase
+          .from('work_logs')
+          .update({
+            check_in_time: checkInTime,
+            check_in_plan: checkInPlan,
+            check_out_time: checkOutTime,
+            day_report: dayReport,
+            status: newStatus,
+          })
+          .eq('id', existingLog.id)
+          .select()
+          .single();
+
+        if (updateError) return { success: false, error: updateError.message };
+        logId = existingLog.id;
+      } else {
+        // Insert new log
+        const { data: newLog, error: insertError } = await supabase
+          .from('work_logs')
+          .insert({
+            user_id: userId,
+            date,
+            check_in_time: checkInTime,
+            check_in_plan: checkInPlan,
+            check_out_time: checkOutTime,
+            day_report: dayReport,
+            status: newStatus,
+          })
+          .select()
+          .single();
+
+        if (insertError) return { success: false, error: insertError.message };
+        logId = newLog.id;
+      }
+
+      // 3. Mark the backfill permission as used
+      const { error: markError } = await supabase
+        .from('backfill_permissions')
+        .update({ is_used: true })
+        .eq('id', permission.id);
+
+      if (markError) {
+        console.warn('Failed to mark backfill permission as used:', markError.message);
+      }
+
+      // 4. Send notifications to manager/owner if needed
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, manager_id')
+          .eq('id', userId)
+          .single();
+
+        if (profile) {
+          const title = requireCheckoutApproval ? 'Backfill Log Request' : 'Backfilled Attendance';
+          const body = requireCheckoutApproval
+            ? `${profile.full_name} has backfilled attendance for ${date} and is waiting for approval`
+            : `${profile.full_name} has backfilled attendance for ${date}`;
+          const notifType = requireCheckoutApproval ? 'checkout_request' : 'checkout_done';
+
+          if (profile.manager_id) {
+            sendPushNotification(
+              profile.manager_id,
+              title,
+              body,
+              { type: notifType, work_log_id: logId }
+            );
+          }
+
+          const { data: owners } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('role', 'owner');
+
+          await Promise.all(
+            (owners || [])
+              .filter((owner) => owner.id !== profile.manager_id && owner.id !== userId)
+              .map((owner) =>
+                sendPushNotification(
+                  owner.id,
+                  title,
+                  body,
+                  { type: notifType, work_log_id: logId }
+                )
+              )
+          );
+        }
+      } catch (notifErr) {
+        if (__DEV__) console.warn('Failed to send backfill notifications:', notifErr);
+      }
+
+      // Refresh local permissions
+      await get().fetchBackfillPermissions(userId);
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   },
 

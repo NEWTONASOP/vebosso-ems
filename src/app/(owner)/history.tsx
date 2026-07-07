@@ -13,11 +13,14 @@ import { WorkLogDetail } from '../../components/WorkLogDetail';
 import { Colors } from '../../constants/colors';
 import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
 import { useWorkStore } from '../../store/workStore';
+import { useAuthStore } from '../../store/authStore';
 import { Profile, Task, WorkLog } from '../../types/database';
 import { supabase } from '../../lib/supabase';
+import { Dialog, Portal, Snackbar } from 'react-native-paper';
 
 export default function OwnerHistoryScreen() {
-  const { teamMembers, fetchTeamMembers, fetchWorkHistory } = useWorkStore();
+  const { profile } = useAuthStore();
+  const { teamMembers, fetchTeamMembers, fetchWorkHistory, grantBackfillPermission } = useWorkStore();
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
@@ -27,6 +30,71 @@ export default function OwnerHistoryScreen() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const [isLoading, setIsLoading] = useState(false);
+
+  // Backfill dialog states
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [actionDialogVisible, setActionDialogVisible] = useState(false);
+  const [backfillDialogVisible, setBackfillDialogVisible] = useState(false);
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
+  const [snackMessage, setSnackMessage] = useState('');
+
+  const handleAuthorize = async () => {
+    if (!selectedDate || !selectedMember || !profile) return;
+    setIsAuthorizing(true);
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    const result = await grantBackfillPermission(selectedMember.id, dateStr, profile.id);
+    setIsAuthorizing(false);
+    setBackfillDialogVisible(false);
+    setActionDialogVisible(false);
+    
+    if (result.success) {
+      setSnackMessage(`Authorized backfill for ${format(selectedDate, 'MMM dd, yyyy')}! 🎉`);
+    } else {
+      setSnackMessage(result.error || 'Failed to authorize backfill.');
+    }
+  };
+
+  const loadTasksForLog = async (log: WorkLog) => {
+    if (!selectedMember) return;
+    try {
+      const { data } = await supabase
+        .from('tasks')
+        .select('*')
+        .or(`work_log_id.eq.${log.id},and(assigned_to.eq.${selectedMember.id},due_date.eq.${log.date})`)
+        .order('created_at', { ascending: true });
+      setSelectedLogTasks((data as Task[]) || []);
+    } catch {
+      setSelectedLogTasks([]);
+    }
+  };
+
+  const handleOpenDetails = async () => {
+    setActionDialogVisible(false);
+    if (!selectedLog || !selectedMember) return;
+    
+    setShowDetail(true);
+    loadTasksForLog(selectedLog);
+  };
+
+  const currentIndex = selectedLog ? workLogs.findIndex((l) => l.id === selectedLog.id) : -1;
+  const hasNextDay = selectedLog ? currentIndex > 0 : false;
+  const hasPrevDay = selectedLog ? (currentIndex !== -1 && currentIndex < workLogs.length - 1) : false;
+
+  const handleNextDay = async () => {
+    if (hasNextDay && currentIndex !== -1) {
+      const nextLog = workLogs[currentIndex - 1];
+      setSelectedLog(nextLog);
+      loadTasksForLog(nextLog);
+    }
+  };
+
+  const handlePrevDay = async () => {
+    if (hasPrevDay && currentIndex !== -1) {
+      const prevLog = workLogs[currentIndex + 1];
+      setSelectedLog(prevLog);
+      loadTasksForLog(prevLog);
+    }
+  };
 
   const loadHistory = useCallback(async () => {
     if (!selectedMember) return;
@@ -143,6 +211,7 @@ export default function OwnerHistoryScreen() {
               {daysInMonth.map((day) => {
                 const log = getLogForDay(day);
                 const isToday = isSameDay(day, new Date());
+                const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
                 return (
                   <TouchableOpacity
                     key={day.toISOString()}
@@ -153,23 +222,32 @@ export default function OwnerHistoryScreen() {
                       isToday && styles.todayCell,
                     ]}
                     onPress={async () => {
-                      if (log && selectedMember) {
-                        setSelectedLog(log);
-                        setShowDetail(true);
-                        // Fetch tasks for this work log
-                        try {
-                          const { data } = await supabase
-                            .from('tasks')
-                            .select('*')
-                            .or(`work_log_id.eq.${log.id},and(assigned_to.eq.${selectedMember.id},due_date.eq.${log.date})`)
-                            .order('created_at', { ascending: true });
-                          setSelectedLogTasks((data as Task[]) || []);
-                        } catch {
-                          setSelectedLogTasks([]);
+                      if (!selectedMember) return;
+                      setSelectedDate(day);
+                      if (log) {
+                        if (isPast) {
+                          setSelectedLog(log);
+                          setActionDialogVisible(true);
+                        } else {
+                          setSelectedLog(log);
+                          setShowDetail(true);
+                          // Fetch tasks for this work log
+                          try {
+                            const { data } = await supabase
+                              .from('tasks')
+                              .select('*')
+                              .or(`work_log_id.eq.${log.id},and(assigned_to.eq.${selectedMember.id},due_date.eq.${log.date})`)
+                              .order('created_at', { ascending: true });
+                            setSelectedLogTasks((data as Task[]) || []);
+                          } catch {
+                            setSelectedLogTasks([]);
+                          }
                         }
+                      } else if (isPast) {
+                        setBackfillDialogVisible(true);
                       }
                     }}
-                    disabled={!log}
+                    disabled={!log && !isPast}
                   >
                     <Text style={[styles.dayNumber, isToday && styles.todayText]}>
                       {format(day, 'd')}
@@ -205,7 +283,94 @@ export default function OwnerHistoryScreen() {
         }}
         workLog={selectedLog}
         tasks={selectedLogTasks}
+        onNextDay={handleNextDay}
+        onPrevDay={handlePrevDay}
+        hasNextDay={hasNextDay}
+        hasPrevDay={hasPrevDay}
       />
+
+      <Portal>
+        {/* Action Options for existing log on a past date */}
+        <Dialog visible={actionDialogVisible} onDismiss={() => setActionDialogVisible(false)} style={styles.dialog}>
+          <Dialog.Title style={styles.dialogTitle}>Attendance Options</Dialog.Title>
+          <Dialog.Content style={{ paddingHorizontal: 0 }}>
+            <Text style={styles.dialogText}>
+              Choose an action for {selectedDate ? format(selectedDate, 'MMMM dd, yyyy') : ''} for {selectedMember?.full_name}:
+            </Text>
+          </Dialog.Content>
+          <View style={styles.dialogActions}>
+            <Button 
+              mode="contained" 
+              onPress={handleOpenDetails} 
+              buttonColor={Colors.accent}
+              textColor="#FFFFFF"
+              style={styles.dialogButtonPrimary}
+              contentStyle={styles.dialogButtonContent}
+              labelStyle={styles.dialogButtonText}
+            >
+              View Details
+            </Button>
+            <Button 
+              mode="contained" 
+              onPress={handleAuthorize} 
+              loading={isAuthorizing} 
+              disabled={isAuthorizing} 
+              buttonColor={Colors.systemGray6}
+              textColor={Colors.warning}
+              style={styles.dialogButtonSecondary}
+              contentStyle={styles.dialogButtonContent}
+              labelStyle={styles.dialogButtonText}
+            >
+              Authorize Edit
+            </Button>
+          </View>
+        </Dialog>
+
+        {/* Dialog for past date with NO log */}
+        <Dialog visible={backfillDialogVisible} onDismiss={() => setBackfillDialogVisible(false)} style={styles.dialog}>
+          <Dialog.Title style={styles.dialogTitle}>Authorize Backfill</Dialog.Title>
+          <Dialog.Content style={{ paddingHorizontal: 0 }}>
+            <Text style={styles.dialogText}>
+              Would you like to authorize {selectedMember?.full_name} to backfill their attendance log for {selectedDate ? format(selectedDate, 'MMMM dd, yyyy') : ''}?
+            </Text>
+          </Dialog.Content>
+          <View style={styles.dialogActions}>
+            <Button 
+              mode="contained"
+              onPress={() => setBackfillDialogVisible(false)} 
+              buttonColor={Colors.systemGray6}
+              textColor={Colors.textPrimary}
+              style={styles.dialogButtonSecondary}
+              contentStyle={styles.dialogButtonContent}
+              labelStyle={styles.dialogButtonText}
+            >
+              Cancel
+            </Button>
+            <Button 
+              mode="contained"
+              onPress={handleAuthorize} 
+              loading={isAuthorizing} 
+              disabled={isAuthorizing} 
+              buttonColor={Colors.accent}
+              textColor="#FFFFFF"
+              style={styles.dialogButtonPrimary}
+              contentStyle={styles.dialogButtonContent}
+              labelStyle={styles.dialogButtonText}
+            >
+              Authorize
+            </Button>
+          </View>
+        </Dialog>
+      </Portal>
+
+      <Snackbar
+        visible={!!snackMessage}
+        onDismiss={() => setSnackMessage('')}
+        duration={3000}
+        wrapperStyle={{ marginBottom: 90 }}
+      >
+        {snackMessage}
+      </Snackbar>
     </View>
   );
 }
@@ -261,4 +426,45 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontSize: 11, color: Colors.textSecondary },
+  dialog: {
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+  },
+  dialogTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 20,
+    color: Colors.text,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 8,
+  },
+  dialogText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 15,
+    color: Colors.textSecondary,
+    lineHeight: 22,
+    paddingHorizontal: 24,
+  },
+  dialogActions: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 16,
+    gap: 10,
+  },
+  dialogButtonContent: {
+    height: 44,
+  },
+  dialogButtonSecondary: {
+    flex: 1,
+    borderRadius: 14,
+  },
+  dialogButtonPrimary: {
+    flex: 1,
+    borderRadius: 14,
+  },
+  dialogButtonText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+  },
 });

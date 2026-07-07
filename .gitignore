@@ -46,5 +46,6 @@ example
 
 
 
-
+.graphifyignore
 google-services.json
+graphify-out

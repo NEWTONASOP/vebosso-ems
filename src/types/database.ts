@@ -53,6 +53,15 @@ export interface WorkLog {
   updated_at: string;
 }
 
+export interface BackfillPermission {
+  id: string;
+  user_id: string;
+  date: string;
+  allowed_by: string;
+  created_at: string;
+  is_used: boolean;
+}
+
 export interface Task {
   id: string;
   assigned_to: string;
