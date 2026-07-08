@@ -4,6 +4,47 @@
 
 ---
 
+## Documentation
+
+| Document | Audience | Purpose |
+|---|---|---|
+| **[CLIENT_GUIDE.md](./CLIENT_GUIDE.md)** | Client / end users | APK install, login, daily use, roles, troubleshooting |
+| **README.md** (this file) | Developers | Setup, database, builds, architecture |
+
+---
+
+## Client Delivery (APK Only)
+
+When handing off to the client **without source code**, ship a folder like:
+
+```
+VEBOSSO_EMS_Delivery_v1.2.7/
+├── vebosso-ems-v1.2.7.apk
+├── CLIENT_GUIDE.md
+└── Owner_Login.txt          ← optional; share credentials out-of-band instead
+```
+
+### Pre-delivery checklist
+
+1. **Build production APK** — `npm run build:prod` or trigger the GitHub Actions workflow (see [Building the App](#building-the-app))
+2. **Verify backend is live** — Supabase migrations applied, edge functions deployed, Realtime enabled
+3. **Confirm owner account** — `seed.sql` run (or existing owner); password changed or ready for forced change on first login
+4. **Set update URLs in Supabase** — `app_settings` keys `latest_version` and `download_url` (updated automatically by CI on release)
+5. **Test on a real Android device** — login, check-in, approval, checkout with photo, push notification
+6. **Rename APK** — e.g. `vebosso-ems-v1.2.7.apk` to match `app.json` version
+7. **Send CLIENT_GUIDE.md** with the APK — do **not** include `.env`, keystore, or service role keys
+
+### What the client gets vs. what stays with you
+
+| Include with client | Keep internal |
+|---|---|
+| Signed release APK | Source code (unless contracted) |
+| CLIENT_GUIDE.md | `.env`, Supabase service role key |
+| Owner login (secure channel) | Android keystore / signing secrets |
+| Support contact | `google-services.json`, Firebase console |
+
+---
+
 ## What Is This App?
 
 VEBOSSO EMS is a mobile-first internal tool that lets a company manage employee attendance, tasks, leave, and announcements — all with a role-based access model. Employees check in daily with a work plan, get approved by their manager or owner, complete tasks, and check out with an end-of-day report.
@@ -35,7 +76,7 @@ VEBOSSO EMS is a mobile-first internal tool that lets a company manage employee 
 - 📊 **Real-time Dashboard** — Live stats via Supabase Realtime subscriptions
 - 🔔 **Push + In-App Notifications** — Expo Push Service plus a persisted in-app notification center (bell + log)
 - 🔒 **Force Logout & Session Management** — Owner can remotely invalidate sessions (edge function + DB RPC)
-- 🔄 **Forced App Updates** — Version gate with minimum version enforcement
+- 🔄 **In-App APK Updates** — Optional update prompt with in-app download and install
 - 👥 **Member Management** — Owner can add, edit, delete members, assign managers
 - 🌐 **Offline Detection** — Banner shown when network is unavailable
 
@@ -49,7 +90,8 @@ VEBOSSO EMS is a mobile-first internal tool that lets a company manage employee 
 - Inter font (400–800) with Material Design 3 via React Native Paper
 - Error Boundary with graceful recovery
 - Loading skeleton states and empty state components
-- Expo Updates (OTA) + EAS build pipeline
+- Expo Updates (OTA) + EAS build pipeline + GitHub Actions production APK workflow
+- Storage cleanup trigger — checkout photos deleted automatically when a profile is removed
 
 ---
 
@@ -73,15 +115,15 @@ VEBOSSO EMS is a mobile-first internal tool that lets a company manage employee 
 | @expo-google-fonts/inter | ^0.4.2 | Typography |
 | NetInfo | 12.0.1 | Offline detection |
 
-> Current app version: **1.2.4** (bundle `com.vebosso.ems`, min Android SDK 29).
+> Current app version: **1.2.7** (bundle `com.vebosso.ems`, min Android SDK 29).
 
 ---
 
 ## Prerequisites
 
-- **Node.js** 18+
-- **Expo CLI**: `npm install -g expo-cli`
+- **Node.js** 18+ (20 recommended for CI parity)
 - **EAS CLI** (for builds): `npm install -g eas-cli`
+- **Supabase CLI** (for edge functions): `npm install -g supabase`
 - **Supabase account**: [supabase.com](https://supabase.com)
 
 ---
@@ -127,6 +169,7 @@ supabase/migrations/009_notifications.sql                — In-app notification
 supabase/migrations/010_add_checkout_photos.sql          — Checkout photos column + private storage bucket
 supabase/migrations/011_attendance_backfills.sql         — Backfill permissions table + insert trigger
 supabase/migrations/011_force_logout_rpc.sql             — force_logout_user() DB function
+supabase/migrations/012_storage_cleanup_trigger.sql      — Delete checkout photos when a profile is deleted
 ```
 
 Then run the seed to create the owner account:
@@ -206,6 +249,18 @@ eas build --platform android --profile production
 
 App version is sourced from EAS remote (`appVersionSource: remote`). Update version in the EAS dashboard before building.
 
+### GitHub Actions (automated production builds)
+
+Pushing a version bump to `app.json` on `main` triggers [`.github/workflows/build-production.yml`](.github/workflows/build-production.yml), which:
+
+1. Runs `expo prebuild` and builds a signed release APK (arm64-v8a)
+2. Publishes a GitHub Release with the APK attached
+3. Updates Supabase `app_settings` (`latest_version`, `download_url`) automatically
+
+You can also trigger the workflow manually via **Actions → Build Production APK → Run workflow**.
+
+Required GitHub repository secrets: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_PROJECT_ID`, `GOOGLE_SERVICES_JSON`, `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `SUPABASE_SERVICE_ROLE_KEY`.
+
 ---
 
 ## OTA Updates (Expo Updates)
@@ -220,18 +275,20 @@ The runtime version policy is `appVersion` — OTA updates are compatible within
 
 ---
 
-## Forced App Update System
+## In-App APK Update System
 
-The app checks `app_settings` on startup for:
+After login, `UpdateChecker` compares the installed version against Supabase `app_settings`:
 
 | Key | Description |
 |---|---|
-| `minimum_app_version` | If current version is below this, user is blocked until they update |
-| `latest_app_version` | If current version is below this, user sees an optional update prompt |
-| `update_message` | Custom message shown on the update screen |
-| `apk_download_url` | Direct APK download URL opened when user taps "Update" |
+| `latest_version` | If the installed version is below this, users see an **optional** update prompt |
+| `download_url` | Direct APK URL used for in-app download/install or browser fallback |
 
-Set these in Supabase Dashboard → Table Editor → `app_settings`.
+Set these in Supabase Dashboard → Table Editor → `app_settings`, or let the [GitHub Actions release workflow](.github/workflows/build-production.yml) update them automatically when a new APK is published.
+
+The app downloads the APK, then opens the Android package installer (`REQUEST_INSTALL_PACKAGES` permission). Users may need to allow **Install unknown apps** for VEBOSSO EMS in Settings.
+
+> Legacy keys from older migrations (`minimum_app_version`, `latest_app_version`, `apk_download_url`) are not read by the current app code — use `latest_version` and `download_url`.
 
 ---
 
@@ -260,16 +317,19 @@ Set these in Supabase Dashboard → Table Editor → `app_settings`.
 | `sessions` | Active session tracking for force-logout |
 | `app_settings` | Global config including version control settings |
 
-RLS is enabled on all tables. Policies are defined by role (`owner`, `manager`, `member`) with helper functions `is_owner()`, `get_user_role()`, and `is_manager_of(uuid)`. The private `checkouts` Storage bucket has its own RLS policies. A `SECURITY DEFINER` RPC `force_logout_user(uuid)` clears a target user's Supabase Auth sessions and refresh tokens.
+RLS is enabled on all tables. Policies are defined by role (`owner`, `manager`, `member`) with helper functions `is_owner()`, `get_user_role()`, and `is_manager_of(uuid)`. The private `checkouts` Storage bucket has its own RLS policies. A `SECURITY DEFINER` RPC `force_logout_user(uuid)` clears a target user's Supabase Auth sessions and refresh tokens. Migration `012` adds a `BEFORE DELETE` trigger on `profiles` that removes the deleted user's checkout photos from Storage.
 
 ---
 
 ## Project Structure
 
 ```
-├── app.json                          # Expo config (v1.2.4, bundle: com.vebosso.ems)
+├── app.json                          # Expo config (v1.2.7, bundle: com.vebosso.ems)
 ├── eas.json                          # EAS build profiles
 ├── .env.example                      # Environment variable template
+├── plugins/withApkInstaller.js       # Expo config plugin for in-app APK install
+├── .github/workflows/
+│   └── build-production.yml          # CI: signed APK build + GitHub Release + Supabase version sync
 ├── src/
 │   ├── app/
 │   │   ├── _layout.tsx               # Root layout — auth guard, theme, version check
@@ -309,7 +369,7 @@ RLS is enabled on all tables. Policies are defined by role (`owner`, `manager`, 
 │   │       ├── notifications.tsx     # In-app notification log
 │   │       ├── profile.tsx           # My profile & password change
 │   │       └── leaves.tsx            # My leave request history & application
-│   ├── components/                   # Shared UI (CheckInModal, CheckOutModal, TaskDetailModal,
+│   ├── components/                   # Shared UI (CheckInModal, CheckOutModal, UpdateChecker,
 │   │                                 #   NotificationBell, BackfillModal, LeaveCard, etc.)
 │   ├── lib/
 │   │   ├── supabase.ts               # Supabase client init
@@ -325,9 +385,9 @@ RLS is enabled on all tables. Policies are defined by role (`owner`, `manager`, 
 │   ├── types/                        # TypeScript types (database, app)
 │   └── theme/                        # Theme config
 ├── supabase/
-│   ├── migrations/                   # 14 ordered SQL migrations
+│   ├── migrations/                   # 15 ordered SQL migrations
 │   ├── functions/                    # 4 Deno edge functions
-│   ├── scripts/                      # Helper SQL scripts
+│   ├── scripts/                      # Helper SQL scripts (e.g. fix-owner-account.sql)
 │   └── seed.sql                      # Owner account seed
 └── assets/                           # Icons, splash, images
 ```
