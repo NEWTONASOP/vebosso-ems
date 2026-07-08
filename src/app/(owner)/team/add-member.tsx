@@ -31,10 +31,10 @@ export default function AddMemberScreen() {
 
   // Auto-generate employee ID
   useEffect(() => {
-    const nextNum = (teamMembers.length + 2).toString().padStart(4, '0');
+    const randomNum = Math.floor(100000 + Math.random() * 900000);
     // @ts-ignore
     // eslint-disable-next-line
-    setEmployeeId(`${EMPLOYEE_ID_PREFIX}-${nextNum}`);
+    setEmployeeId(`${EMPLOYEE_ID_PREFIX}-${randomNum}`);
   }, [teamMembers]);
 
   // Generate random password
@@ -159,8 +159,8 @@ export default function AddMemberScreen() {
                 setDepartment('');
                 setRole('member');
                 setManagerId('');
-                const nextNum = (teamMembers.length + 3).toString().padStart(4, '0');
-                setEmployeeId(`${EMPLOYEE_ID_PREFIX}-${nextNum}`);
+                const randomNum = Math.floor(100000 + Math.random() * 900000);
+                setEmployeeId(`${EMPLOYEE_ID_PREFIX}-${randomNum}`);
               }}
             >
               <Text style={styles.addAnotherBtnText}>Add Another Member</Text>

@@ -112,7 +112,7 @@ serve(async (req) => {
     }
 
     // Generate a unique email from employee_id (used for Supabase Auth)
-    const email = `${employee_id.toLowerCase().replace(/[^a-z0-9]/g, '')}@vebosso.local`;
+    const email = `${employee_id.toLowerCase().replace(/[^a-z0-9]/g, '')}@vebosso.com`;
 
     // Create auth user
     const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
