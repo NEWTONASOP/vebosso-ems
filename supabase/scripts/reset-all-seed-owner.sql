@@ -1,41 +1,44 @@
 -- ============================================================================
--- VEBOSSO EMS — Fix broken owner account (Fresh Reset)
+-- VEBOSSO EMS — Full Reset + Fixed Owner Seed
 -- ============================================================================
--- Run this in your Supabase SQL Editor (or: supabase db execute -f supabase/scripts/fix-owner-account.sql)
--- Deletes the existing owner account and recreates it with a new random employee ID.
+-- DESTRUCTIVE: Deletes ALL auth users and ALL app data tied to profiles
+-- (work logs, tasks, announcements, leave requests, sessions, notifications, etc.)
 --
--- Login credentials (generated on each run):
---   Employee ID: random VB-XXXX (see NOTICE output after run)
---   Password:    VEBOSSO
+-- Preserves: app_settings (version control, company config)
+--
+-- After run, login with:
+--   Employee ID : 2451  (or VB-2451)
+--   Password    : VEBOSSO
+--   Auth email  : vb2451@vebosso.com  (internal; app builds this automatically)
+--
+-- Run in Supabase SQL Editor.
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 DO $$
 DECLARE
   owner_uid UUID := uuid_generate_v4();
-  owner_employee_id TEXT := 'VB-' || LPAD((FLOOR(RANDOM() * 9000) + 1000)::TEXT, 4, '0');
+  owner_employee_id TEXT := 'VB-2451';
+  -- lower() BEFORE regexp_replace (POSIX [a-z] does not match uppercase VB)
   owner_email TEXT := regexp_replace(lower(owner_employee_id), '[^a-z0-9]', '', 'g') || '@vebosso.com';
   owner_password TEXT := 'VEBOSSO';
   encrypted_pw TEXT;
 BEGIN
-  -- Disable triggers that block owner deletion on hosted Supabase
+  -- Disable triggers that can block profile/user deletion on hosted Supabase
   ALTER TABLE public.profiles DISABLE TRIGGER on_profile_delete_cleanup_storage;
   ALTER TABLE public.profiles DISABLE TRIGGER trg_prevent_privilege_escalation;
 
-  -- Remove existing owner account(s)
-  DELETE FROM auth.identities
-  WHERE user_id IN (SELECT id FROM public.profiles WHERE role = 'owner');
-
-  DELETE FROM auth.users
-  WHERE id IN (SELECT id FROM public.profiles WHERE role = 'owner');
+  -- Wipe all auth users (profiles + related app rows cascade via FK)
+  DELETE FROM auth.identities;
+  DELETE FROM auth.users;
 
   ALTER TABLE public.profiles ENABLE TRIGGER on_profile_delete_cleanup_storage;
   ALTER TABLE public.profiles ENABLE TRIGGER trg_prevent_privilege_escalation;
 
   encrypted_pw := extensions.crypt(owner_password, extensions.gen_salt('bf'));
 
-  -- Create owner user in auth.users
   INSERT INTO auth.users (
     instance_id,
     id,
@@ -74,7 +77,6 @@ BEGIN
     ''
   );
 
-  -- Create identity mapping
   INSERT INTO auth.identities (
     id,
     user_id,
@@ -95,7 +97,6 @@ BEGIN
     NOW()
   );
 
-  -- Create profile row linked to the user
   INSERT INTO public.profiles (
     id,
     full_name,
@@ -114,8 +115,8 @@ BEGIN
     false
   );
 
-  RAISE NOTICE 'Owner account seeded successfully!';
-  RAISE NOTICE 'Employee ID: %', owner_employee_id;
-  RAISE NOTICE 'Email: %', owner_email;
-  RAISE NOTICE 'Password: VEBOSSO';
+  RAISE NOTICE '✅ Full reset complete. Owner account created.';
+  RAISE NOTICE '   Employee ID : %', owner_employee_id;
+  RAISE NOTICE '   Email       : %', owner_email;
+  RAISE NOTICE '   Password    : %', owner_password;
 END $$;

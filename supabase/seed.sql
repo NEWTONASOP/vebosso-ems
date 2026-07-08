@@ -15,7 +15,7 @@ DO $$
 DECLARE
   owner_uid UUID := uuid_generate_v4();
   owner_employee_id TEXT := 'VB-' || LPAD((FLOOR(RANDOM() * 9000) + 1000)::TEXT, 4, '0');
-  owner_email TEXT := lower(regexp_replace(owner_employee_id, '[^a-z0-9]', '', 'g')) || '@vebosso.com';
+  owner_email TEXT := regexp_replace(lower(owner_employee_id), '[^a-z0-9]', '', 'g') || '@vebosso.com';
   owner_password TEXT := 'VEBOSSO';
   encrypted_pw TEXT;
 BEGIN

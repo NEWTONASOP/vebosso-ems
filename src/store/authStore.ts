@@ -204,7 +204,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         normalizedId = `VB-${numPart.padStart(4, '0')}`;
       }
 
-      // Construct the internal email format used by create-member / seed scripts
+      // Must match create-member edge function + seed SQL:
+      //   VB-184959 -> vb184959@vebosso.com
       const internalEmail = `${normalizedId.toLowerCase().replace(/[^a-z0-9]/g, '')}@vebosso.com`;
 
       const { data, error } = await supabase.auth.signInWithPassword({
