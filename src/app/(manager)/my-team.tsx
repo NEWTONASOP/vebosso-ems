@@ -2,6 +2,7 @@
 // VEBOSSO EMS — Manager: My Team Screen
 // ============================================================================
 
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Platform, RefreshControl, StyleSheet, View } from 'react-native';
 import { Searchbar, Text } from 'react-native-paper';
@@ -15,13 +16,37 @@ import { Profile } from '../../types/database';
 
 export default function ManagerMyTeamScreen() {
   const { profile } = useAuthStore();
-  const { teamMembers, isLoadingTeam, fetchTeamMembers } = useWorkStore();
+  const {
+    teamMembers,
+    isLoadingTeam,
+    fetchTeamMembers,
+    refreshMemberLiveStatus,
+    memberLiveStatus,
+    subscribeToRealtime,
+  } = useWorkStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (profile) fetchTeamMembers(profile.id);
   }, [profile, fetchTeamMembers]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!profile?.id) return;
+
+      refreshMemberLiveStatus();
+      subscribeToRealtime(profile.id, 'manager', profile.id);
+
+      const pollId = setInterval(() => {
+        refreshMemberLiveStatus();
+      }, 15000);
+
+      return () => {
+        clearInterval(pollId);
+      };
+    }, [profile?.id, refreshMemberLiveStatus, subscribeToRealtime])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -35,7 +60,23 @@ export default function ManagerMyTeamScreen() {
     m.employee_id.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const renderMember = useCallback(({ item }: { item: Profile }) => <MemberCard member={item} />, []);
+  const renderMember = useCallback(({ item }: { item: Profile }) => {
+    const live = memberLiveStatus[item.id];
+    return (
+      <MemberCard
+        member={item}
+        currentStatus={live?.status ?? 'offline'}
+        checkInTime={live?.checkInTime}
+        checkOutTime={live?.checkOutTime}
+        checkInPlan={live?.checkInPlan}
+        dayReport={live?.dayReport}
+        pendingTaskCount={live?.pendingTaskCount ?? 0}
+        inProgressTaskCount={live?.inProgressTaskCount ?? 0}
+        doneTaskCount={live?.doneTaskCount ?? 0}
+        activeTasks={live?.activeTasks ?? []}
+      />
+    );
+  }, [memberLiveStatus]);
 
   return (
     <View style={styles.container}>

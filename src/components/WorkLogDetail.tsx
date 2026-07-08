@@ -89,10 +89,10 @@ export function WorkLogDetail({
       >
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <View style={{ flex: 1, marginRight: 8 }}>
-              <Text style={styles.dateTitle} numberOfLines={1}>
-                {format(new Date(workLog.date), 'EEEE, MMMM dd, yyyy')}
-              </Text>
+            <Text style={styles.dateTitle}>
+              {format(new Date(workLog.date), 'EEEE, MMMM dd, yyyy')}
+            </Text>
+            <View style={styles.headerActions}>
               <Chip
                 style={[styles.statusChip, { backgroundColor: statusConfig.backgroundColor }]}
                 textStyle={[styles.statusText, { color: statusConfig.color }]}
@@ -100,43 +100,43 @@ export function WorkLogDetail({
               >
                 {statusConfig.label}
               </Chip>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {onPrevDay && (
+              <View style={styles.navButtons}>
+                {onPrevDay && (
+                  <Pressable
+                    onPress={onPrevDay}
+                    disabled={!hasPrevDay}
+                    style={({ pressed }) => [
+                      styles.closeBtn,
+                      !hasPrevDay && { opacity: 0.3 },
+                      pressed && hasPrevDay && { opacity: 0.5 }
+                    ]}
+                    hitSlop={12}
+                  >
+                    <Feather name="chevron-left" size={26} color={Colors.textSecondary} />
+                  </Pressable>
+                )}
+                {onNextDay && (
+                  <Pressable
+                    onPress={onNextDay}
+                    disabled={!hasNextDay}
+                    style={({ pressed }) => [
+                      styles.closeBtn,
+                      !hasNextDay && { opacity: 0.3 },
+                      pressed && hasNextDay && { opacity: 0.5 }
+                    ]}
+                    hitSlop={12}
+                  >
+                    <Feather name="chevron-right" size={26} color={Colors.textSecondary} />
+                  </Pressable>
+                )}
                 <Pressable
-                  onPress={onPrevDay}
-                  disabled={!hasPrevDay}
-                  style={({ pressed }) => [
-                    styles.closeBtn,
-                    !hasPrevDay && { opacity: 0.3 },
-                    pressed && hasPrevDay && { opacity: 0.5 }
-                  ]}
+                  onPress={onDismiss}
+                  style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.5 }]}
                   hitSlop={12}
                 >
-                  <Feather name="chevron-left" size={26} color={Colors.textSecondary} />
+                  <Feather name="x" size={24} color={Colors.textSecondary} />
                 </Pressable>
-              )}
-              {onNextDay && (
-                <Pressable
-                  onPress={onNextDay}
-                  disabled={!hasNextDay}
-                  style={({ pressed }) => [
-                    styles.closeBtn,
-                    !hasNextDay && { opacity: 0.3 },
-                    pressed && hasNextDay && { opacity: 0.5 }
-                  ]}
-                  hitSlop={12}
-                >
-                  <Feather name="chevron-right" size={26} color={Colors.textSecondary} />
-                </Pressable>
-              )}
-              <Pressable
-                onPress={onDismiss}
-                style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.5 }]}
-                hitSlop={12}
-              >
-                <Feather name="x" size={24} color={Colors.textSecondary} />
-              </Pressable>
+              </View>
             </View>
           </View>
 
@@ -325,18 +325,25 @@ const styles = StyleSheet.create({
     ...Colors.shadow,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: 10,
   },
   dateTitle: {
     fontSize: 18,
     fontFamily: 'Inter_700Bold',
     color: Colors.text,
-    marginBottom: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  navButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   statusChip: {
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
   },
   statusText: {
     fontSize: 11,

@@ -52,8 +52,13 @@ interface WorkState {
   memberLiveStatus: Record<string, {
     status: WorkLogStatus | 'offline' | 'on_leave';
     checkInTime: string | null;
+    checkOutTime: string | null;
     checkInPlan: string | null;
+    dayReport: string | null;
     pendingTaskCount: number;
+    inProgressTaskCount: number;
+    doneTaskCount: number;
+    activeTasks: { title: string; status: 'pending' | 'in_progress' | 'done' }[];
   }>;
 
   // Announcements
@@ -98,6 +103,8 @@ interface WorkState {
   approveCheckIn: (workLogId: string, approverId: string, tasks?: TaskInsert[]) => Promise<{ success: boolean; error?: string }>;
   rejectCheckIn: (workLogId: string, approverId: string, reason: string) => Promise<{ success: boolean; error?: string }>;
   fetchTeamMembers: (managerId?: string) => Promise<{ success: boolean; error?: string }>;
+  /** Soft refresh of today's live status for loaded team members (no loading spinner) */
+  refreshMemberLiveStatus: () => Promise<{ success: boolean; error?: string }>;
   fetchStats: (managerId?: string) => Promise<{ success: boolean; error?: string }>;
   addTask: (task: TaskInsert) => Promise<{ success: boolean; error?: string }>;
   reassignTask: (taskId: string, newAssigneeId: string, assignerId: string) => Promise<{ success: boolean; error?: string }>;
@@ -725,63 +732,117 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       }
 
       const members = (data as Profile[]) || [];
+      set({ teamMembers: members });
 
-      // Fetch today's work logs + pending task counts in parallel
+      const liveResult = await get().refreshMemberLiveStatus();
+      set({ isLoadingTeam: false, errorTeam: null, teamError: null });
+      return liveResult.success ? { success: true } : liveResult;
+    } catch (err: any) {
+      set({ errorTeam: err.message, teamError: err.message, isLoadingTeam: false });
+      return { success: false, error: err.message };
+    }
+  },
+
+  refreshMemberLiveStatus: async () => {
+    try {
+      const members = get().teamMembers;
+      if (members.length === 0) {
+        set({ memberLiveStatus: {} });
+        return { success: true };
+      }
+
       const today = format(new Date(), 'yyyy-MM-dd');
       const memberIds = members.map((m) => m.id);
 
-      const [logsRes, tasksRes, leavesRes] = await Promise.all([
-        memberIds.length > 0
-          ? supabase
-              .from('work_logs')
-              .select('user_id, status, check_in_time, check_in_plan')
-              .eq('date', today)
-              .in('user_id', memberIds)
-          : Promise.resolve({ data: [], error: null }),
-        memberIds.length > 0
-          ? supabase
-              .from('tasks')
-              .select('assigned_to, status')
-              .in('assigned_to', memberIds)
-              .eq('status', 'pending')
-          : Promise.resolve({ data: [], error: null }),
-        memberIds.length > 0
-          ? supabase
-              .from('leave_requests')
-              .select('user_id')
-              .eq('date', today)
-              .eq('status', 'approved')
-              .in('user_id', memberIds)
-          : Promise.resolve({ data: [], error: null }),
+      const [logsRes, openTasksRes, todayDoneTasksRes, leavesRes] = await Promise.all([
+        supabase
+          .from('work_logs')
+          .select('user_id, status, check_in_time, check_out_time, check_in_plan, day_report')
+          .eq('date', today)
+          .in('user_id', memberIds),
+        supabase
+          .from('tasks')
+          .select('assigned_to, status, title')
+          .in('assigned_to', memberIds)
+          .in('status', ['pending', 'in_progress'])
+          .order('updated_at', { ascending: false }),
+        supabase
+          .from('tasks')
+          .select('assigned_to, status, title')
+          .in('assigned_to', memberIds)
+          .eq('status', 'done')
+          .gte('completed_at', `${today}T00:00:00`)
+          .lte('completed_at', `${today}T23:59:59`)
+          .order('completed_at', { ascending: false }),
+        supabase
+          .from('leave_requests')
+          .select('user_id')
+          .eq('date', today)
+          .eq('status', 'approved')
+          .in('user_id', memberIds),
       ]);
 
-      // Build lookup maps
       const logMap: Record<string, any> = {};
       for (const log of (logsRes.data || [])) logMap[log.user_id] = log;
 
-      const taskCountMap: Record<string, number> = {};
-      for (const task of (tasksRes.data || [])) {
-        taskCountMap[task.assigned_to] = (taskCountMap[task.assigned_to] || 0) + 1;
+      type TaskSnap = { title: string; status: 'pending' | 'in_progress' | 'done' };
+      const taskMap: Record<string, {
+        pending: number;
+        inProgress: number;
+        done: number;
+        active: TaskSnap[];
+      }> = {};
+
+      const ensureBucket = (userId: string) => {
+        if (!taskMap[userId]) {
+          taskMap[userId] = { pending: 0, inProgress: 0, done: 0, active: [] };
+        }
+        return taskMap[userId];
+      };
+
+      for (const task of (openTasksRes.data || []) as { assigned_to: string; status: string; title: string }[]) {
+        const bucket = ensureBucket(task.assigned_to);
+        if (task.status === 'pending') bucket.pending += 1;
+        else if (task.status === 'in_progress') bucket.inProgress += 1;
+
+        if (bucket.active.length < 3) {
+          bucket.active.push({
+            title: task.title,
+            status: task.status as 'pending' | 'in_progress',
+          });
+        }
+      }
+
+      for (const task of (todayDoneTasksRes.data || []) as { assigned_to: string; title: string }[]) {
+        const bucket = ensureBucket(task.assigned_to);
+        bucket.done += 1;
+        if (bucket.active.length < 3) {
+          bucket.active.push({ title: task.title, status: 'done' });
+        }
       }
 
       const onLeaveSet = new Set((leavesRes.data || []).map((l: any) => l.user_id));
 
-      // Build memberLiveStatus map
       const liveStatus: Record<string, any> = {};
       for (const m of members) {
         const log = logMap[m.id];
+        const tasks = taskMap[m.id];
         liveStatus[m.id] = {
           status: onLeaveSet.has(m.id) ? 'on_leave' : (log?.status ?? 'offline'),
           checkInTime: log?.check_in_time ?? null,
+          checkOutTime: log?.check_out_time ?? null,
           checkInPlan: log?.check_in_plan ?? null,
-          pendingTaskCount: taskCountMap[m.id] ?? 0,
+          dayReport: log?.day_report ?? null,
+          pendingTaskCount: tasks?.pending ?? 0,
+          inProgressTaskCount: tasks?.inProgress ?? 0,
+          doneTaskCount: tasks?.done ?? 0,
+          activeTasks: tasks?.active ?? [],
         };
       }
 
-      set({ teamMembers: members, memberLiveStatus: liveStatus, isLoadingTeam: false, errorTeam: null, teamError: null });
+      set({ memberLiveStatus: liveStatus });
       return { success: true };
     } catch (err: any) {
-      set({ errorTeam: err.message, teamError: err.message, isLoadingTeam: false });
       return { success: false, error: err.message };
     }
   },
@@ -1180,6 +1241,17 @@ export const useWorkStore = create<WorkState>((set, get) => ({
     
     const channels: RealtimeChannel[] = [];
     const channelId = Math.random().toString(36).substring(7);
+    const isLead = role === 'owner' || role === 'manager';
+    let liveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleTeamLiveRefresh = () => {
+      if (!isLead) return;
+      if (liveRefreshTimer) clearTimeout(liveRefreshTimer);
+      liveRefreshTimer = setTimeout(() => {
+        liveRefreshTimer = null;
+        get().refreshMemberLiveStatus();
+      }, 400);
+    };
 
     const workLogsChannel = supabase
       .channel(`work_logs_changes_${channelId}`)
@@ -1187,13 +1259,17 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         if (role === 'owner') { get().fetchPendingApprovals(); get().fetchStats(); }
         else if (role === 'manager') { get().fetchPendingApprovals(managerId); get().fetchStats(managerId); }
         get().fetchTodayLog(userId);
+        scheduleTeamLiveRefresh();
       })
       .subscribe();
 
     channels.push(workLogsChannel);
     const tasksChannel = supabase
       .channel(`tasks_changes_${channelId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => get().fetchTodayTasks(userId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+        get().fetchTodayTasks(userId);
+        scheduleTeamLiveRefresh();
+      })
       .subscribe();
 
     channels.push(tasksChannel);
@@ -1203,6 +1279,17 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       .subscribe();
 
     channels.push(announcementsChannel);
+
+    if (isLead) {
+      const leavesChannel = supabase
+        .channel(`leave_requests_changes_${channelId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'leave_requests' }, () => {
+          scheduleTeamLiveRefresh();
+        })
+        .subscribe();
+      channels.push(leavesChannel);
+    }
+
     set({ channels });
   },
 

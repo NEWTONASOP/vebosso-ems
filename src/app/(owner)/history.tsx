@@ -5,7 +5,7 @@
 import { eachDayOfInterval, endOfMonth, format, isSameDay, startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View, Platform, ActivityIndicator } from 'react-native';
-import { Button, Text } from 'react-native-paper';
+import { Button, Text, Snackbar } from 'react-native-paper';
 import { Feather } from '@expo/vector-icons';
 import { EmptyState } from '../../components/EmptyState';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
@@ -14,13 +14,19 @@ import { Colors } from '../../constants/colors';
 import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
 import { useWorkStore } from '../../store/workStore';
 import { useAuthStore } from '../../store/authStore';
-import { Profile, Task, WorkLog } from '../../types/database';
+import { BackfillPermission, Profile, Task, WorkLog } from '../../types/database';
 import { supabase } from '../../lib/supabase';
-import { Dialog, Portal, Snackbar } from 'react-native-paper';
 
 export default function OwnerHistoryScreen() {
   const { profile } = useAuthStore();
-  const { teamMembers, fetchTeamMembers, fetchWorkHistory, grantBackfillPermission } = useWorkStore();
+  const {
+    teamMembers,
+    fetchTeamMembers,
+    fetchWorkHistory,
+    grantBackfillPermission,
+    backfillPermissions,
+    fetchBackfillPermissions,
+  } = useWorkStore();
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
@@ -31,28 +37,10 @@ export default function OwnerHistoryScreen() {
 
   const [isLoading, setIsLoading] = useState(false);
 
-  // Backfill dialog states
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [actionDialogVisible, setActionDialogVisible] = useState(false);
-  const [backfillDialogVisible, setBackfillDialogVisible] = useState(false);
+  // Authorize-edit mode: pick a calendar date instead of dialogs
+  const [authorizeMode, setAuthorizeMode] = useState(false);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
-
-  const handleAuthorize = async () => {
-    if (!selectedDate || !selectedMember || !profile) return;
-    setIsAuthorizing(true);
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const result = await grantBackfillPermission(selectedMember.id, dateStr, profile.id);
-    setIsAuthorizing(false);
-    setBackfillDialogVisible(false);
-    setActionDialogVisible(false);
-    
-    if (result.success) {
-      setSnackMessage(`Authorized backfill for ${format(selectedDate, 'MMM dd, yyyy')}! 🎉`);
-    } else {
-      setSnackMessage(result.error || 'Failed to authorize backfill.');
-    }
-  };
 
   const loadTasksForLog = async (log: WorkLog) => {
     if (!selectedMember) return;
@@ -68,12 +56,44 @@ export default function OwnerHistoryScreen() {
     }
   };
 
-  const handleOpenDetails = async () => {
-    setActionDialogVisible(false);
-    if (!selectedLog || !selectedMember) return;
-    
+  const openLogDetail = async (log: WorkLog) => {
+    setSelectedLog(log);
     setShowDetail(true);
-    loadTasksForLog(selectedLog);
+    await loadTasksForLog(log);
+  };
+
+  const getPermissionForDay = (day: Date): BackfillPermission | undefined =>
+    backfillPermissions.find(
+      (p) => p.date === format(day, 'yyyy-MM-dd') && !p.is_used
+    );
+
+  const handleAuthorizeDate = async (day: Date) => {
+    if (!selectedMember || !profile || isAuthorizing) return;
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    if (day >= startOfToday) {
+      setSnackMessage('Select a past date to authorize edit.');
+      return;
+    }
+
+    if (getPermissionForDay(day)) {
+      setSnackMessage(`Edit already authorized for ${format(day, 'MMM dd, yyyy')}.`);
+      return;
+    }
+
+    setIsAuthorizing(true);
+    const dateStr = format(day, 'yyyy-MM-dd');
+    const result = await grantBackfillPermission(selectedMember.id, dateStr, profile.id);
+    setIsAuthorizing(false);
+
+    if (result.success) {
+      await fetchBackfillPermissions(selectedMember.id);
+      setSnackMessage(`Authorized edit for ${format(day, 'MMM dd, yyyy')}.`);
+      setAuthorizeMode(false);
+    } else {
+      setSnackMessage(result.error || 'Failed to authorize edit.');
+    }
   };
 
   const currentIndex = selectedLog ? workLogs.findIndex((l) => l.id === selectedLog.id) : -1;
@@ -101,14 +121,21 @@ export default function OwnerHistoryScreen() {
     setIsLoading(true);
     const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
     const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-    const result = await fetchWorkHistory(selectedMember.id, start, end);
-    setWorkLogs(result.data);
+    const [historyResult] = await Promise.all([
+      fetchWorkHistory(selectedMember.id, start, end),
+      fetchBackfillPermissions(selectedMember.id),
+    ]);
+    setWorkLogs(historyResult.data);
     setIsLoading(false);
-  }, [selectedMember, currentMonth, fetchWorkHistory]);
+  }, [selectedMember, currentMonth, fetchWorkHistory, fetchBackfillPermissions]);
 
   useEffect(() => {
     fetchTeamMembers();
   }, [fetchTeamMembers]);
+
+  useEffect(() => {
+    setAuthorizeMode(false);
+  }, [selectedMember?.id]);
 
   useEffect(() => {
     // eslint-disable-next-line
@@ -172,6 +199,30 @@ export default function OwnerHistoryScreen() {
         <EmptyState icon="calendar-month-outline" title="Select a Member" subtitle="Choose a team member to view their attendance history" />
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* Authorize edit — above calendar */}
+          <View style={styles.authorizeSection}>
+            <Button
+              mode={authorizeMode ? 'contained' : 'outlined'}
+              onPress={() => setAuthorizeMode((prev) => !prev)}
+              icon="pencil-lock-outline"
+              buttonColor={authorizeMode ? Colors.warning : undefined}
+              textColor={authorizeMode ? Colors.white : Colors.warning}
+              style={[
+                styles.authorizeButton,
+                !authorizeMode && { borderColor: Colors.warning },
+              ]}
+              loading={isAuthorizing}
+              disabled={isAuthorizing}
+            >
+              {authorizeMode ? 'Tap a date to authorize' : 'Authorize Edit'}
+            </Button>
+            {authorizeMode && (
+              <Text style={styles.authorizeHint}>
+                Select a past date so {selectedMember.full_name} can edit attendance for that day.
+              </Text>
+            )}
+          </View>
+
           {/* Month Navigation */}
           <View style={styles.monthNav}>
             <TouchableOpacity
@@ -212,6 +263,9 @@ export default function OwnerHistoryScreen() {
                 const log = getLogForDay(day);
                 const isToday = isSameDay(day, new Date());
                 const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
+                const permission = getPermissionForDay(day);
+                const canSelectInAuthorizeMode = authorizeMode && isPast;
+
                 return (
                   <TouchableOpacity
                     key={day.toISOString()}
@@ -220,34 +274,19 @@ export default function OwnerHistoryScreen() {
                       { backgroundColor: getDayColor(log) },
                       log && { borderColor: getDayBorderColor(log), borderWidth: 1.5 },
                       isToday && styles.todayCell,
+                      permission && styles.authorizedCell,
+                      canSelectInAuthorizeMode && styles.authorizeSelectableCell,
                     ]}
-                    onPress={async () => {
-                      if (!selectedMember) return;
-                      setSelectedDate(day);
+                    onPress={() => {
+                      if (authorizeMode) {
+                        void handleAuthorizeDate(day);
+                        return;
+                      }
                       if (log) {
-                        if (isPast) {
-                          setSelectedLog(log);
-                          setActionDialogVisible(true);
-                        } else {
-                          setSelectedLog(log);
-                          setShowDetail(true);
-                          // Fetch tasks for this work log
-                          try {
-                            const { data } = await supabase
-                              .from('tasks')
-                              .select('*')
-                              .or(`work_log_id.eq.${log.id},and(assigned_to.eq.${selectedMember.id},due_date.eq.${log.date})`)
-                              .order('created_at', { ascending: true });
-                            setSelectedLogTasks((data as Task[]) || []);
-                          } catch {
-                            setSelectedLogTasks([]);
-                          }
-                        }
-                      } else if (isPast) {
-                        setBackfillDialogVisible(true);
+                        void openLogDetail(log);
                       }
                     }}
-                    disabled={!log && !isPast}
+                    disabled={authorizeMode ? !isPast : !log}
                   >
                     <Text style={[styles.dayNumber, isToday && styles.todayText]}>
                       {format(day, 'd')}
@@ -256,6 +295,9 @@ export default function OwnerHistoryScreen() {
                       <Text style={[styles.dayHours, { color: WORK_LOG_STATUS_CONFIG[log.status]?.color }]}>
                         {log.total_hours ? `${log.total_hours}h` : '·'}
                       </Text>
+                    )}
+                    {permission && !log && (
+                      <Text style={styles.authorizedMark}>Edit</Text>
                     )}
                   </TouchableOpacity>
                 );
@@ -271,6 +313,10 @@ export default function OwnerHistoryScreen() {
                 <Text style={styles.legendText}>{config.label}</Text>
               </View>
             ))}
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: Colors.warning }]} />
+              <Text style={styles.legendText}>Edit authorized</Text>
+            </View>
           </View>
         </ScrollView>
       )}
@@ -288,80 +334,6 @@ export default function OwnerHistoryScreen() {
         hasNextDay={hasNextDay}
         hasPrevDay={hasPrevDay}
       />
-
-      <Portal>
-        {/* Action Options for existing log on a past date */}
-        <Dialog visible={actionDialogVisible} onDismiss={() => setActionDialogVisible(false)} style={styles.dialog}>
-          <Dialog.Title style={styles.dialogTitle}>Attendance Options</Dialog.Title>
-          <Dialog.Content style={{ paddingHorizontal: 0 }}>
-            <Text style={styles.dialogText}>
-              Choose an action for {selectedDate ? format(selectedDate, 'MMMM dd, yyyy') : ''} for {selectedMember?.full_name}:
-            </Text>
-          </Dialog.Content>
-          <View style={styles.dialogActions}>
-            <Button 
-              mode="contained" 
-              onPress={handleOpenDetails} 
-              buttonColor={Colors.accent}
-              textColor="#FFFFFF"
-              style={styles.dialogButtonPrimary}
-              contentStyle={styles.dialogButtonContent}
-              labelStyle={styles.dialogButtonText}
-            >
-              View Details
-            </Button>
-            <Button 
-              mode="contained" 
-              onPress={handleAuthorize} 
-              loading={isAuthorizing} 
-              disabled={isAuthorizing} 
-              buttonColor={Colors.systemGray6}
-              textColor={Colors.warning}
-              style={styles.dialogButtonSecondary}
-              contentStyle={styles.dialogButtonContent}
-              labelStyle={styles.dialogButtonText}
-            >
-              Authorize Edit
-            </Button>
-          </View>
-        </Dialog>
-
-        {/* Dialog for past date with NO log */}
-        <Dialog visible={backfillDialogVisible} onDismiss={() => setBackfillDialogVisible(false)} style={styles.dialog}>
-          <Dialog.Title style={styles.dialogTitle}>Authorize Backfill</Dialog.Title>
-          <Dialog.Content style={{ paddingHorizontal: 0 }}>
-            <Text style={styles.dialogText}>
-              Would you like to authorize {selectedMember?.full_name} to backfill their attendance log for {selectedDate ? format(selectedDate, 'MMMM dd, yyyy') : ''}?
-            </Text>
-          </Dialog.Content>
-          <View style={styles.dialogActions}>
-            <Button 
-              mode="contained"
-              onPress={() => setBackfillDialogVisible(false)} 
-              buttonColor={Colors.systemGray6}
-              textColor={Colors.textPrimary}
-              style={styles.dialogButtonSecondary}
-              contentStyle={styles.dialogButtonContent}
-              labelStyle={styles.dialogButtonText}
-            >
-              Cancel
-            </Button>
-            <Button 
-              mode="contained"
-              onPress={handleAuthorize} 
-              loading={isAuthorizing} 
-              disabled={isAuthorizing} 
-              buttonColor={Colors.accent}
-              textColor="#FFFFFF"
-              style={styles.dialogButtonPrimary}
-              contentStyle={styles.dialogButtonContent}
-              labelStyle={styles.dialogButtonText}
-            >
-              Authorize
-            </Button>
-          </View>
-        </Dialog>
-      </Portal>
 
       <Snackbar
         visible={!!snackMessage}
@@ -381,6 +353,15 @@ const styles = StyleSheet.create({
   title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
   pickerSection: { paddingHorizontal: 20, paddingTop: 12 },
   pickerButton: { borderColor: Colors.border, borderRadius: 12, justifyContent: 'flex-start' },
+  authorizeSection: { marginTop: 8 },
+  authorizeButton: { borderRadius: 12 },
+  authorizeHint: {
+    marginTop: 8,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 110 },
   monthNav: {
     flexDirection: 'row',
@@ -407,9 +388,23 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   todayCell: { borderColor: Colors.accent, borderWidth: 1.5, backgroundColor: Colors.accentSubtle },
+  authorizedCell: {
+    backgroundColor: Colors.warningLight,
+    borderColor: Colors.warning,
+    borderWidth: 1.5,
+  },
+  authorizeSelectableCell: {
+    opacity: 1,
+  },
   dayNumber: { fontSize: 14, color: Colors.text, fontWeight: '500' },
   todayText: { color: Colors.accent, fontWeight: '700' },
   dayHours: { fontSize: 9, marginTop: 1, fontWeight: '600' },
+  authorizedMark: {
+    fontSize: 8,
+    marginTop: 1,
+    fontWeight: '700',
+    color: Colors.warning,
+  },
   legend: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -426,45 +421,4 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontSize: 11, color: Colors.textSecondary },
-  dialog: {
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
-  },
-  dialogTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 20,
-    color: Colors.text,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 8,
-  },
-  dialogText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    color: Colors.textSecondary,
-    lineHeight: 22,
-    paddingHorizontal: 24,
-  },
-  dialogActions: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    paddingTop: 16,
-    gap: 10,
-  },
-  dialogButtonContent: {
-    height: 44,
-  },
-  dialogButtonSecondary: {
-    flex: 1,
-    borderRadius: 14,
-  },
-  dialogButtonPrimary: {
-    flex: 1,
-    borderRadius: 14,
-  },
-  dialogButtonText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
-  },
 });

@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { Chip, Menu, Searchbar, Snackbar, Text } from 'react-native-paper';
@@ -23,7 +23,16 @@ import { Profile } from '../../../types/database';
 export default function OwnerTeamScreen() {
   const router = useRouter();
   const { profile } = useAuthStore();
-  const { teamMembers, isLoadingTeam, teamError, fetchTeamMembers, addTask, memberLiveStatus } = useWorkStore();
+  const {
+    teamMembers,
+    isLoadingTeam,
+    teamError,
+    fetchTeamMembers,
+    refreshMemberLiveStatus,
+    addTask,
+    memberLiveStatus,
+    subscribeToRealtime,
+  } = useWorkStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
@@ -40,6 +49,24 @@ export default function OwnerTeamScreen() {
   useEffect(() => {
     fetchTeamMembers();
   }, [fetchTeamMembers]);
+
+  // Keep live status fresh while Team tab is focused (realtime + poll fallback)
+  useFocusEffect(
+    useCallback(() => {
+      if (!profile?.id) return;
+
+      refreshMemberLiveStatus();
+      subscribeToRealtime(profile.id, 'owner');
+
+      const pollId = setInterval(() => {
+        refreshMemberLiveStatus();
+      }, 15000);
+
+      return () => {
+        clearInterval(pollId);
+      };
+    }, [profile?.id, refreshMemberLiveStatus, subscribeToRealtime])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -147,8 +174,13 @@ export default function OwnerTeamScreen() {
         member={item}
         currentStatus={live?.status ?? 'offline'}
         checkInTime={live?.checkInTime}
+        checkOutTime={live?.checkOutTime}
         checkInPlan={live?.checkInPlan}
+        dayReport={live?.dayReport}
         pendingTaskCount={live?.pendingTaskCount ?? 0}
+        inProgressTaskCount={live?.inProgressTaskCount ?? 0}
+        doneTaskCount={live?.doneTaskCount ?? 0}
+        activeTasks={live?.activeTasks ?? []}
         onPress={(pageY: number) => handleMemberPress(item, pageY)}
       />
     );

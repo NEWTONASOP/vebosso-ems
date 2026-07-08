@@ -108,6 +108,18 @@ export default function MemberProfileManagementScreen() {
     }
   }, [memberId]);
 
+  // Expo Router reuses member/[id] when switching members — reset action UI state
+  useEffect(() => {
+    setIsDeleting(false);
+    setIsSaving(false);
+    setIsUpdatingPassword(false);
+    setIsLoggingOutSessions(null);
+    setSnackMessage('');
+    setNewPassword('');
+    setShowPassword(false);
+    setShowManagerPicker(false);
+  }, [memberId]);
+
   useEffect(() => {
     loadMemberData();
     fetchTeamMembers();
@@ -281,14 +293,12 @@ export default function MemberProfileManagementScreen() {
         const msg = parseFunctionError(error);
         if (__DEV__) console.error('[Delete] Function invoke error:', error);
         setSnackMessage('Delete failed: ' + msg);
-        setIsDeleting(false);
         return;
       }
 
       if (data?.error) {
         if (__DEV__) console.error('[Delete] Function returned error:', data.error);
         setSnackMessage('Delete failed: ' + data.error);
-        setIsDeleting(false);
         return;
       }
 
@@ -298,6 +308,8 @@ export default function MemberProfileManagementScreen() {
     } catch (err: any) {
       if (__DEV__) console.error('[Delete] Unexpected error:', err);
       setSnackMessage('Delete failed: ' + (err?.message || 'Unknown error'));
+    } finally {
+      // Always clear so a reused member/[id] screen is not stuck loading
       setIsDeleting(false);
     }
   };
