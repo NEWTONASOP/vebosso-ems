@@ -204,14 +204,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         normalizedId = `VB-${numPart.padStart(4, '0')}`;
       }
 
-      // First, look up the employee's email by their employee_id
-      // We need to construct the internal email format used by create-member
-      let internalEmail = `${normalizedId.toLowerCase().replace(/[^a-z0-9]/g, '')}@vebosso.local`;
-
-      // Special mapping for the seeded owner account
-      if (normalizedId === 'VB-0001' || normalizedId === 'OWNER') {
-        internalEmail = 'owner@vebosso.com';
-      }
+      // Construct the internal email format used by create-member / seed scripts
+      const internalEmail = `${normalizedId.toLowerCase().replace(/[^a-z0-9]/g, '')}@vebosso.com`;
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: internalEmail,

@@ -1,15 +1,12 @@
 -- ============================================================================
 -- VEBOSSO EMS — Seed Owner Account (Fresh Reset)
 -- ============================================================================
--- Run this in your Supabase SQL Editor.
--- Deletes all old users and recreates the owner account.
+-- Run this in your Supabase SQL Editor (or: supabase db execute -f supabase/seed.sql)
+-- Deletes the existing owner account and recreates it with a new random employee ID.
 --
--- ⚠️  IMPORTANT: Change the owner password immediately after first login!
---     The default password is intentionally strong but must be rotated.
---
--- Login credentials:
---   Employee ID: VB-0001
---   Password:    VbOwner#Reset2026!  ← CHANGE THIS ON FIRST LOGIN
+-- Login credentials (generated on each run):
+--   Employee ID: random VB-XXXX (see NOTICE output after run)
+--   Password:    VEBOSSO
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -17,15 +14,24 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 DO $$
 DECLARE
   owner_uid UUID := uuid_generate_v4();
-  owner_email TEXT := 'owner@vebosso.com';
-  -- ⚠️  Change this password immediately after first login via the app.
-  owner_password TEXT := 'VbOwner#Reset2026!';
+  owner_employee_id TEXT := 'VB-' || LPAD((FLOOR(RANDOM() * 9000) + 1000)::TEXT, 4, '0');
+  owner_email TEXT := lower(regexp_replace(owner_employee_id, '[^a-z0-9]', '', 'g')) || '@vebosso.com';
+  owner_password TEXT := 'VEBOSSO';
   encrypted_pw TEXT;
 BEGIN
-  -- Delete all existing auth identities and users
-  -- Note: Cascades will automatically delete rows in public.profiles, work_logs, tasks, etc.
-  DELETE FROM auth.identities;
-  DELETE FROM auth.users;
+  -- Disable triggers that block owner deletion on hosted Supabase
+  ALTER TABLE public.profiles DISABLE TRIGGER on_profile_delete_cleanup_storage;
+  ALTER TABLE public.profiles DISABLE TRIGGER trg_prevent_privilege_escalation;
+
+  -- Remove existing owner account(s)
+  DELETE FROM auth.identities
+  WHERE user_id IN (SELECT id FROM public.profiles WHERE role = 'owner');
+
+  DELETE FROM auth.users
+  WHERE id IN (SELECT id FROM public.profiles WHERE role = 'owner');
+
+  ALTER TABLE public.profiles ENABLE TRIGGER on_profile_delete_cleanup_storage;
+  ALTER TABLE public.profiles ENABLE TRIGGER trg_prevent_privilege_escalation;
 
   encrypted_pw := extensions.crypt(owner_password, extensions.gen_salt('bf'));
 
@@ -59,7 +65,7 @@ BEGIN
     NOW(),
     NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"VEBOSSO Owner","employee_id":"VB-0001"}',
+    jsonb_build_object('full_name', 'VEBOSSO Owner', 'employee_id', owner_employee_id),
     NOW(),
     NOW(),
     '',
@@ -90,7 +96,6 @@ BEGIN
   );
 
   -- Create profile row linked to the user
-  -- must_change_password = true forces a password change on first login
   INSERT INTO public.profiles (
     id,
     full_name,
@@ -102,16 +107,15 @@ BEGIN
   ) VALUES (
     owner_uid,
     'VEBOSSO Owner',
-    'VB-0001',
+    owner_employee_id,
     'owner',
     'Management',
     true,
-    true   -- ← Forces password change on first login
+    false
   );
 
   RAISE NOTICE '✅ Owner account seeded successfully!';
-  RAISE NOTICE '   Employee ID : VB-0001';
-  RAISE NOTICE '   Email       : owner@vebosso.com';
-  RAISE NOTICE '   Password    : VbOwner#Reset2026!';
-  RAISE NOTICE '   ⚠️  CHANGE THIS PASSWORD ON FIRST LOGIN!';
+  RAISE NOTICE '   Employee ID : %', owner_employee_id;
+  RAISE NOTICE '   Email       : %', owner_email;
+  RAISE NOTICE '   Password    : VEBOSSO';
 END $$;

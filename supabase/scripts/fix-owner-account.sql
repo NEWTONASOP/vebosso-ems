@@ -1,12 +1,11 @@
 -- ============================================================================
 -- VEBOSSO EMS — Fix broken owner account (Fresh Reset)
 -- ============================================================================
--- Run this in your Supabase SQL Editor.
--- Deletes all old users and recreates the owner account.
+-- Run this in your Supabase SQL Editor (or: supabase db execute -f supabase/scripts/fix-owner-account.sql)
+-- Deletes the existing owner account and recreates it with a new random employee ID.
 --
--- Login credentials:
---   Employee ID: VB-0001
---   Email:       owner@vebosso.com
+-- Login credentials (generated on each run):
+--   Employee ID: random VB-XXXX (see NOTICE output after run)
 --   Password:    VEBOSSO
 -- ============================================================================
 
@@ -15,14 +14,24 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 DO $$
 DECLARE
   owner_uid UUID := uuid_generate_v4();
-  owner_email TEXT := 'owner@vebosso.com';
+  owner_employee_id TEXT := 'VB-' || LPAD((FLOOR(RANDOM() * 9000) + 1000)::TEXT, 4, '0');
+  owner_email TEXT := lower(regexp_replace(owner_employee_id, '[^a-z0-9]', '', 'g')) || '@vebosso.com';
   owner_password TEXT := 'VEBOSSO';
   encrypted_pw TEXT;
 BEGIN
-  -- Delete all existing auth identities and users
-  -- Note: Cascades will automatically delete rows in public.profiles, work_logs, tasks, etc.
-  DELETE FROM auth.identities;
-  DELETE FROM auth.users;
+  -- Disable triggers that block owner deletion on hosted Supabase
+  ALTER TABLE public.profiles DISABLE TRIGGER on_profile_delete_cleanup_storage;
+  ALTER TABLE public.profiles DISABLE TRIGGER trg_prevent_privilege_escalation;
+
+  -- Remove existing owner account(s)
+  DELETE FROM auth.identities
+  WHERE user_id IN (SELECT id FROM public.profiles WHERE role = 'owner');
+
+  DELETE FROM auth.users
+  WHERE id IN (SELECT id FROM public.profiles WHERE role = 'owner');
+
+  ALTER TABLE public.profiles ENABLE TRIGGER on_profile_delete_cleanup_storage;
+  ALTER TABLE public.profiles ENABLE TRIGGER trg_prevent_privilege_escalation;
 
   encrypted_pw := extensions.crypt(owner_password, extensions.gen_salt('bf'));
 
@@ -56,7 +65,7 @@ BEGIN
     NOW(),
     NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"VEBOSSO Owner","employee_id":"VB-0001"}',
+    jsonb_build_object('full_name', 'VEBOSSO Owner', 'employee_id', owner_employee_id),
     NOW(),
     NOW(),
     '',
@@ -98,7 +107,7 @@ BEGIN
   ) VALUES (
     owner_uid,
     'VEBOSSO Owner',
-    'VB-0001',
+    owner_employee_id,
     'owner',
     'Management',
     true,
@@ -106,7 +115,7 @@ BEGIN
   );
 
   RAISE NOTICE 'Owner account seeded successfully!';
-  RAISE NOTICE 'Employee ID: VB-0001';
-  RAISE NOTICE 'Email: owner@vebosso.com';
+  RAISE NOTICE 'Employee ID: %', owner_employee_id;
+  RAISE NOTICE 'Email: %', owner_email;
   RAISE NOTICE 'Password: VEBOSSO';
 END $$;
