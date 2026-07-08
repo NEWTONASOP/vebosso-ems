@@ -12,11 +12,12 @@ import { EmptyState } from '../../../components/EmptyState';
 import { Colors } from '../../../constants/colors';
 import { useAuthStore } from '../../../store/authStore';
 import { useWorkStore } from '../../../store/workStore';
+import { Alert } from '../../../lib/alert';
 
 export default function AnnouncementsScreen() {
   const router = useRouter();
   const { profile } = useAuthStore();
-  const { announcements, fetchAnnouncements, createAnnouncement } = useWorkStore();
+  const { announcements, fetchAnnouncements, createAnnouncement, deleteAnnouncement } = useWorkStore();
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -24,6 +25,8 @@ export default function AnnouncementsScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
   const [showForm, setShowForm] = useState(false);
+
+  const isOwner = profile?.role === 'owner';
 
   useEffect(() => {
     if (profile) {
@@ -37,6 +40,10 @@ export default function AnnouncementsScreen() {
       return;
     }
     if (!profile) return;
+    if (!isOwner) {
+      setSnackMessage('Only the Owner can create announcements.');
+      return;
+    }
 
     setIsLoading(true);
     const result = await createAnnouncement({
@@ -58,6 +65,31 @@ export default function AnnouncementsScreen() {
     }
   };
 
+  const handleDelete = (announcementId: string) => {
+    if (!profile || !isOwner) return;
+    Alert.alert(
+      'Delete Announcement',
+      'Are you sure you want to permanently delete this announcement?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const res = await deleteAnnouncement(announcementId);
+
+            if (res.success) {
+              setSnackMessage('Announcement deleted.');
+              fetchAnnouncements(profile.role, profile.id);
+            } else {
+              setSnackMessage(res.error || 'Failed to delete announcement.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -72,22 +104,24 @@ export default function AnnouncementsScreen() {
         </Pressable>
         <Text style={styles.title}>Announcements</Text>
         <View style={{ flex: 1 }} />
-        <Pressable
-          style={({ pressed }) => [
-            styles.newBtn,
-            pressed && styles.btnPressed,
-            showForm && styles.newBtnActive
-          ]}
-          onPress={() => setShowForm(!showForm)}
-        >
-          <Feather name={showForm ? 'x' : 'plus'} size={16} color={showForm ? Colors.textPrimary : Colors.white} />
-          <Text style={[styles.newBtnText, showForm && styles.newBtnTextActive]}>
-            {showForm ? 'Cancel' : 'New'}
-          </Text>
-        </Pressable>
+        {isOwner && (
+          <Pressable
+            style={({ pressed }) => [
+              styles.newBtn,
+              pressed && styles.btnPressed,
+              showForm && styles.newBtnActive
+            ]}
+            onPress={() => setShowForm(!showForm)}
+          >
+            <Feather name={showForm ? 'x' : 'plus'} size={16} color={showForm ? Colors.textPrimary : Colors.white} />
+            <Text style={[styles.newBtnText, showForm && styles.newBtnTextActive]}>
+              {showForm ? 'Cancel' : 'New'}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
-      {showForm && (
+      {isOwner && showForm && (
         <View style={styles.formSection}>
           <TextInput
             mode="outlined"
@@ -154,7 +188,13 @@ export default function AnnouncementsScreen() {
 
       <FlatList
         data={announcements}
-        renderItem={({ item }) => <AnnouncementCard announcement={item} />}
+        renderItem={({ item }) => (
+          <AnnouncementCard
+            announcement={item}
+            canDelete={isOwner}
+            onDelete={(announcementId) => handleDelete(announcementId)}
+          />
+        )}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={

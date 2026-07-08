@@ -3,7 +3,7 @@
 // ============================================================================
 
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { Pressable, View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -11,13 +11,16 @@ import { AnnouncementWithCreator } from '../types/database';
 import { Feather } from '@expo/vector-icons';
 
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import { Colors } from '../constants/colors';
 
 interface AnnouncementCardProps {
   announcement: AnnouncementWithCreator;
   index?: number;
+  canDelete?: boolean;
+  onDelete?: (announcementId: string) => void;
 }
 
-export function AnnouncementCard({ announcement, index = 0 }: AnnouncementCardProps) {
+export function AnnouncementCard({ announcement, index = 0, canDelete = false, onDelete }: AnnouncementCardProps) {
   const timeAgo = formatDistanceToNow(new Date(announcement.created_at), { addSuffix: true });
 
   return (
@@ -37,6 +40,20 @@ export function AnnouncementCard({ announcement, index = 0 }: AnnouncementCardPr
             By {announcement.creator?.full_name || 'Admin'} • {timeAgo}
           </Text>
         </View>
+
+        {canDelete && (
+          <Pressable
+            onPress={() => onDelete?.(announcement.id)}
+            style={({ pressed }) => [
+              styles.deleteBtn,
+              pressed && styles.deleteBtnPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Delete announcement"
+          >
+            <Feather name="trash-2" size={16} color={Colors.error} />
+          </Pressable>
+        )}
         
         {/* Sleek Role Pill */}
         {announcement.target_role && announcement.target_role !== 'all' && (
@@ -83,6 +100,20 @@ const styles = StyleSheet.create({
   },
   headerInfo: {
     flex: 1,
+  },
+  deleteBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(190, 18, 60, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(190, 18, 60, 0.18)',
+  },
+  deleteBtnPressed: {
+    transform: [{ scale: 0.97 }],
+    opacity: 0.85,
   },
   title: {
     fontFamily: 'Inter_700Bold',

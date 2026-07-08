@@ -112,6 +112,7 @@ interface WorkState {
   // Actions — Announcements
   fetchAnnouncements: (role: string, userId: string) => Promise<{ success: boolean; error?: string }>;
   createAnnouncement: (announcement: { title: string; body: string; target_role?: string; target_user_id?: string; created_by: string }) => Promise<{ success: boolean; error?: string }>;
+  deleteAnnouncement: (announcementId: string) => Promise<{ success: boolean; error?: string }>;
 
   // Actions — Settings
   fetchSettings: () => Promise<{ success: boolean; error?: string }>;
@@ -1012,6 +1013,20 @@ export const useWorkStore = create<WorkState>((set, get) => ({
     }
   },
 
+  deleteAnnouncement: async (announcementId: string) => {
+    try {
+      const { error } = await supabase
+        .from('announcements')
+        .delete()
+        .eq('id', announcementId);
+
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to delete announcement' };
+    }
+  },
+
   // ============================================================================
   // SETTINGS
   // ============================================================================
@@ -1275,7 +1290,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
     channels.push(tasksChannel);
     const announcementsChannel = supabase
       .channel(`announcements_changes_${channelId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, () => get().fetchAnnouncements(role, userId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => get().fetchAnnouncements(role, userId))
       .subscribe();
 
     channels.push(announcementsChannel);
