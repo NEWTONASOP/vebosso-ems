@@ -24,7 +24,9 @@
       "predictiveBackGestureEnabled": false,
       "allowBackup": false,
       "minSdkVersion": 29,
-      "permissions": []
+      "permissions": [
+        "android.permission.REQUEST_INSTALL_PACKAGES"
+      ]
     },
     "web": {
       "output": "static",
@@ -55,6 +57,7 @@
           "color": "#2563EB"
         }
       ],
+      "./plugins/withApkInstaller.js",
       [
         "expo-splash-screen",
         {
