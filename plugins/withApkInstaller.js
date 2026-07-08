@@ -5,7 +5,7 @@ const { withAndroidManifest, AndroidConfig } = require('expo/config-plugins');
  */
 function withApkInstaller(config) {
   return withAndroidManifest(config, (config) => {
-    config.modResults = AndroidConfig.Permissions.ensurePermissions(config.modResults, [
+    AndroidConfig.Permissions.ensurePermissions(config.modResults, [
       'android.permission.REQUEST_INSTALL_PACKAGES',
     ]);
     return config;
