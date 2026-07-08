@@ -1,9 +1,9 @@
 // ============================================================================
-// VEBOSSO EMS — In-App Update Checker (Optional Updates)
+// VEBOSSO EMS — In-App Update Checker (Required Updates)
 // ============================================================================
 
 import { useEffect, useState } from 'react';
-import { Alert, Platform, StyleSheet, View } from 'react-native';
+import { Alert, BackHandler, Platform, StyleSheet, View } from 'react-native';
 import { Button, Modal, Portal, ProgressBar, Text } from 'react-native-paper';
 import {
   checkAppVersion,
@@ -11,7 +11,6 @@ import {
   openAppStore,
   openInstallPermissionSettings,
 } from '../lib/versionCheck';
-import { useAuthStore } from '../store/authStore';
 import { Colors } from '../constants/colors';
 
 type UpdatePhase = 'idle' | 'downloading' | 'installing' | 'error';
@@ -23,46 +22,31 @@ export function UpdateChecker() {
   const [progress, setProgress] = useState(0);
   const [targetVersion, setTargetVersion] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   useEffect(() => {
-    if (Platform.OS !== 'android' || checked || !isAuthenticated) return;
+    if (Platform.OS !== 'android' || checked) return;
 
     setChecked(true);
-    checkForOptionalUpdate();
-  }, [isAuthenticated, checked]);
+    checkForRequiredUpdate();
+  }, [checked]);
 
-  const checkForOptionalUpdate = async () => {
+  useEffect(() => {
+    if (!modalVisible) return;
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => subscription.remove();
+  }, [modalVisible]);
+
+  const checkForRequiredUpdate = async () => {
     try {
       const result = await checkAppVersion();
 
       if (result.needsUpdate) {
-        showUpdateAlert(result.latestVersion);
+        await startInAppUpdate(result.latestVersion);
       }
     } catch (error) {
       if (__DEV__) console.error('Error checking for updates:', error);
     }
-  };
-
-  const showUpdateAlert = (version: string) => {
-    Alert.alert(
-      'Update Available',
-      `Version ${version} is now available. Download and install it directly in the app to get the latest features and fixes.`,
-      [
-        {
-          text: 'Later',
-          style: 'cancel',
-        },
-        {
-          text: 'Download & Install',
-          onPress: () => {
-            startInAppUpdate(version).catch((err) => {
-              if (__DEV__) console.error('Failed to start in-app update:', err);
-            });
-          },
-        },
-      ]
-    );
   };
 
   const startInAppUpdate = async (version: string) => {
@@ -103,15 +87,8 @@ export function UpdateChecker() {
   const handleBrowserFallback = () => {
     openAppStore().catch((err) => {
       if (__DEV__) console.error('Failed to open browser download:', err);
-      Alert.alert('Download failed', 'Could not open the download page. Please try again later.');
+      Alert.alert('Download failed', 'Could not open the download page. Please try again.');
     });
-  };
-
-  const handleDismiss = () => {
-    setModalVisible(false);
-    setPhase('idle');
-    setProgress(0);
-    setErrorMessage('');
   };
 
   const progressLabel =
@@ -125,20 +102,19 @@ export function UpdateChecker() {
     <Portal>
       <Modal
         visible={modalVisible}
-        onDismiss={phase === 'downloading' ? undefined : handleDismiss}
-        dismissable={phase !== 'downloading'}
+        dismissable={false}
         contentContainerStyle={styles.modal}
       >
         <Text variant="titleLarge" style={styles.title}>
-          {phase === 'error' ? 'Update Failed' : 'Updating App'}
+          Update Required
         </Text>
 
         <Text variant="bodyMedium" style={styles.subtitle}>
           {phase === 'error'
             ? errorMessage
             : phase === 'installing'
-              ? 'Follow the system prompt to finish installing the update.'
-              : `Downloading version ${targetVersion}. Keep the app open until the download completes.`}
+              ? 'Follow the system prompt to install the update. You must install it to continue using the app.'
+              : `Version ${targetVersion} is required. Keep the app open until the download completes.`}
         </Text>
 
         {phase !== 'error' && (
@@ -167,17 +143,6 @@ export function UpdateChecker() {
             </Button>
             <Button mode="text" onPress={handleBrowserFallback}>
               Download in Browser
-            </Button>
-            <Button mode="text" onPress={handleDismiss}>
-              Later
-            </Button>
-          </View>
-        )}
-
-        {phase === 'installing' && (
-          <View style={styles.actions}>
-            <Button mode="contained" onPress={handleDismiss}>
-              Done
             </Button>
           </View>
         )}
