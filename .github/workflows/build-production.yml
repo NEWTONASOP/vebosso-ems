@@ -142,6 +142,9 @@ jobs:
         # (Gradle cache + .cxx native build cache) can actually take effect.
         run: npx expo prebuild --platform android
 
+      - name: Set minSdkVersion
+        run: echo "android.minSdkVersion=29" >> android/gradle.properties
+
       - name: Decode release keystore
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore

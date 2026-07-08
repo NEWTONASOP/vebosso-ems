@@ -23,7 +23,6 @@
       "googleServicesFile": "./google-services.json",
       "predictiveBackGestureEnabled": false,
       "allowBackup": false,
-      "minSdkVersion": 29,
       "permissions": [
         "android.permission.REQUEST_INSTALL_PACKAGES"
       ]
