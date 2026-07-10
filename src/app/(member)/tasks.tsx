@@ -106,7 +106,7 @@ export default function MemberTasksScreen() {
         {/* Tasks unified Grouped Card */}
         <View style={styles.listContainer}>
           {isLoadingToday ? (
-            <ListSkeleton count={3} />
+            <ListSkeleton count={3} variant="task-row" />
           ) : filteredTasks.length > 0 ? (
             <View style={styles.groupedCard}>
               {filteredTasks.map((task, index) => (

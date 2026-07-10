@@ -118,7 +118,7 @@ export default function SessionManagementScreen() {
 
       {isLoading ? (
         <View style={styles.skeletonContainer}>
-          <ListSkeleton count={3} />
+          <ListSkeleton count={3} variant="task-row" />
         </View>
       ) : fetchError ? (
         <View style={{ paddingHorizontal: 20, marginTop: 14 }}>

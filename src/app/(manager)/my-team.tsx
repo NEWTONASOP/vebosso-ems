@@ -99,7 +99,7 @@ export default function ManagerMyTeamScreen() {
       </View>
 
       {isLoadingTeam ? (
-        <View style={styles.content}><ListSkeleton count={5} /></View>
+        <View style={styles.content}><ListSkeleton count={5} variant="member" /></View>
       ) : (
         <FlatList
           data={filtered}

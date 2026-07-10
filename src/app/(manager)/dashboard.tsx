@@ -16,7 +16,7 @@ import { CheckInModal } from '../../components/CheckInModal';
 import { CheckOutModal } from '../../components/CheckOutModal';
 import { EmptyState } from '../../components/EmptyState';
 import { InlineError } from '../../components/InlineError';
-import { ListSkeleton } from '../../components/LoadingSkeleton';
+import { ListSkeleton, StatusCardSkeleton } from '../../components/LoadingSkeleton';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
 import { TaskCard } from '../../components/TaskCard';
 import { Colors } from '../../constants/colors';
@@ -246,7 +246,7 @@ export default function ManagerDashboard() {
   };
 
   const renderWorkStatus = () => {
-    if (isLoadingToday) return <ListSkeleton count={1} />;
+    if (isLoadingToday) return <StatusCardSkeleton />;
 
     if (!todayLog) {
       return (
@@ -413,7 +413,7 @@ export default function ManagerDashboard() {
 
       <View style={styles.listContainer}>
         {isLoadingApprovals ? (
-          <ListSkeleton count={2} />
+          <ListSkeleton count={2} variant="approval" />
         ) : approvalsError ? (
           <InlineError
             message={approvalsError}

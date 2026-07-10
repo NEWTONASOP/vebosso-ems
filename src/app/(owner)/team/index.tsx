@@ -245,7 +245,9 @@ export default function OwnerTeamScreen() {
       </View>
 
       {isLoadingTeam ? (
-        <ListSkeleton count={5} />
+        <View style={styles.list}>
+          <ListSkeleton count={5} variant="member" />
+        </View>
       ) : teamError ? (
         <View style={{ paddingHorizontal: 20 }}>
           <InlineError message={teamError} onRetry={() => fetchTeamMembers()} />

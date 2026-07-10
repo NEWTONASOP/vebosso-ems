@@ -11,7 +11,7 @@ import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { CheckInModal } from '../../components/CheckInModal';
 import { CheckOutModal } from '../../components/CheckOutModal';
 import { InlineError } from '../../components/InlineError';
-import { ListSkeleton } from '../../components/LoadingSkeleton';
+import { StatusCardSkeleton } from '../../components/LoadingSkeleton';
 import { PageTransition } from '../../components/PageTransition';
 import { TaskCard } from '../../components/TaskCard';
 import { Colors } from '../../constants/colors';
@@ -135,7 +135,7 @@ export default function MemberHomeScreen() {
   };
 
   const renderStatusCard = () => {
-    if (isLoadingToday) return <ListSkeleton count={1} />;
+    if (isLoadingToday) return <StatusCardSkeleton />;
 
     // Not checked in
     if (!todayLog) {

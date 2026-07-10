@@ -233,7 +233,7 @@ export default function OwnerApprovalsScreen() {
 
       {isLoading && !refreshing ? (
         <View style={styles.content}>
-          <ListSkeleton count={3} />
+          <ListSkeleton count={3} variant="approval" />
         </View>
       ) : activeTab === 'attendance' ? (
         <FlatList

@@ -236,7 +236,7 @@ export default function ManagerTaskTrackingScreen() {
           {/* Tasks List */}
           <View style={styles.listContainer}>
             {isLoading ? (
-              <ListSkeleton count={4} />
+              <ListSkeleton count={4} variant="task-row" />
             ) : filteredTasks.length > 0 ? (
               <View style={styles.tasksList}>
                 {filteredTasks.map((task) => {

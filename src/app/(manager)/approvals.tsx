@@ -211,7 +211,7 @@ export default function ManagerApprovalsScreen() {
       </View>
       
       {isLoading && !refreshing ? (
-        <View style={styles.content}><ListSkeleton count={3} /></View>
+        <View style={styles.content}><ListSkeleton count={3} variant="approval" /></View>
       ) : currentError ? (
         <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
           <InlineError

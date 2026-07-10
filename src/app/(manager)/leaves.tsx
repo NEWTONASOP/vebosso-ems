@@ -94,7 +94,7 @@ export default function LeavesScreen() {
       {/* Main List */}
       {isLoadingLeaves && !refreshing ? (
         <View style={styles.skeletonContainer}>
-          <ListSkeleton count={3} />
+          <ListSkeleton count={3} variant="approval" />
         </View>
       ) : (
         <FlatList

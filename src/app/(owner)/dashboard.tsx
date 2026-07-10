@@ -276,7 +276,7 @@ export default function OwnerDashboard() {
 
         <View style={styles.listContainer}>
           {isLoadingApprovals ? (
-            <ListSkeleton count={2} />
+            <ListSkeleton count={2} variant="approval" />
           ) : approvalsError ? (
             <InlineError
               message={approvalsError}
