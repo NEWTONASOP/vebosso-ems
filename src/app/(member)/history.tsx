@@ -4,7 +4,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
-import { Text, Snackbar, Portal } from 'react-native-paper';
+import { Text, Snackbar } from 'react-native-paper';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
@@ -99,6 +99,7 @@ export default function MemberHistoryScreen() {
   const totalHours = workLogs.reduce((sum, l) => sum + (l.total_hours || 0), 0);
 
   return (
+    <>
     <PageTransition>
     <View style={styles.container}>
       {/* Header title */}
@@ -246,43 +247,43 @@ export default function MemberHistoryScreen() {
           </View>
         </View>
       </ScrollView>
-
-      <WorkLogDetail 
-        visible={showDetail} 
-        onDismiss={() => setShowDetail(false)} 
-        workLog={selectedLog} 
-        onNextDay={handleNextDay}
-        onPrevDay={handlePrevDay}
-        hasNextDay={hasNextDay}
-        hasPrevDay={hasPrevDay}
-      />
-
-      <Portal>
-        {selectedBackfillDate ? (
-          <BackfillModal
-            visible={backfillModalVisible}
-            date={selectedBackfillDate}
-            onDismiss={() => setBackfillModalVisible(false)}
-            onSubmit={handleBackfillSubmit}
-            isLoading={submittingBackfill}
-            initialCheckInPlan={backfillInitialPlan}
-            initialCheckInTime={backfillInitialIn}
-            initialCheckOutTime={backfillInitialOut}
-            initialDayReport={backfillInitialReport}
-          />
-        ) : null}
-      </Portal>
-
-      <Snackbar
-        visible={!!snackMessage}
-        onDismiss={() => setSnackMessage('')}
-        duration={3000}
-        wrapperStyle={{ marginBottom: 90 }}
-      >
-        {snackMessage}
-      </Snackbar>
     </View>
     </PageTransition>
+
+    <WorkLogDetail
+      visible={showDetail}
+      onDismiss={() => setShowDetail(false)}
+      workLog={selectedLog}
+      onNextDay={handleNextDay}
+      onPrevDay={handlePrevDay}
+      hasNextDay={hasNextDay}
+      hasPrevDay={hasPrevDay}
+    />
+
+    {backfillModalVisible && selectedBackfillDate ? (
+      <BackfillModal
+        key={`${selectedBackfillDate}-${backfillInitialPlan}`}
+        visible
+        date={selectedBackfillDate}
+        onDismiss={() => setBackfillModalVisible(false)}
+        onSubmit={handleBackfillSubmit}
+        isLoading={submittingBackfill}
+        initialCheckInPlan={backfillInitialPlan}
+        initialCheckInTime={backfillInitialIn}
+        initialCheckOutTime={backfillInitialOut}
+        initialDayReport={backfillInitialReport}
+      />
+    ) : null}
+
+    <Snackbar
+      visible={!!snackMessage}
+      onDismiss={() => setSnackMessage('')}
+      duration={3000}
+      wrapperStyle={{ marginBottom: 90 }}
+    >
+      {snackMessage}
+    </Snackbar>
+    </>
   );
 }
 

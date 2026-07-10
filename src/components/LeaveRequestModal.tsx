@@ -3,9 +3,9 @@
 // ============================================================================
 
 import { addDays, format, isValid, parseISO } from 'date-fns';
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
-import { Button, Chip, HelperText, Modal, Portal, Text, TextInput } from 'react-native-paper';
+import { useCallback, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
+import { Button, Chip, HelperText, Modal, Portal, Text } from 'react-native-paper';
 import { Colors } from '../constants/colors';
 
 interface LeaveRequestModalProps {
@@ -21,9 +21,15 @@ export function LeaveRequestModal({
   onSubmit,
   isLoading,
 }: LeaveRequestModalProps) {
+  const dateRef = useRef('');
+  const reasonRef = useRef('');
   const [dateStr, setDateStr] = useState('');
-  const [reason, setReason] = useState('');
+  const [charCount, setCharCount] = useState(0);
   const [error, setError] = useState('');
+
+  const clearError = useCallback(() => {
+    setError((prev) => (prev ? '' : prev));
+  }, []);
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd');
@@ -35,13 +41,14 @@ export function LeaveRequestModal({
   };
 
   const handleQuickDateSelect = (selectedDate: string) => {
+    dateRef.current = selectedDate;
     setDateStr(selectedDate);
     setError('');
   };
 
   const handleDateChange = (text: string) => {
-    // Basic filtering to allow only digits and hyphens
     const filtered = text.replace(/[^0-9-]/g, '');
+    dateRef.current = filtered;
     setDateStr(filtered);
     setError('');
 
@@ -57,16 +64,19 @@ export function LeaveRequestModal({
   };
 
   const handleSubmit = async () => {
-    if (!dateStr.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const dateValue = dateRef.current;
+    const reason = reasonRef.current;
+
+    if (!dateValue.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
       setError('Please enter date as YYYY-MM-DD');
       return;
     }
-    const parsed = parseISO(dateStr);
+    const parsed = parseISO(dateValue);
     if (!isValid(parsed)) {
       setError('Invalid date format');
       return;
     }
-    if (dateStr < today) {
+    if (dateValue < today) {
       setError('Leave date cannot be in the past');
       return;
     }
@@ -76,23 +86,17 @@ export function LeaveRequestModal({
     }
 
     setError('');
-    const sanitizedReason = reason.trim().slice(0, 500);
-    await onSubmit(dateStr, sanitizedReason);
-    handleDismiss();
-  };
-
-  const handleDismiss = () => {
-    setDateStr('');
-    setReason('');
-    setError('');
+    await onSubmit(dateValue, reason.trim().slice(0, 500));
     onDismiss();
   };
+
+  if (!visible) return null;
 
   return (
     <Portal>
       <Modal
-        visible={visible}
-        onDismiss={handleDismiss}
+        visible
+        onDismiss={onDismiss}
         contentContainerStyle={styles.container}
       >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -136,55 +140,39 @@ export function LeaveRequestModal({
               </Chip>
             </View>
 
+            <Text style={styles.inputLabel}>Leave Date (YYYY-MM-DD)</Text>
             <TextInput
-              mode="outlined"
-              label="Leave Date (YYYY-MM-DD)"
+              style={styles.input}
               placeholder="e.g. 2026-07-15"
+              placeholderTextColor={Colors.placeholder}
               value={dateStr}
               onChangeText={handleDateChange}
               maxLength={10}
-              style={styles.input}
-              outlineColor={Colors.border}
-              activeOutlineColor={Colors.accent}
-              textColor={Colors.text}
-              placeholderTextColor={Colors.placeholder}
-              theme={{
-                colors: {
-                  onSurfaceVariant: Colors.textTertiary,
-                  surface: Colors.inputBackground,
-                },
-              }}
+              keyboardType="numbers-and-punctuation"
+              editable={!isLoading}
             />
           </View>
 
           <View style={[styles.section, { marginTop: 12 }]}>
             <Text style={styles.label}>Reason for Leave</Text>
             <TextInput
-              mode="outlined"
-              label="Reason"
+              style={styles.input}
               placeholder="E.g. Family function / medical appointment..."
-              value={reason}
+              placeholderTextColor={Colors.placeholder}
+              defaultValue=""
               onChangeText={(text) => {
-                setReason(text);
-                if (error) setError('');
+                reasonRef.current = text;
+                setCharCount(text.length);
+                clearError();
               }}
               multiline
-              numberOfLines={3}
+              textAlignVertical="top"
               maxLength={500}
-              style={styles.inputReason}
-              outlineColor={Colors.border}
-              activeOutlineColor={Colors.accent}
-              textColor={Colors.text}
-              placeholderTextColor={Colors.placeholder}
-              theme={{
-                colors: {
-                  onSurfaceVariant: Colors.textTertiary,
-                  surface: Colors.inputBackground,
-                },
-              }}
+              editable={!isLoading}
+              blurOnSubmit={false}
             />
             <View style={styles.charCountRow}>
-              <Text style={styles.charCount}>{reason.length} / 500</Text>
+              <Text style={styles.charCount}>{charCount} / 500</Text>
             </View>
           </View>
 
@@ -197,7 +185,7 @@ export function LeaveRequestModal({
           <View style={styles.actions}>
             <Button
               mode="outlined"
-              onPress={handleDismiss}
+              onPress={onDismiss}
               style={styles.cancelButton}
               textColor={Colors.textSecondary}
             >
@@ -273,12 +261,27 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceLight,
     borderColor: Colors.border,
   },
+  inputLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 6,
+  },
   input: {
     backgroundColor: Colors.inputBackground,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 15,
+    color: Colors.text,
   },
   inputReason: {
-    backgroundColor: Colors.inputBackground,
-    minHeight: 80,
+    minHeight: 88,
+    maxHeight: 160,
+    paddingTop: 14,
   },
   charCountRow: {
     alignItems: 'flex-end',

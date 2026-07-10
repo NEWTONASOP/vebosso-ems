@@ -317,18 +317,20 @@ export default function OwnerDashboard() {
         onSelectMember={handleSelectMember}
       />
 
-      <AssignTaskModal
-        visible={assignTaskModalVisible}
-        onDismiss={() => {
-          setAssignTaskModalVisible(false);
-          setSelectedMember(null);
-          setSelectedMemberForApproval(null);
-          setAssignTargetWorkLog(null);
-        }}
-        targetMember={selectedMember || selectedMemberForApproval}
-        onSubmit={assignTargetWorkLog ? handleAssignTaskFromApproval : handleAssignTask}
-        isLoading={isAssigningTask}
-      />
+      {assignTaskModalVisible ? (
+        <AssignTaskModal
+          visible
+          onDismiss={() => {
+            setAssignTaskModalVisible(false);
+            setSelectedMember(null);
+            setSelectedMemberForApproval(null);
+            setAssignTargetWorkLog(null);
+          }}
+          targetMember={selectedMember || selectedMemberForApproval}
+          onSubmit={assignTargetWorkLog ? handleAssignTaskFromApproval : handleAssignTask}
+          isLoading={isAssigningTask}
+        />
+      ) : null}
 
       <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>
         {snackMessage}

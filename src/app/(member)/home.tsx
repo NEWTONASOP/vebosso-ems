@@ -4,7 +4,7 @@
 
 import { Feather } from '@expo/vector-icons';
 import { differenceInMinutes, format } from 'date-fns';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
 import { AnimatedPressable } from '../../components/AnimatedPressable';
@@ -23,12 +23,18 @@ import { NotificationBell } from '../../components/NotificationBell';
 
 export default function MemberHomeScreen() {
   const { profile } = useAuthStore();
-  const {
-    todayLog, todayTasks, isLoadingToday, todayError,
-    fetchTodayLog, fetchTodayTasks, fetchSettings,
-    checkIn, checkOut, updateTaskStatus,
-    subscribeToRealtime, unsubscribeFromRealtime,
-  } = useWorkStore();
+  const todayLog = useWorkStore((s) => s.todayLog);
+  const todayTasks = useWorkStore((s) => s.todayTasks);
+  const isLoadingToday = useWorkStore((s) => s.isLoadingToday);
+  const todayError = useWorkStore((s) => s.todayError);
+  const fetchTodayLog = useWorkStore((s) => s.fetchTodayLog);
+  const fetchTodayTasks = useWorkStore((s) => s.fetchTodayTasks);
+  const fetchSettings = useWorkStore((s) => s.fetchSettings);
+  const checkIn = useWorkStore((s) => s.checkIn);
+  const checkOut = useWorkStore((s) => s.checkOut);
+  const updateTaskStatus = useWorkStore((s) => s.updateTaskStatus);
+  const subscribeToRealtime = useWorkStore((s) => s.subscribeToRealtime);
+  const unsubscribeFromRealtime = useWorkStore((s) => s.unsubscribeFromRealtime);
 
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showCheckOut, setShowCheckOut] = useState(false);
@@ -83,7 +89,7 @@ export default function MemberHomeScreen() {
     }
   };
 
-  const handleCheckIn = async (plan: string) => {
+  const handleCheckIn = useCallback(async (plan: string) => {
     setCheckInLoading(true);
     const result = await checkIn(plan);
     setCheckInLoading(false);
@@ -93,9 +99,12 @@ export default function MemberHomeScreen() {
     } else {
       setSnackMessage(result.error || 'Failed to check in');
     }
-  };
+  }, [checkIn]);
 
-  const handleCheckOut = async (report: string, photoUris: string[]) => {
+  const handleDismissCheckIn = useCallback(() => setShowCheckIn(false), []);
+  const handleDismissCheckOut = useCallback(() => setShowCheckOut(false), []);
+
+  const handleCheckOut = useCallback(async (report: string, photoUris: string[]) => {
     setCheckOutLoading(true);
     const result = await checkOut(report, photoUris);
     setCheckOutLoading(false);
@@ -105,7 +114,7 @@ export default function MemberHomeScreen() {
     } else {
       setSnackMessage(result.error || 'Failed to check out');
     }
-  };
+  }, [checkOut]);
 
   const handleStatusChange = async (taskId: string, status: TaskStatus, completionNote?: string) => {
     const result = await updateTaskStatus(taskId, status, completionNote);
@@ -276,6 +285,7 @@ export default function MemberHomeScreen() {
   };
 
   return (
+    <>
     <PageTransition>
     <ScrollView
       style={styles.container}
@@ -323,11 +333,27 @@ export default function MemberHomeScreen() {
         </View>
       )}
 
-      <CheckInModal visible={showCheckIn} onDismiss={() => setShowCheckIn(false)} onSubmit={handleCheckIn} isLoading={checkInLoading} />
-      <CheckOutModal visible={showCheckOut} onDismiss={() => setShowCheckOut(false)} onSubmit={handleCheckOut} isLoading={checkOutLoading} />
-      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>{snackMessage}</Snackbar>
     </ScrollView>
     </PageTransition>
+
+    {showCheckIn ? (
+      <CheckInModal
+        visible
+        onDismiss={handleDismissCheckIn}
+        onSubmit={handleCheckIn}
+        isLoading={checkInLoading}
+      />
+    ) : null}
+    {showCheckOut ? (
+      <CheckOutModal
+        visible
+        onDismiss={handleDismissCheckOut}
+        onSubmit={handleCheckOut}
+        isLoading={checkOutLoading}
+      />
+    ) : null}
+    <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>{snackMessage}</Snackbar>
+    </>
   );
 }
 

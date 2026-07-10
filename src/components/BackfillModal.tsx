@@ -2,23 +2,35 @@
 // VEBOSSO EMS — Backfill Attendance Modal
 // ============================================================================
 
-import React, { useState, useEffect } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View, ScrollView } from 'react-native';
-import { Button, HelperText, Modal, Portal, Text, TextInput } from 'react-native-paper';
+import { useCallback, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Button, HelperText, Modal, Portal, Text } from 'react-native-paper';
 import { Colors } from '../constants/colors';
 import { format, parse } from 'date-fns';
 
 interface BackfillModalProps {
   visible: boolean;
-  date: string; // 'YYYY-MM-DD'
+  date: string;
   onDismiss: () => void;
   onSubmit: (checkInTime: string, checkInPlan: string, checkOutTime: string, dayReport: string) => Promise<void>;
   isLoading?: boolean;
   initialCheckInPlan?: string;
-  initialCheckInTime?: string; // ISO or HH:MM
-  initialCheckOutTime?: string; // ISO or HH:MM
+  initialCheckInTime?: string;
+  initialCheckOutTime?: string;
   initialDayReport?: string;
 }
+
+const formatTimeToHHMM = (timeStr: string) => {
+  if (!timeStr) return '';
+  if (timeStr.includes('T')) {
+    try {
+      return format(new Date(timeStr), 'HH:mm');
+    } catch {
+      return '09:00';
+    }
+  }
+  return timeStr;
+};
 
 export function BackfillModal({
   visible,
@@ -31,44 +43,25 @@ export function BackfillModal({
   initialCheckOutTime = '18:00',
   initialDayReport = '',
 }: BackfillModalProps) {
-  const [inTime, setInTime] = useState('09:00');
-  const [outTime, setOutTime] = useState('18:00');
-  const [plan, setPlan] = useState('');
-  const [report, setReport] = useState('');
+  const inTimeRef = useRef(formatTimeToHHMM(initialCheckInTime) || '09:00');
+  const outTimeRef = useRef(formatTimeToHHMM(initialCheckOutTime) || '18:00');
+  const planRef = useRef(initialCheckInPlan);
+  const reportRef = useRef(initialDayReport);
   const [error, setError] = useState('');
 
-  // Format Helper: Extract HH:MM from ISO string if needed
-  const formatTimeToHHMM = (timeStr: string) => {
-    if (!timeStr) return '';
-    if (timeStr.includes('T')) {
-      try {
-        return format(new Date(timeStr), 'HH:mm');
-      } catch {
-        return '09:00';
-      }
-    }
-    return timeStr;
-  };
+  const clearError = useCallback(() => {
+    setError((prev) => (prev ? '' : prev));
+  }, []);
 
-  useEffect(() => {
-    if (visible) {
-      setInTime(formatTimeToHHMM(initialCheckInTime) || '09:00');
-      setOutTime(formatTimeToHHMM(initialCheckOutTime) || '18:00');
-      setPlan(initialCheckInPlan);
-      setReport(initialDayReport);
-      setError('');
-    }
-  }, [visible, initialCheckInTime, initialCheckOutTime, initialCheckInPlan, initialDayReport]);
-
-  const validateTime = (timeStr: string) => {
-    return /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(timeStr);
-  };
+  const validateTime = (timeStr: string) => /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(timeStr);
 
   const handleSubmit = async () => {
     setError('');
 
-    const trimmedIn = inTime.trim();
-    const trimmedOut = outTime.trim();
+    const trimmedIn = inTimeRef.current.trim();
+    const trimmedOut = outTimeRef.current.trim();
+    const plan = planRef.current;
+    const report = reportRef.current;
 
     if (!validateTime(trimmedIn)) {
       setError('Check-in time must be in HH:MM format (24-hour)');
@@ -87,7 +80,6 @@ export function BackfillModal({
       return;
     }
 
-    // Parse times to ensure check-out is after check-in
     try {
       const inParsed = parse(trimmedIn, 'HH:mm', new Date());
       const outParsed = parse(trimmedOut, 'HH:mm', new Date());
@@ -100,34 +92,33 @@ export function BackfillModal({
       return;
     }
 
-    // Construct full ISO timestamps combining the target backfill date and local selected times
     const checkInISO = new Date(`${date}T${trimmedIn}:00`).toISOString();
     const checkOutISO = new Date(`${date}T${trimmedOut}:00`).toISOString();
-
     await onSubmit(checkInISO, plan.trim(), checkOutISO, report.trim());
   };
 
-  const formattedDateLabel = () => {
-    try {
-      return format(new Date(date + 'T00:00:00'), 'EEEE, MMMM dd, yyyy');
-    } catch {
-      return date;
-    }
-  };
+  if (!visible) return null;
+
+  const defaultInTime = formatTimeToHHMM(initialCheckInTime) || '09:00';
+  const defaultOutTime = formatTimeToHHMM(initialCheckOutTime) || '18:00';
 
   return (
     <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={onDismiss}
-        contentContainerStyle={styles.container}
-      >
+      <Modal visible onDismiss={onDismiss} contentContainerStyle={styles.container}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.header}>
               <Text style={styles.emoji}>📝</Text>
               <Text style={styles.title}>Backfill Attendance</Text>
-              <Text style={styles.subtitle}>{formattedDateLabel()}</Text>
+              <Text style={styles.subtitle}>
+                {(() => {
+                  try {
+                    return format(new Date(date + 'T00:00:00'), 'EEEE, MMMM dd, yyyy');
+                  } catch {
+                    return date;
+                  }
+                })()}
+              </Text>
             </View>
 
             {error ? (
@@ -137,70 +128,70 @@ export function BackfillModal({
             ) : null}
 
             <View style={styles.timeRow}>
-              <TextInput
-                mode="outlined"
-                label="Check-in (HH:MM)"
-                placeholder="09:00"
-                value={inTime}
-                onChangeText={(text) => {
-                  setInTime(text);
-                  setError('');
-                }}
-                maxLength={5}
-                style={styles.timeInput}
-                outlineColor={Colors.border}
-                activeOutlineColor={Colors.accent}
-                textColor={Colors.text}
-              />
-              <TextInput
-                mode="outlined"
-                label="Check-out (HH:MM)"
-                placeholder="18:00"
-                value={outTime}
-                onChangeText={(text) => {
-                  setOutTime(text);
-                  setError('');
-                }}
-                maxLength={5}
-                style={styles.timeInput}
-                outlineColor={Colors.border}
-                activeOutlineColor={Colors.accent}
-                textColor={Colors.text}
-              />
+              <View style={styles.timeField}>
+                <Text style={styles.inputLabel}>Check-in (HH:MM)</Text>
+                <TextInput
+                  style={styles.timeInput}
+                  placeholder="09:00"
+                  placeholderTextColor={Colors.placeholder}
+                  defaultValue={defaultInTime}
+                  onChangeText={(text) => {
+                    inTimeRef.current = text;
+                    clearError();
+                  }}
+                  maxLength={5}
+                  keyboardType="numbers-and-punctuation"
+                  editable={!isLoading}
+                />
+              </View>
+              <View style={styles.timeField}>
+                <Text style={styles.inputLabel}>Check-out (HH:MM)</Text>
+                <TextInput
+                  style={styles.timeInput}
+                  placeholder="18:00"
+                  placeholderTextColor={Colors.placeholder}
+                  defaultValue={defaultOutTime}
+                  onChangeText={(text) => {
+                    outTimeRef.current = text;
+                    clearError();
+                  }}
+                  maxLength={5}
+                  keyboardType="numbers-and-punctuation"
+                  editable={!isLoading}
+                />
+              </View>
             </View>
 
+            <Text style={styles.inputLabel}>Check-in Plan</Text>
             <TextInput
-              mode="outlined"
-              label="Check-in Plan"
+              style={[styles.input, styles.multilineInput]}
               placeholder="What was your plan for the day?"
-              value={plan}
+              placeholderTextColor={Colors.placeholder}
+              defaultValue={initialCheckInPlan}
               onChangeText={(text) => {
-                setPlan(text);
-                setError('');
+                planRef.current = text;
+                clearError();
               }}
               multiline
-              numberOfLines={3}
-              style={styles.input}
-              outlineColor={Colors.border}
-              activeOutlineColor={Colors.accent}
-              textColor={Colors.text}
+              textAlignVertical="top"
+              editable={!isLoading}
+              blurOnSubmit={false}
             />
 
+            <Text style={styles.inputLabel}>Day Report / Accomplishments</Text>
             <TextInput
-              mode="outlined"
-              label="Day Report / Accomplishments"
+              style={[styles.input, styles.multilineInput]}
               placeholder="Summarize what you accomplished..."
-              value={report}
+              placeholderTextColor={Colors.placeholder}
+              defaultValue={initialDayReport}
               onChangeText={(text) => {
-                setReport(text);
-                setError('');
+                reportRef.current = text;
+                clearError();
               }}
               multiline
-              numberOfLines={4}
-              style={styles.input}
-              outlineColor={Colors.border}
-              activeOutlineColor={Colors.accent}
-              textColor={Colors.text}
+              textAlignVertical="top"
+              editable={!isLoading}
+              blurOnSubmit={false}
             />
 
             <View style={styles.actions}>
@@ -264,16 +255,44 @@ const styles = StyleSheet.create({
   },
   timeRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     gap: 12,
     marginBottom: 12,
   },
-  timeInput: {
+  timeField: {
     flex: 1,
-    height: 50,
+  },
+  inputLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 6,
+  },
+  timeInput: {
+    backgroundColor: Colors.inputBackground,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 15,
+    color: Colors.text,
+    height: 48,
   },
   input: {
-    marginBottom: 16,
+    backgroundColor: Colors.inputBackground,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 15,
+    color: Colors.text,
+    marginBottom: 12,
+  },
+  multilineInput: {
+    minHeight: 88,
+    maxHeight: 160,
   },
   errorText: {
     color: Colors.error,

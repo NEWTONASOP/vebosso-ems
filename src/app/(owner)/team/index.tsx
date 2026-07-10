@@ -6,12 +6,13 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { Chip, Menu, Searchbar, Snackbar, Text } from 'react-native-paper';
+import { Chip, Searchbar, Snackbar, Text } from 'react-native-paper';
 import { AssignManagerModal } from '../../../components/AssignManagerModal';
 import { AssignTaskModal } from '../../../components/AssignTaskModal';
 import { EmptyState } from '../../../components/EmptyState';
 import { InlineError } from '../../../components/InlineError';
 import { ListSkeleton } from '../../../components/LoadingSkeleton';
+import { MemberActionsModal } from '../../../components/MemberActionsModal';
 import { MemberCard } from '../../../components/MemberCard';
 import { Colors } from '../../../constants/colors';
 import { parseSupabaseError } from '../../../lib/errors';
@@ -43,8 +44,7 @@ export default function OwnerTeamScreen() {
   const [isAssigningTask, setIsAssigningTask] = useState(false);
   const [isAssigningManager, setIsAssigningManager] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [actionsModalVisible, setActionsModalVisible] = useState(false);
 
   useEffect(() => {
     fetchTeamMembers();
@@ -74,11 +74,9 @@ export default function OwnerTeamScreen() {
     setRefreshing(false);
   };
 
-  const handleMemberPress = useCallback((member: Profile, pageY: number) => {
+  const handleMemberPress = useCallback((member: Profile) => {
     setSelectedMember(member);
-    setMenuAnchor({ x: 20, y: pageY });
-    setMenuVisible(false); // reset first so the menu re-mounts cleanly
-    setTimeout(() => setMenuVisible(true), 0);
+    setActionsModalVisible(true);
   }, []);
 
   const handleAssignTask = async (title: string, description: string | null, dueDate: string | null) => {
@@ -181,7 +179,7 @@ export default function OwnerTeamScreen() {
         inProgressTaskCount={live?.inProgressTaskCount ?? 0}
         doneTaskCount={live?.doneTaskCount ?? 0}
         activeTasks={live?.activeTasks ?? []}
-        onPress={(pageY: number) => handleMemberPress(item, pageY)}
+        onPress={() => handleMemberPress(item)}
       />
     );
   }, [handleMemberPress, memberLiveStatus]);
@@ -285,66 +283,66 @@ export default function OwnerTeamScreen() {
         />
       )}
 
-      {/* Context Menu */}
-      <Menu
-        visible={menuVisible}
-        onDismiss={() => setMenuVisible(false)}
-        anchor={menuAnchor || { x: 0, y: 0 }}
-        contentStyle={styles.menuContent}
-      >
-        <Menu.Item
-          onPress={() => {
-            setMenuVisible(false);
+      {selectedMember && (
+        <MemberActionsModal
+          visible={actionsModalVisible}
+          member={selectedMember}
+          onDismiss={() => {
+            setActionsModalVisible(false);
+            setSelectedMember(null);
+          }}
+          onAssignTask={() => {
+            setActionsModalVisible(false);
             setAssignTaskModalVisible(true);
           }}
-          title="Assign Task"
-          leadingIcon="clipboard-text-outline"
-          titleStyle={styles.menuItemText}
-        />
-        <Menu.Item
-          onPress={() => {
-            setMenuVisible(false);
+          onAssignManager={() => {
+            setActionsModalVisible(false);
             setAssignManagerModalVisible(true);
           }}
-          title="Assign Manager"
-          leadingIcon="account-supervisor"
-          titleStyle={styles.menuItemText}
-        />
-        <Menu.Item
-          onPress={() => {
-            setMenuVisible(false);
-            if (selectedMember) {
-              router.push(`/(owner)/member/${selectedMember.id}` as any);
-            }
+          onManageProfile={() => {
+            setActionsModalVisible(false);
+            router.push(`/(owner)/member/${selectedMember.id}` as any);
+            setSelectedMember(null);
           }}
-          title="Manage Profile"
-          leadingIcon="account-cog-outline"
-          titleStyle={styles.menuItemText}
+          currentStatus={memberLiveStatus[selectedMember.id]?.status ?? 'offline'}
+          checkInTime={memberLiveStatus[selectedMember.id]?.checkInTime}
+          checkOutTime={memberLiveStatus[selectedMember.id]?.checkOutTime}
+          checkInPlan={memberLiveStatus[selectedMember.id]?.checkInPlan}
+          dayReport={memberLiveStatus[selectedMember.id]?.dayReport}
+          pendingTaskCount={memberLiveStatus[selectedMember.id]?.pendingTaskCount ?? 0}
+          inProgressTaskCount={memberLiveStatus[selectedMember.id]?.inProgressTaskCount ?? 0}
+          doneTaskCount={memberLiveStatus[selectedMember.id]?.doneTaskCount ?? 0}
+          activeTasks={memberLiveStatus[selectedMember.id]?.activeTasks ?? []}
         />
-      </Menu>
+      )}
 
-      <AssignTaskModal
-        visible={assignTaskModalVisible}
-        onDismiss={() => {
-          setAssignTaskModalVisible(false);
-          setSelectedMember(null);
-        }}
-        targetMember={selectedMember}
-        onSubmit={handleAssignTask}
-        isLoading={isAssigningTask}
-      />
+      {assignTaskModalVisible && selectedMember ? (
+        <AssignTaskModal
+          visible
+          key={selectedMember.id}
+          onDismiss={() => {
+            setAssignTaskModalVisible(false);
+            setSelectedMember(null);
+          }}
+          targetMember={selectedMember}
+          onSubmit={handleAssignTask}
+          isLoading={isAssigningTask}
+        />
+      ) : null}
 
-      <AssignManagerModal
-        visible={assignManagerModalVisible}
-        onDismiss={() => {
-          setAssignManagerModalVisible(false);
-          setSelectedMember(null);
-        }}
-        targetMember={selectedMember}
-        managers={managers}
-        onAssign={handleAssignManager}
-        isLoading={isAssigningManager}
-      />
+      {assignManagerModalVisible && selectedMember ? (
+        <AssignManagerModal
+          visible
+          onDismiss={() => {
+            setAssignManagerModalVisible(false);
+            setSelectedMember(null);
+          }}
+          targetMember={selectedMember}
+          managers={managers}
+          onAssign={handleAssignManager}
+          isLoading={isAssigningManager}
+        />
+      ) : null}
 
       <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>
         {snackMessage}
@@ -406,12 +404,4 @@ const styles = StyleSheet.create({
   filterChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600' },
   filterChipTextActive: { color: Colors.accent, fontWeight: '700' },
   list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 110 },
-  menuContent: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-  },
-  menuItemText: {
-    color: Colors.text,
-    fontSize: 14,
-  },
 });

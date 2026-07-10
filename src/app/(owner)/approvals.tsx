@@ -272,13 +272,16 @@ export default function OwnerApprovalsScreen() {
       )}
 
       {/* Assign Task Modal — shown when owner taps "Assign Task" on a check-in card */}
-      <AssignTaskModal
-        visible={!!assignTargetLog}
-        onDismiss={() => setAssignTargetLog(null)}
-        onSubmit={handleAssignModalSubmit}
-        targetMember={assignTargetMember}
-        isLoading={isAssigning}
-      />
+      {assignTargetLog && assignTargetMember ? (
+        <AssignTaskModal
+          visible
+          key={assignTargetLog.id}
+          onDismiss={() => setAssignTargetLog(null)}
+          onSubmit={handleAssignModalSubmit}
+          targetMember={assignTargetMember}
+          isLoading={isAssigning}
+        />
+      ) : null}
 
       <Snackbar
         visible={!!snackMessage}

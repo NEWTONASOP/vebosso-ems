@@ -2,9 +2,9 @@
 // VEBOSSO EMS — Check-Out Modal
 // ============================================================================
 
-import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Button, HelperText, Modal, Portal, Text, TextInput } from 'react-native-paper';
+import { useCallback, useRef, useState } from 'react';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Button, HelperText, Modal, Portal, Text } from 'react-native-paper';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../constants/colors';
@@ -17,9 +17,16 @@ interface CheckOutModalProps {
 }
 
 export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: CheckOutModalProps) {
-  const [report, setReport] = useState('');
+  const reportRef = useRef('');
+  const [charCount, setCharCount] = useState(0);
   const [photos, setPhotos] = useState<string[]>([]);
   const [error, setError] = useState('');
+
+  const handleChangeReport = useCallback((text: string) => {
+    reportRef.current = text;
+    setCharCount(text.length);
+    setError((prev) => (prev ? '' : prev));
+  }, []);
 
   const pickImage = async () => {
     if (photos.length >= 3) {
@@ -76,31 +83,23 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
   };
 
   const handleSubmit = async () => {
-    if (report.trim().length === 0) {
+    const report = reportRef.current;
+    if (!report.trim()) {
       setError('Please provide a day report');
       return;
     }
-    
-    const sanitized = report.trim().slice(0, 1000); // Max 1000 chars
-    
+
     setError('');
-    await onSubmit(sanitized, photos);
-    setReport('');
-    setPhotos([]);
+    await onSubmit(report.trim().slice(0, 1000), photos);
   };
 
-  const handleDismiss = () => {
-    setReport('');
-    setPhotos([]);
-    setError('');
-    onDismiss();
-  };
+  if (!visible) return null;
 
   return (
     <Portal>
       <Modal
-        visible={visible}
-        onDismiss={handleDismiss}
+        visible
+        onDismiss={onDismiss}
         contentContainerStyle={styles.container}
       >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -113,29 +112,18 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
               </Text>
             </View>
 
+            <Text style={styles.inputLabel}>Day Report</Text>
             <TextInput
-              mode="outlined"
-              label="Day Report"
-              placeholder="Write a summary of your work today..."
-              value={report}
-              onChangeText={(text) => {
-                setReport(text);
-                if (error) setError('');
-              }}
-              multiline
-              numberOfLines={5}
-              maxLength={3000}
               style={styles.input}
-              outlineColor={Colors.border}
-              activeOutlineColor={Colors.accent}
-              textColor={Colors.text}
+              placeholder="Write a summary of your work today..."
               placeholderTextColor={Colors.placeholder}
-              theme={{
-                colors: {
-                  onSurfaceVariant: Colors.textTertiary,
-                  surface: Colors.inputBackground,
-                },
-              }}
+              defaultValue=""
+              onChangeText={handleChangeReport}
+              multiline
+              textAlignVertical="top"
+              maxLength={3000}
+              editable={!isLoading}
+              blurOnSubmit={false}
             />
 
             <View style={styles.charCountRow}>
@@ -144,7 +132,7 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
                   {error}
                 </HelperText>
               ) : (
-                <Text style={styles.charCount}>{report.length} / 3000</Text>
+                <Text style={styles.charCount}>{charCount} / 3000</Text>
               )}
             </View>
 
@@ -194,7 +182,7 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
             <View style={styles.actions}>
               <Button
                 mode="outlined"
-                onPress={handleDismiss}
+                onPress={onDismiss}
                 style={styles.cancelButton}
                 textColor={Colors.textSecondary}
                 disabled={isLoading}
@@ -205,7 +193,7 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
                 mode="contained"
                 onPress={handleSubmit}
                 loading={isLoading}
-                disabled={isLoading || report.trim().length === 0}
+                disabled={isLoading}
                 style={styles.submitButton}
                 buttonColor={Colors.accent}
                 textColor={Colors.white}
@@ -255,10 +243,23 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
   },
+  inputLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginBottom: 8,
+  },
   input: {
     backgroundColor: Colors.inputBackground,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
     minHeight: 120,
+    maxHeight: 200,
     fontFamily: 'Inter_400Regular',
+    fontSize: 15,
+    color: Colors.text,
   },
   errorText: {
     color: Colors.error,

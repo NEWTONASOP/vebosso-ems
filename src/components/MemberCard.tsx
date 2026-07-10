@@ -28,8 +28,45 @@ interface MemberCardProps {
   inProgressTaskCount?: number;
   doneTaskCount?: number;
   activeTasks?: MemberActiveTask[];
-  onPress?: (pageY: number) => void;
+  onPress?: () => void;
   index?: number;
+}
+
+function getStatusDisplay(status: WorkLogStatus | 'offline' | 'on_leave') {
+  if (status === 'offline') {
+    return { label: 'Not checked in', color: Colors.textTertiary, bg: Colors.surfaceLight };
+  }
+  if (status === 'on_leave') {
+    return { label: 'On Leave', color: Colors.warning, bg: Colors.warningLight };
+  }
+  const config = WORK_LOG_STATUS_CONFIG[status];
+  return {
+    label: config?.label || 'Unknown',
+    color: config?.color || Colors.textTertiary,
+    bg: config?.backgroundColor || Colors.surfaceLight,
+  };
+}
+
+function getAvatarColors(role: Profile['role']) {
+  switch (role) {
+    case 'owner':
+      return { bg: Colors.ownerAccent + '15', text: Colors.ownerAccent };
+    case 'manager':
+      return { bg: Colors.managerAccent + '15', text: Colors.managerAccent };
+    default:
+      return { bg: Colors.memberAccent + '15', text: Colors.memberAccent };
+  }
+}
+
+function getRolePillColor(role: Profile['role']) {
+  switch (role) {
+    case 'owner':
+      return Colors.ownerAccent;
+    case 'manager':
+      return Colors.managerAccent;
+    default:
+      return Colors.memberAccent;
+  }
 }
 
 export function MemberCard({
@@ -46,176 +83,151 @@ export function MemberCard({
   onPress,
   index = 0,
 }: MemberCardProps) {
-  const handlePress = (e: any) => {
-    if (!onPress) return;
-    const pageY = e?.nativeEvent?.pageY ?? 200;
-    onPress(pageY);
-  };
+  const status = getStatusDisplay(currentStatus);
+  const avatarColors = getAvatarColors(member.role);
+  const roleColor = getRolePillColor(member.role);
 
-  const getStatusDisplay = () => {
-    if (currentStatus === 'offline') {
-      return { label: 'Not checked in', color: Colors.textTertiary, bg: Colors.surfaceLight };
-    }
-    if (currentStatus === 'on_leave') {
-      return { label: 'On Leave', color: Colors.warning, bg: Colors.warningLight };
-    }
-    const config = WORK_LOG_STATUS_CONFIG[currentStatus as WorkLogStatus];
-    return {
-      label: config?.label || 'Unknown',
-      color: config?.color || Colors.textTertiary,
-      bg: config?.backgroundColor || Colors.surfaceLight,
-    };
-  };
-
-  const getAvatarColors = () => {
-    switch (member.role) {
-      case 'owner': return { bg: Colors.ownerAccent + '15', text: Colors.ownerAccent };
-      case 'manager': return { bg: Colors.managerAccent + '15', text: Colors.managerAccent };
-      case 'member': default: return { bg: Colors.memberAccent + '15', text: Colors.memberAccent };
-    }
-  };
-
-  const status = getStatusDisplay();
-  const avatarColors = getAvatarColors();
-  const hasWorkLog = currentStatus !== 'offline' && currentStatus !== 'on_leave';
-  const isWorking = currentStatus === 'working' || currentStatus === 'pending_approval' || currentStatus === 'pending_checkout';
+  const isWorking =
+    currentStatus === 'working' ||
+    currentStatus === 'pending_approval' ||
+    currentStatus === 'pending_checkout';
   const isDone = currentStatus === 'done';
 
   const formattedCheckIn = checkInTime ? format(new Date(checkInTime), 'hh:mm a') : null;
   const formattedCheckOut = checkOutTime ? format(new Date(checkOutTime), 'hh:mm a') : null;
 
-  const workSummary =
-    isDone && dayReport
-      ? dayReport
-      : checkInPlan || null;
-
+  const workSummary = isDone && dayReport ? dayReport : checkInPlan || null;
   const workLabel = isDone && dayReport ? 'Worked today' : isWorking ? 'Working on' : checkInPlan ? 'Plan' : null;
 
   const openTaskTotal = pendingTaskCount + inProgressTaskCount;
+  const hasTaskSummary = openTaskTotal > 0 || doneTaskCount > 0;
+  const hasFooter = !!(workSummary && workLabel) || hasTaskSummary || currentStatus === 'on_leave';
+
+  const CardWrapper = onPress ? AnimatedPressable : View;
+  const cardProps = onPress ? { onPress, style: styles.card } : { style: styles.card };
 
   return (
     <Animated.View
-      entering={FadeInDown.delay(index * 50).springify()}
+      entering={FadeInDown.delay(index * 40).springify()}
       layout={LinearTransition.springify()}
       style={styles.cardContainer}
     >
-      <AnimatedPressable style={styles.card} onPress={handlePress}>
+      <CardWrapper {...cardProps}>
         <View style={styles.topRow}>
           <Avatar.Text
-            size={44}
+            size={40}
             label={member.full_name.substring(0, 2).toUpperCase()}
-            style={[styles.avatar, { backgroundColor: avatarColors.bg }]}
-            labelStyle={[styles.avatarLabel, { color: avatarColors.text }]}
+            style={{ backgroundColor: avatarColors.bg }}
+            labelStyle={{ color: avatarColors.text, fontFamily: 'Inter_700Bold', fontSize: 14 }}
           />
 
           <View style={styles.info}>
-            <View style={styles.nameRow}>
-              <Text style={styles.name} numberOfLines={1}>{member.full_name}</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.name} numberOfLines={1}>
+                {member.full_name}
+              </Text>
+              {onPress && <Feather name="chevron-right" size={16} color={Colors.textTertiary} />}
+            </View>
+
+            <View style={styles.metaRow}>
+              <Text style={styles.employeeId}>{member.employee_id}</Text>
+              <View style={[styles.rolePill, { backgroundColor: roleColor }]}>
+                <Text style={styles.rolePillText}>{ROLE_LABELS[member.role]}</Text>
+              </View>
+            </View>
+
+            {!!member.department && (
+              <Text style={styles.department} numberOfLines={1}>
+                {member.department}
+              </Text>
+            )}
+
+            <View style={styles.statusRow}>
               <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
                 <View style={[styles.statusDot, { backgroundColor: status.color }]} />
                 <Text style={[styles.statusLabel, { color: status.color }]}>{status.label}</Text>
               </View>
+              {formattedCheckIn && (
+                <View style={styles.timeChip}>
+                  <Feather name="log-in" size={10} color={Colors.success} />
+                  <Text style={styles.timeChipText}>{formattedCheckIn}</Text>
+                </View>
+              )}
+              {formattedCheckOut && (
+                <View style={styles.timeChip}>
+                  <Feather name="log-out" size={10} color={Colors.textSecondary} />
+                  <Text style={styles.timeChipText}>{formattedCheckOut}</Text>
+                </View>
+              )}
             </View>
-
-            <Text style={styles.details}>
-              {member.employee_id}
-              {member.department ? ` • ${member.department}` : ''}
-              {' • '}
-              {ROLE_LABELS[member.role]}
-            </Text>
-
-            {(formattedCheckIn || formattedCheckOut) && (
-              <View style={styles.activityRow}>
-                {formattedCheckIn && (
-                  <View style={styles.activityChip}>
-                    <Feather name="log-in" size={11} color={Colors.success} />
-                    <Text style={styles.activityChipText}>In {formattedCheckIn}</Text>
-                  </View>
-                )}
-                {formattedCheckOut && (
-                  <View style={styles.activityChip}>
-                    <Feather name="log-out" size={11} color={Colors.textSecondary} />
-                    <Text style={styles.activityChipText}>Out {formattedCheckOut}</Text>
-                  </View>
-                )}
-              </View>
-            )}
           </View>
         </View>
 
-        {/* Today's work summary — visible without opening card */}
-        {workSummary && workLabel && (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>{workLabel}</Text>
-            <Text style={styles.sectionBody} numberOfLines={2}>
-              {workSummary}
-            </Text>
-          </View>
-        )}
+        {hasFooter && (
+          <View style={styles.footer}>
+            {currentStatus === 'on_leave' && (
+              <Text style={styles.footerMuted}>On approved leave today</Text>
+            )}
 
-        {currentStatus === 'on_leave' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionBodyMuted}>Away on approved leave today</Text>
-          </View>
-        )}
+            {workSummary && workLabel && (
+              <View style={styles.summaryBlock}>
+                <Text style={styles.footerLabel}>{workLabel}</Text>
+                <Text style={styles.footerBody} numberOfLines={2}>
+                  {workSummary}
+                </Text>
+              </View>
+            )}
 
-        {!hasWorkLog && currentStatus === 'offline' && openTaskTotal === 0 && doneTaskCount === 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionBodyMuted}>No attendance logged today</Text>
-          </View>
-        )}
-
-        {/* Tasks snapshot */}
-        {(openTaskTotal > 0 || doneTaskCount > 0 || activeTasks.length > 0) && (
-          <View style={styles.section}>
-            <View style={styles.taskCountsRow}>
-              <Text style={styles.sectionLabel}>Tasks</Text>
-              <View style={styles.activityRow}>
+            {hasTaskSummary && (
+              <View style={styles.taskSummary}>
                 {inProgressTaskCount > 0 && (
-                  <View style={styles.activityChip}>
-                    <Feather name="play-circle" size={11} color={TASK_STATUS_CONFIG.in_progress.color} />
-                    <Text style={styles.activityChipText}>{inProgressTaskCount} active</Text>
-                  </View>
+                  <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.in_progress.color }]}>
+                    {inProgressTaskCount} active
+                  </Text>
                 )}
                 {pendingTaskCount > 0 && (
-                  <View style={styles.activityChip}>
-                    <Feather name="circle" size={11} color={TASK_STATUS_CONFIG.pending.color} />
-                    <Text style={styles.activityChipText}>{pendingTaskCount} pending</Text>
-                  </View>
+                  <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.pending.color }]}>
+                    {pendingTaskCount} pending
+                  </Text>
                 )}
                 {doneTaskCount > 0 && (
-                  <View style={styles.activityChip}>
-                    <Feather name="check-circle" size={11} color={TASK_STATUS_CONFIG.done.color} />
-                    <Text style={styles.activityChipText}>{doneTaskCount} done</Text>
-                  </View>
+                  <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.done.color }]}>
+                    {doneTaskCount} done
+                  </Text>
                 )}
               </View>
-            </View>
+            )}
 
-            {activeTasks.slice(0, 3).map((task, i) => {
-              const taskColor = TASK_STATUS_CONFIG[task.status]?.color || Colors.textTertiary;
-              return (
-                <View key={`${task.title}-${i}`} style={styles.taskRow}>
-                  <View style={[styles.taskDot, { backgroundColor: taskColor }]} />
-                  <Text style={styles.taskTitle} numberOfLines={1}>{task.title}</Text>
-                </View>
-              );
-            })}
+            {activeTasks.length > 0 && (
+              <View style={styles.taskList}>
+                {activeTasks.slice(0, 2).map((task, i) => {
+                  const taskColor = TASK_STATUS_CONFIG[task.status]?.color || Colors.textTertiary;
+                  return (
+                    <View key={`${task.title}-${i}`} style={styles.taskRow}>
+                      <View style={[styles.taskDot, { backgroundColor: taskColor }]} />
+                      <Text style={styles.taskTitle} numberOfLines={1}>
+                        {task.title}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         )}
-      </AnimatedPressable>
+      </CardWrapper>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   cardContainer: {
-    marginBottom: 10,
+    marginBottom: 8,
   },
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: 20,
-    padding: 14,
+    borderRadius: 18,
+    padding: 12,
     borderWidth: 1,
     borderColor: Colors.border,
     ...Colors.shadow,
@@ -223,115 +235,142 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-  },
-  avatar: {},
-  avatarLabel: {
-    fontSize: 15,
-    fontFamily: 'Inter_700Bold',
+    gap: 10,
   },
   info: {
     flex: 1,
-    marginLeft: 12,
+    minWidth: 0,
   },
-  nameRow: {
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
+    gap: 6,
   },
   name: {
+    flex: 1,
     fontSize: 15,
     fontFamily: 'Inter_700Bold',
     color: Colors.text,
-    flexShrink: 1,
+    letterSpacing: -0.2,
   },
-  details: {
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 3,
+    flexWrap: 'wrap',
+  },
+  employeeId: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.textSecondary,
+  },
+  rolePill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  rolePillText: {
+    fontSize: 10,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.white,
+  },
+  department: {
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
     color: Colors.textSecondary,
     marginTop: 2,
   },
-  activityRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 6,
-    flexWrap: 'wrap',
-  },
-  activityChip: {
+  statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: 8,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
-  activityChipText: {
-    fontSize: 11,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.textSecondary,
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 4,
   },
   statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   statusLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: 'Inter_600SemiBold',
   },
-  section: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
+  timeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: Colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
-  sectionLabel: {
-    fontSize: 11,
+  timeChipText: {
+    fontSize: 10,
+    fontFamily: 'Inter_500Medium',
+    color: Colors.textSecondary,
+  },
+  footer: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.divider,
+    gap: 6,
+  },
+  footerLabel: {
+    fontSize: 10,
     fontFamily: 'Inter_700Bold',
     color: Colors.textTertiary,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginBottom: 4,
+    letterSpacing: 0.35,
+    marginBottom: 1,
   },
-  sectionBody: {
+  footerBody: {
     fontSize: 13,
     fontFamily: 'Inter_400Regular',
     color: Colors.text,
     lineHeight: 18,
   },
-  sectionBodyMuted: {
+  footerMuted: {
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
     color: Colors.textTertiary,
   },
-  taskCountsRow: {
+  summaryBlock: {
+    gap: 2,
+  },
+  taskSummary: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
     flexWrap: 'wrap',
-    marginBottom: 4,
+    gap: 10,
+  },
+  taskStat: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  taskList: {
+    gap: 4,
+    marginTop: 2,
   },
   taskRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 6,
+    gap: 6,
   },
   taskDot: {
-    width: 6,
-    height: 6,
+    width: 5,
+    height: 5,
     borderRadius: 3,
   },
   taskTitle: {

@@ -129,29 +129,32 @@ export default function ManagerDashboard() {
     }
   };
 
-  const handleCheckIn = async (plan: string) => {
+  const handleCheckIn = useCallback(async (plan: string) => {
     setCheckInLoading(true);
     const result = await checkIn(plan);
     setCheckInLoading(false);
-    if (result.success) { 
-      setShowCheckIn(false); 
-      setSnackMessage('Check-in submitted! Waiting for approval.'); 
+    if (result.success) {
+      setShowCheckIn(false);
+      setSnackMessage('Check-in submitted! Waiting for approval.');
     } else {
       setSnackMessage(result.error || 'Failed to check in. Please try again.');
     }
-  };
+  }, [checkIn]);
 
-  const handleCheckOut = async (report: string, photoUris: string[]) => {
+  const handleDismissCheckIn = useCallback(() => setShowCheckIn(false), []);
+  const handleDismissCheckOut = useCallback(() => setShowCheckOut(false), []);
+
+  const handleCheckOut = useCallback(async (report: string, photoUris: string[]) => {
     setCheckOutLoading(true);
     const result = await checkOut(report, photoUris);
     setCheckOutLoading(false);
-    if (result.success) { 
-      setShowCheckOut(false); 
-      setSnackMessage('Day ended! Great work today.'); 
+    if (result.success) {
+      setShowCheckOut(false);
+      setSnackMessage('Day ended! Great work today.');
     } else {
       setSnackMessage(result.error || 'Failed to check out. Please try again.');
     }
-  };
+  }, [checkOut]);
 
   const handleStatusChange = async (taskId: string, status: 'pending' | 'in_progress' | 'done', completionNote?: string) => {
     const result = await updateTaskStatus(taskId, status, completionNote);
@@ -439,27 +442,32 @@ export default function ManagerDashboard() {
         )}
       </View>
 
-      <CheckInModal 
-        visible={showCheckIn} 
-        onDismiss={() => setShowCheckIn(false)} 
-        onSubmit={handleCheckIn} 
-        isLoading={checkInLoading} 
+    </ScrollView>
+
+    {showCheckIn ? (
+      <CheckInModal
+        visible
+        onDismiss={handleDismissCheckIn}
+        onSubmit={handleCheckIn}
+        isLoading={checkInLoading}
       />
-      <CheckOutModal 
-        visible={showCheckOut} 
-        onDismiss={() => setShowCheckOut(false)} 
-        onSubmit={handleCheckOut} 
+    ) : null}
+    {showCheckOut ? (
+      <CheckOutModal
+        visible
+        onDismiss={handleDismissCheckOut}
+        onSubmit={handleCheckOut}
         isLoading={checkOutLoading}
       />
-      <Snackbar 
-        visible={!!snackMessage} 
-        onDismiss={() => setSnackMessage('')} 
-        duration={3000}
-        wrapperStyle={{ marginBottom: 90 }}
-      >
-        {snackMessage}
-      </Snackbar>
-    </ScrollView>
+    ) : null}
+    <Snackbar
+      visible={!!snackMessage}
+      onDismiss={() => setSnackMessage('')}
+      duration={3000}
+      wrapperStyle={{ marginBottom: 90 }}
+    >
+      {snackMessage}
+    </Snackbar>
 
     <MemberPickerModal
       visible={memberPickerVisible}
@@ -472,18 +480,20 @@ export default function ManagerDashboard() {
       onSelectMember={handleSelectMember}
     />
 
-    <AssignTaskModal
-      visible={assignTaskModalVisible}
-      onDismiss={() => {
-        setAssignTaskModalVisible(false);
-        setSelectedMember(null);
-        setSelectedMemberForApproval(null);
-        setAssignTargetWorkLog(null);
-      }}
-      targetMember={selectedMember || selectedMemberForApproval}
-      onSubmit={assignTargetWorkLog ? handleAssignTaskFromApproval : handleAssignTask}
-      isLoading={isAssigningTask}
-    />
+    {assignTaskModalVisible ? (
+      <AssignTaskModal
+        visible
+        onDismiss={() => {
+          setAssignTaskModalVisible(false);
+          setSelectedMember(null);
+          setSelectedMemberForApproval(null);
+          setAssignTargetWorkLog(null);
+        }}
+        targetMember={selectedMember || selectedMemberForApproval}
+        onSubmit={assignTargetWorkLog ? handleAssignTaskFromApproval : handleAssignTask}
+        isLoading={isAssigningTask}
+      />
+    ) : null}
     </>
   );
 }

@@ -4,9 +4,9 @@
 
 import { Feather } from '@expo/vector-icons';
 import { addDays, format, isValid, parseISO } from 'date-fns';
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
-import { Avatar, Button, Chip, HelperText, Icon, Modal, Portal, Text, TextInput } from 'react-native-paper';
+import { useCallback, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Avatar, Button, Chip, HelperText, Icon, Modal, Portal, Text } from 'react-native-paper';
 import { Colors } from '../constants/colors';
 import { ROLE_LABELS } from '../constants/roles';
 import { Profile } from '../types/database';
@@ -26,14 +26,16 @@ export function AssignTaskModal({
   targetMember,
   isLoading,
 }: AssignTaskModalProps) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const titleRef = useRef('');
+  const descriptionRef = useRef('');
+  const dateInputRef = useRef('');
   const [dueDate, setDueDate] = useState<string | null>(null);
   const [showDateInput, setShowDateInput] = useState(false);
-  const [dateInputValue, setDateInputValue] = useState('');
   const [error, setError] = useState('');
 
-  const isValid_title = title.trim().length > 0;
+  const clearError = useCallback(() => {
+    setError((prev) => (prev ? '' : prev));
+  }, []);
 
   const handleQuickDateSelect = (days: number | null) => {
     if (days === null) {
@@ -43,14 +45,13 @@ export function AssignTaskModal({
       setDueDate(format(date, 'yyyy-MM-dd'));
     }
     setShowDateInput(false);
-    setDateInputValue('');
+    dateInputRef.current = '';
   };
 
   const handleDateInputChange = (text: string) => {
-    setDateInputValue(text);
+    dateInputRef.current = text;
     setError('');
 
-    // Try to parse the date if it looks complete (YYYY-MM-DD)
     if (text.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(text)) {
       const parsed = parseISO(text);
       if (isValid(parsed)) {
@@ -62,7 +63,10 @@ export function AssignTaskModal({
   };
 
   const handleSubmit = async () => {
-    if (!isValid_title) {
+    const title = titleRef.current;
+    const description = descriptionRef.current;
+
+    if (!title.trim()) {
       setError('Task title is required');
       return;
     }
@@ -72,21 +76,13 @@ export function AssignTaskModal({
       const sanitizedTitle = title.trim().slice(0, 500);
       const sanitizedDescription = description.trim().length > 0 ? description.trim().slice(0, 2000) : null;
       await onSubmit(sanitizedTitle, sanitizedDescription, dueDate);
-      handleDismiss();
-    } catch (err) {
+      onDismiss();
+    } catch {
       setError('Failed to assign task');
     }
   };
 
-  const handleDismiss = () => {
-    setTitle('');
-    setDescription('');
-    setDueDate(null);
-    setShowDateInput(false);
-    setDateInputValue('');
-    setError('');
-    onDismiss();
-  };
+  if (!visible) return null;
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd');
@@ -116,8 +112,8 @@ export function AssignTaskModal({
   return (
     <Portal>
       <Modal
-        visible={visible}
-        onDismiss={handleDismiss}
+        visible
+        onDismiss={onDismiss}
         contentContainerStyle={styles.container}
       >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -154,49 +150,32 @@ export function AssignTaskModal({
             </Text>
           </View>
 
-          {/* Task Title */}
+          <Text style={styles.fieldLabel}>Task Title</Text>
           <TextInput
-            mode="outlined"
-            label="Task Title"
-            placeholder="What needs to be done?"
-            value={title}
-            onChangeText={(text) => {
-              setTitle(text);
-              if (error === 'Task title is required') setError('');
-            }}
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.text}
+            placeholder="What needs to be done?"
             placeholderTextColor={Colors.placeholder}
-            theme={{
-              colors: {
-                onSurfaceVariant: Colors.textTertiary,
-                surface: Colors.inputBackground,
-              },
+            defaultValue=""
+            onChangeText={(text) => {
+              titleRef.current = text;
+              if (error === 'Task title is required') clearError();
             }}
+            editable={!isLoading}
           />
 
-          {/* Task Description */}
+          <Text style={styles.fieldLabel}>Description (Optional)</Text>
           <TextInput
-            mode="outlined"
-            label="Description (Optional)"
-            placeholder="Add more details about this task..."
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={3}
             style={[styles.input, styles.descriptionInput]}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.text}
+            placeholder="Add more details about this task..."
             placeholderTextColor={Colors.placeholder}
-            theme={{
-              colors: {
-                onSurfaceVariant: Colors.textTertiary,
-                surface: Colors.inputBackground,
-              },
+            defaultValue=""
+            onChangeText={(text) => {
+              descriptionRef.current = text;
             }}
+            multiline
+            textAlignVertical="top"
+            editable={!isLoading}
+            blurOnSubmit={false}
           />
 
           {/* Due Date Section */}
@@ -286,30 +265,24 @@ export function AssignTaskModal({
 
             {showDateInput && (
               <View style={styles.dateInputContainer}>
-                <TextInput
-                  mode="outlined"
-                  label="Custom Date (YYYY-MM-DD)"
-                  placeholder="2024-01-20"
-                  value={dateInputValue}
-                  onChangeText={handleDateInputChange}
-                  style={styles.dateInput}
-                  outlineColor={Colors.border}
-                  activeOutlineColor={Colors.accent}
-                  textColor={Colors.text}
-                  placeholderTextColor={Colors.placeholder}
-                  theme={{
-                    colors: {
-                      onSurfaceVariant: Colors.textTertiary,
-                      surface: Colors.inputBackground,
-                    },
-                  }}
-                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.fieldLabel}>Custom Date (YYYY-MM-DD)</Text>
+                  <TextInput
+                    style={styles.dateInput}
+                    placeholder="2024-01-20"
+                    placeholderTextColor={Colors.placeholder}
+                    defaultValue=""
+                    onChangeText={handleDateInputChange}
+                    keyboardType="numbers-and-punctuation"
+                    editable={!isLoading}
+                  />
+                </View>
                 <Button
                   compact
                   textColor={Colors.textSecondary}
                   onPress={() => {
                     setShowDateInput(false);
-                    setDateInputValue('');
+                    dateInputRef.current = '';
                   }}
                 >
                   Cancel
@@ -329,7 +302,7 @@ export function AssignTaskModal({
           <View style={styles.actions}>
             <Button
               mode="outlined"
-              onPress={handleDismiss}
+              onPress={onDismiss}
               style={styles.cancelButton}
               textColor={Colors.textSecondary}
             >
@@ -339,7 +312,7 @@ export function AssignTaskModal({
               mode="contained"
               onPress={handleSubmit}
               loading={isLoading}
-              disabled={!isValid_title || isLoading}
+              disabled={isLoading}
               style={styles.submitButton}
               buttonColor={Colors.accent}
               textColor={Colors.white}
@@ -419,13 +392,28 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
   },
+  fieldLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 6,
+  },
   input: {
     backgroundColor: Colors.inputBackground,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     marginBottom: 12,
     fontFamily: 'Inter_400Regular',
+    fontSize: 15,
+    color: Colors.text,
   },
   descriptionInput: {
-    minHeight: 80,
+    minHeight: 88,
+    maxHeight: 160,
+    paddingTop: 14,
   },
   dueDateSection: {
     marginBottom: 16,
@@ -493,9 +481,15 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   dateInput: {
-    flex: 1,
     backgroundColor: Colors.inputBackground,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontFamily: 'Inter_400Regular',
+    fontSize: 15,
+    color: Colors.text,
   },
   errorText: {
     color: Colors.error,

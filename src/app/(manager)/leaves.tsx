@@ -125,12 +125,14 @@ export default function LeavesScreen() {
       )}
 
       {/* Leave Request Modal */}
-      <LeaveRequestModal
-        visible={modalVisible}
-        onDismiss={() => setModalVisible(false)}
-        onSubmit={handleRequestSubmit}
-        isLoading={isSubmitting}
-      />
+      {modalVisible ? (
+        <LeaveRequestModal
+          visible
+          onDismiss={() => setModalVisible(false)}
+          onSubmit={handleRequestSubmit}
+          isLoading={isSubmitting}
+        />
+      ) : null}
 
       {/* Success/Error Toast */}
       <Snackbar

@@ -2,9 +2,9 @@
 // VEBOSSO EMS — Check-In Modal
 // ============================================================================
 
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
-import { Button, HelperText, Modal, Portal, Text, TextInput } from 'react-native-paper';
+import { useCallback, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
+import { Button, HelperText, Modal, Portal, Text } from 'react-native-paper';
 import { Colors } from '../constants/colors';
 
 interface CheckInModalProps {
@@ -14,72 +14,62 @@ interface CheckInModalProps {
   isLoading?: boolean;
 }
 
-export function CheckInModal({ visible, onDismiss, onSubmit, isLoading }: CheckInModalProps) {
-  const [plan, setPlan] = useState('');
+export function CheckInModal({
+  visible,
+  onDismiss,
+  onSubmit,
+  isLoading,
+}: CheckInModalProps) {
+  const planRef = useRef('');
+  const [charCount, setCharCount] = useState(0);
   const [error, setError] = useState('');
 
-  const charCount = plan.length;
-  const isValid = plan.trim().length > 0; // Just check if not empty
+  const handleChangeText = useCallback((text: string) => {
+    planRef.current = text;
+    setCharCount(text.length);
+    setError((prev) => (prev ? '' : prev));
+  }, []);
 
-  const handleSubmit = async () => {
-    if (!isValid) {
+  const handleSubmit = useCallback(async () => {
+    const plan = planRef.current;
+    if (!plan.trim()) {
       setError('Please enter your plan for today');
       return;
     }
-    
-    // Sanitize input - remove excessive whitespace and limit length
-    const sanitized = plan.trim().slice(0, 1000); // Max 1000 chars
-    
-    setError('');
-    await onSubmit(sanitized);
-    setPlan('');
-  };
 
-  const handleDismiss = () => {
-    setPlan('');
     setError('');
-    onDismiss();
-  };
+    await onSubmit(plan.trim().slice(0, 1000));
+  }, [onSubmit]);
+
+  if (!visible) return null;
 
   return (
     <Portal>
       <Modal
-        visible={visible}
-        onDismiss={handleDismiss}
+        visible
+        onDismiss={onDismiss}
         contentContainerStyle={styles.container}
       >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.header}>
             <Text style={styles.emoji}>🌅</Text>
             <Text style={styles.title}>Start Your Day</Text>
-            <Text style={styles.subtitle}>
-              What will you work on today?
-            </Text>
+            <Text style={styles.subtitle}>What will you work on today?</Text>
           </View>
 
+          <Text style={styles.inputLabel}>Today&apos;s Plan</Text>
           <TextInput
-            mode="outlined"
-            label="Today's Plan"
-            placeholder="Describe what you'll be working on today..."
-            value={plan}
-            onChangeText={(text) => {
-              setPlan(text);
-              if (error) setError('');
-            }}
-            multiline
-            numberOfLines={4}
-            maxLength={2000}
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.text}
+            placeholder="Describe what you'll be working on today..."
             placeholderTextColor={Colors.placeholder}
-            theme={{
-              colors: {
-                onSurfaceVariant: Colors.textTertiary,
-                surface: Colors.inputBackground,
-              },
-            }}
+            defaultValue=""
+            onChangeText={handleChangeText}
+            multiline
+            textAlignVertical="top"
+            maxLength={2000}
+            editable={!isLoading}
+            autoCorrect
+            blurOnSubmit={false}
           />
 
           <View style={styles.charCountRow}>
@@ -88,7 +78,7 @@ export function CheckInModal({ visible, onDismiss, onSubmit, isLoading }: CheckI
                 {error}
               </HelperText>
             ) : (
-              <Text style={[styles.charCount, isValid && styles.charCountValid]}>
+              <Text style={[styles.charCount, charCount > 0 && styles.charCountValid]}>
                 {charCount} / 2000
               </Text>
             )}
@@ -97,9 +87,10 @@ export function CheckInModal({ visible, onDismiss, onSubmit, isLoading }: CheckI
           <View style={styles.actions}>
             <Button
               mode="outlined"
-              onPress={handleDismiss}
+              onPress={onDismiss}
               style={styles.cancelButton}
               textColor={Colors.textSecondary}
+              disabled={isLoading}
             >
               Cancel
             </Button>
@@ -107,7 +98,7 @@ export function CheckInModal({ visible, onDismiss, onSubmit, isLoading }: CheckI
               mode="contained"
               onPress={handleSubmit}
               loading={isLoading}
-              disabled={!isValid || isLoading}
+              disabled={isLoading}
               style={styles.submitButton}
               buttonColor={Colors.accent}
               textColor={Colors.white}
@@ -152,10 +143,23 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
   },
+  inputLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginBottom: 8,
+  },
   input: {
     backgroundColor: Colors.inputBackground,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
     minHeight: 100,
+    maxHeight: 180,
     fontFamily: 'Inter_400Regular',
+    fontSize: 15,
+    color: Colors.text,
   },
   charCountRow: {
     flexDirection: 'row',
