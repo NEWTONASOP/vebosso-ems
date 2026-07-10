@@ -16,6 +16,10 @@ import { LoadingScreen } from '../components/LoadingScreen';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { UpdateChecker } from '../components/UpdateChecker';
 import { Colors, PaperThemeColors } from '../constants/colors';
+import {
+  setupAuthSessionLifecycle,
+  teardownAuthSessionLifecycle,
+} from '../lib/authSessionLifecycle';
 import { useAuthStore } from '../store/authStore';
 
 import {
@@ -189,6 +193,11 @@ export default function RootLayout() {
 
   useEffect(() => {
     initialize();
+    setupAuthSessionLifecycle();
+    return () => {
+      teardownAuthSessionLifecycle();
+      useAuthStore.getState().cleanup();
+    };
   }, [initialize]);
 
   useEffect(() => {
