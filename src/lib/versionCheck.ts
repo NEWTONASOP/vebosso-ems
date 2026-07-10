@@ -136,6 +136,22 @@ export function getApkFileUri(version: string): string {
   return `${FileSystem.cacheDirectory}vebosso-ems-v${version}.apk`;
 }
 
+/**
+ * Whether a completed APK for this version is already in cache
+ */
+export async function hasCachedApk(version: string): Promise<boolean> {
+  const fileUri = getApkFileUri(version);
+  const info = await FileSystem.getInfoAsync(fileUri);
+  return info.exists && (info.size ?? 0) > 0;
+}
+
+/**
+ * Remove a cached APK for this version
+ */
+export async function clearCachedApk(version: string): Promise<void> {
+  await FileSystem.deleteAsync(getApkFileUri(version), { idempotent: true });
+}
+
 async function launchApkInstaller(fileUri: string): Promise<void> {
   const contentUri = await FileSystem.getContentUriAsync(fileUri);
 
@@ -172,27 +188,28 @@ export async function relaunchCachedApkInstaller(version: string): Promise<void>
 }
 
 /**
- * Download the latest APK and launch the system installer
+ * Download the APK (reuses cache unless forceRedownload is set)
  */
-export async function downloadAndInstallApk(
+export async function downloadApk(
+  version: string,
   onProgress?: DownloadProgressCallback,
-  version?: string
-): Promise<void> {
+  options?: { forceRedownload?: boolean }
+): Promise<string> {
   if (Platform.OS !== 'android') {
     throw new Error('In-app APK updates are only supported on Android');
   }
 
-  const downloadUrl = await getDownloadUrl();
-  const latestVersion = version || (await checkAppVersion()).latestVersion;
-  const fileUri = getApkFileUri(latestVersion);
+  const fileUri = getApkFileUri(version);
 
-  const existingFile = await FileSystem.getInfoAsync(fileUri);
-  if (existingFile.exists) {
-    await FileSystem.deleteAsync(fileUri, { idempotent: true });
+  if (!options?.forceRedownload && (await hasCachedApk(version))) {
+    onProgress?.(1);
+    return fileUri;
   }
 
+  await clearCachedApk(version);
   onProgress?.(0);
 
+  const downloadUrl = await getDownloadUrl();
   const downloadTask = FileSystem.createDownloadResumable(
     downloadUrl,
     fileUri,
@@ -212,7 +229,24 @@ export async function downloadAndInstallApk(
   }
 
   onProgress?.(1);
-  await launchApkInstaller(result.uri);
+  return result.uri;
+}
+
+/**
+ * Download the latest APK and launch the system installer
+ */
+export async function downloadAndInstallApk(
+  onProgress?: DownloadProgressCallback,
+  version?: string,
+  options?: { forceRedownload?: boolean }
+): Promise<void> {
+  if (Platform.OS !== 'android') {
+    throw new Error('In-app APK updates are only supported on Android');
+  }
+
+  const latestVersion = version || (await checkAppVersion()).latestVersion;
+  const fileUri = await downloadApk(latestVersion, onProgress, options);
+  await launchApkInstaller(fileUri);
 }
 
 /**

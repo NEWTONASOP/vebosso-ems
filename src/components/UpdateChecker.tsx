@@ -9,6 +9,7 @@ import { Colors } from '../constants/colors';
 import {
   checkAppVersion,
   downloadAndInstallApk,
+  hasCachedApk,
   openAppStore,
   openInstallPermissionSettings,
   relaunchCachedApkInstaller,
@@ -24,6 +25,7 @@ export function UpdateChecker() {
   const [targetVersion, setTargetVersion] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isOpeningInstaller, setIsOpeningInstaller] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
 
   useEffect(() => {
     if (Platform.OS !== 'android' || checked) return;
@@ -51,28 +53,62 @@ export function UpdateChecker() {
     }
   };
 
-  const startInAppUpdate = async (version: string) => {
-    setTargetVersion(version);
-    setProgress(0);
-    setErrorMessage('');
-    setPhase('downloading');
-    setModalVisible(true);
+  const resumeFromCachedApk = async (version: string) => {
+    setProgress(1);
+    setPhase('installing');
 
     try {
-      await downloadAndInstallApk((value) => setProgress(value), version);
+      await relaunchCachedApkInstaller(version);
+    } catch (error) {
+      if (__DEV__) console.warn('Could not auto-open installer from cache:', error);
+    }
+  };
+
+  const startInAppUpdate = async (
+    version: string,
+    options?: { forceRedownload?: boolean }
+  ) => {
+    setTargetVersion(version);
+    setErrorMessage('');
+    setModalVisible(true);
+    setIsBusy(true);
+
+    try {
+      if (!options?.forceRedownload && (await hasCachedApk(version))) {
+        await resumeFromCachedApk(version);
+        return;
+      }
+
+      setProgress(0);
+      setPhase('downloading');
+
+      await downloadAndInstallApk(
+        (value) => setProgress(value),
+        version,
+        options
+      );
       setPhase('installing');
     } catch (error: any) {
       setPhase('error');
       setErrorMessage(
         error?.message || 'Update failed. Please try again or download from the browser.'
       );
+    } finally {
+      setIsBusy(false);
     }
   };
 
   const handleRetry = () => {
-    if (!targetVersion) return;
-    startInAppUpdate(targetVersion).catch((err) => {
+    if (!targetVersion || isBusy) return;
+    startInAppUpdate(targetVersion, { forceRedownload: true }).catch((err) => {
       if (__DEV__) console.error('Failed to retry in-app update:', err);
+    });
+  };
+
+  const handleRedownload = () => {
+    if (!targetVersion || isBusy || isOpeningInstaller) return;
+    startInAppUpdate(targetVersion, { forceRedownload: true }).catch((err) => {
+      if (__DEV__) console.error('Failed to re-download update:', err);
     });
   };
 
@@ -94,14 +130,14 @@ export function UpdateChecker() {
   };
 
   const handleOpenInstaller = async () => {
-    if (!targetVersion || isOpeningInstaller) return;
+    if (!targetVersion || isOpeningInstaller || isBusy) return;
 
     setIsOpeningInstaller(true);
     try {
       await relaunchCachedApkInstaller(targetVersion);
     } catch (error: any) {
       if (error?.message?.includes('not found')) {
-        startInAppUpdate(targetVersion).catch((err) => {
+        startInAppUpdate(targetVersion, { forceRedownload: true }).catch((err) => {
           if (__DEV__) console.error('Failed to re-download update:', err);
         });
         return;
@@ -123,6 +159,8 @@ export function UpdateChecker() {
         ? 'Update failed'
         : `Downloading v${targetVersion}...`;
 
+  const actionsDisabled = isBusy || isOpeningInstaller;
+
   return (
     <Portal>
       <Modal
@@ -138,7 +176,7 @@ export function UpdateChecker() {
           {phase === 'error'
             ? errorMessage
             : phase === 'installing'
-              ? 'Install the update from the system prompt. If you closed it, tap the button below to open it again.'
+              ? 'Tap Install Now to open the system installer. If nothing happens, use Redownload or check install permissions.'
               : `Version ${targetVersion} is required before you can continue.`}
         </Text>
 
@@ -177,11 +215,39 @@ export function UpdateChecker() {
               mode="contained"
               onPress={handleOpenInstaller}
               loading={isOpeningInstaller}
-              disabled={isOpeningInstaller}
+              disabled={actionsDisabled}
               style={styles.button}
               buttonColor={Colors.accent}
             >
-              Open Installer Again
+              Install Now
+            </Button>
+            <Button
+              mode="outlined"
+              onPress={handleRedownload}
+              disabled={actionsDisabled}
+              style={styles.button}
+            >
+              Redownload
+            </Button>
+            <Button
+              mode="text"
+              onPress={handleOpenSettings}
+              disabled={actionsDisabled}
+            >
+              Open Install Settings
+            </Button>
+          </View>
+        )}
+
+        {phase === 'downloading' && (
+          <View style={styles.actions}>
+            <Button
+              mode="outlined"
+              onPress={handleRedownload}
+              disabled={actionsDisabled}
+              style={styles.button}
+            >
+              Redownload
             </Button>
           </View>
         )}
