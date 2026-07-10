@@ -236,25 +236,25 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
           <View style={styles.dialogActions}>
             <Button 
               mode="contained"
-              onPress={handleApproveOnly}
+              onPress={handleApproveWithTask}
               style={styles.dialogButtonSecondary}
               contentStyle={styles.dialogButtonContent}
               buttonColor={Colors.systemGray6}
               textColor={Colors.textPrimary}
               labelStyle={styles.dialogButtonSecondaryText}
             >
-              Just Approve
+              Assign Task
             </Button>
             <Button 
               mode="contained"
-              onPress={handleApproveWithTask}
+              onPress={handleApproveOnly}
               style={styles.dialogButtonPrimary}
               contentStyle={styles.dialogButtonContent}
               buttonColor={Colors.accent}
               textColor="#FFFFFF"
               labelStyle={styles.dialogButtonPrimaryText}
             >
-              Assign Task
+              Just Approve
             </Button>
           </View>
         </Dialog>
