@@ -4,9 +4,10 @@
 
 import { addDays, format, isValid, parseISO } from 'date-fns';
 import { useCallback, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Button, Chip, HelperText, Modal, Portal, Text } from 'react-native-paper';
 import { Colors } from '../constants/colors';
+import { PaperOutlinedField } from './PaperOutlinedField';
 
 interface LeaveRequestModalProps {
   visible: boolean;
@@ -140,25 +141,22 @@ export function LeaveRequestModal({
               </Chip>
             </View>
 
-            <Text style={styles.inputLabel}>Leave Date (YYYY-MM-DD)</Text>
-            <TextInput
-              style={styles.input}
+            <PaperOutlinedField
+              label="Leave Date (YYYY-MM-DD)"
               placeholder="e.g. 2026-07-15"
-              placeholderTextColor={Colors.placeholder}
               value={dateStr}
               onChangeText={handleDateChange}
               maxLength={10}
               keyboardType="numbers-and-punctuation"
               editable={!isLoading}
+              dense
             />
           </View>
 
           <View style={[styles.section, { marginTop: 12 }]}>
-            <Text style={styles.label}>Reason for Leave</Text>
-            <TextInput
-              style={styles.input}
+            <PaperOutlinedField
+              label="Reason for Leave"
               placeholder="E.g. Family function / medical appointment..."
-              placeholderTextColor={Colors.placeholder}
               defaultValue=""
               onChangeText={(text) => {
                 reasonRef.current = text;
@@ -166,10 +164,8 @@ export function LeaveRequestModal({
                 clearError();
               }}
               multiline
-              textAlignVertical="top"
               maxLength={500}
               editable={!isLoading}
-              blurOnSubmit={false}
             />
             <View style={styles.charCountRow}>
               <Text style={styles.charCount}>{charCount} / 500</Text>
@@ -260,28 +256,6 @@ const styles = StyleSheet.create({
   chip: {
     backgroundColor: Colors.surfaceLight,
     borderColor: Colors.border,
-  },
-  inputLabel: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: Colors.inputBackground,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    color: Colors.text,
-  },
-  inputReason: {
-    minHeight: 88,
-    maxHeight: 160,
-    paddingTop: 14,
   },
   charCountRow: {
     alignItems: 'flex-end',

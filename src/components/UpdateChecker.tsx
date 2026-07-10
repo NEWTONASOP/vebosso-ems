@@ -5,13 +5,13 @@
 import { useEffect, useState } from 'react';
 import { Alert, BackHandler, Platform, StyleSheet, View } from 'react-native';
 import { Button, Modal, Portal, ProgressBar, Text } from 'react-native-paper';
+import { Colors } from '../constants/colors';
 import {
   checkAppVersion,
   downloadAndInstallApk,
   openAppStore,
   openInstallPermissionSettings,
 } from '../lib/versionCheck';
-import { Colors } from '../constants/colors';
 
 type UpdatePhase = 'idle' | 'downloading' | 'installing' | 'error';
 
@@ -114,7 +114,7 @@ export function UpdateChecker() {
             ? errorMessage
             : phase === 'installing'
               ? 'Follow the system prompt to install the update. You must install it to continue using the app.'
-              : `Version ${targetVersion} is required. Keep the app open until the download completes.`}
+              : `Version ${targetVersion} is required. Please keep the app open until the download completes.`}
         </Text>
 
         {phase !== 'error' && (

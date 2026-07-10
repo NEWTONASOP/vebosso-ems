@@ -4,7 +4,7 @@
 
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { Chip, Searchbar, Snackbar, Text } from 'react-native-paper';
 import { AssignManagerModal } from '../../../components/AssignManagerModal';
@@ -17,6 +17,7 @@ import { MemberCard } from '../../../components/MemberCard';
 import { Colors } from '../../../constants/colors';
 import { parseSupabaseError } from '../../../lib/errors';
 import { supabase } from '../../../lib/supabase';
+import { sortMembersByLiveStatus } from '../../../lib/teamSort';
 import { useAuthStore } from '../../../store/authStore';
 import { useWorkStore } from '../../../store/workStore';
 import { Profile } from '../../../types/database';
@@ -36,7 +37,6 @@ export default function OwnerTeamScreen() {
   } = useWorkStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
-  const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [assignTaskModalVisible, setAssignTaskModalVisible] = useState(false);
   const [assignManagerModalVisible, setAssignManagerModalVisible] = useState(false);
@@ -148,22 +148,20 @@ export default function OwnerTeamScreen() {
     }
   };
 
-  // Get unique departments
-  const departments = [...new Set(teamMembers.map((m) => m.department).filter(Boolean))] as string[];
+  // Filter and sort members (status priority, then name)
+  const filteredMembers = useMemo(() => {
+    const filtered = teamMembers.filter((member) => {
+      const matchesSearch =
+        searchQuery === '' ||
+        member.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        member.employee_id.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesRole = !selectedRole || member.role === selectedRole;
+      return matchesSearch && matchesRole;
+    });
+    return sortMembersByLiveStatus(filtered, memberLiveStatus);
+  }, [teamMembers, searchQuery, selectedRole, memberLiveStatus]);
 
-  // Get all managers for assignment
   const managers = teamMembers.filter((m) => m.role === 'manager');
-
-  // Filter members
-  const filteredMembers = teamMembers.filter((member) => {
-    const matchesSearch =
-      searchQuery === '' ||
-      member.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.employee_id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = !selectedRole || member.role === selectedRole;
-    const matchesDept = !selectedDept || member.department === selectedDept;
-    return matchesSearch && matchesRole && matchesDept;
-  });
 
   const renderMember = useCallback(({ item }: { item: Profile }) => {
     const live = memberLiveStatus[item.id];
@@ -218,30 +216,18 @@ export default function OwnerTeamScreen() {
             { label: 'All', value: null },
             { label: 'Managers', value: 'manager' },
             { label: 'Members', value: 'member' },
-            ...departments.map((d) => ({ label: d, value: `dept:${d}` })),
           ]}
           renderItem={({ item }) => {
-            const isRole = item.value && !item.value.startsWith('dept:');
-            const isDept = item.value?.startsWith('dept:');
-            const isActive = isRole
-              ? selectedRole === item.value
-              : isDept
-              ? selectedDept === item.value?.replace('dept:', '')
-              : !selectedRole && !selectedDept;
+            const isActive = item.value ? selectedRole === item.value : !selectedRole;
 
             return (
               <Chip
                 selected={isActive}
                 onPress={() => {
-                  if (isRole) {
+                  if (item.value) {
                     setSelectedRole(isActive ? null : item.value);
-                    setSelectedDept(null);
-                  } else if (isDept) {
-                    setSelectedDept(isActive ? null : item.value!.replace('dept:', ''));
-                    setSelectedRole(null);
                   } else {
                     setSelectedRole(null);
-                    setSelectedDept(null);
                   }
                 }}
                 style={[styles.filterChip, isActive && styles.filterChipActive]}

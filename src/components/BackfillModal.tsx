@@ -3,10 +3,11 @@
 // ============================================================================
 
 import { useCallback, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, HelperText, Modal, Portal, Text } from 'react-native-paper';
 import { Colors } from '../constants/colors';
 import { format, parse } from 'date-fns';
+import { PaperOutlinedField } from './PaperOutlinedField';
 
 interface BackfillModalProps {
   visible: boolean;
@@ -129,11 +130,9 @@ export function BackfillModal({
 
             <View style={styles.timeRow}>
               <View style={styles.timeField}>
-                <Text style={styles.inputLabel}>Check-in (HH:MM)</Text>
-                <TextInput
-                  style={styles.timeInput}
+                <PaperOutlinedField
+                  label="Check-in (HH:MM)"
                   placeholder="09:00"
-                  placeholderTextColor={Colors.placeholder}
                   defaultValue={defaultInTime}
                   onChangeText={(text) => {
                     inTimeRef.current = text;
@@ -142,14 +141,13 @@ export function BackfillModal({
                   maxLength={5}
                   keyboardType="numbers-and-punctuation"
                   editable={!isLoading}
+                  dense
                 />
               </View>
               <View style={styles.timeField}>
-                <Text style={styles.inputLabel}>Check-out (HH:MM)</Text>
-                <TextInput
-                  style={styles.timeInput}
+                <PaperOutlinedField
+                  label="Check-out (HH:MM)"
                   placeholder="18:00"
-                  placeholderTextColor={Colors.placeholder}
                   defaultValue={defaultOutTime}
                   onChangeText={(text) => {
                     outTimeRef.current = text;
@@ -158,40 +156,33 @@ export function BackfillModal({
                   maxLength={5}
                   keyboardType="numbers-and-punctuation"
                   editable={!isLoading}
+                  dense
                 />
               </View>
             </View>
 
-            <Text style={styles.inputLabel}>Check-in Plan</Text>
-            <TextInput
-              style={[styles.input, styles.multilineInput]}
+            <PaperOutlinedField
+              label="Check-in Plan"
               placeholder="What was your plan for the day?"
-              placeholderTextColor={Colors.placeholder}
               defaultValue={initialCheckInPlan}
               onChangeText={(text) => {
                 planRef.current = text;
                 clearError();
               }}
               multiline
-              textAlignVertical="top"
               editable={!isLoading}
-              blurOnSubmit={false}
             />
 
-            <Text style={styles.inputLabel}>Day Report / Accomplishments</Text>
-            <TextInput
-              style={[styles.input, styles.multilineInput]}
+            <PaperOutlinedField
+              label="Day Report / Accomplishments"
               placeholder="Summarize what you accomplished..."
-              placeholderTextColor={Colors.placeholder}
               defaultValue={initialDayReport}
               onChangeText={(text) => {
                 reportRef.current = text;
                 clearError();
               }}
               multiline
-              textAlignVertical="top"
               editable={!isLoading}
-              blurOnSubmit={false}
             />
 
             <View style={styles.actions}>
@@ -260,39 +251,6 @@ const styles = StyleSheet.create({
   },
   timeField: {
     flex: 1,
-  },
-  inputLabel: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginBottom: 6,
-  },
-  timeInput: {
-    backgroundColor: Colors.inputBackground,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    color: Colors.text,
-    height: 48,
-  },
-  input: {
-    backgroundColor: Colors.inputBackground,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 14,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    color: Colors.text,
-    marginBottom: 12,
-  },
-  multilineInput: {
-    minHeight: 88,
-    maxHeight: 160,
   },
   errorText: {
     color: Colors.error,

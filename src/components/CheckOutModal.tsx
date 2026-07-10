@@ -3,11 +3,12 @@
 // ============================================================================
 
 import { useCallback, useRef, useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, HelperText, Modal, Portal, Text } from 'react-native-paper';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../constants/colors';
+import { PaperOutlinedField } from './PaperOutlinedField';
 
 interface CheckOutModalProps {
   visible: boolean;
@@ -112,18 +113,14 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
               </Text>
             </View>
 
-            <Text style={styles.inputLabel}>Day Report</Text>
-            <TextInput
-              style={styles.input}
+            <PaperOutlinedField
+              label="Day Report"
               placeholder="Write a summary of your work today..."
-              placeholderTextColor={Colors.placeholder}
               defaultValue=""
               onChangeText={handleChangeReport}
               multiline
-              textAlignVertical="top"
               maxLength={3000}
               editable={!isLoading}
-              blurOnSubmit={false}
             />
 
             <View style={styles.charCountRow}>
@@ -242,24 +239,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     color: Colors.textSecondary,
     textAlign: 'center',
-  },
-  inputLabel: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: Colors.inputBackground,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 14,
-    minHeight: 120,
-    maxHeight: 200,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    color: Colors.text,
   },
   errorText: {
     color: Colors.error,

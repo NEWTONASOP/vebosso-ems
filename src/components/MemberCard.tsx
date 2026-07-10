@@ -58,7 +58,7 @@ function getAvatarColors(role: Profile['role']) {
   }
 }
 
-function getRolePillColor(role: Profile['role']) {
+function getRoleMutedColor(role: Profile['role']) {
   switch (role) {
     case 'owner':
       return Colors.ownerAccent;
@@ -85,7 +85,7 @@ export function MemberCard({
 }: MemberCardProps) {
   const status = getStatusDisplay(currentStatus);
   const avatarColors = getAvatarColors(member.role);
-  const roleColor = getRolePillColor(member.role);
+  const roleMuted = getRoleMutedColor(member.role);
 
   const isWorking =
     currentStatus === 'working' ||
@@ -98,6 +98,11 @@ export function MemberCard({
 
   const workSummary = isDone && dayReport ? dayReport : checkInPlan || null;
   const workLabel = isDone && dayReport ? 'Worked today' : isWorking ? 'Working on' : checkInPlan ? 'Plan' : null;
+  const workLabelColor = isDone
+    ? Colors.success
+    : isWorking
+      ? Colors.warning
+      : Colors.info;
 
   const openTaskTotal = pendingTaskCount + inProgressTaskCount;
   const hasTaskSummary = openTaskTotal > 0 || doneTaskCount > 0;
@@ -129,18 +134,17 @@ export function MemberCard({
               {onPress && <Feather name="chevron-right" size={16} color={Colors.textTertiary} />}
             </View>
 
-            <View style={styles.metaRow}>
-              <Text style={styles.employeeId}>{member.employee_id}</Text>
-              <View style={[styles.rolePill, { backgroundColor: roleColor }]}>
-                <Text style={styles.rolePillText}>{ROLE_LABELS[member.role]}</Text>
-              </View>
-            </View>
-
-            {!!member.department && (
-              <Text style={styles.department} numberOfLines={1}>
-                {member.department}
+            <Text style={styles.metaLine} numberOfLines={1}>
+              <Text style={[styles.roleText, { color: roleMuted }]}>
+                {ROLE_LABELS[member.role] ?? member.role}
               </Text>
-            )}
+              {!!member.department && (
+                <>
+                  <Text style={styles.metaSep}> · </Text>
+                  <Text style={styles.department}>{member.department}</Text>
+                </>
+              )}
+            </Text>
 
             <View style={styles.statusRow}>
               <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
@@ -148,13 +152,13 @@ export function MemberCard({
                 <Text style={[styles.statusLabel, { color: status.color }]}>{status.label}</Text>
               </View>
               {formattedCheckIn && (
-                <View style={styles.timeChip}>
+                <View style={[styles.timeChip, styles.timeChipIn]}>
                   <Feather name="log-in" size={10} color={Colors.success} />
-                  <Text style={styles.timeChipText}>{formattedCheckIn}</Text>
+                  <Text style={[styles.timeChipText, styles.timeChipTextIn]}>{formattedCheckIn}</Text>
                 </View>
               )}
               {formattedCheckOut && (
-                <View style={styles.timeChip}>
+                <View style={[styles.timeChip, styles.timeChipOut]}>
                   <Feather name="log-out" size={10} color={Colors.textSecondary} />
                   <Text style={styles.timeChipText}>{formattedCheckOut}</Text>
                 </View>
@@ -170,8 +174,8 @@ export function MemberCard({
             )}
 
             {workSummary && workLabel && (
-              <View style={styles.summaryBlock}>
-                <Text style={styles.footerLabel}>{workLabel}</Text>
+              <View style={[styles.summaryBlock, { backgroundColor: workLabelColor + '0D' }]}>
+                <Text style={[styles.footerLabel, { color: workLabelColor }]}>{workLabel}</Text>
                 <Text style={styles.footerBody} numberOfLines={2}>
                   {workSummary}
                 </Text>
@@ -181,19 +185,25 @@ export function MemberCard({
             {hasTaskSummary && (
               <View style={styles.taskSummary}>
                 {inProgressTaskCount > 0 && (
-                  <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.in_progress.color }]}>
-                    {inProgressTaskCount} active
-                  </Text>
+                  <View style={[styles.taskPill, { backgroundColor: TASK_STATUS_CONFIG.in_progress.backgroundColor }]}>
+                    <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.in_progress.color }]}>
+                      {inProgressTaskCount} active
+                    </Text>
+                  </View>
                 )}
                 {pendingTaskCount > 0 && (
-                  <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.pending.color }]}>
-                    {pendingTaskCount} pending
-                  </Text>
+                  <View style={[styles.taskPill, { backgroundColor: TASK_STATUS_CONFIG.pending.backgroundColor }]}>
+                    <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.pending.color }]}>
+                      {pendingTaskCount} pending
+                    </Text>
+                  </View>
                 )}
                 {doneTaskCount > 0 && (
-                  <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.done.color }]}>
-                    {doneTaskCount} done
-                  </Text>
+                  <View style={[styles.taskPill, { backgroundColor: TASK_STATUS_CONFIG.done.backgroundColor }]}>
+                    <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.done.color }]}>
+                      {doneTaskCount} done
+                    </Text>
+                  </View>
                 )}
               </View>
             )}
@@ -253,33 +263,22 @@ const styles = StyleSheet.create({
     color: Colors.text,
     letterSpacing: -0.2,
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  metaLine: {
     marginTop: 3,
-    flexWrap: 'wrap',
-  },
-  employeeId: {
     fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
-    color: Colors.textSecondary,
+    lineHeight: 16,
   },
-  rolePill: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 8,
+  metaSep: {
+    fontFamily: 'Inter_400Regular',
+    color: Colors.textTertiary,
   },
-  rolePillText: {
-    fontSize: 10,
-    fontFamily: 'Inter_700Bold',
-    color: Colors.white,
+  roleText: {
+    fontFamily: 'Inter_500Medium',
+    opacity: 0.85,
   },
   department: {
-    fontSize: 12,
     fontFamily: 'Inter_400Regular',
     color: Colors.textSecondary,
-    marginTop: 2,
   },
   statusRow: {
     flexDirection: 'row',
@@ -291,35 +290,44 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderRadius: 10,
-    gap: 4,
+    gap: 5,
   },
   statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
   statusLabel: {
-    fontSize: 10,
-    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+    fontFamily: 'Inter_700Bold',
   },
   timeChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 1,
+  },
+  timeChipIn: {
+    backgroundColor: Colors.successLight,
+    borderColor: 'rgba(4, 120, 87, 0.15)',
+  },
+  timeChipOut: {
+    backgroundColor: Colors.surfaceLight,
     borderColor: Colors.borderLight,
   },
   timeChipText: {
     fontSize: 10,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_600SemiBold',
     color: Colors.textSecondary,
+  },
+  timeChipTextIn: {
+    color: Colors.success,
   },
   footer: {
     marginTop: 10,
@@ -331,14 +339,13 @@ const styles = StyleSheet.create({
   footerLabel: {
     fontSize: 10,
     fontFamily: 'Inter_700Bold',
-    color: Colors.textTertiary,
     textTransform: 'uppercase',
     letterSpacing: 0.35,
-    marginBottom: 1,
+    marginBottom: 2,
   },
   footerBody: {
     fontSize: 13,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Inter_500Medium',
     color: Colors.text,
     lineHeight: 18,
   },
@@ -349,11 +356,18 @@ const styles = StyleSheet.create({
   },
   summaryBlock: {
     gap: 2,
+    padding: 10,
+    borderRadius: 12,
   },
   taskSummary: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 6,
+  },
+  taskPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
   taskStat: {
     fontSize: 11,
@@ -377,6 +391,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontFamily: 'Inter_500Medium',
-    color: Colors.textSecondary,
+    color: Colors.text,
   },
 });

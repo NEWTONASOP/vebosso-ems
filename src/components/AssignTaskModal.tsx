@@ -5,11 +5,12 @@
 import { Feather } from '@expo/vector-icons';
 import { addDays, format, isValid, parseISO } from 'date-fns';
 import { useCallback, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Chip, HelperText, Icon, Modal, Portal, Text } from 'react-native-paper';
 import { Colors } from '../constants/colors';
 import { ROLE_LABELS } from '../constants/roles';
 import { Profile } from '../types/database';
+import { PaperOutlinedField } from './PaperOutlinedField';
 
 interface AssignTaskModalProps {
   visible: boolean;
@@ -150,11 +151,9 @@ export function AssignTaskModal({
             </Text>
           </View>
 
-          <Text style={styles.fieldLabel}>Task Title</Text>
-          <TextInput
-            style={styles.input}
+          <PaperOutlinedField
+            label="Task Title"
             placeholder="What needs to be done?"
-            placeholderTextColor={Colors.placeholder}
             defaultValue=""
             onChangeText={(text) => {
               titleRef.current = text;
@@ -163,19 +162,15 @@ export function AssignTaskModal({
             editable={!isLoading}
           />
 
-          <Text style={styles.fieldLabel}>Description (Optional)</Text>
-          <TextInput
-            style={[styles.input, styles.descriptionInput]}
+          <PaperOutlinedField
+            label="Description (Optional)"
             placeholder="Add more details about this task..."
-            placeholderTextColor={Colors.placeholder}
             defaultValue=""
             onChangeText={(text) => {
               descriptionRef.current = text;
             }}
             multiline
-            textAlignVertical="top"
             editable={!isLoading}
-            blurOnSubmit={false}
           />
 
           {/* Due Date Section */}
@@ -266,15 +261,14 @@ export function AssignTaskModal({
             {showDateInput && (
               <View style={styles.dateInputContainer}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.fieldLabel}>Custom Date (YYYY-MM-DD)</Text>
-                  <TextInput
-                    style={styles.dateInput}
+                  <PaperOutlinedField
+                    label="Custom Date (YYYY-MM-DD)"
                     placeholder="2024-01-20"
-                    placeholderTextColor={Colors.placeholder}
                     defaultValue=""
                     onChangeText={handleDateInputChange}
                     keyboardType="numbers-and-punctuation"
                     editable={!isLoading}
+                    dense
                   />
                 </View>
                 <Button
@@ -398,23 +392,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginBottom: 6,
   },
-  input: {
-    backgroundColor: Colors.inputBackground,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 12,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    color: Colors.text,
-  },
-  descriptionInput: {
-    minHeight: 88,
-    maxHeight: 160,
-    paddingTop: 14,
-  },
   dueDateSection: {
     marginBottom: 16,
   },
@@ -479,17 +456,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     alignItems: 'flex-end',
-  },
-  dateInput: {
-    backgroundColor: Colors.inputBackground,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    color: Colors.text,
   },
   errorText: {
     color: Colors.error,

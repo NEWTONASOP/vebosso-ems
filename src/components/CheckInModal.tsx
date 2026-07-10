@@ -3,9 +3,10 @@
 // ============================================================================
 
 import { useCallback, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Button, HelperText, Modal, Portal, Text } from 'react-native-paper';
 import { Colors } from '../constants/colors';
+import { PaperOutlinedField } from './PaperOutlinedField';
 
 interface CheckInModalProps {
   visible: boolean;
@@ -57,19 +58,14 @@ export function CheckInModal({
             <Text style={styles.subtitle}>What will you work on today?</Text>
           </View>
 
-          <Text style={styles.inputLabel}>Today&apos;s Plan</Text>
-          <TextInput
-            style={styles.input}
+          <PaperOutlinedField
+            label="Today's Plan"
             placeholder="Describe what you'll be working on today..."
-            placeholderTextColor={Colors.placeholder}
             defaultValue=""
             onChangeText={handleChangeText}
             multiline
-            textAlignVertical="top"
             maxLength={2000}
             editable={!isLoading}
-            autoCorrect
-            blurOnSubmit={false}
           />
 
           <View style={styles.charCountRow}>
@@ -142,24 +138,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     color: Colors.textSecondary,
     textAlign: 'center',
-  },
-  inputLabel: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: Colors.inputBackground,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 14,
-    minHeight: 100,
-    maxHeight: 180,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    color: Colors.text,
   },
   charCountRow: {
     flexDirection: 'row',

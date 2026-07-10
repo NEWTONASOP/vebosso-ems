@@ -5,9 +5,9 @@
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Avatar, Modal, Portal, Text } from 'react-native-paper';
+import { Avatar, Button, Modal, Portal, Text } from 'react-native-paper';
 import { Colors } from '../constants/colors';
-import { ROLE_LABELS, WORK_LOG_STATUS_CONFIG } from '../constants/roles';
+import { ROLE_LABELS, TASK_STATUS_CONFIG, WORK_LOG_STATUS_CONFIG } from '../constants/roles';
 import { Profile, WorkLogStatus } from '../types/database';
 import { MemberActiveTask } from './MemberCard';
 
@@ -55,6 +55,17 @@ function getAvatarColors(role: Profile['role']) {
   }
 }
 
+function getRoleMutedColor(role: Profile['role']) {
+  switch (role) {
+    case 'owner':
+      return Colors.ownerAccent;
+    case 'manager':
+      return Colors.managerAccent;
+    default:
+      return Colors.memberAccent;
+  }
+}
+
 export function MemberActionsModal({
   visible,
   member,
@@ -76,6 +87,7 @@ export function MemberActionsModal({
 
   const status = getStatusDisplay(currentStatus);
   const avatarColors = getAvatarColors(member.role);
+  const roleMuted = getRoleMutedColor(member.role);
   const isWorking =
     currentStatus === 'working' ||
     currentStatus === 'pending_approval' ||
@@ -83,6 +95,11 @@ export function MemberActionsModal({
   const isDone = currentStatus === 'done';
   const workSummary = isDone && dayReport ? dayReport : checkInPlan || null;
   const workLabel = isDone && dayReport ? 'Worked today' : isWorking ? 'Working on' : checkInPlan ? 'Plan' : null;
+  const workLabelColor = isDone
+    ? Colors.success
+    : isWorking
+      ? Colors.warning
+      : Colors.info;
   const openTaskTotal = pendingTaskCount + inProgressTaskCount;
 
   const formattedCheckIn = checkInTime ? format(new Date(checkInTime), 'hh:mm a') : null;
@@ -95,7 +112,12 @@ export function MemberActionsModal({
   return (
     <Portal>
       <Modal visible onDismiss={onDismiss} contentContainerStyle={styles.container}>
-        <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+        >
           <View style={styles.header}>
             <Avatar.Text
               size={64}
@@ -104,50 +126,89 @@ export function MemberActionsModal({
               labelStyle={{ color: avatarColors.text, fontFamily: 'Inter_700Bold', fontSize: 22 }}
             />
             <Text style={styles.name}>{member.full_name}</Text>
-            <Text style={styles.meta}>
-              {member.employee_id}
-              {member.department ? ` • ${member.department}` : ''}
+            <Text style={styles.metaLine}>
+              <Text style={styles.employeeId}>{member.employee_id}</Text>
+              <Text style={styles.metaSep}> · </Text>
+              <Text style={[styles.roleText, { color: roleMuted }]}>{ROLE_LABELS[member.role]}</Text>
+              {!!member.department && (
+                <>
+                  <Text style={styles.metaSep}> · </Text>
+                  <Text style={styles.department}>{member.department}</Text>
+                </>
+              )}
             </Text>
-            <View style={styles.badgeRow}>
-              <View style={[styles.rolePill, { backgroundColor: Colors.accent }]}>
-                <Text style={styles.rolePillText}>{ROLE_LABELS[member.role]}</Text>
-              </View>
-              <View style={[styles.statusPill, { backgroundColor: status.bg }]}>
+            <View style={styles.statusRow}>
+              <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
                 <View style={[styles.statusDot, { backgroundColor: status.color }]} />
-                <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+                <Text style={[styles.statusLabel, { color: status.color }]}>{status.label}</Text>
               </View>
+              {formattedCheckIn && (
+                <View style={[styles.timeChip, styles.timeChipIn]}>
+                  <Feather name="log-in" size={11} color={Colors.success} />
+                  <Text style={[styles.timeChipText, styles.timeChipTextIn]}>{formattedCheckIn}</Text>
+                </View>
+              )}
+              {formattedCheckOut && (
+                <View style={[styles.timeChip, styles.timeChipOut]}>
+                  <Feather name="log-out" size={11} color={Colors.textSecondary} />
+                  <Text style={styles.timeChipText}>{formattedCheckOut}</Text>
+                </View>
+              )}
             </View>
           </View>
 
-          {(formattedCheckIn || formattedCheckOut || workSummary || openTaskTotal > 0 || doneTaskCount > 0) && (
+          {(formattedCheckIn || formattedCheckOut || workSummary || openTaskTotal > 0 || doneTaskCount > 0 || currentStatus === 'on_leave') && (
             <View style={styles.summaryCard}>
               <Text style={styles.sectionTitle}>Today</Text>
-              {(formattedCheckIn || formattedCheckOut) && (
-                <View style={styles.summaryRow}>
-                  {formattedCheckIn && (
-                    <Text style={styles.summaryMeta}>Check-in {formattedCheckIn}</Text>
-                  )}
-                  {formattedCheckOut && (
-                    <Text style={styles.summaryMeta}>Check-out {formattedCheckOut}</Text>
-                  )}
-                </View>
+
+              {currentStatus === 'on_leave' && (
+                <Text style={styles.footerMuted}>On approved leave today</Text>
               )}
+
               {workSummary && workLabel && (
-                <View style={styles.summaryBlock}>
-                  <Text style={styles.summaryLabel}>{workLabel}</Text>
+                <View style={[styles.summaryBlock, { backgroundColor: workLabelColor + '0D' }]}>
+                  <Text style={[styles.summaryLabel, { color: workLabelColor }]}>{workLabel}</Text>
                   <Text style={styles.summaryBody}>{workSummary}</Text>
                 </View>
               )}
+
               {(openTaskTotal > 0 || doneTaskCount > 0) && (
-                <Text style={styles.summaryMeta}>
-                  Tasks: {inProgressTaskCount} active • {pendingTaskCount} pending • {doneTaskCount} done
-                </Text>
+                <View style={styles.taskSummary}>
+                  {inProgressTaskCount > 0 && (
+                    <View style={[styles.taskPill, { backgroundColor: TASK_STATUS_CONFIG.in_progress.backgroundColor }]}>
+                      <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.in_progress.color }]}>
+                        {inProgressTaskCount} active
+                      </Text>
+                    </View>
+                  )}
+                  {pendingTaskCount > 0 && (
+                    <View style={[styles.taskPill, { backgroundColor: TASK_STATUS_CONFIG.pending.backgroundColor }]}>
+                      <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.pending.color }]}>
+                        {pendingTaskCount} pending
+                      </Text>
+                    </View>
+                  )}
+                  {doneTaskCount > 0 && (
+                    <View style={[styles.taskPill, { backgroundColor: TASK_STATUS_CONFIG.done.backgroundColor }]}>
+                      <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.done.color }]}>
+                        {doneTaskCount} done
+                      </Text>
+                    </View>
+                  )}
+                </View>
               )}
-              {activeTasks.slice(0, 2).map((task, index) => (
-                <Text key={`${task.title}-${index}`} style={styles.taskLine} numberOfLines={1}>
-                  • {task.title}
-                </Text>
-              ))}
+
+              {activeTasks.slice(0, 3).map((task, index) => {
+                const taskColor = TASK_STATUS_CONFIG[task.status]?.color || Colors.textTertiary;
+                return (
+                  <View key={`${task.title}-${index}`} style={styles.taskRow}>
+                    <View style={[styles.taskDot, { backgroundColor: taskColor }]} />
+                    <Text style={styles.taskLine} numberOfLines={1}>
+                      {task.title}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
           )}
 
@@ -159,11 +220,19 @@ export function MemberActionsModal({
             )}
             <ActionRow label="Manage Profile" icon="settings" onPress={() => runAction(onManageProfile)} isLast />
           </View>
-
-          <Pressable style={styles.cancelBtn} onPress={onDismiss}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </Pressable>
         </ScrollView>
+
+        <View style={styles.cancelSection}>
+          <Button
+            mode="outlined"
+            onPress={onDismiss}
+            style={styles.cancelButton}
+            contentStyle={styles.cancelButtonContent}
+            textColor={Colors.textSecondary}
+          >
+            Cancel
+          </Button>
+        </View>
       </Modal>
     </Portal>
   );
@@ -198,10 +267,17 @@ const styles = StyleSheet.create({
     margin: 20,
     borderRadius: 24,
     padding: 24,
+    paddingBottom: 20,
     maxHeight: '88%',
     borderWidth: 1,
     borderColor: Colors.border,
     ...Colors.shadowHeavy,
+  },
+  scroll: {
+    flexGrow: 0,
+  },
+  scrollContent: {
+    paddingBottom: 4,
   },
   header: {
     alignItems: 'center',
@@ -215,46 +291,77 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
     textAlign: 'center',
   },
-  meta: {
-    fontFamily: 'Inter_500Medium',
+  metaLine: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    lineHeight: 18,
     marginTop: 4,
     textAlign: 'center',
   },
-  badgeRow: {
+  employeeId: {
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.textSecondary,
+  },
+  metaSep: {
+    fontFamily: 'Inter_400Regular',
+    color: Colors.textTertiary,
+  },
+  roleText: {
+    fontFamily: 'Inter_500Medium',
+    opacity: 0.85,
+  },
+  department: {
+    fontFamily: 'Inter_400Regular',
+    color: Colors.textSecondary,
+  },
+  statusRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 8,
+    alignItems: 'center',
+    gap: 6,
     marginTop: 12,
   },
-  rolePill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  rolePillText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 11,
-    color: Colors.white,
-  },
-  statusPill: {
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
+    gap: 5,
   },
   statusDot: {
     width: 7,
     height: 7,
     borderRadius: 4,
   },
-  statusText: {
-    fontFamily: 'Inter_600SemiBold',
+  statusLabel: {
     fontSize: 11,
+    fontFamily: 'Inter_700Bold',
+  },
+  timeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  timeChipIn: {
+    backgroundColor: Colors.successLight,
+    borderColor: 'rgba(4, 120, 87, 0.15)',
+  },
+  timeChipOut: {
+    backgroundColor: Colors.surfaceLight,
+    borderColor: Colors.borderLight,
+  },
+  timeChipText: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.textSecondary,
+  },
+  timeChipTextIn: {
+    color: Colors.success,
   },
   sectionTitle: {
     fontFamily: 'Inter_700Bold',
@@ -272,39 +379,59 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderWidth: 1,
     borderColor: Colors.border,
-    gap: 6,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    gap: 8,
   },
   summaryBlock: {
-    marginTop: 4,
+    padding: 10,
+    borderRadius: 12,
+    gap: 2,
   },
   summaryLabel: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 11,
-    color: Colors.textTertiary,
+    fontSize: 10,
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    marginBottom: 2,
+    letterSpacing: 0.35,
   },
   summaryBody: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Inter_500Medium',
     fontSize: 13,
     color: Colors.text,
     lineHeight: 18,
   },
-  summaryMeta: {
-    fontFamily: 'Inter_500Medium',
+  footerMuted: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    fontFamily: 'Inter_400Regular',
+    color: Colors.textTertiary,
+  },
+  taskSummary: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  taskPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  taskStat: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  taskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  taskDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
   },
   taskLine: {
+    flex: 1,
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: Colors.text,
   },
   actionsCard: {
     backgroundColor: Colors.surfaceLight,
@@ -312,7 +439,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: Colors.border,
-    marginBottom: 12,
   },
   actionRow: {
     flexDirection: 'row',
@@ -336,13 +462,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text,
   },
-  cancelBtn: {
-    alignItems: 'center',
-    paddingVertical: 8,
+  cancelSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.divider,
   },
-  cancelText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-    color: Colors.textSecondary,
+  cancelButton: {
+    borderColor: Colors.border,
+    borderRadius: 12,
+  },
+  cancelButtonContent: {
+    minHeight: 46,
   },
 });
