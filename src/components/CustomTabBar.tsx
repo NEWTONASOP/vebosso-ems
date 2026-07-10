@@ -3,9 +3,12 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { BottomTabBarProps } from 'expo-router/tabs';
 import React from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants/colors';
+
+const SLIM_WIDTH = 400;
 
 // Map route names to icons
 const ICON_MAP: Record<string, string> = {
@@ -38,6 +41,10 @@ const LABEL_MAP: Record<string, string> = {
 };
 
 export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isSlim = width < SLIM_WIDTH;
+  const bottomOffset = Math.max(insets.bottom, Platform.OS === 'android' ? 12 : 16) + (isSlim ? 8 : 12);
   const currentRoute = state.routes[state.index];
   const currentOptions = descriptors[currentRoute.key]?.options;
 
@@ -50,18 +57,23 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
   if (shouldHide) return null;
 
   return (
-    <View style={styles.outerContainer}>
+    <View
+      style={[
+        styles.outerContainer,
+        isSlim && styles.outerContainerSlim,
+        { bottom: bottomOffset },
+      ]}
+    >
       <BlurView
         tint="light"
         intensity={80}
         style={styles.blurContainer}
       >
-        <View style={styles.innerContainer}>
+        <View style={[styles.innerContainer, isSlim && styles.innerContainerSlim]}>
           {state.routes.map((route, index) => {
             const { options } = descriptors[route.key];
             
             const hasDashboard = state.routes.some((r) => r.name === 'dashboard');
-            const hasMyTeam = state.routes.some((r) => r.name === 'my-team');
 
             // Skip hidden tabs (Expo Router uses href: null to hide tabs, or dynamic sub-routes)
             if (
@@ -107,6 +119,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
                 iconName={iconName}
                 renderIcon={renderIcon}
                 onPress={onPress}
+                isSlim={isSlim}
               />
             );
           })}
@@ -122,9 +135,10 @@ interface TabItemProps {
   iconName: string;
   renderIcon: ((props: { focused: boolean; color: string; size: number }) => React.ReactNode) | undefined;
   onPress: () => void;
+  isSlim: boolean;
 }
 
-function TabItem({ isFocused, label, iconName, renderIcon, onPress }: TabItemProps) {
+function TabItem({ isFocused, label, iconName, renderIcon, onPress, isSlim }: TabItemProps) {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -145,7 +159,7 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress }: TabItemPro
   };
 
   const color = isFocused ? Colors.tabActive : Colors.tabInactive;
-  const iconSize = isFocused ? 28 : 26;
+  const iconSize = isSlim ? (isFocused ? 22 : 20) : (isFocused ? 28 : 26);
   const iconElement = renderIcon
     ? renderIcon({ focused: isFocused, color, size: iconSize })
     : <Feather name={iconName as any} size={iconSize} color={color} />;
@@ -155,11 +169,12 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress }: TabItemPro
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      style={styles.tabButton}
+      style={[styles.tabButton, isSlim && styles.tabButtonSlim]}
     >
       <Animated.View
         style={[
           styles.pillContainer,
+          isSlim && styles.pillContainerSlim,
           isFocused && styles.pillActive,
           animatedStyle,
         ]}
@@ -173,11 +188,14 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress }: TabItemPro
 const styles = StyleSheet.create({
   outerContainer: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 32 : 28,
     left: 16,
     right: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  outerContainerSlim: {
+    left: 10,
+    right: 10,
   },
   blurContainer: {
     borderRadius: 36,
@@ -210,11 +228,18 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
   },
+  innerContainerSlim: {
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+  },
   tabButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 64,
+  },
+  tabButtonSlim: {
+    minWidth: 0,
   },
   pillContainer: {
     flexDirection: 'column',
@@ -224,6 +249,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 24,
     minHeight: 56,
+  },
+  pillContainerSlim: {
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 20,
+    minHeight: 44,
   },
   pillActive: {
     backgroundColor: 'rgba(0, 0, 0, 0.08)', // Slightly darker for better visibility

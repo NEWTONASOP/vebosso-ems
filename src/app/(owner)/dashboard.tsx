@@ -15,6 +15,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { InlineError } from '../../components/InlineError';
 import { ListSkeleton, StatsSkeleton } from '../../components/LoadingSkeleton';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
+import { QuickActionCard } from '../../components/QuickActionCard';
 import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
@@ -403,63 +404,6 @@ const statStyles = StyleSheet.create({
   },
 });
 
-// ============================================================================
-// Quick Action Card component
-// ============================================================================
-
-interface QuickActionCardProps {
-  icon: string;
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-}
-
-function QuickActionCard({ icon, title, subtitle, onPress }: QuickActionCardProps) {
-  return (
-    <AnimatedPressable
-      style={quickActionStyles.container}
-      onPress={onPress}
-    >
-      <Feather name={icon as any} size={24} color={Colors.accent} style={quickActionStyles.icon} />
-      <View style={quickActionStyles.content}>
-        <Text style={quickActionStyles.title}>{title}</Text>
-        <Text style={quickActionStyles.subtitle}>{subtitle}</Text>
-      </View>
-      <Feather name="chevron-right" size={22} color={Colors.textTertiary} />
-    </AnimatedPressable>
-  );
-}
-
-const quickActionStyles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 8,
-  },
-  icon: {
-    marginRight: 12,
-  },
-  content: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 15,
-    fontFamily: 'Inter_600SemiBold',
-    color: Colors.text,
-    marginBottom: 2,
-  },
-  subtitle: {
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
-    color: Colors.textSecondary,
-  },
-});
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -533,6 +477,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   quickActionsContainer: {
+    flexDirection: 'row',
+    gap: 10,
     paddingHorizontal: 20,
   },
   listContainer: {

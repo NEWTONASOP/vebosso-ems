@@ -11,6 +11,7 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { configureFonts, MD3LightTheme, PaperProvider } from 'react-native-paper';
 import 'react-native-reanimated';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LoadingScreen } from '../components/LoadingScreen';
 import { OfflineBanner } from '../components/OfflineBanner';
@@ -212,30 +213,32 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <GestureHandlerRootView style={styles.container}>
-        <PaperProvider 
-          theme={theme}
-          settings={{
-            icon: props => <MaterialCommunityIcons {...props} />,
-          }}
-        >
-          <StatusBar style="dark" />
-          <OfflineBanner />
-          <UpdateChecker />
-          <AuthGuard />
-          {!isInitialized ? (
-            <LoadingScreen />
-          ) : (
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: Colors.background },
-                animation: 'slide_from_right',
-              }}
-            />
-          )}
-        </PaperProvider>
-      </GestureHandlerRootView>
+      <SafeAreaProvider>
+        <GestureHandlerRootView style={styles.container}>
+          <PaperProvider 
+            theme={theme}
+            settings={{
+              icon: props => <MaterialCommunityIcons {...props} />,
+            }}
+          >
+            <StatusBar style="dark" />
+            <OfflineBanner />
+            <UpdateChecker />
+            <AuthGuard />
+            {!isInitialized ? (
+              <LoadingScreen />
+            ) : (
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: Colors.background },
+                  animation: 'slide_from_right',
+                }}
+              />
+            )}
+          </PaperProvider>
+        </GestureHandlerRootView>
+      </SafeAreaProvider>
     </ErrorBoundary>
   );
 }
