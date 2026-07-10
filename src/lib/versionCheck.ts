@@ -130,6 +130,48 @@ export async function openInstallPermissionSettings(): Promise<void> {
 }
 
 /**
+ * Local cache path for a downloaded APK
+ */
+export function getApkFileUri(version: string): string {
+  return `${FileSystem.cacheDirectory}vebosso-ems-v${version}.apk`;
+}
+
+async function launchApkInstaller(fileUri: string): Promise<void> {
+  const contentUri = await FileSystem.getContentUriAsync(fileUri);
+
+  try {
+    await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+      data: contentUri,
+      flags: 1,
+      type: 'application/vnd.android.package-archive',
+    });
+  } catch (error) {
+    if (__DEV__) console.error('APK install intent failed:', error);
+    throw new Error(
+      'Could not open the installer. Allow "Install unknown apps" for VEBOSSO EMS in Settings, then try again.'
+    );
+  }
+}
+
+/**
+ * Re-open the system installer from a previously downloaded APK (no re-download)
+ */
+export async function relaunchCachedApkInstaller(version: string): Promise<void> {
+  if (Platform.OS !== 'android') {
+    throw new Error('In-app APK updates are only supported on Android');
+  }
+
+  const fileUri = getApkFileUri(version);
+  const existingFile = await FileSystem.getInfoAsync(fileUri);
+
+  if (!existingFile.exists) {
+    throw new Error('Update file not found. Please download again.');
+  }
+
+  await launchApkInstaller(fileUri);
+}
+
+/**
  * Download the latest APK and launch the system installer
  */
 export async function downloadAndInstallApk(
@@ -142,8 +184,7 @@ export async function downloadAndInstallApk(
 
   const downloadUrl = await getDownloadUrl();
   const latestVersion = version || (await checkAppVersion()).latestVersion;
-  const fileName = `vebosso-ems-v${latestVersion}.apk`;
-  const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+  const fileUri = getApkFileUri(latestVersion);
 
   const existingFile = await FileSystem.getInfoAsync(fileUri);
   if (existingFile.exists) {
@@ -171,21 +212,7 @@ export async function downloadAndInstallApk(
   }
 
   onProgress?.(1);
-
-  const contentUri = await FileSystem.getContentUriAsync(result.uri);
-
-  try {
-    await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-      data: contentUri,
-      flags: 1,
-      type: 'application/vnd.android.package-archive',
-    });
-  } catch (error) {
-    if (__DEV__) console.error('APK install intent failed:', error);
-    throw new Error(
-      'Could not open the installer. Allow "Install unknown apps" for VEBOSSO EMS in Settings, then try again.'
-    );
-  }
+  await launchApkInstaller(result.uri);
 }
 
 /**

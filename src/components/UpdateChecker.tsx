@@ -11,6 +11,7 @@ import {
   downloadAndInstallApk,
   openAppStore,
   openInstallPermissionSettings,
+  relaunchCachedApkInstaller,
 } from '../lib/versionCheck';
 
 type UpdatePhase = 'idle' | 'downloading' | 'installing' | 'error';
@@ -22,6 +23,7 @@ export function UpdateChecker() {
   const [progress, setProgress] = useState(0);
   const [targetVersion, setTargetVersion] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [isOpeningInstaller, setIsOpeningInstaller] = useState(false);
 
   useEffect(() => {
     if (Platform.OS !== 'android' || checked) return;
@@ -91,9 +93,32 @@ export function UpdateChecker() {
     });
   };
 
+  const handleOpenInstaller = async () => {
+    if (!targetVersion || isOpeningInstaller) return;
+
+    setIsOpeningInstaller(true);
+    try {
+      await relaunchCachedApkInstaller(targetVersion);
+    } catch (error: any) {
+      if (error?.message?.includes('not found')) {
+        startInAppUpdate(targetVersion).catch((err) => {
+          if (__DEV__) console.error('Failed to re-download update:', err);
+        });
+        return;
+      }
+
+      setPhase('error');
+      setErrorMessage(
+        error?.message || 'Could not open the installer. Please try again.'
+      );
+    } finally {
+      setIsOpeningInstaller(false);
+    }
+  };
+
   const progressLabel =
     phase === 'installing'
-      ? 'Opening installer...'
+      ? 'Download complete'
       : phase === 'error'
         ? 'Update failed'
         : `Downloading v${targetVersion}...`;
@@ -113,9 +138,22 @@ export function UpdateChecker() {
           {phase === 'error'
             ? errorMessage
             : phase === 'installing'
-              ? 'Follow the system prompt to install the update. You must install it to continue using the app.'
-              : `Version ${targetVersion} is required. Please keep the app open until the download completes.`}
+              ? 'Install the update from the system prompt. If you closed it, tap the button below to open it again.'
+              : `Version ${targetVersion} is required before you can continue.`}
         </Text>
+
+        {phase !== 'error' && (
+          <View style={styles.keepOpenNotice}>
+            <Text variant="labelMedium" style={styles.keepOpenTitle}>
+              Keep this app open
+            </Text>
+            <Text variant="bodySmall" style={styles.keepOpenText}>
+              {phase === 'installing'
+                ? 'Do not close or swipe away VEBOSSO EMS until the update is fully installed.'
+                : 'Do not close or swipe away the app while the update is downloading.'}
+            </Text>
+          </View>
+        )}
 
         {phase !== 'error' && (
           <View style={styles.progressSection}>
@@ -130,6 +168,21 @@ export function UpdateChecker() {
             <Text variant="labelSmall" style={styles.progressPercent}>
               {Math.round((phase === 'installing' ? 1 : progress) * 100)}%
             </Text>
+          </View>
+        )}
+
+        {phase === 'installing' && (
+          <View style={styles.actions}>
+            <Button
+              mode="contained"
+              onPress={handleOpenInstaller}
+              loading={isOpeningInstaller}
+              disabled={isOpeningInstaller}
+              style={styles.button}
+              buttonColor={Colors.accent}
+            >
+              Open Installer Again
+            </Button>
           </View>
         )}
 
@@ -165,8 +218,26 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: Colors.textSecondary,
-    marginBottom: 20,
+    marginBottom: 16,
     lineHeight: 22,
+  },
+  keepOpenNotice: {
+    backgroundColor: Colors.warningLight,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(180, 83, 9, 0.2)',
+  },
+  keepOpenTitle: {
+    color: Colors.warning,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  keepOpenText: {
+    color: Colors.textSecondary,
+    lineHeight: 18,
   },
   progressSection: {
     gap: 8,
