@@ -13,6 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import Constants from 'expo-constants';
 
+import { InfoRow } from '../../components/InfoRow';
 import { PageTransition } from '../../components/PageTransition';
 
 export default function MemberProfileScreen() {
@@ -128,33 +129,6 @@ export default function MemberProfileScreen() {
 // Row Components
 // ============================================================================
 
-interface InfoRowProps {
-  label: string;
-  value: string;
-  isLast?: boolean;
-  valueBadge?: boolean;
-  badgeColor?: string;
-  badgeTextColor?: string;
-}
-
-function InfoRow({ label, value, isLast, valueBadge, badgeColor, badgeTextColor }: InfoRowProps) {
-  return (
-    <View style={rowStyles.rowWrapper}>
-      <View style={rowStyles.rowContent}>
-        <Text style={rowStyles.label}>{label}</Text>
-        {valueBadge ? (
-          <View style={[rowStyles.badge, { backgroundColor: badgeColor }]}>
-            <Text style={[rowStyles.badgeText, { color: badgeTextColor }]}>{value}</Text>
-          </View>
-        ) : (
-          <Text style={rowStyles.value}>{value}</Text>
-        )}
-      </View>
-      {!isLast && <View style={rowStyles.separator} />}
-    </View>
-  );
-}
-
 interface ActionRowProps {
   label: string;
   icon: string;
@@ -206,21 +180,6 @@ const rowStyles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     fontSize: 15,
     color: Colors.textSecondary,
-  },
-  value: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
-    color: Colors.textPrimary,
-    letterSpacing: -0.1,
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  badgeText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
   },
   destructiveText: {
     fontFamily: 'Inter_600SemiBold',
