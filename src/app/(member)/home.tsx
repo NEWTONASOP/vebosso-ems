@@ -523,6 +523,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textSecondary,
     letterSpacing: 1,
+    textAlign: 'center',
   },
   heroValue: {
     fontFamily: 'Inter_800ExtraBold',
@@ -530,6 +531,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     letterSpacing: -1,
     marginVertical: 4,
+    textAlign: 'center',
   },
   cardDetailsGroup: {
     width: '100%',
