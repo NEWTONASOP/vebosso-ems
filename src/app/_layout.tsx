@@ -7,7 +7,7 @@ import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-rout
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { StyleSheet } from 'react-native';
+import { AppState, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { configureFonts, MD3LightTheme, PaperProvider } from 'react-native-paper';
 import 'react-native-reanimated';
@@ -77,16 +77,16 @@ function AuthGuard() {
 
       const setupNotifications = async () => {
         try {
-          const { 
-            registerForPushNotificationsAsync, 
-            savePushToken, 
-            addNotificationResponseListener, 
-            addNotificationReceivedListener 
+          const {
+            syncPushTokenForUser,
+            syncPushTokenOnForeground,
+            addPushTokenRefreshListener,
+            addNotificationResponseListener,
+            addNotificationReceivedListener,
           } = await import('../lib/notifications');
-          
-          const token = await registerForPushNotificationsAsync();
-          if (token && active) {
-            await savePushToken(profile.id, token);
+
+          if (active) {
+            await syncPushTokenForUser(profile.id);
           }
 
           if (active) {
@@ -96,14 +96,23 @@ function AuthGuard() {
             const receivedSub = addNotificationReceivedListener((notification) => {
               if (__DEV__) console.log('Notification received in foreground:', notification);
             });
+            const tokenSub = addPushTokenRefreshListener(profile.id);
+
+            const appStateSub = AppState.addEventListener('change', (nextState) => {
+              if (nextState === 'active' && active) {
+                syncPushTokenOnForeground(profile.id);
+              }
+            });
 
             cleanup = () => {
               responseSub.remove();
               receivedSub.remove();
+              tokenSub.remove();
+              appStateSub.remove();
             };
           }
         } catch (error) {
-          if (__DEV__) console.error('Failed to setup push notifications:', error);
+          console.warn('Failed to setup push notifications:', error);
         }
       };
 

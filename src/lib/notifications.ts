@@ -4,7 +4,7 @@
 
 import type * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { supabase } from './supabase';
 import { isRunningInExpoGo } from 'expo';
@@ -14,6 +14,12 @@ const expoNotifications = !isRunningInExpoGo()
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   ? (require('expo-notifications') as typeof Notifications)
   : null;
+
+let androidChannelsConfigured = false;
+
+const SAVE_TOKEN_MAX_ATTEMPTS = 3;
+const FOREGROUND_SYNC_MIN_INTERVAL_MS = 30_000;
+let lastForegroundSyncAt = 0;
 
 // Configure notification behavior if available
 if (expoNotifications) {
@@ -26,6 +32,47 @@ if (expoNotifications) {
       shouldShowList: true,
     }),
   });
+}
+
+async function ensureAndroidNotificationChannels(): Promise<void> {
+  if (!expoNotifications || Platform.OS !== 'android' || androidChannelsConfigured) {
+    return;
+  }
+
+  await expoNotifications.setNotificationChannelAsync('default', {
+    name: 'Default',
+    importance: expoNotifications.AndroidImportance?.HIGH ?? 6,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#2563EB',
+    sound: 'default',
+  });
+
+  await expoNotifications.setNotificationChannelAsync('approvals', {
+    name: 'Approvals',
+    description: 'Check-in and checkout approval notifications',
+    importance: expoNotifications.AndroidImportance?.HIGH ?? 6,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#F59E0B',
+    sound: 'default',
+  });
+
+  await expoNotifications.setNotificationChannelAsync('tasks', {
+    name: 'Tasks',
+    description: 'Task assignment notifications',
+    importance: expoNotifications.AndroidImportance?.DEFAULT ?? 5,
+    lightColor: '#2563EB',
+    sound: 'default',
+  });
+
+  await expoNotifications.setNotificationChannelAsync('announcements', {
+    name: 'Announcements',
+    description: 'Company announcements',
+    importance: expoNotifications.AndroidImportance?.DEFAULT ?? 5,
+    lightColor: '#6366F1',
+    sound: 'default',
+  });
+
+  androidChannelsConfigured = true;
 }
 
 /**
@@ -71,62 +118,93 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     return null;
   }
 
-  // Configure Android notification channel
-  if (Platform.OS === 'android') {
-    await expoNotifications.setNotificationChannelAsync('default', {
-      name: 'Default',
-      importance: expoNotifications.AndroidImportance?.HIGH ?? 6,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#2563EB',
-      sound: 'default',
-    });
-
-    await expoNotifications.setNotificationChannelAsync('approvals', {
-      name: 'Approvals',
-      description: 'Check-in and checkout approval notifications',
-      importance: expoNotifications.AndroidImportance?.HIGH ?? 6,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#F59E0B',
-      sound: 'default',
-    });
-
-    await expoNotifications.setNotificationChannelAsync('tasks', {
-      name: 'Tasks',
-      description: 'Task assignment notifications',
-      importance: expoNotifications.AndroidImportance?.DEFAULT ?? 5,
-      lightColor: '#2563EB',
-      sound: 'default',
-    });
-
-    await expoNotifications.setNotificationChannelAsync('announcements', {
-      name: 'Announcements',
-      description: 'Company announcements',
-      importance: expoNotifications.AndroidImportance?.DEFAULT ?? 5,
-      lightColor: '#6366F1',
-      sound: 'default',
-    });
-  }
+  // Configure Android notification channels (once per app session)
+  await ensureAndroidNotificationChannels();
 
   return token;
 }
 
 /**
- * Save the push token to the user's profile
+ * Save the push token to the user's profile (with retry).
+ * Returns true when the token is persisted successfully.
  */
-export async function savePushToken(userId: string, token: string): Promise<void> {
-  try {
-    const { error } = await supabase
-      .from('profiles')
-       
-      .update({ expo_push_token: token } as any)
-      .eq('id', userId);
+export async function savePushToken(userId: string, token: string): Promise<boolean> {
+  for (let attempt = 1; attempt <= SAVE_TOKEN_MAX_ATTEMPTS; attempt++) {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ expo_push_token: token } as any)
+        .eq('id', userId);
 
-    if (error) {
-      if (__DEV__) console.error('Error saving push token:', error);
+      if (!error) {
+        return true;
+      }
+
+      console.warn(
+        `Push token save failed (attempt ${attempt}/${SAVE_TOKEN_MAX_ATTEMPTS}):`,
+        error.message
+      );
+    } catch (error) {
+      console.warn(
+        `Push token save error (attempt ${attempt}/${SAVE_TOKEN_MAX_ATTEMPTS}):`,
+        error
+      );
     }
-  } catch (error) {
-    if (__DEV__) console.error('Error saving push token:', error);
+
+    if (attempt < SAVE_TOKEN_MAX_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+    }
   }
+
+  return false;
+}
+
+/**
+ * Register for push notifications and persist the token for a user.
+ */
+export async function syncPushTokenForUser(userId: string): Promise<boolean> {
+  const token = await registerForPushNotificationsAsync();
+  if (!token) {
+    return false;
+  }
+
+  const saved = await savePushToken(userId, token);
+  if (!saved) {
+    console.warn('Failed to persist push token after registration');
+  }
+  return saved;
+}
+
+/**
+ * Re-sync push token when the app returns to foreground (throttled).
+ */
+export async function syncPushTokenOnForeground(userId: string): Promise<void> {
+  if (AppState.currentState !== 'active') {
+    return;
+  }
+
+  const now = Date.now();
+  if (now - lastForegroundSyncAt < FOREGROUND_SYNC_MIN_INTERVAL_MS) {
+    return;
+  }
+
+  lastForegroundSyncAt = now;
+  await syncPushTokenForUser(userId);
+}
+
+/**
+ * Listen for Expo push token rotation and persist updates.
+ */
+export function addPushTokenRefreshListener(
+  userId: string
+): Notifications.EventSubscription {
+  if (!expoNotifications) {
+    return { remove: () => {} } as Notifications.EventSubscription;
+  }
+
+  return expoNotifications.addPushTokenListener(async ({ data: token }) => {
+    await savePushToken(userId, token);
+  });
 }
 
 /**
