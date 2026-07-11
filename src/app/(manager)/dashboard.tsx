@@ -33,15 +33,17 @@ export default function ManagerDashboard() {
   const {
     pendingApprovals, isLoadingApprovals, approvalsError, todayLog, todayTasks, isLoadingToday,
     fetchPendingApprovals, fetchSettings, fetchTodayLog, fetchTodayTasks,
-    approveCheckIn, rejectCheckIn, checkIn, checkOut, updateTaskStatus,
+    approveCheckIn, rejectCheckIn, checkIn, updateCheckInPlan, checkOut, updateTaskStatus,
     subscribeToRealtime, unsubscribeFromRealtime,
     teamMembers, fetchTeamMembers, addTask,
   } = useWorkStore();
 
   const [refreshing, setRefreshing] = React.useState(false);
   const [showCheckIn, setShowCheckIn] = useState(false);
+  const [showEditPlan, setShowEditPlan] = useState(false);
   const [showCheckOut, setShowCheckOut] = useState(false);
   const [checkInLoading, setCheckInLoading] = useState(false);
+  const [editPlanLoading, setEditPlanLoading] = useState(false);
   const [checkOutLoading, setCheckOutLoading] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
   const [elapsed, setElapsed] = useState('');
@@ -143,7 +145,20 @@ export default function ManagerDashboard() {
   }, [checkIn]);
 
   const handleDismissCheckIn = useCallback(() => setShowCheckIn(false), []);
+  const handleDismissEditPlan = useCallback(() => setShowEditPlan(false), []);
   const handleDismissCheckOut = useCallback(() => setShowCheckOut(false), []);
+
+  const handleUpdatePlan = useCallback(async (plan: string) => {
+    setEditPlanLoading(true);
+    const result = await updateCheckInPlan(plan);
+    setEditPlanLoading(false);
+    if (result.success) {
+      setShowEditPlan(false);
+      setSnackMessage("Today's plan updated");
+    } else {
+      setSnackMessage(result.error || 'Failed to update plan');
+    }
+  }, [updateCheckInPlan]);
 
   const handleCheckOut = useCallback(async (report: string, photoUris: string[]) => {
     setCheckOutLoading(true);
@@ -246,6 +261,28 @@ export default function ManagerDashboard() {
     }
   };
 
+  const renderPlanSection = () => {
+    const canEditPlan =
+      todayLog?.status === 'working' || todayLog?.status === 'pending_approval';
+    if (!canEditPlan || !todayLog) return null;
+
+    return (
+      <View style={styles.planSection}>
+        <View style={styles.planHeader}>
+          <Text style={styles.planLabel}>Today&apos;s Plan</Text>
+          <Button compact mode="text" textColor={Colors.accent} onPress={() => setShowEditPlan(true)}>
+            Update
+          </Button>
+        </View>
+        {todayLog.check_in_plan ? (
+          <Text style={styles.planText}>{todayLog.check_in_plan}</Text>
+        ) : (
+          <Text style={styles.planPlaceholder}>Tap Update to describe what you are working on</Text>
+        )}
+      </View>
+    );
+  };
+
   const renderWorkStatus = () => {
     if (isLoadingToday) return <StatusCardSkeleton />;
 
@@ -279,6 +316,7 @@ export default function ManagerDashboard() {
           <View style={styles.pendingDots}>
             {[0, 1, 2].map((i) => <View key={i} style={[styles.dot, { backgroundColor: Colors.warning }]} />)}
           </View>
+          {renderPlanSection()}
         </Animated.View>
       );
     }
@@ -298,7 +336,8 @@ export default function ManagerDashboard() {
               <Text style={styles.workingValue}>{elapsed}</Text>
             </View>
           </View>
-          <Button 
+          {renderPlanSection()}
+          <Button
             mode="contained" 
             onPress={() => setShowCheckOut(true)} 
             style={styles.endButton} 
@@ -451,6 +490,16 @@ export default function ManagerDashboard() {
         onDismiss={handleDismissCheckIn}
         onSubmit={handleCheckIn}
         isLoading={checkInLoading}
+      />
+    ) : null}
+    {showEditPlan ? (
+      <CheckInModal
+        visible
+        mode="edit"
+        initialPlan={todayLog?.check_in_plan ?? ''}
+        onDismiss={handleDismissEditPlan}
+        onSubmit={handleUpdatePlan}
+        isLoading={editPlanLoading}
       />
     ) : null}
     {showCheckOut ? (
@@ -697,5 +746,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     paddingHorizontal: 20,
+  },
+  planSection: {
+    width: '100%',
+    marginTop: 8,
+    marginBottom: 8,
+    padding: 14,
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  planHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  planLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  planText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: Colors.textPrimary,
+    lineHeight: 20,
+    marginTop: 6,
+  },
+  planPlaceholder: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+    marginTop: 6,
+    fontStyle: 'italic',
   },
 });

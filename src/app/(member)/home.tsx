@@ -31,14 +31,17 @@ export default function MemberHomeScreen() {
   const fetchTodayTasks = useWorkStore((s) => s.fetchTodayTasks);
   const fetchSettings = useWorkStore((s) => s.fetchSettings);
   const checkIn = useWorkStore((s) => s.checkIn);
+  const updateCheckInPlan = useWorkStore((s) => s.updateCheckInPlan);
   const checkOut = useWorkStore((s) => s.checkOut);
   const updateTaskStatus = useWorkStore((s) => s.updateTaskStatus);
   const subscribeToRealtime = useWorkStore((s) => s.subscribeToRealtime);
   const unsubscribeFromRealtime = useWorkStore((s) => s.unsubscribeFromRealtime);
 
   const [showCheckIn, setShowCheckIn] = useState(false);
+  const [showEditPlan, setShowEditPlan] = useState(false);
   const [showCheckOut, setShowCheckOut] = useState(false);
   const [checkInLoading, setCheckInLoading] = useState(false);
+  const [editPlanLoading, setEditPlanLoading] = useState(false);
   const [checkOutLoading, setCheckOutLoading] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -102,7 +105,20 @@ export default function MemberHomeScreen() {
   }, [checkIn]);
 
   const handleDismissCheckIn = useCallback(() => setShowCheckIn(false), []);
+  const handleDismissEditPlan = useCallback(() => setShowEditPlan(false), []);
   const handleDismissCheckOut = useCallback(() => setShowCheckOut(false), []);
+
+  const handleUpdatePlan = useCallback(async (plan: string) => {
+    setEditPlanLoading(true);
+    const result = await updateCheckInPlan(plan);
+    setEditPlanLoading(false);
+    if (result.success) {
+      setShowEditPlan(false);
+      setSnackMessage("Today's plan updated");
+    } else {
+      setSnackMessage(result.error || 'Failed to update plan');
+    }
+  }, [updateCheckInPlan]);
 
   const handleCheckOut = useCallback(async (report: string, photoUris: string[]) => {
     setCheckOutLoading(true);
@@ -132,6 +148,29 @@ export default function MemberHomeScreen() {
     } catch {
       return '--';
     }
+  };
+
+  const renderPlanSection = () => {
+    const canEditPlan =
+      todayLog?.status === 'working' || todayLog?.status === 'pending_approval';
+    if (!canEditPlan) return null;
+
+    return (
+      <View style={styles.planSection}>
+        <View style={styles.planHeader}>
+          <Text style={rowStyles.label}>Today&apos;s Plan</Text>
+          <AnimatedPressable style={styles.editPlanBtn} onPress={() => setShowEditPlan(true)}>
+            <Feather name="edit-2" size={14} color={Colors.accent} />
+            <Text style={styles.editPlanBtnText}>Update</Text>
+          </AnimatedPressable>
+        </View>
+        {todayLog.check_in_plan ? (
+          <Text style={styles.planText}>{todayLog.check_in_plan}</Text>
+        ) : (
+          <Text style={styles.planPlaceholder}>Tap Update to describe what you are working on</Text>
+        )}
+      </View>
+    );
   };
 
   const renderStatusCard = () => {
@@ -181,6 +220,8 @@ export default function MemberHomeScreen() {
               <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
             </View>
           </View>
+
+          {renderPlanSection()}
         </View>
       );
     }
@@ -212,6 +253,8 @@ export default function MemberHomeScreen() {
               </Text>
             </View>
           </View>
+
+          {renderPlanSection()}
 
           <AnimatedPressable
             style={styles.endBtn}
@@ -342,6 +385,16 @@ export default function MemberHomeScreen() {
         onDismiss={handleDismissCheckIn}
         onSubmit={handleCheckIn}
         isLoading={checkInLoading}
+      />
+    ) : null}
+    {showEditPlan ? (
+      <CheckInModal
+        visible
+        mode="edit"
+        initialPlan={todayLog?.check_in_plan ?? ''}
+        onDismiss={handleDismissEditPlan}
+        onSubmit={handleUpdatePlan}
+        isLoading={editPlanLoading}
       />
     ) : null}
     {showCheckOut ? (
@@ -551,5 +604,45 @@ const styles = StyleSheet.create({
   },
   tasksContainer: {
     paddingTop: 4,
+  },
+  planSection: {
+    width: '100%',
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  planHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  planText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: Colors.textPrimary,
+    lineHeight: 20,
+  },
+  planPlaceholder: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+    fontStyle: 'italic',
+  },
+  editPlanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  editPlanBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: Colors.accent,
   },
 });

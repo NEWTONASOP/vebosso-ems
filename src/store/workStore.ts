@@ -93,6 +93,7 @@ interface WorkState {
 
   // Actions — Member
   checkIn: (plan: string) => Promise<{ success: boolean; error?: string }>;
+  updateCheckInPlan: (plan: string) => Promise<{ success: boolean; error?: string }>;
   checkOut: (report: string, photoUris?: string[]) => Promise<{ success: boolean; error?: string }>;
   fetchTodayLog: (userId: string) => Promise<{ success: boolean; error?: string }>;
   fetchTodayTasks: (userId: string) => Promise<{ success: boolean; error?: string }>;
@@ -333,6 +334,39 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed to check in.' };
+    }
+  },
+
+  updateCheckInPlan: async (plan: string) => {
+    try {
+      const todayLog = get().todayLog;
+      if (!todayLog) {
+        return { success: false, error: 'No active work log found' };
+      }
+
+      const editableStatuses: WorkLogStatus[] = ['working', 'pending_approval'];
+      if (!editableStatuses.includes(todayLog.status)) {
+        return { success: false, error: 'Plan can only be updated while working or awaiting approval' };
+      }
+
+      const sanitizedPlan = plan.trim().slice(0, 2000);
+      if (!sanitizedPlan) {
+        return { success: false, error: 'Plan cannot be empty' };
+      }
+
+      const { data, error } = await supabase
+        .from('work_logs')
+        .update({ check_in_plan: sanitizedPlan })
+        .eq('id', todayLog.id)
+        .select()
+        .single();
+
+      if (error) return { success: false, error: error.message };
+
+      set({ todayLog: data as WorkLog });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to update plan.' };
     }
   },
 

@@ -259,19 +259,48 @@ Pushing a version bump to `app.json` on `main` triggers [`.github/workflows/buil
 
 You can also trigger the workflow manually via **Actions → Build Production APK → Run workflow**.
 
-Required GitHub repository secrets: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_PROJECT_ID`, `GOOGLE_SERVICES_JSON`, `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `SUPABASE_SERVICE_ROLE_KEY`.
+Required GitHub repository secrets: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_PROJECT_ID`, `GOOGLE_SERVICES_JSON`, `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `SUPABASE_SERVICE_ROLE_KEY`, `EXPO_TOKEN` (OTA workflow).
 
 ---
 
 ## OTA Updates (Expo Updates)
 
-The app uses Expo Updates for over-the-air JS bundle updates without a full APK rebuild.
+GitHub Actions builds the **native APK**; later **JS/UI changes** can ship via Expo Updates (no APK reinstall) — but only after the APK was built with a channel header.
+
+| Workflow | When it runs | What it does |
+|---|---|---|
+| `build-production.yml` | `app.json` **version** changes | Builds APK, GitHub Release, bumps Supabase `latest_version` |
+| `publish-ota-update.yml` | Push to `main` when version is **unchanged** | Publishes JS bundle to Expo (`production` channel) |
+
+**Channel alignment (must stay in sync):**
+
+| Place | Value |
+|---|---|
+| `app.json` → `updates.requestHeaders["expo-channel-name"]` | `production` |
+| `eas.json` → `build.production.channel` | `production` |
+| `publish-ota-update.yml` / `npm run update:ota` | `--channel production` |
+
+GitHub-built APKs (`expo prebuild` + Gradle) do **not** get a channel from EAS Build. The channel is baked into `AndroidManifest.xml` only when `updates.requestHeaders` is present at prebuild time. Publishing OTA to a channel the installed APK never requests will do nothing.
+
+**Current installed APKs (built before `requestHeaders` existed):** they have `updates.url` but **no** `expo-channel-name`, so they **cannot** receive EAS OTA until users install **one** new APK built after this config. After that, JS-only releases need no reinstall.
+
+On app launch, the client checks for an OTA bundle and reloads silently if one is available. If OTA fails (offline, no channel match, etc.), the app keeps running on the embedded bundle — nothing breaks.
+
+**Manual publish:**
 
 ```bash
-eas update --branch production --message "Fix: ..."
+npm run update:ota -- --message "Describe the JS/UI change"
 ```
 
-The runtime version policy is `appVersion` — OTA updates are compatible within the same native app version.
+The runtime version policy is `appVersion` — OTA updates only apply within the same native app version (e.g. all `1.3.6` APKs receive `1.3.6` OTA bundles).
+
+**Required GitHub secret (OTA workflow):** `EXPO_TOKEN` — create at [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens).
+
+**Release checklist:**
+
+1. **First time enabling OTA for users** → bump `app.json` version once → GitHub APK workflow → users install that APK (embeds `production` channel).
+2. **JS/UI only (after step 1)** → push to `main`, do **not** bump version → OTA workflow / `npm run update:ota`.
+3. **Native change** (permissions, SDK, plugins) → bump version → APK workflow again.
 
 ---
 

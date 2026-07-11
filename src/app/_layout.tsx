@@ -202,9 +202,29 @@ export default function RootLayout() {
   }, [initialize]);
 
   useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
-    }
+    if (!fontsLoaded) return;
+
+    let cancelled = false;
+
+    const prepareApp = async () => {
+      try {
+        const { applyOtaUpdateIfAvailable } = await import('../lib/otaUpdates');
+        const reloaded = await applyOtaUpdateIfAvailable();
+        if (reloaded || cancelled) return;
+      } catch (error) {
+        if (__DEV__) console.warn('OTA bootstrap failed:', error);
+      }
+
+      if (!cancelled) {
+        SplashScreen.hideAsync();
+      }
+    };
+
+    prepareApp();
+
+    return () => {
+      cancelled = true;
+    };
   }, [fontsLoaded]);
 
   if (!fontsLoaded) {

@@ -2,7 +2,7 @@
   "expo": {
     "name": "VEBOSSO EMS",
     "slug": "vebosso-ems",
-    "version": "1.3.6",
+    "version": "1.3.7",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "vebossoems",
@@ -90,7 +90,12 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/4ac738d0-e4b2-4814-8eb5-2389074f5c4a"
+      "url": "https://u.expo.dev/4ac738d0-e4b2-4814-8eb5-2389074f5c4a",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      },
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
     }
   }
 }

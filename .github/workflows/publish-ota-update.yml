@@ -1,0 +1,98 @@
+name: Publish OTA Update
+
+# Publishes JS/UI bundles via Expo Updates when app.json version is unchanged.
+# Native/APK releases stay in build-production.yml (triggered by version bumps).
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version_changed: ${{ steps.check.outputs.version_changed }}
+      version: ${{ steps.check.outputs.version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Detect app.json version change
+        id: check
+        run: |
+          CURRENT_VERSION=$(node -p "require('./app.json').expo.version")
+          echo "Current version: $CURRENT_VERSION"
+
+          git checkout HEAD~1 -- app.json 2>/dev/null || true
+          if [ -f app.json ]; then
+            PREVIOUS_VERSION=$(node -p "require('./app.json').expo.version")
+          else
+            PREVIOUS_VERSION="0.0.0"
+          fi
+          echo "Previous version: $PREVIOUS_VERSION"
+
+          git checkout HEAD -- app.json
+
+          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+            echo "Version changed — APK workflow owns this release; skipping OTA publish"
+            echo "version_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "Version unchanged — publishing OTA update for v$CURRENT_VERSION"
+            echo "version_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+  publish-ota:
+    needs: check-version
+    if: needs.check-version.outputs.version_changed == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env file
+        run: |
+          echo "EXPO_PUBLIC_SUPABASE_URL=${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}" >> .env
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}" >> .env
+          echo "EXPO_PUBLIC_PROJECT_ID=${{ secrets.EXPO_PUBLIC_PROJECT_ID }}" >> .env
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      # Channel MUST match app.json updates.requestHeaders["expo-channel-name"]
+      # and eas.json build.production.channel. GitHub prebuild APKs only receive
+      # OTA if that header was baked in at prebuild time.
+      - name: Publish OTA update to production channel
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          VERSION: ${{ needs.check-version.outputs.version }}
+          COMMIT_SHA: ${{ github.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          eas update \
+            --channel production \
+            --message "OTA v${VERSION} (${COMMIT_SHA:0:7}): ${COMMIT_MESSAGE:-JS/UI update}" \
+            --non-interactive
+
+          echo "✅ OTA update published for runtime version ${VERSION} on channel production"

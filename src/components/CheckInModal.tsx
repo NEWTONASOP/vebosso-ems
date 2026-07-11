@@ -2,7 +2,7 @@
 // VEBOSSO EMS — Check-In Modal
 // ============================================================================
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Button, HelperText, Modal, Portal, Text } from 'react-native-paper';
 import { Colors } from '../constants/colors';
@@ -13,6 +13,10 @@ interface CheckInModalProps {
   onDismiss: () => void;
   onSubmit: (plan: string) => Promise<void>;
   isLoading?: boolean;
+  /** Pre-fill the plan field (used when updating an existing plan) */
+  initialPlan?: string;
+  /** 'checkin' = start day, 'edit' = update existing plan */
+  mode?: 'checkin' | 'edit';
 }
 
 export function CheckInModal({
@@ -20,10 +24,21 @@ export function CheckInModal({
   onDismiss,
   onSubmit,
   isLoading,
+  initialPlan = '',
+  mode = 'checkin',
 }: CheckInModalProps) {
   const planRef = useRef('');
   const [charCount, setCharCount] = useState(0);
   const [error, setError] = useState('');
+  const isEditMode = mode === 'edit';
+
+  useEffect(() => {
+    if (!visible) return;
+    const seed = isEditMode ? initialPlan : '';
+    planRef.current = seed;
+    setCharCount(seed.length);
+    setError('');
+  }, [visible, isEditMode, initialPlan]);
 
   const handleChangeText = useCallback((text: string) => {
     planRef.current = text;
@@ -53,15 +68,20 @@ export function CheckInModal({
       >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.header}>
-            <Text style={styles.emoji}>🌅</Text>
-            <Text style={styles.title}>Start Your Day</Text>
-            <Text style={styles.subtitle}>What will you work on today?</Text>
+            <Text style={styles.emoji}>{isEditMode ? '📝' : '🌅'}</Text>
+            <Text style={styles.title}>{isEditMode ? "Update Today's Plan" : 'Start Your Day'}</Text>
+            <Text style={styles.subtitle}>
+              {isEditMode
+                ? 'Add or revise what you are working on today'
+                : 'What will you work on today?'}
+            </Text>
           </View>
 
           <PaperOutlinedField
+            key={isEditMode ? `edit-${initialPlan}` : 'checkin'}
             label="Today's Plan"
             placeholder="Describe what you'll be working on today..."
-            defaultValue=""
+            defaultValue={isEditMode ? initialPlan : ''}
             onChangeText={handleChangeText}
             multiline
             maxLength={2000}
@@ -99,7 +119,7 @@ export function CheckInModal({
               buttonColor={Colors.accent}
               textColor={Colors.white}
             >
-              Check In
+              {isEditMode ? 'Save Plan' : 'Check In'}
             </Button>
           </View>
         </KeyboardAvoidingView>
