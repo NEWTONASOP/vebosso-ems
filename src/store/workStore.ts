@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { create } from 'zustand';
 import { sendPushNotification } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
+import { formatWorkLogDateForMessage } from '../lib/workLogDates';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import {
@@ -621,18 +622,22 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
   approveCheckIn: async (workLogId: string, approverId: string, tasks?: TaskInsert[]) => {
     try {
-      let isCheckout = false;
-      const existing = get().pendingApprovals.find((w) => w.id === workLogId);
-      if (existing) {
-        isCheckout = existing.status === 'pending_checkout';
-      } else {
-        const { data: wl } = await supabase
+      let workLogMeta = get().pendingApprovals.find((w) => w.id === workLogId);
+      if (!workLogMeta) {
+        const { data: wl, error: fetchErr } = await supabase
           .from('work_logs')
-          .select('status')
+          .select('status, date, user_id')
           .eq('id', workLogId)
           .single();
-        if (wl) isCheckout = wl.status === 'pending_checkout';
+
+        if (fetchErr || !wl) {
+          return { success: false, error: fetchErr?.message || 'Work log not found' };
+        }
+
+        workLogMeta = wl as WorkLogWithProfile;
       }
+
+      const isCheckout = workLogMeta.status === 'pending_checkout';
 
       const updateData = isCheckout
         ? {
@@ -661,18 +666,24 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       }
 
       if (data) {
+        const dateWhen = formatWorkLogDateForMessage(workLogMeta.date);
+
         if (isCheckout) {
           sendPushNotification(
             data.user_id,
             'Checkout Approved! 🎉',
-            'Your checkout and day report have been approved. Great work!',
+            dateWhen
+              ? `Your checkout for ${dateWhen} has been approved. Great work!`
+              : 'Your checkout and day report have been approved. Great work!',
             { type: 'check_out_approved', work_log_id: workLogId }
           );
         } else {
           sendPushNotification(
             data.user_id,
             'Check-in Approved! ✅',
-            'Your check-in has been approved. Have a productive day!',
+            dateWhen
+              ? `Your check-in for ${dateWhen} has been approved.`
+              : 'Your check-in has been approved. Have a productive day!',
             { type: 'check_in_approved', work_log_id: workLogId }
           );
         }
@@ -687,18 +698,22 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
   rejectCheckIn: async (workLogId: string, approverId: string, reason: string) => {
     try {
-      let isCheckout = false;
-      const existing = get().pendingApprovals.find((w) => w.id === workLogId);
-      if (existing) {
-        isCheckout = existing.status === 'pending_checkout';
-      } else {
-        const { data: wl } = await supabase
+      let workLogMeta = get().pendingApprovals.find((w) => w.id === workLogId);
+      if (!workLogMeta) {
+        const { data: wl, error: fetchErr } = await supabase
           .from('work_logs')
-          .select('status')
+          .select('status, date, user_id')
           .eq('id', workLogId)
           .single();
-        if (wl) isCheckout = wl.status === 'pending_checkout';
+
+        if (fetchErr || !wl) {
+          return { success: false, error: fetchErr?.message || 'Work log not found' };
+        }
+
+        workLogMeta = wl as WorkLogWithProfile;
       }
+
+      const isCheckout = workLogMeta.status === 'pending_checkout';
 
       const updateData = isCheckout
         ? {
@@ -723,18 +738,24 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       if (error) return { success: false, error: error.message };
 
       if (data) {
+        const dateWhen = formatWorkLogDateForMessage(workLogMeta.date);
+
         if (isCheckout) {
           sendPushNotification(
             data.user_id,
             'Checkout Rejected ❌',
-            `Your checkout was rejected: ${reason}. Please update your report and check out again.`,
+            dateWhen
+              ? `Your checkout for ${dateWhen} was rejected: ${reason}. Please update your report and check out again.`
+              : `Your checkout was rejected: ${reason}. Please update your report and check out again.`,
             { type: 'check_out_rejected', work_log_id: workLogId }
           );
         } else {
           sendPushNotification(
             data.user_id,
             'Check-in Rejected ❌',
-            `Your check-in was rejected: ${reason}`,
+            dateWhen
+              ? `Your check-in for ${dateWhen} was rejected: ${reason}`
+              : `Your check-in was rejected: ${reason}`,
             { type: 'check_in_rejected', work_log_id: workLogId }
           );
         }

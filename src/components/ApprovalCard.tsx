@@ -13,6 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
 import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
+import { formatWorkLogDateLabel } from '../lib/workLogDates';
 import { WorkLogWithProfile } from '../types/database';
 import { supabase } from '../lib/supabase';
 
@@ -72,6 +73,8 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
     ? format(new Date(workLog.check_in_time), 'hh:mm a')
     : '--';
 
+  const dateLabel = formatWorkLogDateLabel(workLog.date);
+
   const getAvatarColors = () => {
     // @ts-ignore - role might be missing if not explicitly fetched in the join, defaulting safely
     const role = profile.role || 'member';
@@ -129,6 +132,13 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
           </Text>
         </View>
       </View>
+
+      {dateLabel && (
+        <View style={styles.dateBanner}>
+          <Feather name="calendar" size={14} color={Colors.warning} />
+          <Text style={styles.dateBannerText}>{dateLabel}</Text>
+        </View>
+      )}
 
       {/* Time & Designation Fields */}
       <View style={styles.timeRow}>
@@ -345,6 +355,22 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 10,
+  },
+  dateBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.warningLight,
+    borderRadius: 8,
+  },
+  dateBannerText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    color: Colors.warning,
   },
   timeRow: {
     flexDirection: 'row',
