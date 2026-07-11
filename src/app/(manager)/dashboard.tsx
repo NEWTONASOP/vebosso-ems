@@ -317,6 +317,19 @@ export default function ManagerDashboard() {
             {[0, 1, 2].map((i) => <View key={i} style={[styles.dot, { backgroundColor: Colors.warning }]} />)}
           </View>
           {renderPlanSection()}
+          <Button
+            mode="contained"
+            onPress={() => setShowCheckOut(true)}
+            style={styles.endButton}
+            buttonColor={Colors.error}
+            textColor={Colors.white}
+            icon="stop"
+          >
+            End Day
+          </Button>
+          <Text style={styles.endDayHint}>
+            You may end your day even if your check-in has not been approved.
+          </Text>
         </Animated.View>
       );
     }
@@ -734,6 +747,14 @@ const styles = StyleSheet.create({
   endButton: { 
     borderRadius: 14, 
     width: '100%',
+    marginTop: 16,
+  },
+  endDayHint: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 10,
   },
   tasksSection: {
     paddingHorizontal: 20,

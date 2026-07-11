@@ -222,6 +222,17 @@ export default function MemberHomeScreen() {
           </View>
 
           {renderPlanSection()}
+
+          <AnimatedPressable
+            style={styles.endBtn}
+            onPress={() => setShowCheckOut(true)}
+          >
+            <Feather name="power" size={16} color={Colors.error} />
+            <Text style={styles.endBtnText}>End Day</Text>
+          </AnimatedPressable>
+          <Text style={styles.endDayHint}>
+            You may end your day even if your check-in has not been approved.
+          </Text>
         </View>
       );
     }
@@ -574,6 +585,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
     fontSize: 14,
     color: Colors.error,
+  },
+  endDayHint: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 10,
   },
   btnPressed: {
     transform: [{ scale: 0.97 }],

@@ -378,7 +378,11 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
       const settings = get().settings;
       const requireCheckoutApproval = settings['require_checkout_approval'] === 'true';
-      const newStatus: WorkLogStatus = requireCheckoutApproval ? 'pending_checkout' : 'done';
+      // If the check-in was never approved, the manager must reconcile the whole
+      // day at checkout — so force review regardless of the checkout-approval setting.
+      const wasPendingApproval = todayLog.status === 'pending_approval';
+      const needsReview = requireCheckoutApproval || wasPendingApproval;
+      const newStatus: WorkLogStatus = needsReview ? 'pending_checkout' : 'done';
 
       // 1. Upload checkout photos to Supabase Storage if any
       const uploadedPaths: string[] = [];
@@ -428,11 +432,13 @@ export const useWorkStore = create<WorkState>((set, get) => ({
           .single();
 
         if (profile) {
-          const title = requireCheckoutApproval ? 'Checkout Request' : 'Checked Out';
-          const body = requireCheckoutApproval
-            ? `${profile.full_name} has checked out and is waiting for approval`
-            : `${profile.full_name} has checked out for the day`;
-          const notifType = requireCheckoutApproval ? 'checkout_request' : 'checkout_done';
+          const title = needsReview ? 'Checkout Request' : 'Checked Out';
+          const body = wasPendingApproval
+            ? `${profile.full_name} ended the day — check-in was still pending approval`
+            : requireCheckoutApproval
+              ? `${profile.full_name} has checked out and is waiting for approval`
+              : `${profile.full_name} has checked out for the day`;
+          const notifType = needsReview ? 'checkout_request' : 'checkout_done';
 
           if (profile.manager_id) {
             sendPushNotification(

@@ -73,7 +73,18 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
     ? format(new Date(workLog.check_in_time), 'hh:mm a')
     : '--';
 
+  const checkOutTime = workLog.check_out_time
+    ? format(new Date(workLog.check_out_time), 'hh:mm a')
+    : null;
+
   const dateLabel = formatWorkLogDateLabel(workLog.date);
+
+  const checkInWasNeverApproved =
+    workLog.status === 'pending_checkout' && !workLog.check_in_approved;
+
+  const hasEndOfDayDetails =
+    workLog.status === 'pending_checkout' &&
+    Boolean(workLog.check_out_time || workLog.day_report);
 
   const getAvatarColors = () => {
     // @ts-ignore - role might be missing if not explicitly fetched in the join, defaulting safely
@@ -140,19 +151,36 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
         </View>
       )}
 
+      {checkInWasNeverApproved && (
+        <View style={styles.unapprovedBanner}>
+          <Feather name="alert-circle" size={14} color={Colors.warning} />
+          <Text style={styles.unapprovedBannerText}>
+            Check-in was not approved before the member ended their day.
+          </Text>
+        </View>
+      )}
+
       {/* Time & Designation Fields */}
       <View style={styles.timeRow}>
         <View style={styles.timeItem}>
           <Text style={styles.timeLabel}>Check-in Time</Text>
           <Text style={styles.timeValue}>{checkInTime}</Text>
         </View>
-        {profile.department && (
+        {checkOutTime ? (
+          <View style={styles.timeItem}>
+            <Text style={styles.timeLabel}>Check-out Time</Text>
+            <Text style={styles.timeValue}>{checkOutTime}</Text>
+          </View>
+        ) : profile.department ? (
           <View style={styles.timeItem}>
             <Text style={styles.timeLabel}>Designation</Text>
             <Text style={styles.timeValue}>{profile.department}</Text>
           </View>
-        )}
+        ) : null}
       </View>
+      {profile.department && checkOutTime ? (
+        <Text style={styles.departmentCaption}>{profile.department}</Text>
+      ) : null}
 
       {/* Check-in Plan details */}
       {workLog.check_in_plan && (
@@ -165,14 +193,18 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
         </View>
       )}
 
-      {/* Checkout Day Report */}
-      {workLog.status === 'pending_checkout' && workLog.day_report && (
+      {/* End of day — day report & checkout photos (same card) */}
+      {hasEndOfDayDetails && (
         <View style={styles.planSection}>
           <View style={styles.planLabelRow}>
             <Feather name="file-text" size={14} color="#007AFF" />
             <Text style={styles.planLabel}> Day Report</Text>
           </View>
-          <Text style={styles.planText}>{workLog.day_report}</Text>
+          {workLog.day_report ? (
+            <Text style={styles.planText}>{workLog.day_report}</Text>
+          ) : (
+            <Text style={styles.planPlaceholder}>No day report provided.</Text>
+          )}
 
           {photoUrls.length > 0 && (
             <View style={styles.photosSection}>
@@ -372,6 +404,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.warning,
   },
+  unapprovedBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: Colors.warningLight,
+    borderRadius: 10,
+  },
+  unapprovedBannerText: {
+    flex: 1,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    lineHeight: 18,
+    color: Colors.warning,
+  },
+  departmentCaption: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 8,
+  },
   timeRow: {
     flexDirection: 'row',
     marginTop: 16,
@@ -414,6 +469,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
     color: '#3A3A3C',
+    lineHeight: 18,
+  },
+  planPlaceholder: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
     lineHeight: 18,
   },
   actions: {
