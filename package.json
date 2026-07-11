@@ -63,7 +63,7 @@
     "lint": "expo lint",
     "build:dev": "eas build --profile development",
     "build:prod": "eas build --profile production",
-    "update:ota": "eas update --channel production"
+    "update:ota": "eas update --channel production --platform android"
   },
   "private": true
 }
