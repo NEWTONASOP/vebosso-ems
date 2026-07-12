@@ -199,6 +199,7 @@ supabase functions deploy create-member
 supabase functions deploy admin-update-member
 supabase functions deploy force-logout
 supabase functions deploy send-push-notification
+supabase functions deploy send-checkout-reminders --no-verify-jwt
 ```
 
 ### 7. Run the App
