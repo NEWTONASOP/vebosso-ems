@@ -925,7 +925,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       };
 
       const { count: totalMembers } = await supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_active', true).neq('role', 'owner');
-      const { count: activeNow } = await supabase.from('work_logs').select('id', { count: 'exact', head: true }).eq('date', today).eq('status', 'working');
+      const { count: activeNow } = await supabase.from('work_logs').select('id', { count: 'exact', head: true }).eq('date', today).in('status', ['working', 'pending_approval']);
       const { count: onLeaveToday } = await supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('date', today).eq('status', 'approved');
       const { count: pendingApprovals } = await supabase.from('work_logs').select('id', { count: 'exact', head: true }).eq('status', 'pending_approval');
 
