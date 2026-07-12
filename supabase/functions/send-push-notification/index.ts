@@ -28,6 +28,8 @@ interface ExpoPushMessage {
   data?: Record<string, unknown>;
   sound: 'default';
   priority: 'high';
+  channelId?: string;
+  ttl?: number;
 }
 
 /** Returns a consistent JSON error response. */
@@ -125,6 +127,19 @@ serve(async (req) => {
       );
     }
 
+    // Determine the appropriate Android notification channel based on the payload type
+    let channelId = 'default';
+    const notifType = data?.type as string | undefined;
+    if (notifType) {
+      if (['check_in_request', 'checkout_request', 'leave_request'].includes(notifType)) {
+        channelId = 'approvals';
+      } else if (['task_assigned', 'task_reassigned'].includes(notifType)) {
+        channelId = 'tasks';
+      } else if (notifType === 'announcement') {
+        channelId = 'announcements';
+      }
+    }
+
     // Construct Expo push message
     const message: ExpoPushMessage = {
       to: token,
@@ -133,6 +148,8 @@ serve(async (req) => {
       data: data || {},
       sound: 'default',
       priority: 'high',
+      channelId,
+      ttl: 2419200, // 4 weeks in seconds - ensures delivery queueing if device is sleeping or offline
     };
 
     // Send via Expo Push API
