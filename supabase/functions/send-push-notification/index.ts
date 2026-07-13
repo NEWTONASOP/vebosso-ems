@@ -129,11 +129,13 @@ serve(async (req) => {
       }
 
       const excluded = new Set(exclude_user_ids || []);
-      targetUsers = (profiles || []).filter((p) => !excluded.has(p.id));
+      const allProfiles = profiles || [];
+      targetUsers = allProfiles.filter((p) => !excluded.has(p.id));
 
+      const actuallyExcluded = allProfiles.length - targetUsers.length;
       console.log(
         `Role broadcast to '${to_role}': ${targetUsers.length} target(s) ` +
-        `(excluded: ${excluded.size})`
+        `(${actuallyExcluded} excluded from ${allProfiles.length} total)`
       );
     } else {
       // Single-user mode

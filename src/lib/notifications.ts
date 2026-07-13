@@ -129,6 +129,14 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
  * Returns true when the token is persisted successfully.
  */
 export async function savePushToken(userId: string, token: string): Promise<boolean> {
+  // Validate token format: only allow valid Expo push tokens
+  if (!token.startsWith('ExponentPushToken[') && !token.startsWith('ExpoPushToken[')) {
+    if (__DEV__) {
+      console.warn(`Refusing to save invalid push token format to DB: ${token}`);
+    }
+    return false;
+  }
+
   for (let attempt = 1; attempt <= SAVE_TOKEN_MAX_ATTEMPTS; attempt++) {
     try {
       const { error } = await supabase
