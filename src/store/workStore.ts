@@ -8,7 +8,7 @@
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { format } from 'date-fns';
 import { create } from 'zustand';
-import { sendPushNotification } from '../lib/notifications';
+import { sendPushNotification, sendPushNotificationToRole } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
 import { formatWorkLogDateForMessage } from '../lib/workLogDates';
 import { Platform } from 'react-native';
@@ -314,22 +314,14 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         );
       }
 
-      const { data: owners } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'owner');
-
-      await Promise.all(
-        (owners || [])
-          .filter((owner) => owner.id !== profile?.manager_id && owner.id !== user.id)
-          .map((owner) =>
-            sendPushNotification(
-              owner.id,
-              'Check-in Request',
-              `${profile?.full_name} has checked in and is waiting for approval`,
-              { type: 'check_in_request', work_log_id: data.id }
-            )
-          )
+      // Notify all owners server-side — Edge Function resolves owner list using
+      // service_role key, bypassing RLS (member cannot query other profiles).
+      sendPushNotificationToRole(
+        'owner',
+        'Check-in Request',
+        `${profile?.full_name} has checked in and is waiting for approval`,
+        { type: 'check_in_request', work_log_id: data.id },
+        [user.id, profile?.manager_id].filter(Boolean) as string[]
       );
 
       return { success: true };
@@ -449,22 +441,14 @@ export const useWorkStore = create<WorkState>((set, get) => ({
             );
           }
 
-          const { data: owners } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('role', 'owner');
-
-          await Promise.all(
-            (owners || [])
-              .filter((owner) => owner.id !== profile.manager_id && owner.id !== todayLog.user_id)
-              .map((owner) =>
-                sendPushNotification(
-                  owner.id,
-                  title,
-                  body,
-                  { type: notifType, work_log_id: data.id }
-                )
-              )
+          // Notify all owners server-side — Edge Function resolves owner list using
+          // service_role key, bypassing RLS.
+          sendPushNotificationToRole(
+            'owner',
+            title,
+            body,
+            { type: notifType, work_log_id: data.id },
+            [todayLog.user_id, profile.manager_id].filter(Boolean) as string[]
           );
         }
       } catch (notifErr) {
@@ -1277,22 +1261,14 @@ export const useWorkStore = create<WorkState>((set, get) => ({
             );
           }
 
-          const { data: owners } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('role', 'owner');
-
-          await Promise.all(
-            (owners || [])
-              .filter((owner) => owner.id !== profile.manager_id && owner.id !== userId)
-              .map((owner) =>
-                sendPushNotification(
-                  owner.id,
-                  title,
-                  body,
-                  { type: notifType, work_log_id: logId }
-                )
-              )
+          // Notify all owners server-side — Edge Function resolves owner list using
+          // service_role key, bypassing RLS.
+          sendPushNotificationToRole(
+            'owner',
+            title,
+            body,
+            { type: notifType, work_log_id: logId },
+            [userId, profile.manager_id].filter(Boolean) as string[]
           );
         }
       } catch (notifErr) {
@@ -1484,23 +1460,14 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         );
       }
 
-      // Notify owners (excluding the requester and their manager who was already notified)
-      const { data: owners } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'owner');
-
-      await Promise.all(
-        (owners || [])
-          .filter((owner) => owner.id !== userId && owner.id !== profile?.manager_id)
-          .map((owner) =>
-            sendPushNotification(
-              owner.id,
-              'Leave Request',
-              `${profile?.full_name} has requested leave for ${date}`,
-              { type: 'leave_request', leave_id: data.id }
-            )
-          )
+      // Notify all owners server-side — Edge Function resolves owner list using
+      // service_role key, bypassing RLS.
+      sendPushNotificationToRole(
+        'owner',
+        'Leave Request',
+        `${profile?.full_name} has requested leave for ${date}`,
+        { type: 'leave_request', leave_id: data.id },
+        [userId, profile?.manager_id].filter(Boolean) as string[]
       );
 
       // Refresh list

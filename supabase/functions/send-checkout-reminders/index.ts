@@ -57,7 +57,7 @@ serve(async (req) => {
     // Joined with profiles to get user_id, full_name, and expo_push_token
     const { data: activeLogs, error: logError } = await adminClient
       .from('work_logs')
-      .select('id, user_id, status, profiles(id, full_name, expo_push_token)')
+      .select('id, user_id, status, profiles!work_logs_user_id_fkey(id, full_name, expo_push_token)')
       .eq('date', todayIST)
       .in('status', ['working', 'pending_approval']);
 

@@ -230,6 +230,44 @@ export async function sendPushNotification(
 }
 
 /**
+ * Broadcast a push notification to all users with a given role.
+ *
+ * Resolving the target users happens server-side inside the Edge Function using
+ * the service_role key, so RLS restrictions on the client do not apply.
+ * This is the correct way to notify owners/managers from a member's session.
+ *
+ * @param role            - The role to broadcast to ('owner' | 'manager' | 'member')
+ * @param title           - Notification title
+ * @param body            - Notification body
+ * @param data            - Optional payload attached to the notification
+ * @param excludeUserIds  - User IDs to exclude (e.g. manager already notified separately)
+ */
+export async function sendPushNotificationToRole(
+  role: 'owner' | 'manager' | 'member',
+  title: string,
+  body: string,
+  data?: Record<string, unknown>,
+  excludeUserIds?: string[]
+): Promise<void> {
+  try {
+    const payload: Record<string, unknown> = { to_role: role, title, body, data };
+    if (excludeUserIds && excludeUserIds.length > 0) {
+      payload.exclude_user_ids = excludeUserIds;
+    }
+
+    const { error } = await supabase.functions.invoke('send-push-notification', {
+      body: payload,
+    });
+
+    if (error) {
+      if (__DEV__) console.error('Error sending role push notification:', error);
+    }
+  } catch (error) {
+    if (__DEV__) console.error('Error sending role push notification:', error);
+  }
+}
+
+/**
  * Add notification response listener (when user taps a notification)
  */
 export function addNotificationResponseListener(
