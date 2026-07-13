@@ -59,7 +59,7 @@ async function ensureAndroidNotificationChannels(): Promise<void> {
   await expoNotifications.setNotificationChannelAsync('tasks', {
     name: 'Tasks',
     description: 'Task assignment notifications',
-    importance: expoNotifications.AndroidImportance?.DEFAULT ?? 5,
+    importance: expoNotifications.AndroidImportance?.HIGH ?? 6,
     lightColor: '#2563EB',
     sound: 'default',
   });
@@ -67,7 +67,7 @@ async function ensureAndroidNotificationChannels(): Promise<void> {
   await expoNotifications.setNotificationChannelAsync('announcements', {
     name: 'Announcements',
     description: 'Company announcements',
-    importance: expoNotifications.AndroidImportance?.DEFAULT ?? 5,
+    importance: expoNotifications.AndroidImportance?.HIGH ?? 6,
     lightColor: '#6366F1',
     sound: 'default',
   });
