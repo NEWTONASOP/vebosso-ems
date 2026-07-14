@@ -137,24 +137,48 @@ export function TaskDetailModal({
           <Divider style={styles.divider} />
 
           {/* Assignee Info */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Feather name="user" size={16} color={Colors.textSecondary} />
-              <Text style={styles.sectionLabel}>Assigned To</Text>
-            </View>
-            <View style={styles.assigneeRow}>
-              <Avatar.Text
-                size={36}
-                label={task.assignee?.full_name?.substring(0, 2).toUpperCase() || '??'}
-                style={styles.avatar}
-                labelStyle={styles.avatarLabel}
-              />
-              <View style={styles.assigneeInfo}>
-                <Text style={styles.assigneeName}>{task.assignee?.full_name}</Text>
-                <Text style={styles.assigneeId}>ID: {task.assignee?.employee_id}</Text>
+          {task.assignee && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Feather name="user" size={16} color={Colors.textSecondary} />
+                <Text style={styles.sectionLabel}>Assigned To</Text>
+              </View>
+              <View style={styles.assigneeRow}>
+                <Avatar.Text
+                  size={36}
+                  label={task.assignee.full_name?.substring(0, 2).toUpperCase() || '??'}
+                  style={styles.avatar}
+                  labelStyle={styles.avatarLabel}
+                />
+                <View style={styles.assigneeInfo}>
+                  <Text style={styles.assigneeName}>{task.assignee.full_name}</Text>
+                  <Text style={styles.assigneeId}>ID: {task.assignee.employee_id}</Text>
+                </View>
               </View>
             </View>
-          </View>
+          )}
+
+          {/* Assigner Info */}
+          {task.assigned_by_profile && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Feather name="user-check" size={16} color={Colors.textSecondary} />
+                <Text style={styles.sectionLabel}>Assigned By</Text>
+              </View>
+              <View style={styles.assigneeRow}>
+                <Avatar.Text
+                  size={36}
+                  label={task.assigned_by_profile.full_name?.substring(0, 2).toUpperCase() || '??'}
+                  style={styles.avatar}
+                  labelStyle={styles.avatarLabel}
+                />
+                <View style={styles.assigneeInfo}>
+                  <Text style={styles.assigneeName}>{task.assigned_by_profile.full_name}</Text>
+                  <Text style={styles.assigneeId}>ID: {task.assigned_by_profile.employee_id}</Text>
+                </View>
+              </View>
+            </View>
+          )}
 
           {/* Due Date */}
           {task.due_date && (

@@ -14,6 +14,7 @@ import { AnimatedPressable } from './AnimatedPressable';
 
 export type MemberActiveTask = {
   title: string;
+  description: string | null;
   status: 'pending' | 'in_progress' | 'done';
 };
 

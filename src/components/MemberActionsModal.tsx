@@ -201,11 +201,18 @@ export function MemberActionsModal({
               {activeTasks.slice(0, 3).map((task, index) => {
                 const taskColor = TASK_STATUS_CONFIG[task.status]?.color || Colors.textTertiary;
                 return (
-                  <View key={`${task.title}-${index}`} style={styles.taskRow}>
-                    <View style={[styles.taskDot, { backgroundColor: taskColor }]} />
-                    <Text style={styles.taskLine} numberOfLines={1}>
-                      {task.title}
-                    </Text>
+                  <View key={`${task.title}-${index}`} style={styles.taskItem}>
+                    <View style={styles.taskRow}>
+                      <View style={[styles.taskDot, { backgroundColor: taskColor }]} />
+                      <Text style={styles.taskLine} numberOfLines={1}>
+                        {task.title}
+                      </Text>
+                    </View>
+                    {!!task.description && (
+                      <Text style={styles.taskDesc}>
+                        {task.description}
+                      </Text>
+                    )}
                   </View>
                 );
               })}
@@ -417,6 +424,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'Inter_600SemiBold',
   },
+  taskItem: {
+    marginBottom: 8,
+    gap: 2,
+  },
   taskRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -429,9 +440,16 @@ const styles = StyleSheet.create({
   },
   taskLine: {
     flex: 1,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
     color: Colors.text,
+  },
+  taskDesc: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginLeft: 11, // aligned with the task title (dot width + gap)
+    lineHeight: 16,
   },
   actionsCard: {
     backgroundColor: Colors.surfaceLight,

@@ -4,11 +4,12 @@
 
 import { format } from 'date-fns';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { AnimatedPressable } from './AnimatedPressable';
 import { TaskCompleteModal } from './TaskCompleteModal';
+import { TaskDetailModal } from './TaskDetailModal';
 
 import { Feather } from '@expo/vector-icons';
 import { Task, TaskStatus } from '../types/database';
@@ -22,6 +23,7 @@ interface TaskCardProps {
 
 export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardProps) {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   const getNextStatus = (): TaskStatus | null => {
     if (task.status === 'pending') return 'in_progress';
@@ -94,29 +96,40 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
         style={styles.rowWrapper}
       >
         <View style={styles.rowContent}>
-          {/* Left Status Icon Container */}
-          <View style={[styles.iconContainer, { backgroundColor: statusStyle.bgColor }]}>
-            <Feather name={statusStyle.icon as any} size={16} color={statusStyle.color} />
-          </View>
-
-          {/* Center Text Column */}
-          <View style={styles.textContainer}>
-            <Text style={[styles.title, task.status === 'done' && styles.titleDone]} numberOfLines={1}>
-              {task.title}
-            </Text>
-            <View style={styles.metaRow}>
-              {dueDate && (
-                <Text style={styles.metaText}>
-                  Due {dueDate}
-                </Text>
-              )}
-              {task.description && (
-                <Text style={styles.description} numberOfLines={1}>
-                  {dueDate ? ` • ${task.description}` : task.description}
-                </Text>
-              )}
+          <Pressable 
+            onPress={() => setShowDetailModal(true)}
+            style={({ pressed }) => [
+              styles.pressableArea,
+              pressed && styles.pressablePressed
+            ]}
+          >
+            {/* Left Status Icon Container */}
+            <View style={[styles.iconContainer, { backgroundColor: statusStyle.bgColor }]}>
+              <Feather name={statusStyle.icon as any} size={16} color={statusStyle.color} />
             </View>
-          </View>
+
+            {/* Center Text Column */}
+            <View style={styles.textContainer}>
+              <View style={styles.titleRow}>
+                <Text style={[styles.title, task.status === 'done' && styles.titleDone]} numberOfLines={1}>
+                  {task.title}
+                </Text>
+                <Feather name="chevron-right" size={14} color="#C7C7CC" />
+              </View>
+              <View style={styles.metaRow}>
+                {dueDate && (
+                  <Text style={styles.metaText}>
+                    Due {dueDate}
+                  </Text>
+                )}
+                {task.description && (
+                  <Text style={styles.description} numberOfLines={1}>
+                    {dueDate ? ` • ${task.description}` : task.description}
+                  </Text>
+                )}
+              </View>
+            </View>
+          </Pressable>
 
           {/* Right Action Button/Badge */}
           {nextLabel && onStatusChange ? (
@@ -155,6 +168,13 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
         onDismiss={() => setShowCompleteModal(false)}
         onComplete={handleComplete}
       />
+
+      {/* Detail Modal */}
+      <TaskDetailModal
+        visible={showDetailModal}
+        onDismiss={() => setShowDetailModal(false)}
+        task={task as any}
+      />
     </>
   );
 }
@@ -177,9 +197,17 @@ const styles = StyleSheet.create({
   rowContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
     paddingHorizontal: 16,
     minHeight: 56,
+  },
+  pressableArea: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  pressablePressed: {
+    opacity: 0.7,
   },
   iconContainer: {
     width: 32,
@@ -193,10 +221,17 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: 12,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
   title: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
     color: '#1C1C1E',
+    flex: 1,
   },
   titleDone: {
     textDecorationLine: 'line-through',

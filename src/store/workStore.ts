@@ -59,7 +59,7 @@ interface WorkState {
     pendingTaskCount: number;
     inProgressTaskCount: number;
     doneTaskCount: number;
-    activeTasks: { title: string; status: 'pending' | 'in_progress' | 'done' }[];
+    activeTasks: { title: string; description: string | null; status: 'pending' | 'in_progress' | 'done' }[];
   }>;
 
   // Announcements
@@ -357,6 +357,40 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       if (error) return { success: false, error: error.message };
 
       set({ todayLog: data as WorkLog });
+
+      // Send notifications to manager/owner when check-in plan is updated
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, manager_id')
+          .eq('id', todayLog.user_id)
+          .single();
+
+        if (profile) {
+          const title = 'Plan Updated 📝';
+          const body = `${profile.full_name} has updated their check-in plan for today`;
+
+          if (profile.manager_id) {
+            sendPushNotification(
+              profile.manager_id,
+              title,
+              body,
+              { type: 'check_in_request', work_log_id: todayLog.id }
+            );
+          }
+
+          sendPushNotificationToRole(
+            'owner',
+            title,
+            body,
+            { type: 'check_in_request', work_log_id: todayLog.id },
+            [todayLog.user_id, profile.manager_id].filter(Boolean) as string[]
+          );
+        }
+      } catch (notifErr) {
+        if (__DEV__) console.warn('Failed to send plan update notifications:', notifErr);
+      }
+
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed to update plan.' };
@@ -492,7 +526,11 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
       const { data, error } = await supabase
         .from('tasks')
-        .select('*')
+        .select(`
+          *,
+          assignee:profiles!tasks_assigned_to_fkey(id, full_name, employee_id, avatar_url, role),
+          assigned_by_profile:profiles!tasks_assigned_by_fkey(id, full_name, employee_id, avatar_url, role)
+        `)
         .eq('assigned_to', userId)
         .or(`due_date.eq.${today},due_date.is.null`)
         .order('created_at', { ascending: false });
@@ -808,13 +846,13 @@ export const useWorkStore = create<WorkState>((set, get) => ({
           .in('user_id', memberIds),
         supabase
           .from('tasks')
-          .select('assigned_to, status, title')
+          .select('assigned_to, status, title, description')
           .in('assigned_to', memberIds)
           .in('status', ['pending', 'in_progress'])
           .order('updated_at', { ascending: false }),
         supabase
           .from('tasks')
-          .select('assigned_to, status, title')
+          .select('assigned_to, status, title, description')
           .in('assigned_to', memberIds)
           .eq('status', 'done')
           .gte('completed_at', `${today}T00:00:00`)
@@ -831,7 +869,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       const logMap: Record<string, any> = {};
       for (const log of (logsRes.data || [])) logMap[log.user_id] = log;
 
-      type TaskSnap = { title: string; status: 'pending' | 'in_progress' | 'done' };
+      type TaskSnap = { title: string; description: string | null; status: 'pending' | 'in_progress' | 'done' };
       const taskMap: Record<string, {
         pending: number;
         inProgress: number;
@@ -846,7 +884,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         return taskMap[userId];
       };
 
-      for (const task of (openTasksRes.data || []) as { assigned_to: string; status: string; title: string }[]) {
+      for (const task of (openTasksRes.data || []) as { assigned_to: string; status: string; title: string; description: string | null }[]) {
         const bucket = ensureBucket(task.assigned_to);
         if (task.status === 'pending') bucket.pending += 1;
         else if (task.status === 'in_progress') bucket.inProgress += 1;
@@ -854,16 +892,21 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         if (bucket.active.length < 3) {
           bucket.active.push({
             title: task.title,
+            description: task.description || null,
             status: task.status as 'pending' | 'in_progress',
           });
         }
       }
 
-      for (const task of (todayDoneTasksRes.data || []) as { assigned_to: string; title: string }[]) {
+      for (const task of (todayDoneTasksRes.data || []) as { assigned_to: string; title: string; description: string | null }[]) {
         const bucket = ensureBucket(task.assigned_to);
         bucket.done += 1;
         if (bucket.active.length < 3) {
-          bucket.active.push({ title: task.title, status: 'done' });
+          bucket.active.push({
+            title: task.title,
+            description: task.description || null,
+            status: 'done'
+          });
         }
       }
 
