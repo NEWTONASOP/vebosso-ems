@@ -286,12 +286,24 @@ export default function ManagerDashboard() {
   const renderWorkStatus = () => {
     if (isLoadingToday) return <StatusCardSkeleton />;
 
+    const formatLogTime = (timeStr: string | null | undefined) => {
+      if (!timeStr) return '--';
+      try {
+        return format(new Date(timeStr), 'hh:mm a');
+      } catch {
+        return '--';
+      }
+    };
+
+    // Not checked in
     if (!todayLog) {
       return (
         <View style={styles.statusCard}>
-          <Text style={styles.statusEmoji}>☀️</Text>
-          <Text style={styles.statusTitle}>Ready to start?</Text>
-          <Text style={styles.statusSubtitle}>Check in to begin your work day</Text>
+          <View style={styles.statusIconCircle}>
+            <Feather name="sun" size={32} color={Colors.warning} />
+          </View>
+          <Text style={styles.statusTitle}>Good {new Date().getHours() < 12 ? 'morning' : 'afternoon'}!</Text>
+          <Text style={styles.statusSubtitle}>Ready to start your work day?</Text>
           <Button 
             mode="contained" 
             onPress={() => setShowCheckIn(true)} 
@@ -307,23 +319,40 @@ export default function ManagerDashboard() {
       );
     }
 
+    // Pending approval
     if (todayLog.status === 'pending_approval') {
       return (
         <Animated.View style={[styles.statusCard, styles.pendingCard, pulseStyle]}>
-          <Text style={styles.statusEmoji}>⏳</Text>
-          <Text style={styles.statusTitle}>Waiting for Approval</Text>
-          <Text style={styles.statusSubtitle}>Your check-in is being reviewed</Text>
-          <View style={styles.pendingDots}>
-            {[0, 1, 2].map((i) => <View key={i} style={[styles.dot, { backgroundColor: Colors.warning }]} />)}
+          <View style={styles.statusIconCircle}>
+            <Feather name="clock" size={32} color={Colors.warning} />
           </View>
+          <Text style={styles.heroLabel}>CHECK-IN REQUEST</Text>
+          <Text style={styles.heroValue}>Awaiting Approval</Text>
+          <Text style={styles.statusSubtitle}>Your check-in plan is being reviewed by the owner.</Text>
+          
+          <View style={styles.cardDetailsGroup}>
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Status</Text>
+              <View style={[rowStyles.badge, { backgroundColor: Colors.warningLight }]}>
+                <Text style={[rowStyles.badgeText, { color: Colors.warning }]}>Pending</Text>
+              </View>
+            </View>
+            <View style={rowStyles.separator} />
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Check-in Sent</Text>
+              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
+            </View>
+          </View>
+
           {renderPlanSection()}
+
           <Button
             mode="contained"
             onPress={() => setShowCheckOut(true)}
             style={styles.endButton}
             buttonColor={Colors.error}
             textColor={Colors.white}
-            icon="stop"
+            icon="power"
           >
             End Day
           </Button>
@@ -334,29 +363,43 @@ export default function ManagerDashboard() {
       );
     }
 
+    // Working
     if (todayLog.status === 'working') {
       return (
         <View style={[styles.statusCard, styles.workingCard]}>
-          <Text style={styles.statusEmoji}>💼</Text>
-          <Text style={styles.statusTitle}>You&apos;re Working</Text>
-          <View style={styles.workingInfo}>
-            <View style={styles.workingDetail}>
-              <Text style={styles.workingLabel}>Since</Text>
-              <Text style={styles.workingValue}>{todayLog.check_in_time ? format(new Date(todayLog.check_in_time), 'hh:mm a') : '--'}</Text>
+          <Text style={styles.heroLabel}>ELAPSED TIME TODAY</Text>
+          <Text style={styles.heroValue}>{elapsed || '00h 00m'}</Text>
+          
+          <View style={styles.cardDetailsGroup}>
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Status</Text>
+              <View style={[rowStyles.badge, { backgroundColor: Colors.successLight }]}>
+                <Text style={[rowStyles.badgeText, { color: Colors.managerAccent }]}>Working</Text>
+              </View>
             </View>
-            <View style={styles.workingDetail}>
-              <Text style={styles.workingLabel}>Elapsed</Text>
-              <Text style={styles.workingValue}>{elapsed}</Text>
+            <View style={rowStyles.separator} />
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Started At</Text>
+              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
+            </View>
+            <View style={rowStyles.separator} />
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Tasks Completed</Text>
+              <Text style={rowStyles.value}>
+                {todayTasks.filter((t) => t.status === 'done').length}/{todayTasks.length}
+              </Text>
             </View>
           </View>
+
           {renderPlanSection()}
+
           <Button
             mode="contained" 
             onPress={() => setShowCheckOut(true)} 
             style={styles.endButton} 
             buttonColor={Colors.error} 
             textColor={Colors.white} 
-            icon="stop"
+            icon="power"
           >
             End Day
           </Button>
@@ -364,14 +407,68 @@ export default function ManagerDashboard() {
       );
     }
 
+    // Pending checkout approval
+    if (todayLog.status === 'pending_checkout') {
+      return (
+        <View style={styles.statusCard}>
+          <View style={styles.statusIconCircle}>
+            <Feather name="clock" size={32} color={Colors.warning} />
+          </View>
+          <Text style={styles.heroLabel}>CHECK-OUT REQUEST</Text>
+          <Text style={styles.heroValue}>Awaiting Approval</Text>
+          <Text style={styles.statusSubtitle}>Your day report and check-out are being reviewed by the owner.</Text>
+          
+          <View style={styles.cardDetailsGroup}>
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Status</Text>
+              <View style={[rowStyles.badge, { backgroundColor: Colors.warningLight }]}>
+                <Text style={[rowStyles.badgeText, { color: Colors.warning }]}>Pending Review</Text>
+              </View>
+            </View>
+            <View style={rowStyles.separator} />
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Check-in</Text>
+              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
+            </View>
+            <View style={rowStyles.separator} />
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Check-out Sent</Text>
+              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_out_time)}</Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    // Done
     if (todayLog.status === 'done') {
+      const formattedHours = todayLog.total_hours ? `${Math.floor(todayLog.total_hours)}h ${Math.round((todayLog.total_hours % 1) * 60)}m` : '--';
       return (
         <View style={[styles.statusCard, styles.doneCard]}>
-          <Text style={styles.statusEmoji}>✅</Text>
-          <Text style={styles.statusTitle}>Day Complete</Text>
-          <Text style={styles.statusSubtitle}>
-            {todayLog.total_hours ? `${todayLog.total_hours} hours worked` : 'Great work today!'}
-          </Text>
+          <View style={styles.statusIconCircle}>
+            <Feather name="check-circle" size={32} color={Colors.success} />
+          </View>
+          <Text style={styles.heroLabel}>TOTAL HOURS LOGGED</Text>
+          <Text style={styles.heroValue}>{formattedHours}</Text>
+          
+          <View style={styles.cardDetailsGroup}>
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Status</Text>
+              <View style={[rowStyles.badge, { backgroundColor: Colors.successLight }]}>
+                <Text style={[rowStyles.badgeText, { color: Colors.success }]}>Completed</Text>
+              </View>
+            </View>
+            <View style={rowStyles.separator} />
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Check-in</Text>
+              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
+            </View>
+            <View style={rowStyles.separator} />
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Check-out</Text>
+              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_out_time)}</Text>
+            </View>
+          </View>
         </View>
       );
     }
@@ -561,6 +658,41 @@ export default function ManagerDashboard() {
   );
 }
 
+const rowStyles = StyleSheet.create({
+  rowContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    minHeight: 46,
+  },
+  label: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  value: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    color: Colors.textPrimary,
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  badgeText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.border,
+    marginHorizontal: 16,
+  },
+});
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -680,6 +812,42 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     ...Colors.shadow,
+  },
+  statusIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.primaryLight,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  heroLabel: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 10,
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  heroValue: {
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 28,
+    color: Colors.textPrimary,
+    letterSpacing: -0.6,
+    marginBottom: 8,
+  },
+  cardDetailsGroup: {
+    width: '100%',
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginTop: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
   },
   pendingCard: { 
     borderColor: Colors.warning,

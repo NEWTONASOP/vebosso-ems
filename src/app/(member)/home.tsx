@@ -302,6 +302,39 @@ export default function MemberHomeScreen() {
       );
     }
 
+    // Pending checkout approval
+    if (todayLog.status === 'pending_checkout') {
+      return (
+        <View style={styles.statusCard}>
+          <View style={styles.statusIconCircle}>
+            <Feather name="clock" size={32} color={Colors.warning} />
+          </View>
+          <Text style={styles.heroLabel}>CHECK-OUT REQUEST</Text>
+          <Text style={styles.heroValue}>Awaiting Approval</Text>
+          <Text style={styles.statusSubtitle}>Your day report and check-out are being reviewed by your manager.</Text>
+          
+          <View style={styles.cardDetailsGroup}>
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Status</Text>
+              <View style={[rowStyles.badge, { backgroundColor: Colors.warningLight }]}>
+                <Text style={[rowStyles.badgeText, { color: Colors.warning }]}>Pending Review</Text>
+              </View>
+            </View>
+            <View style={rowStyles.separator} />
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Check-in</Text>
+              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
+            </View>
+            <View style={rowStyles.separator} />
+            <View style={rowStyles.rowContent}>
+              <Text style={rowStyles.label}>Check-out Sent</Text>
+              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_out_time)}</Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
     // Done
     if (todayLog.status === 'done') {
       const formattedHours = todayLog.total_hours ? `${Math.floor(todayLog.total_hours)}h ${Math.round((todayLog.total_hours % 1) * 60)}m` : '--';
