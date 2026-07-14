@@ -157,9 +157,10 @@ export function MemberActionsModal({
             </View>
           </View>
 
-          {(formattedCheckIn || formattedCheckOut || workSummary || openTaskTotal > 0 || doneTaskCount > 0 || currentStatus === 'on_leave') && (
+          {/* 1. Today's Work & Attendance Card */}
+          {(formattedCheckIn || formattedCheckOut || workSummary || currentStatus === 'on_leave') && (
             <View style={styles.summaryCard}>
-              <Text style={styles.sectionTitle}>Today</Text>
+              <Text style={styles.cardSectionTitle}>Work & Attendance</Text>
 
               {currentStatus === 'on_leave' && (
                 <Text style={styles.footerMuted}>On approved leave today</Text>
@@ -171,51 +172,68 @@ export function MemberActionsModal({
                   <Text style={styles.summaryBody}>{workSummary}</Text>
                 </View>
               )}
+            </View>
+          )}
 
-              {(openTaskTotal > 0 || doneTaskCount > 0) && (
-                <View style={styles.taskSummary}>
-                  {inProgressTaskCount > 0 && (
-                    <View style={[styles.taskPill, { backgroundColor: TASK_STATUS_CONFIG.in_progress.backgroundColor }]}>
-                      <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.in_progress.color }]}>
-                        {inProgressTaskCount} active
-                      </Text>
-                    </View>
-                  )}
-                  {pendingTaskCount > 0 && (
-                    <View style={[styles.taskPill, { backgroundColor: TASK_STATUS_CONFIG.pending.backgroundColor }]}>
-                      <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.pending.color }]}>
-                        {pendingTaskCount} pending
-                      </Text>
-                    </View>
-                  )}
-                  {doneTaskCount > 0 && (
-                    <View style={[styles.taskPill, { backgroundColor: TASK_STATUS_CONFIG.done.backgroundColor }]}>
-                      <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.done.color }]}>
-                        {doneTaskCount} done
-                      </Text>
-                    </View>
-                  )}
+          {/* 2. Today's Tasks Card */}
+          {(openTaskTotal > 0 || doneTaskCount > 0) && (
+            <View style={styles.summaryCard}>
+              <Text style={styles.cardSectionTitle}>Assigned Tasks</Text>
+
+              {/* Status Pills */}
+              <View style={styles.taskSummary}>
+                {inProgressTaskCount > 0 && (
+                  <View style={[styles.taskPill, { backgroundColor: TASK_STATUS_CONFIG.in_progress.backgroundColor }]}>
+                    <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.in_progress.color }]}>
+                      {inProgressTaskCount} active
+                    </Text>
+                  </View>
+                )}
+                {pendingTaskCount > 0 && (
+                  <View style={[styles.taskPill, { backgroundColor: TASK_STATUS_CONFIG.pending.backgroundColor }]}>
+                    <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.pending.color }]}>
+                      {pendingTaskCount} pending
+                    </Text>
+                  </View>
+                )}
+                {doneTaskCount > 0 && (
+                  <View style={[styles.taskPill, { backgroundColor: TASK_STATUS_CONFIG.done.backgroundColor }]}>
+                    <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.done.color }]}>
+                      {doneTaskCount} done
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Task List */}
+              {activeTasks.length > 0 && (
+                <View style={styles.taskListContainer}>
+                  {activeTasks.slice(0, 3).map((task, index) => {
+                    const statusConfig = TASK_STATUS_CONFIG[task.status] || {
+                      color: Colors.textTertiary,
+                      backgroundColor: Colors.surfaceLighter,
+                    };
+                    return (
+                      <View 
+                        key={`${task.title}-${index}`} 
+                        style={[styles.taskItem, { backgroundColor: statusConfig.backgroundColor }]}
+                      >
+                        <View style={styles.taskRow}>
+                          <View style={[styles.taskDot, { backgroundColor: statusConfig.color }]} />
+                          <Text style={styles.taskLine} numberOfLines={1}>
+                            {task.title}
+                          </Text>
+                        </View>
+                        {!!task.description && (
+                          <Text style={styles.taskDesc}>
+                            {task.description}
+                          </Text>
+                        )}
+                      </View>
+                    );
+                  })}
                 </View>
               )}
-
-              {activeTasks.slice(0, 3).map((task, index) => {
-                const taskColor = TASK_STATUS_CONFIG[task.status]?.color || Colors.textTertiary;
-                return (
-                  <View key={`${task.title}-${index}`} style={styles.taskItem}>
-                    <View style={styles.taskRow}>
-                      <View style={[styles.taskDot, { backgroundColor: taskColor }]} />
-                      <Text style={styles.taskLine} numberOfLines={1}>
-                        {task.title}
-                      </Text>
-                    </View>
-                    {!!task.description && (
-                      <Text style={styles.taskDesc}>
-                        {task.description}
-                      </Text>
-                    )}
-                  </View>
-                );
-              })}
             </View>
           )}
 
@@ -379,6 +397,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginLeft: 4,
   },
+  cardSectionTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  taskListContainer: {
+    marginTop: 10,
+    gap: 8,
+  },
   summaryCard: {
     backgroundColor: Colors.surfaceLight,
     borderRadius: 16,
@@ -425,8 +455,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
   },
   taskItem: {
-    marginBottom: 8,
-    gap: 2,
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 4,
+    gap: 4,
   },
   taskRow: {
     flexDirection: 'row',
@@ -434,22 +466,22 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   taskDot: {
-    width: 5,
-    height: 5,
+    width: 6,
+    height: 6,
     borderRadius: 3,
   },
   taskLine: {
     flex: 1,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Inter_700Bold',
     fontSize: 12,
     color: Colors.text,
   },
   taskDesc: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginLeft: 11, // aligned with the task title (dot width + gap)
-    lineHeight: 16,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    color: '#374151', // Darker charcoal for better readability/contrast
+    marginLeft: 12, // aligned with the task title (dot width + gap)
+    lineHeight: 18,
   },
   actionsCard: {
     backgroundColor: Colors.surfaceLight,
