@@ -1,0 +1,3110 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "",
+        "title": "standard public schema",
+        "version": "14.5"
+    },
+    "host": "etojpskxcygjarostjio.supabase.co:443",
+    "basePath": "/",
+    "schemes": [
+        "https"
+    ],
+    "consumes": [
+        "application/json",
+        "application/vnd.pgrst.object+json;nulls=stripped",
+        "application/vnd.pgrst.object+json",
+        "text/csv"
+    ],
+    "produces": [
+        "application/json",
+        "application/vnd.pgrst.object+json;nulls=stripped",
+        "application/vnd.pgrst.object+json",
+        "text/csv"
+    ],
+    "paths": {
+        "/": {
+            "get": {
+                "produces": [
+                    "application/openapi+json",
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "summary": "OpenAPI description (this document)",
+                "tags": [
+                    "Introspection"
+                ]
+            }
+        },
+        "/sessions": {
+            "get": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.supabase_session_token"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.device_info"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.last_active"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.is_active"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/order"
+                    },
+                    {
+                        "$ref": "#/parameters/range"
+                    },
+                    {
+                        "$ref": "#/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "items": {
+                                "$ref": "#/definitions/sessions"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "tags": [
+                    "sessions"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/body.sessions"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/preferPost"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "tags": [
+                    "sessions"
+                ]
+            },
+            "delete": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.supabase_session_token"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.device_info"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.last_active"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.is_active"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "sessions"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.supabase_session_token"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.device_info"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.last_active"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.is_active"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.sessions.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/body.sessions"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "sessions"
+                ]
+            }
+        },
+        "/notifications": {
+            "get": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.title"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.body"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.data"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.read"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/order"
+                    },
+                    {
+                        "$ref": "#/parameters/range"
+                    },
+                    {
+                        "$ref": "#/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "items": {
+                                "$ref": "#/definitions/notifications"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "tags": [
+                    "notifications"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/body.notifications"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/preferPost"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "tags": [
+                    "notifications"
+                ]
+            },
+            "delete": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.title"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.body"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.data"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.read"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "notifications"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.title"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.body"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.data"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.read"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.notifications.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/body.notifications"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "notifications"
+                ]
+            }
+        },
+        "/announcements": {
+            "get": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.created_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.title"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.body"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.target_role"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.target_user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/order"
+                    },
+                    {
+                        "$ref": "#/parameters/range"
+                    },
+                    {
+                        "$ref": "#/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "items": {
+                                "$ref": "#/definitions/announcements"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "tags": [
+                    "announcements"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/body.announcements"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/preferPost"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "tags": [
+                    "announcements"
+                ]
+            },
+            "delete": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.created_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.title"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.body"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.target_role"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.target_user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "announcements"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.created_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.title"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.body"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.target_role"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.target_user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.announcements.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/body.announcements"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "announcements"
+                ]
+            }
+        },
+        "/backfill_permissions": {
+            "get": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.date"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.allowed_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.is_used"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/order"
+                    },
+                    {
+                        "$ref": "#/parameters/range"
+                    },
+                    {
+                        "$ref": "#/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "items": {
+                                "$ref": "#/definitions/backfill_permissions"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "tags": [
+                    "backfill_permissions"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/body.backfill_permissions"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/preferPost"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "tags": [
+                    "backfill_permissions"
+                ]
+            },
+            "delete": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.date"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.allowed_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.is_used"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "backfill_permissions"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.date"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.allowed_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.backfill_permissions.is_used"
+                    },
+                    {
+                        "$ref": "#/parameters/body.backfill_permissions"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "backfill_permissions"
+                ]
+            }
+        },
+        "/leave_requests": {
+            "get": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.date"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.reason"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.status"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.reviewed_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.reviewed_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/order"
+                    },
+                    {
+                        "$ref": "#/parameters/range"
+                    },
+                    {
+                        "$ref": "#/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "items": {
+                                "$ref": "#/definitions/leave_requests"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "tags": [
+                    "leave_requests"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/body.leave_requests"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/preferPost"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "tags": [
+                    "leave_requests"
+                ]
+            },
+            "delete": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.date"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.reason"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.status"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.reviewed_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.reviewed_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "leave_requests"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.date"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.reason"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.status"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.reviewed_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.reviewed_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.leave_requests.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/body.leave_requests"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "leave_requests"
+                ]
+            }
+        },
+        "/profiles": {
+            "get": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.full_name"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.employee_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.role"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.department"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.manager_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.avatar_url"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.is_active"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.expo_push_token"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.must_change_password"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.updated_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.created_by"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/order"
+                    },
+                    {
+                        "$ref": "#/parameters/range"
+                    },
+                    {
+                        "$ref": "#/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "items": {
+                                "$ref": "#/definitions/profiles"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "tags": [
+                    "profiles"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/body.profiles"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/preferPost"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "tags": [
+                    "profiles"
+                ]
+            },
+            "delete": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.full_name"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.employee_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.role"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.department"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.manager_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.avatar_url"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.is_active"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.expo_push_token"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.must_change_password"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.updated_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.created_by"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "profiles"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.full_name"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.employee_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.role"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.department"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.manager_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.avatar_url"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.is_active"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.expo_push_token"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.must_change_password"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.updated_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.profiles.created_by"
+                    },
+                    {
+                        "$ref": "#/parameters/body.profiles"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "profiles"
+                ]
+            }
+        },
+        "/tasks": {
+            "get": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.assigned_to"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.assigned_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.work_log_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.title"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.description"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.status"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.due_date"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.updated_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.completion_note"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.completed_at"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/order"
+                    },
+                    {
+                        "$ref": "#/parameters/range"
+                    },
+                    {
+                        "$ref": "#/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "items": {
+                                "$ref": "#/definitions/tasks"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "tags": [
+                    "tasks"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/body.tasks"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/preferPost"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "tags": [
+                    "tasks"
+                ]
+            },
+            "delete": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.assigned_to"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.assigned_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.work_log_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.title"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.description"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.status"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.due_date"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.updated_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.completion_note"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.completed_at"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "tasks"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.assigned_to"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.assigned_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.work_log_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.title"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.description"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.status"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.due_date"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.updated_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.completion_note"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.tasks.completed_at"
+                    },
+                    {
+                        "$ref": "#/parameters/body.tasks"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "tasks"
+                ]
+            }
+        },
+        "/app_settings": {
+            "get": {
+                "description": "- minimum_app_version: Users below this version will be forced to update\r\n- latest_app_version: Latest available version (informational)\r\n- update_message: Custom message to show users when update is required",
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.app_settings.key"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.app_settings.value"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.app_settings.updated_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.app_settings.updated_by"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/order"
+                    },
+                    {
+                        "$ref": "#/parameters/range"
+                    },
+                    {
+                        "$ref": "#/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "items": {
+                                "$ref": "#/definitions/app_settings"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "summary": "Global app configuration including version control for forced updates. \r",
+                "tags": [
+                    "app_settings"
+                ]
+            },
+            "post": {
+                "description": "- minimum_app_version: Users below this version will be forced to update\r\n- latest_app_version: Latest available version (informational)\r\n- update_message: Custom message to show users when update is required",
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/body.app_settings"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/preferPost"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "summary": "Global app configuration including version control for forced updates. \r",
+                "tags": [
+                    "app_settings"
+                ]
+            },
+            "delete": {
+                "description": "- minimum_app_version: Users below this version will be forced to update\r\n- latest_app_version: Latest available version (informational)\r\n- update_message: Custom message to show users when update is required",
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.app_settings.key"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.app_settings.value"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.app_settings.updated_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.app_settings.updated_by"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "summary": "Global app configuration including version control for forced updates. \r",
+                "tags": [
+                    "app_settings"
+                ]
+            },
+            "patch": {
+                "description": "- minimum_app_version: Users below this version will be forced to update\r\n- latest_app_version: Latest available version (informational)\r\n- update_message: Custom message to show users when update is required",
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.app_settings.key"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.app_settings.value"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.app_settings.updated_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.app_settings.updated_by"
+                    },
+                    {
+                        "$ref": "#/parameters/body.app_settings"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "summary": "Global app configuration including version control for forced updates. \r",
+                "tags": [
+                    "app_settings"
+                ]
+            }
+        },
+        "/work_logs": {
+            "get": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.date"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_in_time"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_in_plan"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_in_approved"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_in_approved_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_in_approved_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_out_time"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.day_report"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_out_approved"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_out_approved_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.status"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.rejection_reason"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.total_hours"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.updated_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_out_photos"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/order"
+                    },
+                    {
+                        "$ref": "#/parameters/range"
+                    },
+                    {
+                        "$ref": "#/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "items": {
+                                "$ref": "#/definitions/work_logs"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "tags": [
+                    "work_logs"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/body.work_logs"
+                    },
+                    {
+                        "$ref": "#/parameters/select"
+                    },
+                    {
+                        "$ref": "#/parameters/preferPost"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "tags": [
+                    "work_logs"
+                ]
+            },
+            "delete": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.date"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_in_time"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_in_plan"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_in_approved"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_in_approved_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_in_approved_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_out_time"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.day_report"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_out_approved"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_out_approved_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.status"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.rejection_reason"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.total_hours"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.updated_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_out_photos"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "work_logs"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.user_id"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.date"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_in_time"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_in_plan"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_in_approved"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_in_approved_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_in_approved_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_out_time"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.day_report"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_out_approved"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_out_approved_by"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.status"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.rejection_reason"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.total_hours"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.created_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.updated_at"
+                    },
+                    {
+                        "$ref": "#/parameters/rowFilter.work_logs.check_out_photos"
+                    },
+                    {
+                        "$ref": "#/parameters/body.work_logs"
+                    },
+                    {
+                        "$ref": "#/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "work_logs"
+                ]
+            }
+        },
+        "/rpc/get_user_role": {
+            "get": {
+                "produces": [
+                    "application/json",
+                    "application/vnd.pgrst.object+json;nulls=stripped",
+                    "application/vnd.pgrst.object+json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "tags": [
+                    "(rpc) get_user_role"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "args",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    {
+                        "$ref": "#/parameters/preferParams"
+                    }
+                ],
+                "produces": [
+                    "application/json",
+                    "application/vnd.pgrst.object+json;nulls=stripped",
+                    "application/vnd.pgrst.object+json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "tags": [
+                    "(rpc) get_user_role"
+                ]
+            }
+        },
+        "/rpc/is_manager_of": {
+            "get": {
+                "parameters": [
+                    {
+                        "format": "uuid",
+                        "in": "query",
+                        "name": "target_user_id",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "produces": [
+                    "application/json",
+                    "application/vnd.pgrst.object+json;nulls=stripped",
+                    "application/vnd.pgrst.object+json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "tags": [
+                    "(rpc) is_manager_of"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "args",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "target_user_id": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "target_user_id"
+                            ],
+                            "type": "object"
+                        }
+                    },
+                    {
+                        "$ref": "#/parameters/preferParams"
+                    }
+                ],
+                "produces": [
+                    "application/json",
+                    "application/vnd.pgrst.object+json;nulls=stripped",
+                    "application/vnd.pgrst.object+json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "tags": [
+                    "(rpc) is_manager_of"
+                ]
+            }
+        },
+        "/rpc/force_logout_user": {
+            "post": {
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "args",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "target_user_id": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "target_user_id"
+                            ],
+                            "type": "object"
+                        }
+                    },
+                    {
+                        "$ref": "#/parameters/preferParams"
+                    }
+                ],
+                "produces": [
+                    "application/json",
+                    "application/vnd.pgrst.object+json;nulls=stripped",
+                    "application/vnd.pgrst.object+json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "tags": [
+                    "(rpc) force_logout_user"
+                ]
+            }
+        },
+        "/rpc/is_owner": {
+            "get": {
+                "produces": [
+                    "application/json",
+                    "application/vnd.pgrst.object+json;nulls=stripped",
+                    "application/vnd.pgrst.object+json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "tags": [
+                    "(rpc) is_owner"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "args",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    {
+                        "$ref": "#/parameters/preferParams"
+                    }
+                ],
+                "produces": [
+                    "application/json",
+                    "application/vnd.pgrst.object+json;nulls=stripped",
+                    "application/vnd.pgrst.object+json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "tags": [
+                    "(rpc) is_owner"
+                ]
+            }
+        },
+        "/rpc/get_manager_name": {
+            "get": {
+                "parameters": [
+                    {
+                        "format": "uuid",
+                        "in": "query",
+                        "name": "user_id",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "produces": [
+                    "application/json",
+                    "application/vnd.pgrst.object+json;nulls=stripped",
+                    "application/vnd.pgrst.object+json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "summary": "Returns the full name of the manager assigned to a user",
+                "tags": [
+                    "(rpc) get_manager_name"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "args",
+                        "required": true,
+                        "schema": {
+                            "description": "Returns the full name of the manager assigned to a user",
+                            "properties": {
+                                "user_id": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "user_id"
+                            ],
+                            "type": "object"
+                        }
+                    },
+                    {
+                        "$ref": "#/parameters/preferParams"
+                    }
+                ],
+                "produces": [
+                    "application/json",
+                    "application/vnd.pgrst.object+json;nulls=stripped",
+                    "application/vnd.pgrst.object+json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "summary": "Returns the full name of the manager assigned to a user",
+                "tags": [
+                    "(rpc) get_manager_name"
+                ]
+            }
+        }
+    },
+    "definitions": {
+        "sessions": {
+            "required": [
+                "id",
+                "user_id",
+                "last_active",
+                "is_active",
+                "created_at"
+            ],
+            "properties": {
+                "id": {
+                    "default": "extensions.uuid_generate_v4()",
+                    "description": "Note:\nThis is a Primary Key.<pk/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "user_id": {
+                    "description": "Note:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "supabase_session_token": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "device_info": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "last_active": {
+                    "default": "now()",
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                },
+                "is_active": {
+                    "default": true,
+                    "format": "boolean",
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "default": "now()",
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "notifications": {
+            "required": [
+                "id",
+                "user_id",
+                "title",
+                "body",
+                "read",
+                "created_at"
+            ],
+            "properties": {
+                "id": {
+                    "default": "gen_random_uuid()",
+                    "description": "Note:\nThis is a Primary Key.<pk/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "user_id": {
+                    "description": "Note:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "title": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "body": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "data": {
+                    "format": "jsonb"
+                },
+                "read": {
+                    "default": false,
+                    "format": "boolean",
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "default": "now()",
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "announcements": {
+            "required": [
+                "id",
+                "created_by",
+                "title",
+                "body",
+                "created_at"
+            ],
+            "properties": {
+                "id": {
+                    "default": "extensions.uuid_generate_v4()",
+                    "description": "Note:\nThis is a Primary Key.<pk/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "created_by": {
+                    "description": "Note:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "title": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "body": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "target_role": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "target_user_id": {
+                    "description": "Note:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "created_at": {
+                    "default": "now()",
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "backfill_permissions": {
+            "required": [
+                "id",
+                "user_id",
+                "date",
+                "allowed_by",
+                "created_at",
+                "is_used"
+            ],
+            "properties": {
+                "id": {
+                    "default": "gen_random_uuid()",
+                    "description": "Note:\nThis is a Primary Key.<pk/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "user_id": {
+                    "description": "Note:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "date": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "allowed_by": {
+                    "description": "Note:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "created_at": {
+                    "default": "now()",
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                },
+                "is_used": {
+                    "default": false,
+                    "format": "boolean",
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "leave_requests": {
+            "required": [
+                "id",
+                "user_id",
+                "date",
+                "reason",
+                "status",
+                "created_at"
+            ],
+            "properties": {
+                "id": {
+                    "default": "extensions.uuid_generate_v4()",
+                    "description": "Note:\nThis is a Primary Key.<pk/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "user_id": {
+                    "description": "Note:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "date": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "reason": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "status": {
+                    "default": "pending",
+                    "format": "text",
+                    "type": "string"
+                },
+                "reviewed_by": {
+                    "description": "Note:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "reviewed_at": {
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                },
+                "created_at": {
+                    "default": "now()",
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "profiles": {
+            "required": [
+                "id",
+                "full_name",
+                "employee_id",
+                "role",
+                "is_active",
+                "must_change_password",
+                "created_at",
+                "updated_at"
+            ],
+            "properties": {
+                "id": {
+                    "description": "Note:\nThis is a Primary Key.<pk/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "full_name": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "employee_id": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "role": {
+                    "default": "member",
+                    "format": "text",
+                    "type": "string"
+                },
+                "department": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "manager_id": {
+                    "description": "References the manager assigned to this user. Only owner can modify this field.\n\nNote:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "avatar_url": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "is_active": {
+                    "default": true,
+                    "format": "boolean",
+                    "type": "boolean"
+                },
+                "expo_push_token": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "must_change_password": {
+                    "default": true,
+                    "format": "boolean",
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "default": "now()",
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "default": "now()",
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                },
+                "created_by": {
+                    "description": "Note:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "tasks": {
+            "required": [
+                "id",
+                "assigned_to",
+                "title",
+                "status",
+                "created_at",
+                "updated_at"
+            ],
+            "properties": {
+                "id": {
+                    "default": "extensions.uuid_generate_v4()",
+                    "description": "Note:\nThis is a Primary Key.<pk/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "assigned_to": {
+                    "description": "Note:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "assigned_by": {
+                    "description": "Note:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "work_log_id": {
+                    "description": "Note:\nThis is a Foreign Key to `work_logs.id`.<fk table='work_logs' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "title": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "description": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "status": {
+                    "default": "pending",
+                    "format": "text",
+                    "type": "string"
+                },
+                "due_date": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "created_at": {
+                    "default": "now()",
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "default": "now()",
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                },
+                "completion_note": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "completed_at": {
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "app_settings": {
+            "description": "Global app configuration including version control for forced updates. \r\n- minimum_app_version: Users below this version will be forced to update\r\n- latest_app_version: Latest available version (informational)\r\n- update_message: Custom message to show users when update is required",
+            "required": [
+                "key",
+                "value",
+                "updated_at"
+            ],
+            "properties": {
+                "key": {
+                    "description": "Note:\nThis is a Primary Key.<pk/>",
+                    "format": "text",
+                    "type": "string"
+                },
+                "value": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "default": "now()",
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                },
+                "updated_by": {
+                    "description": "Note:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "work_logs": {
+            "required": [
+                "id",
+                "user_id",
+                "date",
+                "check_in_approved",
+                "check_out_approved",
+                "status",
+                "created_at",
+                "updated_at"
+            ],
+            "properties": {
+                "id": {
+                    "default": "extensions.uuid_generate_v4()",
+                    "description": "Note:\nThis is a Primary Key.<pk/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "user_id": {
+                    "description": "Note:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "date": {
+                    "default": "CURRENT_DATE",
+                    "format": "date",
+                    "type": "string"
+                },
+                "check_in_time": {
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                },
+                "check_in_plan": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "check_in_approved": {
+                    "default": false,
+                    "format": "boolean",
+                    "type": "boolean"
+                },
+                "check_in_approved_by": {
+                    "description": "Note:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "check_in_approved_at": {
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                },
+                "check_out_time": {
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                },
+                "day_report": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "check_out_approved": {
+                    "default": false,
+                    "format": "boolean",
+                    "type": "boolean"
+                },
+                "check_out_approved_by": {
+                    "description": "Note:\nThis is a Foreign Key to `profiles.id`.<fk table='profiles' column='id'/>",
+                    "format": "uuid",
+                    "type": "string"
+                },
+                "status": {
+                    "default": "pending_approval",
+                    "format": "text",
+                    "type": "string"
+                },
+                "rejection_reason": {
+                    "format": "text",
+                    "type": "string"
+                },
+                "total_hours": {
+                    "format": "numeric",
+                    "type": "number"
+                },
+                "created_at": {
+                    "default": "now()",
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "default": "now()",
+                    "format": "timestamp with time zone",
+                    "type": "string"
+                },
+                "check_out_photos": {
+                    "format": "text[]",
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        }
+    },
+    "parameters": {
+        "preferParams": {
+            "name": "Prefer",
+            "description": "Preference",
+            "required": false,
+            "in": "header",
+            "type": "string"
+        },
+        "preferReturn": {
+            "name": "Prefer",
+            "description": "Preference",
+            "required": false,
+            "enum": [
+                "return=representation",
+                "return=minimal",
+                "return=none"
+            ],
+            "in": "header",
+            "type": "string"
+        },
+        "preferCount": {
+            "name": "Prefer",
+            "description": "Preference",
+            "required": false,
+            "enum": [
+                "count=none"
+            ],
+            "in": "header",
+            "type": "string"
+        },
+        "preferPost": {
+            "name": "Prefer",
+            "description": "Preference",
+            "required": false,
+            "enum": [
+                "return=representation",
+                "return=minimal",
+                "return=none",
+                "resolution=ignore-duplicates",
+                "resolution=merge-duplicates"
+            ],
+            "in": "header",
+            "type": "string"
+        },
+        "select": {
+            "name": "select",
+            "description": "Filtering Columns",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "on_conflict": {
+            "name": "on_conflict",
+            "description": "On Conflict",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "order": {
+            "name": "order",
+            "description": "Ordering",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "range": {
+            "name": "Range",
+            "description": "Limiting and Pagination",
+            "required": false,
+            "in": "header",
+            "type": "string"
+        },
+        "rangeUnit": {
+            "name": "Range-Unit",
+            "description": "Limiting and Pagination",
+            "required": false,
+            "default": "items",
+            "in": "header",
+            "type": "string"
+        },
+        "offset": {
+            "name": "offset",
+            "description": "Limiting and Pagination",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "limit": {
+            "name": "limit",
+            "description": "Limiting and Pagination",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "body.sessions": {
+            "name": "sessions",
+            "description": "sessions",
+            "required": false,
+            "in": "body",
+            "schema": {
+                "$ref": "#/definitions/sessions"
+            }
+        },
+        "rowFilter.sessions.id": {
+            "name": "id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.sessions.user_id": {
+            "name": "user_id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.sessions.supabase_session_token": {
+            "name": "supabase_session_token",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.sessions.device_info": {
+            "name": "device_info",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.sessions.last_active": {
+            "name": "last_active",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.sessions.is_active": {
+            "name": "is_active",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.sessions.created_at": {
+            "name": "created_at",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "body.notifications": {
+            "name": "notifications",
+            "description": "notifications",
+            "required": false,
+            "in": "body",
+            "schema": {
+                "$ref": "#/definitions/notifications"
+            }
+        },
+        "rowFilter.notifications.id": {
+            "name": "id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.notifications.user_id": {
+            "name": "user_id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.notifications.title": {
+            "name": "title",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.notifications.body": {
+            "name": "body",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.notifications.data": {
+            "name": "data",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.notifications.read": {
+            "name": "read",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.notifications.created_at": {
+            "name": "created_at",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "body.announcements": {
+            "name": "announcements",
+            "description": "announcements",
+            "required": false,
+            "in": "body",
+            "schema": {
+                "$ref": "#/definitions/announcements"
+            }
+        },
+        "rowFilter.announcements.id": {
+            "name": "id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.announcements.created_by": {
+            "name": "created_by",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.announcements.title": {
+            "name": "title",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.announcements.body": {
+            "name": "body",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.announcements.target_role": {
+            "name": "target_role",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.announcements.target_user_id": {
+            "name": "target_user_id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.announcements.created_at": {
+            "name": "created_at",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "body.backfill_permissions": {
+            "name": "backfill_permissions",
+            "description": "backfill_permissions",
+            "required": false,
+            "in": "body",
+            "schema": {
+                "$ref": "#/definitions/backfill_permissions"
+            }
+        },
+        "rowFilter.backfill_permissions.id": {
+            "name": "id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.backfill_permissions.user_id": {
+            "name": "user_id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.backfill_permissions.date": {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.backfill_permissions.allowed_by": {
+            "name": "allowed_by",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.backfill_permissions.created_at": {
+            "name": "created_at",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.backfill_permissions.is_used": {
+            "name": "is_used",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "body.leave_requests": {
+            "name": "leave_requests",
+            "description": "leave_requests",
+            "required": false,
+            "in": "body",
+            "schema": {
+                "$ref": "#/definitions/leave_requests"
+            }
+        },
+        "rowFilter.leave_requests.id": {
+            "name": "id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.leave_requests.user_id": {
+            "name": "user_id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.leave_requests.date": {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.leave_requests.reason": {
+            "name": "reason",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.leave_requests.status": {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.leave_requests.reviewed_by": {
+            "name": "reviewed_by",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.leave_requests.reviewed_at": {
+            "name": "reviewed_at",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.leave_requests.created_at": {
+            "name": "created_at",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "body.profiles": {
+            "name": "profiles",
+            "description": "profiles",
+            "required": false,
+            "in": "body",
+            "schema": {
+                "$ref": "#/definitions/profiles"
+            }
+        },
+        "rowFilter.profiles.id": {
+            "name": "id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.profiles.full_name": {
+            "name": "full_name",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.profiles.employee_id": {
+            "name": "employee_id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.profiles.role": {
+            "name": "role",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.profiles.department": {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.profiles.manager_id": {
+            "name": "manager_id",
+            "description": "References the manager assigned to this user. Only owner can modify this field.",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.profiles.avatar_url": {
+            "name": "avatar_url",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.profiles.is_active": {
+            "name": "is_active",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.profiles.expo_push_token": {
+            "name": "expo_push_token",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.profiles.must_change_password": {
+            "name": "must_change_password",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.profiles.created_at": {
+            "name": "created_at",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.profiles.updated_at": {
+            "name": "updated_at",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.profiles.created_by": {
+            "name": "created_by",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "body.tasks": {
+            "name": "tasks",
+            "description": "tasks",
+            "required": false,
+            "in": "body",
+            "schema": {
+                "$ref": "#/definitions/tasks"
+            }
+        },
+        "rowFilter.tasks.id": {
+            "name": "id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.tasks.assigned_to": {
+            "name": "assigned_to",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.tasks.assigned_by": {
+            "name": "assigned_by",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.tasks.work_log_id": {
+            "name": "work_log_id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.tasks.title": {
+            "name": "title",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.tasks.description": {
+            "name": "description",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.tasks.status": {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.tasks.due_date": {
+            "name": "due_date",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.tasks.created_at": {
+            "name": "created_at",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.tasks.updated_at": {
+            "name": "updated_at",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.tasks.completion_note": {
+            "name": "completion_note",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.tasks.completed_at": {
+            "name": "completed_at",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "body.app_settings": {
+            "name": "app_settings",
+            "description": "app_settings",
+            "required": false,
+            "in": "body",
+            "schema": {
+                "$ref": "#/definitions/app_settings"
+            }
+        },
+        "rowFilter.app_settings.key": {
+            "name": "key",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.app_settings.value": {
+            "name": "value",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.app_settings.updated_at": {
+            "name": "updated_at",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.app_settings.updated_by": {
+            "name": "updated_by",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "body.work_logs": {
+            "name": "work_logs",
+            "description": "work_logs",
+            "required": false,
+            "in": "body",
+            "schema": {
+                "$ref": "#/definitions/work_logs"
+            }
+        },
+        "rowFilter.work_logs.id": {
+            "name": "id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.user_id": {
+            "name": "user_id",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.date": {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.check_in_time": {
+            "name": "check_in_time",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.check_in_plan": {
+            "name": "check_in_plan",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.check_in_approved": {
+            "name": "check_in_approved",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.check_in_approved_by": {
+            "name": "check_in_approved_by",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.check_in_approved_at": {
+            "name": "check_in_approved_at",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.check_out_time": {
+            "name": "check_out_time",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.day_report": {
+            "name": "day_report",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.check_out_approved": {
+            "name": "check_out_approved",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.check_out_approved_by": {
+            "name": "check_out_approved_by",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.status": {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.rejection_reason": {
+            "name": "rejection_reason",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.total_hours": {
+            "name": "total_hours",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.created_at": {
+            "name": "created_at",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.updated_at": {
+            "name": "updated_at",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        },
+        "rowFilter.work_logs.check_out_photos": {
+            "name": "check_out_photos",
+            "required": false,
+            "in": "query",
+            "type": "string"
+        }
+    },
+    "externalDocs": {
+        "description": "PostgREST Documentation",
+        "url": "https://postgrest.org/en/v14/references/api.html"
+    }
+}
