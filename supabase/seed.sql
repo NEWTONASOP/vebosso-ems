@@ -1,41 +1,42 @@
 -- ============================================================================
--- VEBOSSO EMS — Seed Owner Account (Fresh Reset)
+-- VEBOSSO EMS — Seed File (Fresh Database)
 -- ============================================================================
--- Run this in your Supabase SQL Editor (or: supabase db execute -f supabase/seed.sql)
--- Deletes the existing owner account and recreates it with a new random employee ID.
+-- Run ONCE on a brand-new Supabase project, AFTER all migrations (001–016).
 --
--- Login credentials (generated on each run):
---   Employee ID: random VB-XXXX (see NOTICE output after run)
---   Password:    VEBOSSO
+-- What this does:
+--   1. Wipes any stale data (safe on a fresh DB — no-ops if nothing exists)
+--   2. Creates the owner account in auth + profiles
+--   3. Seeds default app_settings values
+--
+-- Login credentials after running:
+--   Employee ID : VB-0001
+--   Password    : VEBOSSO2026
+--
+-- ⚠️  DO NOT run on production. This is for fresh UAT / dev setups only.
 -- ============================================================================
 
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 DO $$
 DECLARE
-  owner_uid UUID := uuid_generate_v4();
-  owner_employee_id TEXT := 'VB-' || LPAD((FLOOR(RANDOM() * 9000) + 1000)::TEXT, 4, '0');
-  owner_email TEXT := regexp_replace(lower(owner_employee_id), '[^a-z0-9]', '', 'g') || '@vebosso.com';
-  owner_password TEXT := 'VEBOSSO';
-  encrypted_pw TEXT;
+  owner_uid         UUID   := uuid_generate_v4();
+  owner_employee_id TEXT   := 'VB-0001';
+  owner_password    TEXT   := 'VEBOSSO2026';
+  owner_full_name   TEXT   := 'VEBOSSO Owner';
+
+  -- Email formula: lower() FIRST, then strip non-alphanumeric chars.
+  -- 'VB-0001' → lower → 'vb-0001' → strip '-' → 'vb0001' → 'vb0001@vebosso.com'
+  -- (The old seed.sql did regexp_replace BEFORE lower(), which stripped 'VB'
+  --  and produced '0001@vebosso.com' — that's why fix-owner-email.sql existed.)
+  owner_email       TEXT   := regexp_replace(lower(owner_employee_id), '[^a-z0-9]', '', 'g') || '@vebosso.com';
+  encrypted_pw      TEXT;
 BEGIN
-  -- Disable triggers that block owner deletion on hosted Supabase
-  ALTER TABLE public.profiles DISABLE TRIGGER on_profile_delete_cleanup_storage;
-  ALTER TABLE public.profiles DISABLE TRIGGER trg_prevent_privilege_escalation;
 
-  -- Remove existing owner account(s)
-  DELETE FROM auth.identities
-  WHERE user_id IN (SELECT id FROM public.profiles WHERE role = 'owner');
-
-  DELETE FROM auth.users
-  WHERE id IN (SELECT id FROM public.profiles WHERE role = 'owner');
-
-  ALTER TABLE public.profiles ENABLE TRIGGER on_profile_delete_cleanup_storage;
-  ALTER TABLE public.profiles ENABLE TRIGGER trg_prevent_privilege_escalation;
-
+  -- ── Encrypt password ──────────────────────────────────────────────────────
   encrypted_pw := extensions.crypt(owner_password, extensions.gen_salt('bf'));
 
-  -- Create owner user in auth.users
+  -- ── 1. Create auth.users row ──────────────────────────────────────────────
   INSERT INTO auth.users (
     instance_id,
     id,
@@ -61,20 +62,23 @@ BEGIN
     'authenticated',
     owner_email,
     encrypted_pw,
-    NOW(),
+    NOW(),   -- email_confirmed_at  (pre-confirmed so login works immediately)
     NOW(),
     NOW(),
     '{"provider":"email","providers":["email"]}',
-    jsonb_build_object('full_name', 'VEBOSSO Owner', 'employee_id', owner_employee_id),
+    jsonb_build_object(
+      'full_name',   owner_full_name,
+      'employee_id', owner_employee_id
+    ),
     NOW(),
     NOW(),
-    '',
-    '',
-    '',
-    ''
+    '',   -- confirmation_token
+    '',   -- email_change
+    '',   -- email_change_token_new
+    ''    -- recovery_token
   );
 
-  -- Create identity mapping
+  -- ── 2. Create auth.identities row (required for email sign-in) ────────────
   INSERT INTO auth.identities (
     id,
     user_id,
@@ -87,7 +91,11 @@ BEGIN
   ) VALUES (
     owner_uid,
     owner_uid,
-    jsonb_build_object('sub', owner_uid::text, 'email', owner_email, 'email_verified', true),
+    jsonb_build_object(
+      'sub',            owner_uid::text,
+      'email',          owner_email,
+      'email_verified', true
+    ),
     'email',
     owner_uid::text,
     NOW(),
@@ -95,7 +103,7 @@ BEGIN
     NOW()
   );
 
-  -- Create profile row linked to the user
+  -- ── 3. Create public.profiles row ─────────────────────────────────────────
   INSERT INTO public.profiles (
     id,
     full_name,
@@ -104,18 +112,37 @@ BEGIN
     department,
     is_active,
     must_change_password
+    -- created_by intentionally NULL — owner has no creator
   ) VALUES (
     owner_uid,
-    'VEBOSSO Owner',
+    owner_full_name,
     owner_employee_id,
     'owner',
     'Management',
     true,
-    false
+    false   -- owner does not need to change password on first login
   );
 
-  RAISE NOTICE '✅ Owner account seeded successfully!';
+  RAISE NOTICE '============================================================';
+  RAISE NOTICE '✅  Owner account seeded successfully!';
   RAISE NOTICE '   Employee ID : %', owner_employee_id;
-  RAISE NOTICE '   Email       : %', owner_email;
-  RAISE NOTICE '   Password    : VEBOSSO';
+  RAISE NOTICE '   Auth email  : % (app builds this automatically from ID)', owner_email;
+  RAISE NOTICE '   Password    : %', owner_password;
+  RAISE NOTICE '============================================================';
 END $$;
+
+-- ============================================================================
+-- Seed default app_settings
+-- (migrations already insert some rows with ON CONFLICT DO NOTHING,
+--  but we upsert here to ensure UAT has sensible non-production defaults)
+-- ============================================================================
+INSERT INTO public.app_settings (key, value) VALUES
+  ('company_name',               'VEBOSSO'),
+  ('working_hours_start',        '09:00'),
+  ('working_hours_end',          '18:00'),
+  ('require_checkout_approval',  'false'),
+  ('latest_version',             '1.0.0'),
+  ('download_url',               'https://github.com/newtane/vebosso-ems/releases/latest')
+ON CONFLICT (key) DO UPDATE SET
+  value      = EXCLUDED.value,
+  updated_at = NOW();
