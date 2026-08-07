@@ -143,37 +143,41 @@ export function DateRail({
     const dotColor = DAY_STATUS_COLOR[getDayStatus(day)];
 
     return (
-      <AnimatedPressable
-        scaleTo={0.94}
-        onPress={() => onSelectDate(day)}
-        style={styles.cell}
-        accessibilityRole="button"
-        accessibilityState={{ selected }}
-        accessibilityLabel={format(day, 'EEEE d MMMM yyyy')}
-      >
-        <Text style={[styles.weekday, selected && styles.weekdaySelected]}>
-          {format(day, 'EEE')}
-        </Text>
-        <View style={[styles.pill, selected && styles.pillSelected]}>
-          <Text
-            style={[
-              styles.dayNum,
-              today && !selected && { color: accentColor },
-              selected && styles.dayNumSelected,
-            ]}
-          >
-            {format(day, 'd')}
+      // Width lives on a plain View so AnimatedPressable can't stretch the
+      // selected pill into a square on native.
+      <View style={styles.cellSlot}>
+        <AnimatedPressable
+          scaleTo={0.94}
+          onPress={() => onSelectDate(day)}
+          style={styles.cell}
+          accessibilityRole="button"
+          accessibilityState={{ selected }}
+          accessibilityLabel={format(day, 'EEEE d MMMM yyyy')}
+        >
+          <Text style={[styles.weekday, selected && styles.weekdaySelected]}>
+            {format(day, 'EEE')}
           </Text>
-        </View>
-        <View style={styles.dotSlot}>
-          {dotColor ? (
-            <Animated.View
-              entering={FadeIn.duration(220)}
-              style={[styles.dot, { backgroundColor: selected ? AppTheme.white : dotColor }]}
-            />
-          ) : null}
-        </View>
-      </AnimatedPressable>
+          <View style={[styles.pill, selected && styles.pillSelected]}>
+            <Text
+              style={[
+                styles.dayNum,
+                today && !selected && { color: accentColor },
+                selected && styles.dayNumSelected,
+              ]}
+            >
+              {format(day, 'd')}
+            </Text>
+          </View>
+          <View style={styles.dotSlot}>
+            {dotColor ? (
+              <Animated.View
+                entering={FadeIn.duration(220)}
+                style={[styles.dot, { backgroundColor: selected ? AppTheme.white : dotColor }]}
+              />
+            ) : null}
+          </View>
+        </AnimatedPressable>
+      </View>
     );
   };
 
@@ -216,9 +220,10 @@ export function DateRail({
         keyExtractor={(day) => day.toISOString()}
         horizontal
         showsHorizontalScrollIndicator={false}
+        // Soft snap after a coast — not disableIntervalMomentum, which kills
+        // inertia the moment the finger lifts and feels broken on phones.
         snapToInterval={ITEM_WIDTH}
-        decelerationRate="fast"
-        disableIntervalMomentum
+        decelerationRate="normal"
         onLayout={handleLayout}
         getItemLayout={(_, index) => ({
           length: ITEM_WIDTH,
@@ -293,8 +298,11 @@ const styles = StyleSheet.create({
     // paddingHorizontal is set dynamically so the selected day can sit dead
     // centre even when it's the 1st or last of the month.
   },
-  cell: {
+  cellSlot: {
     width: ITEM_WIDTH,
+  },
+  cell: {
+    width: '100%',
     alignItems: 'center',
     gap: 6,
     paddingVertical: 2,
@@ -307,12 +315,15 @@ const styles = StyleSheet.create({
   weekdaySelected: {
     color: AppTheme.inkSoft,
   },
+  // Circle, not a rounded square — Android often ignores borderRadius on a
+  // filled view unless overflow is clipped.
   pill: {
     width: 38,
     height: 38,
-    borderRadius: 13,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   pillSelected: {
     backgroundColor: AppTheme.charcoal,

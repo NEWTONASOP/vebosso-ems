@@ -214,11 +214,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 16,
+    overflow: 'hidden',
     backgroundColor: AppTheme.card,
-    ...appSoftShadow,
+    // Shadow on the inner AnimatedPressable view reads as a thick outer box
+    // on phones, especially when the selected fill is a soft tint. Keep rows
+    // flat; selection is the fill + checkmark.
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: AppTheme.hairline,
   },
   selectedItemContainer: {
     backgroundColor: AppTheme.blueSoft,
+    borderColor: 'transparent',
   },
   avatar: {
     marginRight: 12,
