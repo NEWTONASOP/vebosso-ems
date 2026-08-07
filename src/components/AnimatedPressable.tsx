@@ -43,9 +43,9 @@ const AnimatedPressableComponent = React.forwardRef<any, AnimatedPressableProps>
     const handlePressIn = (e: any) => {
 
       scale.value = withSpring(scaleTo, {
-        mass: 0.1,
-        damping: 10,
-        stiffness: 200,
+        mass: 0.2,
+        damping: 16,
+        stiffness: 280,
       });
       if (onPressIn) onPressIn(e);
     };
@@ -53,9 +53,9 @@ const AnimatedPressableComponent = React.forwardRef<any, AnimatedPressableProps>
     const handlePressOut = (e: any) => {
 
       scale.value = withSpring(1, {
-        mass: 0.1,
-        damping: 10,
-        stiffness: 200,
+        mass: 0.2,
+        damping: 16,
+        stiffness: 280,
       });
       if (onPressOut) onPressOut(e);
     };
@@ -83,12 +83,16 @@ const AnimatedPressableComponent = React.forwardRef<any, AnimatedPressableProps>
             margin: flatStyle.margin,
             alignSelf: flatStyle.alignSelf,
             flex: flatStyle.flex,
+            // Without this the pressable can't shrink below its content on
+            // web, so flexed siblings overflow their track.
+            minWidth: flatStyle.flex !== undefined ? 0 : undefined,
           };
         }}
         {...props}
       >
         {(state) => {
           const resolvedStyle = typeof style === 'function' ? style(state) : style;
+          const flatStyle = StyleSheet.flatten(resolvedStyle) || {};
           const content = typeof children === 'function' ? children(state) : children;
           return (
             <Animated.View
@@ -102,6 +106,17 @@ const AnimatedPressableComponent = React.forwardRef<any, AnimatedPressableProps>
                   marginRight: 0,
                   margin: 0,
                   alignSelf: undefined,
+                  // The outer Pressable already owns the width. Repeating it
+                  // here would compound a percentage against itself, so fill
+                  // the parent instead.
+                  width: flatStyle.width !== undefined ? '100%' : undefined,
+                  // Likewise for flex: the outer handles distribution among
+                  // siblings. Keeping `flex` here would give this view a zero
+                  // basis, so a parent sized by its content collapses on web.
+                  flex: undefined,
+                  flexGrow: flatStyle.flex !== undefined ? 1 : flatStyle.flexGrow,
+                  flexShrink: flatStyle.flex !== undefined ? 1 : flatStyle.flexShrink,
+                  flexBasis: flatStyle.flex !== undefined ? 'auto' : flatStyle.flexBasis,
                 },
               ]}
             >

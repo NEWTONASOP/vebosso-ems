@@ -1,15 +1,22 @@
 // ============================================================================
-// VEBOSSO EMS — Owner Settings Screen (Premium Fintech Aesthetic)
+// VEBOSSO EMS — Owner Settings Screen
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, Pressable, StyleSheet, View } from 'react-native';
 import { Snackbar, Switch, Text } from 'react-native-paper';
-import { Colors } from '../../../constants/colors';
 import { APP_NAME } from '../../../constants/roles';
+import {
+  AppRadius,
+  AppSpace,
+  AppTheme,
+  appShadow,
+  appSoftShadow,
+  screenChrome,
+} from '../../../constants/theme';
 import { Alert } from '../../../lib/alert';
 import { useAuthStore } from '../../../store/authStore';
 import { useWorkStore } from '../../../store/workStore';
@@ -48,113 +55,127 @@ export default function OwnerSettingsScreen() {
   };
 
   return (
-    <View style={{ flex: 1 }}>
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Settings</Text>
-      </View>
-
-      {/* Profile Card (Apple ID Style) */}
-      <View style={styles.profileCard}>
-        <View style={styles.profileAvatar}>
-          <Text style={styles.avatarText}>
-            {profile?.full_name?.substring(0, 2).toUpperCase()}
-          </Text>
+    <View style={styles.root}>
+      <ScrollView
+        style={screenChrome.root}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={screenChrome.header}>
+          <Text style={screenChrome.title}>Settings</Text>
         </View>
-        <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{profile?.full_name}</Text>
-          <View style={styles.roleBadge}>
-            <View style={styles.roleDot} />
-            <Text style={styles.profileRole}>Owner • {profile?.employee_id}</Text>
-          </View>
-        </View>
-      </View>
 
-      {/* Team Management Group */}
-      <Text style={styles.sectionLabel}>Team Management</Text>
-      <View style={styles.groupedCard}>
-        <SettingsRow
-          icon="bell"
-          iconColor={Colors.warning}
-          title="Announcements"
-          subtitle="Send announcements to team"
-          onPress={() => router.push('/(owner)/settings/announcements')}
-        />
-        <View style={styles.separator} />
-        <SettingsRow
-          icon="cpu"
-          iconColor={Colors.ownerAccent}
-          title="Session Management"
-          subtitle="View and manage active sessions"
-          onPress={() => router.push('/(owner)/settings/session-management')}
-          isLast
-        />
-      </View>
-
-      {/* App Settings Group */}
-      <Text style={styles.sectionLabel}>App Settings</Text>
-      <View style={styles.groupedCard}>
-        <View style={styles.toggleRow}>
-          <View style={[styles.iconContainer, { backgroundColor: Colors.textSecondary + '1A' }]}>
-            <Feather name="check-square" size={18} color={Colors.textSecondary} />
-          </View>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingTitle}>Require Checkout Approval</Text>
-            <Text style={styles.settingSubtitle}>
-              Members need approval when ending their day
+        {/* Profile card — visual anchor */}
+        <View style={styles.profileCard}>
+          <View style={styles.profileAvatar}>
+            <Text style={styles.avatarText}>
+              {profile?.full_name?.substring(0, 2).toUpperCase()}
             </Text>
           </View>
-          <Switch
-            value={requireCheckoutApproval}
-            onValueChange={handleToggleCheckout}
-            color={Colors.accent} // Custom switch to match fintech design
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>{profile?.full_name}</Text>
+            <View style={styles.roleBadge}>
+              <View style={styles.roleDot} />
+              <Text style={styles.profileRole}>Owner • {profile?.employee_id}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Team Management */}
+        <Text style={styles.sectionLabel}>Team management</Text>
+        <View style={styles.groupedCard}>
+          <SettingsRow
+            icon="bell"
+            iconColor={AppTheme.amber}
+            iconBg={AppTheme.amberSoft}
+            title="Announcements"
+            subtitle="Send announcements to team"
+            onPress={() => router.push('/(owner)/settings/announcements')}
+          />
+          <View style={styles.separator} />
+          <SettingsRow
+            icon="cpu"
+            iconColor={AppTheme.violet}
+            iconBg={AppTheme.violetSoft}
+            title="Session Management"
+            subtitle="View and manage active sessions"
+            onPress={() => router.push('/(owner)/settings/session-management')}
           />
         </View>
-      </View>
 
-      {/* Account Actions Group */}
-      <Text style={styles.sectionLabel}>Account</Text>
-      <View style={styles.groupedCard}>
-        <SettingsRow
-          icon="lock"
-          iconColor={Colors.warning}
-          title="Change Password"
-          subtitle="Update your password"
-          onPress={() => router.push('/(auth)/change-password')}
-        />
-        <Pressable
-          style={({ pressed }) => [
-            styles.settingRow,
-            pressed && styles.rowPressed
-          ]}
-          onPress={handleSignOut}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: Colors.errorLight }]}>
-            <Feather name="log-out" size={18} color={Colors.error} />
+        {/* App Settings */}
+        <Text style={styles.sectionLabel}>App settings</Text>
+        <View style={styles.groupedCard}>
+          <View style={styles.toggleRow}>
+            <View style={[styles.iconContainer, { backgroundColor: AppTheme.blueSoft }]}>
+              <Feather name="check-square" size={18} color={AppTheme.blue} />
+            </View>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingTitle}>Require Checkout Approval</Text>
+              <Text style={styles.settingSubtitle}>
+                Members need approval when ending their day
+              </Text>
+            </View>
+            <Switch
+              value={requireCheckoutApproval}
+              onValueChange={handleToggleCheckout}
+              color={AppTheme.charcoal}
+            />
           </View>
-          <View style={styles.settingInfo}>
-            <Text style={[styles.settingTitle, { color: Colors.error }]}>Sign Out</Text>
-            <Text style={styles.settingSubtitle}>Log out of your account</Text>
-          </View>
-          <Feather name="chevron-right" size={16} color={Colors.textTertiary} />
-        </Pressable>
-      </View>
+        </View>
 
-      {/* App Info Footer */}
-      <View style={styles.appInfo}>
-        <Text style={styles.appName}>{APP_NAME} EMS</Text>
-        <Text style={styles.appVersion}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
-      </View>
-    </ScrollView>
+        {/* Account */}
+        <Text style={styles.sectionLabel}>Account</Text>
+        <View style={styles.groupedCard}>
+          <SettingsRow
+            icon="lock"
+            iconColor={AppTheme.amber}
+            iconBg={AppTheme.amberSoft}
+            title="Change Password"
+            subtitle="Update your password"
+            onPress={() => router.push('/(auth)/change-password')}
+          />
+        </View>
 
-    <Snackbar
-      visible={!!snackMessage}
-      onDismiss={() => setSnackMessage('')}
-      duration={4000}
-      wrapperStyle={{ marginBottom: 90 }}
-    >
-      {snackMessage}
-    </Snackbar>
+        {/* Sign out — visually separated destructive action */}
+        <View style={styles.signOutCard}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.settingRow,
+              styles.signOutRow,
+              pressed && styles.rowPressed,
+            ]}
+            onPress={handleSignOut}
+            accessibilityRole="button"
+            accessibilityLabel="Sign Out"
+          >
+            <View style={[styles.iconContainer, { backgroundColor: AppTheme.coralSoft }]}>
+              <Feather name="log-out" size={18} color={AppTheme.coral} />
+            </View>
+            <View style={styles.settingInfo}>
+              <Text style={styles.signOutTitle}>Sign Out</Text>
+              <Text style={styles.settingSubtitle}>Log out of your account</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={AppTheme.coral} />
+          </Pressable>
+        </View>
+
+        {/* App Info Footer */}
+        <View style={styles.appInfo}>
+          <Text style={styles.appName}>{APP_NAME} EMS</Text>
+          <Text style={styles.appVersion}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
+        </View>
+      </ScrollView>
+
+      <Snackbar
+        visible={!!snackMessage}
+        onDismiss={() => setSnackMessage('')}
+        duration={4000}
+        theme={{ colors: { inverseSurface: AppTheme.charcoal, inverseOnSurface: AppTheme.white } }}
+        wrapperStyle={{ marginBottom: 90 }}
+      >
+        {snackMessage}
+      </Snackbar>
     </View>
   );
 }
@@ -166,29 +187,31 @@ export default function OwnerSettingsScreen() {
 interface SettingsRowProps {
   icon: string;
   iconColor: string;
+  iconBg: string;
   title: string;
   subtitle: string;
   onPress: () => void;
-  isLast?: boolean;
 }
 
-function SettingsRow({ icon, iconColor, title, subtitle, onPress }: SettingsRowProps) {
+function SettingsRow({ icon, iconColor, iconBg, title, subtitle, onPress }: SettingsRowProps) {
   return (
     <Pressable
       style={({ pressed }) => [
         styles.settingRow,
-        pressed && styles.rowPressed
+        pressed && styles.rowPressed,
       ]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={title}
     >
-      <View style={[styles.iconContainer, { backgroundColor: iconColor + '12' }]}>
+      <View style={[styles.iconContainer, { backgroundColor: iconBg }]}>
         <Feather name={icon as any} size={18} color={iconColor} />
       </View>
       <View style={styles.settingInfo}>
         <Text style={styles.settingTitle}>{title}</Text>
         <Text style={styles.settingSubtitle}>{subtitle}</Text>
       </View>
-      <Feather name="chevron-right" size={16} color={Colors.textTertiary} />
+      <Feather name="chevron-right" size={16} color={AppTheme.mute} />
     </Pressable>
   );
 }
@@ -198,54 +221,37 @@ function SettingsRow({ icon, iconColor, title, subtitle, onPress }: SettingsRowP
 // ============================================================================
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background, // Premium Fintech light grey
-  },
+  root: { flex: 1 },
   scrollContent: {
-    paddingBottom: 110, // Increased bottom padding to clear tab bar
+    paddingBottom: 110,
     width: '100%',
     maxWidth: 600,
     alignSelf: 'center',
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 36,
-    paddingBottom: 8,
-  },
-  title: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 28,
-    color: Colors.textPrimary,
-    letterSpacing: -0.7,
-  },
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    marginHorizontal: 16,
-    marginTop: 14,
-    borderRadius: 24,
+    backgroundColor: AppTheme.card,
+    marginHorizontal: AppSpace.screen,
+    marginTop: 8,
+    borderRadius: AppRadius.hero,
     padding: 20,
-    ...Colors.shadow,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    ...appShadow,
     gap: 16,
   },
   profileAvatar: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: Colors.ownerAccent + '15', // Violet role tint
-    borderWidth: 1,
-    borderColor: Colors.ownerAccent + '30',
+    backgroundColor: AppTheme.violetSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    fontFamily: 'Inter_800ExtraBold',
-    color: Colors.ownerAccent,
+    fontFamily: 'Inter_700Bold',
+    color: AppTheme.violet,
     fontSize: 20,
+    letterSpacing: -0.4,
   },
   profileInfo: {
     flex: 1,
@@ -253,8 +259,8 @@ const styles = StyleSheet.create({
   profileName: {
     fontFamily: 'Inter_700Bold',
     fontSize: 18,
-    color: Colors.textPrimary,
-    letterSpacing: -0.2,
+    color: AppTheme.ink,
+    letterSpacing: -0.3,
   },
   roleBadge: {
     flexDirection: 'row',
@@ -265,47 +271,56 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.ownerAccent,
+    backgroundColor: AppTheme.violet,
     marginRight: 6,
   },
   profileRole: {
     fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    color: Colors.textSecondary,
+    fontSize: 13,
+    color: AppTheme.mute,
   },
   sectionLabel: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-    color: Colors.textSecondary,
-    paddingHorizontal: 28,
-    marginTop: 26,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    color: AppTheme.mute,
+    letterSpacing: -0.1,
+    paddingHorizontal: AppSpace.screen,
+    marginTop: 24,
+    marginBottom: 10,
   },
   groupedCard: {
-    backgroundColor: Colors.surface,
-    marginHorizontal: 16,
-    borderRadius: 24,
+    backgroundColor: AppTheme.card,
+    marginHorizontal: AppSpace.screen,
+    borderRadius: AppRadius.card,
     overflow: 'hidden',
-    ...Colors.shadow,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    ...appSoftShadow,
+  },
+  signOutCard: {
+    backgroundColor: AppTheme.card,
+    marginHorizontal: AppSpace.screen,
+    marginTop: 16,
+    borderRadius: AppRadius.card,
+    overflow: 'hidden',
+    ...appSoftShadow,
   },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    minHeight: 52,
-    backgroundColor: Colors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 56,
+    backgroundColor: AppTheme.card,
+  },
+  signOutRow: {
+    backgroundColor: AppTheme.card,
   },
   rowPressed: {
-    backgroundColor: Colors.surfacePressed,
+    backgroundColor: AppTheme.soft,
   },
   iconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 8, // iOS Squircle style
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
@@ -317,39 +332,47 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
-    color: Colors.textPrimary,
+    color: AppTheme.ink,
+    letterSpacing: -0.2,
   },
   settingSubtitle: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    color: Colors.textSecondary,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: AppTheme.mute,
     marginTop: 2,
+  },
+  signOutTitle: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: AppTheme.coral,
+    letterSpacing: -0.2,
   },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    minHeight: 52,
-    backgroundColor: Colors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 56,
+    backgroundColor: AppTheme.card,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.divider,
-    marginLeft: 62, // Padding left (14) + Icon width (32) + Icon margin (16)
+    backgroundColor: AppTheme.hairline,
+    marginLeft: 64,
   },
   appInfo: {
     alignItems: 'center',
     paddingVertical: 36,
   },
   appName: {
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
-    color: Colors.textTertiary,
+    color: AppTheme.mute,
   },
   appVersion: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 10,
-    color: Colors.textTertiary,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: AppTheme.mute,
     marginTop: 2,
   },
 });

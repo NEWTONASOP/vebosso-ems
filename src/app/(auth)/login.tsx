@@ -1,5 +1,5 @@
 // ============================================================================
-// VEBOSSO EMS — Login Screen (Premium Fintech / Apple Wallet Aesthetic)
+// VEBOSSO EMS — Login Screen
 // ============================================================================
 
 import React, { useState } from 'react';
@@ -9,7 +9,14 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useAuthStore } from '../../store/authStore';
 import { APP_NAME, APP_TAGLINE } from '../../constants/roles';
 import { Feather } from '@expo/vector-icons';
-import { Colors } from '../../constants/colors';
+import {
+  AppTheme,
+  AppSpace,
+  AppRadius,
+  appShadow,
+  appSoftShadow,
+  screenChrome,
+} from '../../constants/theme';
 import Constants from 'expo-constants';
 
 export default function LoginScreen() {
@@ -74,15 +81,15 @@ export default function LoginScreen() {
             }}
             autoCapitalize="characters"
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.textPrimary}
+            outlineColor={AppTheme.soft2}
+            activeOutlineColor={AppTheme.charcoal}
+            textColor={AppTheme.ink}
             outlineStyle={styles.inputOutline}
             left={<TextInput.Affix text="VB-" />}
             theme={{
               colors: {
-                onSurfaceVariant: Colors.textTertiary,
-                surface: Colors.systemGray6,
+                onSurfaceVariant: AppTheme.mute,
+                surface: AppTheme.soft,
               },
             }}
           />
@@ -97,27 +104,26 @@ export default function LoginScreen() {
             }}
             secureTextEntry={!showPassword}
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.textPrimary}
+            outlineColor={AppTheme.soft2}
+            activeOutlineColor={AppTheme.charcoal}
+            textColor={AppTheme.ink}
             outlineStyle={styles.inputOutline}
-            left={<TextInput.Icon icon="lock-outline" color={Colors.textSecondary} />}
+            left={<TextInput.Icon icon="lock-outline" color={AppTheme.inkSoft} />}
             right={
               <TextInput.Icon
                 icon={showPassword ? 'eye-off' : 'eye'}
-                color={Colors.textSecondary}
+                color={AppTheme.inkSoft}
                 onPress={() => setShowPassword(!showPassword)}
               />
             }
             theme={{
               colors: {
-                onSurfaceVariant: Colors.textTertiary,
-                surface: Colors.systemGray6,
+                onSurfaceVariant: AppTheme.mute,
+                surface: AppTheme.soft,
               },
             }}
           />
 
-          {/* Premium Black Pill Button */}
           <Pressable
             style={({ pressed }) => [
               styles.loginBtn,
@@ -126,16 +132,18 @@ export default function LoginScreen() {
             ]}
             onPress={handleLogin}
             disabled={isLoading}
+            accessibilityRole="button"
+            accessibilityLabel="Sign In"
           >
             {isLoading ? (
-              <ActivityIndicator color={Colors.white} size="small" />
+              <ActivityIndicator color={AppTheme.white} size="small" />
             ) : (
               <Text style={styles.loginBtnText}>Sign In</Text>
             )}
           </Pressable>
 
           <View style={styles.helpSection}>
-            <Feather name="info" size={14} color={Colors.textTertiary} />
+            <Feather name="info" size={14} color={AppTheme.mute} />
             <Text style={styles.helpText}>
               Don&apos;t have an account? Contact your admin.
             </Text>
@@ -152,7 +160,8 @@ export default function LoginScreen() {
         visible={!!snackError}
         onDismiss={() => setSnackError('')}
         duration={4000}
-        action={{ label: 'OK', textColor: Colors.white }}
+        style={styles.snackbar}
+        action={{ label: 'OK', textColor: AppTheme.white }}
       >
         {snackError}
       </Snackbar>
@@ -160,120 +169,107 @@ export default function LoginScreen() {
   );
 }
 
-// ============================================================================
-// Styles
-// ============================================================================
-
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: Colors.background,
+    ...screenChrome.root,
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: AppSpace.screen,
     paddingVertical: 40,
     width: '100%',
-    maxWidth: 400, // Compact widescreen layout
+    maxWidth: 400,
     alignSelf: 'center',
   },
   brandSection: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: AppSpace.xxl,
   },
   logoImage: {
     width: 72,
     height: 72,
     borderRadius: 22,
     overflow: 'hidden',
-    marginBottom: 16,
-    ...Colors.shadow,
+    marginBottom: AppSpace.lg,
+    ...appSoftShadow,
   },
   appName: {
-    fontFamily: 'Inter_800ExtraBold',
+    fontFamily: 'Inter_700Bold',
     fontSize: 30,
-    color: Colors.textPrimary,
-    letterSpacing: 4,
+    color: AppTheme.ink,
+    letterSpacing: -0.9,
   },
   tagline: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    color: Colors.textSecondary,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: AppTheme.mute,
     marginTop: 4,
-    letterSpacing: 0.5,
   },
   formSection: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
+    backgroundColor: AppTheme.card,
+    borderRadius: AppRadius.card,
     padding: 24,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 20,
-    ...Colors.shadow,
+    marginBottom: AppSpace.xl,
+    ...appShadow,
   },
   welcomeText: {
-    fontFamily: 'Inter_800ExtraBold',
+    fontFamily: 'Inter_700Bold',
     fontSize: 22,
-    color: Colors.textPrimary,
+    color: AppTheme.ink,
     letterSpacing: -0.5,
     marginBottom: 4,
   },
   welcomeSubtext: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_400Regular',
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: AppTheme.mute,
     marginBottom: 24,
   },
   input: {
-    marginBottom: 16,
-    backgroundColor: Colors.systemGray6,
+    marginBottom: AppSpace.lg,
+    backgroundColor: AppTheme.soft,
     fontSize: 15,
   },
   inputOutline: {
     borderRadius: 14,
-    borderWidth: 1,
   },
   loginBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.accent,
-    borderRadius: 24,
+    ...screenChrome.primaryPill,
     width: '100%',
     height: 48,
-    marginTop: 8,
-    gap: 8,
+    marginTop: AppSpace.sm,
   },
   loginBtnText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 14,
-    color: Colors.white,
+    ...screenChrome.primaryPillText,
   },
   btnPressed: {
     transform: [{ scale: 0.97 }],
     opacity: 0.9,
   },
   btnDisabled: {
-    backgroundColor: Colors.surfaceLighter,
+    backgroundColor: AppTheme.soft2,
   },
   helpSection: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
+    marginTop: AppSpace.xl,
     gap: 6,
   },
   helpText: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_400Regular',
     fontSize: 12,
-    color: Colors.textTertiary,
+    color: AppTheme.mute,
     textAlign: 'center',
   },
   version: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_400Regular',
     textAlign: 'center',
     fontSize: 11,
-    color: Colors.textTertiary,
+    color: AppTheme.mute,
+  },
+  snackbar: {
+    backgroundColor: AppTheme.coral,
   },
 });

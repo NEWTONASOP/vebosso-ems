@@ -13,7 +13,7 @@ import * as Haptics from 'expo-haptics';
 
 import { LeaveRequestWithProfile } from '../types/database';
 import { LEAVE_STATUS_CONFIG } from '../constants/roles';
-import { Colors } from '../constants/colors';
+import { AppTheme, appSoftShadow } from '../constants/theme';
 
 interface LeaveCardProps {
   leave: LeaveRequestWithProfile;
@@ -37,8 +37,8 @@ export function LeaveCard({
   const profile = leave.profiles;
   const statusConfig = LEAVE_STATUS_CONFIG[leave.status] || {
     label: leave.status,
-    color: Colors.textSecondary,
-    backgroundColor: Colors.surfaceLighter,
+    color: AppTheme.mute,
+    backgroundColor: AppTheme.soft,
   };
 
   const formattedDate = leave.date
@@ -46,12 +46,12 @@ export function LeaveCard({
     : '--';
 
   const getAvatarColors = () => {
-    if (!profile) return { bg: Colors.memberAccent + '15', text: Colors.memberAccent };
+    if (!profile) return { bg: AppTheme.soft, text: AppTheme.inkSoft };
     const role = profile.role || 'member';
     switch (role) {
-      case 'owner': return { bg: Colors.ownerAccent + '15', text: Colors.ownerAccent };
-      case 'manager': return { bg: Colors.managerAccent + '15', text: Colors.managerAccent };
-      case 'member': default: return { bg: Colors.memberAccent + '15', text: Colors.memberAccent };
+      case 'owner': return { bg: AppTheme.violetSoft, text: AppTheme.violet };
+      case 'manager': return { bg: AppTheme.blueSoft, text: AppTheme.blue };
+      case 'member': default: return { bg: AppTheme.soft, text: AppTheme.inkSoft };
     }
   };
 
@@ -66,7 +66,7 @@ export function LeaveCard({
       {/* Header Info */}
       {showUser && profile && (
         <View style={styles.header}>
-          <View style={[styles.avatar, { backgroundColor: avatarColors.bg, borderColor: avatarColors.text + '30' }]}>
+          <View style={[styles.avatar, { backgroundColor: avatarColors.bg }]}>
             <Text style={[styles.avatarLabel, { color: avatarColors.text }]}>
               {profile.full_name.substring(0, 2).toUpperCase()}
             </Text>
@@ -88,7 +88,7 @@ export function LeaveCard({
       {/* Leave details */}
       <View style={[styles.detailsSection, !showUser && { marginTop: 0 }]}>
         <View style={styles.detailsHeader}>
-          <Feather name="calendar" size={14} color="#B45309" />
+          <Feather name="calendar" size={14} color={AppTheme.amber} />
           <Text style={styles.dateLabel}> Requested Leave Date</Text>
           {!showUser && (
             <View style={{ flex: 1, alignItems: 'flex-end' }}>
@@ -125,10 +125,10 @@ export function LeaveCard({
               }}
             >
               {isRejecting ? (
-                <ActivityIndicator size="small" color="#FF3B30" />
+                <ActivityIndicator size="small" color={AppTheme.coral} />
               ) : (
                 <>
-                  <Feather name="x" size={14} color="#FF3B30" />
+                  <Feather name="x" size={14} color={AppTheme.coral} />
                   <Text style={styles.rejectBtnText}>Reject</Text>
                 </>
               )}
@@ -149,10 +149,10 @@ export function LeaveCard({
               }}
             >
               {isApproving ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={AppTheme.white} />
               ) : (
                 <>
-                  <Feather name="check" size={14} color="#FFFFFF" />
+                  <Feather name="check" size={14} color={AppTheme.white} />
                   <Text style={styles.approveBtnText}>Approve</Text>
                 </>
               )}
@@ -166,17 +166,11 @@ export function LeaveCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
+    backgroundColor: AppTheme.card,
+    borderRadius: 22,
     padding: 20,
     marginBottom: 14,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    elevation: 3,
+    ...appSoftShadow,
   },
   header: {
     flexDirection: 'row',
@@ -189,7 +183,6 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
   },
   avatarLabel: {
     fontFamily: 'Inter_800ExtraBold',
@@ -202,18 +195,18 @@ const styles = StyleSheet.create({
   name: {
     fontFamily: 'Inter_700Bold',
     fontSize: 16,
-    color: '#1C1C1E',
+    color: AppTheme.ink,
     letterSpacing: -0.2,
   },
   employeeId: {
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: '#5E6672',
+    color: AppTheme.mute,
     marginTop: 2,
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 10,
   },
   statusBadgeText: {
@@ -222,7 +215,7 @@ const styles = StyleSheet.create({
   },
   detailsSection: {
     marginTop: 4,
-    backgroundColor: 'rgba(180, 83, 9, 0.03)',
+    backgroundColor: AppTheme.amberSoft,
     borderRadius: 14,
     padding: 14,
   },
@@ -234,28 +227,28 @@ const styles = StyleSheet.create({
   dateLabel: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
-    color: '#B45309',
+    color: AppTheme.amber,
   },
   dateText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 14,
-    color: '#1C1C1E',
+    color: AppTheme.ink,
   },
   reasonSection: {
     borderTopWidth: 1,
-    borderTopColor: 'rgba(180, 83, 9, 0.06)',
+    borderTopColor: AppTheme.hairline,
     paddingTop: 8,
   },
   reasonLabel: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 11,
-    color: '#5E6672',
+    color: AppTheme.mute,
     marginBottom: 2,
   },
   reasonText: {
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
-    color: '#3A3A3C',
+    color: AppTheme.inkSoft,
     lineHeight: 18,
   },
   actions: {
@@ -268,7 +261,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 59, 48, 0.08)',
+    backgroundColor: AppTheme.coralSoft,
     borderRadius: 20,
     height: 40,
     gap: 6,
@@ -276,14 +269,14 @@ const styles = StyleSheet.create({
   rejectBtnText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 13,
-    color: '#FF3B30',
+    color: AppTheme.coral,
   },
   approveBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000000',
+    backgroundColor: AppTheme.charcoal,
     borderRadius: 20,
     height: 40,
     gap: 6,
@@ -291,7 +284,7 @@ const styles = StyleSheet.create({
   approveBtnText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 13,
-    color: '#FFFFFF',
+    color: AppTheme.white,
   },
   btnPressed: {
     transform: [{ scale: 0.97 }],

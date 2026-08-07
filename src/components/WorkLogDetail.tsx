@@ -6,8 +6,8 @@ import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Chip, Divider, Modal, Portal, Text } from 'react-native-paper';
-import { Colors } from '../constants/colors';
+import { Modal, Portal, Text } from 'react-native-paper';
+import { AppTheme, appSoftShadow } from '../constants/theme';
 import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
 import { supabase } from '../lib/supabase';
 import { Task, WorkLog } from '../types/database';
@@ -23,10 +23,17 @@ interface WorkLogDetailProps {
   hasNextDay?: boolean;
 }
 
+/**
+ * Long descriptions are clamped so the modal stays navigable. Measuring the
+ * rendered text would be exact but `onTextLayout` is unreliable on web, so the
+ * affordance appears past a length that reliably wraps beyond the clamp.
+ */
+const LIKELY_CLAMPED = 130;
+
 const TASK_STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
-  pending: { color: '#8E8E93', bg: '#F4F4F6', label: 'Pending' },
-  in_progress: { color: '#007AFF', bg: 'rgba(0,122,255,0.08)', label: 'In Progress' },
-  done: { color: '#34C759', bg: 'rgba(52,199,89,0.08)', label: 'Done' },
+  pending: { color: AppTheme.mute, bg: AppTheme.soft, label: 'Pending' },
+  in_progress: { color: AppTheme.blue, bg: AppTheme.blueSoft, label: 'In Progress' },
+  done: { color: AppTheme.green, bg: AppTheme.greenSoft, label: 'Done' },
 };
 
 export function WorkLogDetail({ 
@@ -39,46 +46,82 @@ export function WorkLogDetail({
   hasPrevDay = false,
   hasNextDay = false
 }: WorkLogDetailProps) {
-  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [checkInPhotoUrls, setCheckInPhotoUrls] = useState<string[]>([]);
+  const [checkOutPhotoUrls, setCheckOutPhotoUrls] = useState<string[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [expandedTasks, setExpandedTasks] = useState<string[]>([]);
+
+  const toggleTask = (id: string) =>
+    setExpandedTasks((open) =>
+      open.includes(id) ? open.filter((t) => t !== id) : [...open, id]
+    );
 
   // Reset state during render when workLog changes
   const [prevWorkLogId, setPrevWorkLogId] = useState<string | undefined>(undefined);
   if (workLog?.id !== prevWorkLogId) {
     setPrevWorkLogId(workLog?.id);
-    setPhotoUrls([]);
+    setCheckInPhotoUrls([]);
+    setCheckOutPhotoUrls([]);
+    setExpandedTasks([]);
   }
 
   useEffect(() => {
-    if (workLog?.check_out_photos && workLog.check_out_photos.length > 0) {
-      let isMounted = true;
-      const loadPhotos = async () => {
-        try {
-          const urls = await Promise.all(
-            workLog.check_out_photos!.map(async (path) => {
-              const { data } = await supabase.storage
-                .from('checkouts')
-                .createSignedUrl(path, 3600); // 1 hour
-              return data?.signedUrl || '';
-            })
-          );
-          if (isMounted) {
-            setPhotoUrls(urls.filter(Boolean));
-          }
-        } catch (err) {
-          console.error('Failed to load signed URLs:', err);
-        }
-      };
-      loadPhotos();
-      return () => {
-        isMounted = false;
-      };
+    const paths = workLog?.check_in_photos;
+    if (!paths?.length) {
+      setCheckInPhotoUrls([]);
+      return;
     }
+    let isMounted = true;
+    const loadPhotos = async () => {
+      try {
+        const urls = await Promise.all(
+          paths.map(async (path) => {
+            const { data } = await supabase.storage.from('checkouts').createSignedUrl(path, 3600);
+            return data?.signedUrl || '';
+          })
+        );
+        if (isMounted) setCheckInPhotoUrls(urls.filter(Boolean));
+      } catch (err) {
+        console.error('Failed to load check-in photo URLs:', err);
+      }
+    };
+    void loadPhotos();
+    return () => {
+      isMounted = false;
+    };
+  }, [workLog?.check_in_photos]);
+
+  useEffect(() => {
+    const paths = workLog?.check_out_photos;
+    if (!paths?.length) {
+      setCheckOutPhotoUrls([]);
+      return;
+    }
+    let isMounted = true;
+    const loadPhotos = async () => {
+      try {
+        const urls = await Promise.all(
+          paths.map(async (path) => {
+            const { data } = await supabase.storage.from('checkouts').createSignedUrl(path, 3600);
+            return data?.signedUrl || '';
+          })
+        );
+        if (isMounted) setCheckOutPhotoUrls(urls.filter(Boolean));
+      } catch (err) {
+        console.error('Failed to load checkout photo URLs:', err);
+      }
+    };
+    void loadPhotos();
+    return () => {
+      isMounted = false;
+    };
   }, [workLog?.check_out_photos]);
 
   if (!workLog) return null;
 
   const statusConfig = WORK_LOG_STATUS_CONFIG[workLog.status];
+  const logDate = new Date(workLog.date);
+  const showStepper = !!(onPrevDay || onNextDay);
 
   return (
     <Portal>
@@ -89,132 +132,126 @@ export function WorkLogDetail({
       >
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <Text style={styles.dateTitle}>
-              {format(new Date(workLog.date), 'EEEE, MMMM dd, yyyy')}
-            </Text>
-            <View style={styles.headerActions}>
-              <Chip
-                style={[styles.statusChip, { backgroundColor: statusConfig.backgroundColor }]}
-                textStyle={[styles.statusText, { color: statusConfig.color }]}
-                compact
-              >
+            <View style={styles.headerText}>
+              <Text style={styles.weekday}>{format(logDate, 'EEEE')}</Text>
+              <Text style={styles.dateTitle}>{format(logDate, 'd MMMM yyyy')}</Text>
+            </View>
+            <Pressable
+              onPress={onDismiss}
+              style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.5 }]}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <Feather name="x" size={20} color={AppTheme.inkSoft} />
+            </Pressable>
+          </View>
+
+          <View style={styles.metaRow}>
+            <View
+              style={[styles.statusPill, { backgroundColor: statusConfig.backgroundColor }]}
+            >
+              <View style={[styles.statusDot, { backgroundColor: statusConfig.color }]} />
+              <Text style={[styles.statusText, { color: statusConfig.color }]}>
                 {statusConfig.label}
-              </Chip>
-              <View style={styles.navButtons}>
-                {onPrevDay && (
-                  <Pressable
-                    onPress={onPrevDay}
-                    disabled={!hasPrevDay}
-                    style={({ pressed }) => [
-                      styles.closeBtn,
-                      !hasPrevDay && { opacity: 0.3 },
-                      pressed && hasPrevDay && { opacity: 0.5 }
-                    ]}
-                    hitSlop={12}
-                  >
-                    <Feather name="chevron-left" size={26} color={Colors.textSecondary} />
-                  </Pressable>
-                )}
-                {onNextDay && (
-                  <Pressable
-                    onPress={onNextDay}
-                    disabled={!hasNextDay}
-                    style={({ pressed }) => [
-                      styles.closeBtn,
-                      !hasNextDay && { opacity: 0.3 },
-                      pressed && hasNextDay && { opacity: 0.5 }
-                    ]}
-                    hitSlop={12}
-                  >
-                    <Feather name="chevron-right" size={26} color={Colors.textSecondary} />
-                  </Pressable>
-                )}
+              </Text>
+            </View>
+
+            {showStepper ? (
+              <View style={styles.stepper}>
                 <Pressable
-                  onPress={onDismiss}
-                  style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.5 }]}
-                  hitSlop={12}
+                  onPress={onPrevDay}
+                  disabled={!hasPrevDay}
+                  style={({ pressed }) => [
+                    styles.stepBtn,
+                    pressed && hasPrevDay && { opacity: 0.5 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Previous day with a record"
                 >
-                  <Feather name="x" size={24} color={Colors.textSecondary} />
+                  <Feather
+                    name="chevron-left"
+                    size={19}
+                    color={hasPrevDay ? AppTheme.ink : AppTheme.mute}
+                  />
+                </Pressable>
+                <View style={styles.stepDivider} />
+                <Pressable
+                  onPress={onNextDay}
+                  disabled={!hasNextDay}
+                  style={({ pressed }) => [
+                    styles.stepBtn,
+                    pressed && hasNextDay && { opacity: 0.5 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Next day with a record"
+                >
+                  <Feather
+                    name="chevron-right"
+                    size={19}
+                    color={hasNextDay ? AppTheme.ink : AppTheme.mute}
+                  />
                 </Pressable>
               </View>
-            </View>
+            ) : null}
           </View>
 
-          <Divider style={styles.divider} />
-
-          {/* Time Summary */}
-          <View style={styles.timeRow}>
-            <View style={styles.timeCard}>
-              <View style={[styles.iconWrapper, { backgroundColor: 'rgba(52, 199, 89, 0.1)' }]}>
-                <Feather name="log-in" size={16} color="#34C759" />
+          {/* Session summary — one bar reads as a span of time, where three
+              separate tiles read as three unrelated numbers. */}
+          <View style={styles.session}>
+            <View style={styles.sessionSide}>
+              <View style={styles.sessionLabelRow}>
+                <View style={[styles.endpoint, { backgroundColor: AppTheme.green }]} />
+                <Text style={styles.sessionLabel}>In</Text>
               </View>
-              <Text style={styles.timeLabel}>Check In</Text>
-              <Text style={styles.timeValue}>
+              <Text style={styles.sessionTime}>
                 {workLog.check_in_time
-                  ? format(new Date(workLog.check_in_time), 'hh:mm a')
+                  ? format(new Date(workLog.check_in_time), 'h:mm a')
                   : '--:--'}
               </Text>
             </View>
-            <View style={styles.timeCard}>
-              <View style={[styles.iconWrapper, { backgroundColor: 'rgba(255, 59, 48, 0.1)' }]}>
-                <Feather name="log-out" size={16} color="#FF3B30" />
+
+            <View style={styles.sessionMid}>
+              <View style={styles.sessionLine} />
+              <View style={styles.hoursPill}>
+                <Text style={styles.hoursText}>
+                  {workLog.total_hours ? `${workLog.total_hours.toFixed(2)}h` : 'Open'}
+                </Text>
               </View>
-              <Text style={styles.timeLabel}>Check Out</Text>
-              <Text style={styles.timeValue}>
+              <View style={styles.sessionLine} />
+            </View>
+
+            <View style={[styles.sessionSide, styles.sessionSideEnd]}>
+              <View style={styles.sessionLabelRow}>
+                <Text style={styles.sessionLabel}>Out</Text>
+                <View
+                  style={[
+                    styles.endpoint,
+                    { backgroundColor: workLog.check_out_time ? AppTheme.coral : AppTheme.soft2 },
+                  ]}
+                />
+              </View>
+              <Text style={styles.sessionTime}>
                 {workLog.check_out_time
-                  ? format(new Date(workLog.check_out_time), 'hh:mm a')
+                  ? format(new Date(workLog.check_out_time), 'h:mm a')
                   : '--:--'}
-              </Text>
-            </View>
-            <View style={styles.timeCard}>
-              <View style={[styles.iconWrapper, { backgroundColor: 'rgba(0, 122, 255, 0.1)' }]}>
-                <Feather name="clock" size={16} color="#007AFF" />
-              </View>
-              <Text style={styles.timeLabel}>Total Hours</Text>
-              <Text style={styles.timeValue}>
-                {workLog.total_hours ? `${workLog.total_hours}h` : '--'}
               </Text>
             </View>
           </View>
 
-          {/* Check-in Plan */}
-          {workLog.check_in_plan && (
-            <View style={styles.section}>
-              <View style={styles.sectionTitleRow}>
-                <Feather name="clipboard" size={14} color={Colors.textSecondary} />
-                <Text style={styles.sectionTitle}>Plan for the Day</Text>
-              </View>
-              <View style={styles.sectionContent}>
-                <Text style={styles.sectionText}>{workLog.check_in_plan}</Text>
-              </View>
-            </View>
-          )}
+          {workLog.check_in_plan ? (
+            <Section label="Plan for the day">
+              <Text style={styles.body}>{workLog.check_in_plan}</Text>
+            </Section>
+          ) : null}
 
-          {/* Day Report */}
-          {workLog.day_report && (
-            <View style={styles.section}>
-              <View style={styles.sectionTitleRow}>
-                <Feather name="edit-3" size={14} color={Colors.textSecondary} />
-                <Text style={styles.sectionTitle}>Day Report</Text>
-              </View>
-              <View style={styles.sectionContent}>
-                <Text style={styles.sectionText}>{workLog.day_report}</Text>
-              </View>
-            </View>
-          )}
-
-          {/* Checkout Photos */}
-          {photoUrls.length > 0 && (
-            <View style={styles.section}>
-              <View style={styles.sectionTitleRow}>
-                <Feather name="image" size={14} color={Colors.textSecondary} />
-                <Text style={styles.sectionTitle}>Day Photos</Text>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosScroll}>
+          {checkInPhotoUrls.length > 0 ? (
+            <Section label="Start photos">
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.photosContainer}>
-                  {photoUrls.map((url, index) => (
+                  {checkInPhotoUrls.map((url, index) => (
                     <Pressable
-                      key={index}
+                      key={`in-${index}`}
                       onPress={() => setSelectedPhoto(url)}
                       style={({ pressed }) => [styles.photoWrapper, pressed && { opacity: 0.9 }]}
                     >
@@ -223,69 +260,100 @@ export function WorkLogDetail({
                   ))}
                 </View>
               </ScrollView>
-            </View>
-          )}
+            </Section>
+          ) : null}
 
-          {/* Rejection Reason */}
-          {workLog.rejection_reason && (
-            <View style={styles.section}>
-              <View style={styles.sectionTitleRow}>
-                <Feather name="x-circle" size={14} color={Colors.error} />
-                <Text style={styles.sectionTitle}>Rejection Reason</Text>
-              </View>
-              <View style={[styles.sectionContent, styles.rejectionContent]}>
-                <Text style={styles.sectionText}>{workLog.rejection_reason}</Text>
-              </View>
-            </View>
-          )}
+          {workLog.day_report ? (
+            <Section label="Day report">
+              <Text style={styles.body}>{workLog.day_report}</Text>
+            </Section>
+          ) : null}
 
-          {/* Tasks */}
-          {tasks.length > 0 && (
-            <View style={styles.section}>
-              <View style={styles.sectionTitleRow}>
-                <Feather name="list" size={14} color={Colors.textSecondary} />
-                <Text style={styles.sectionTitle}>Tasks ({tasks.length})</Text>
+          {checkOutPhotoUrls.length > 0 ? (
+            <Section label="End photos">
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.photosContainer}>
+                  {checkOutPhotoUrls.map((url, index) => (
+                    <Pressable
+                      key={`out-${index}`}
+                      onPress={() => setSelectedPhoto(url)}
+                      style={({ pressed }) => [styles.photoWrapper, pressed && { opacity: 0.9 }]}
+                    >
+                      <Image source={{ uri: url }} style={styles.photo} />
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            </Section>
+          ) : null}
+
+          {workLog.rejection_reason ? (
+            <Section label="Why this was rejected">
+              <View style={styles.alertBox}>
+                <Text style={styles.alertText}>{workLog.rejection_reason}</Text>
               </View>
-              <View style={styles.tasksList}>
-                {tasks.map((task) => {
+            </Section>
+          ) : null}
+
+          {tasks.length > 0 ? (
+            <Section label={`Tasks · ${tasks.length}`}>
+                {tasks.map((task, index) => {
                   const tConfig = TASK_STATUS_CONFIG[task.status] || TASK_STATUS_CONFIG.pending;
+                  const open = expandedTasks.includes(task.id);
+                  const canExpand = (task.description?.length ?? 0) > LIKELY_CLAMPED;
                   return (
-                    <View key={task.id} style={styles.taskItem}>
+                    <Pressable
+                      key={task.id}
+                      onPress={canExpand ? () => toggleTask(task.id) : undefined}
+                      style={({ pressed }) => [
+                        styles.taskRow,
+                        index > 0 && styles.taskRowDivided,
+                        pressed && canExpand && { opacity: 0.6 },
+                      ]}
+                    >
                       <View style={styles.taskHeader}>
-                        <View style={[styles.taskStatusDot, { backgroundColor: tConfig.color }]} />
-                        <Text style={styles.taskTitle} numberOfLines={2}>{task.title}</Text>
-                        <View style={[styles.taskStatusBadge, { backgroundColor: tConfig.bg }]}>
-                          <Text style={[styles.taskStatusText, { color: tConfig.color }]}>
-                            {tConfig.label}
-                          </Text>
-                        </View>
+                        <View style={[styles.taskDot, { backgroundColor: tConfig.color }]} />
+                        <Text style={styles.taskTitle}>{task.title}</Text>
+                        <Text style={[styles.taskStatus, { color: tConfig.color }]}>
+                          {tConfig.label}
+                        </Text>
                       </View>
                       {task.description ? (
-                        <Text style={styles.taskDesc} numberOfLines={2}>{task.description}</Text>
+                        <Text
+                          style={styles.taskDesc}
+                          numberOfLines={open || !canExpand ? undefined : 3}
+                        >
+                          {task.description}
+                        </Text>
+                      ) : null}
+                      {canExpand ? (
+                        <View style={styles.moreRow}>
+                          <Text style={styles.moreText}>
+                            {open ? 'Show less' : 'Show full details'}
+                          </Text>
+                          <Feather
+                            name={open ? 'chevron-up' : 'chevron-down'}
+                            size={13}
+                            color={AppTheme.blue}
+                          />
+                        </View>
                       ) : null}
                       {task.completion_note && task.status === 'done' ? (
                         <View style={styles.completionNoteBox}>
-                          <View style={styles.completionNoteHeader}>
-                            <Feather name="check-circle" size={12} color={Colors.success} />
-                            <Text style={styles.completionNoteLabel}>Completion Note</Text>
-                          </View>
+                          <Text style={styles.completionNoteLabel}>Completion note</Text>
                           <Text style={styles.completionNoteText}>{task.completion_note}</Text>
                         </View>
                       ) : null}
                       {task.due_date ? (
-                        <View style={styles.taskDueRow}>
-                          <Feather name="calendar" size={11} color={Colors.textTertiary} />
-                          <Text style={styles.taskDueText}>
-                            Due {format(new Date(task.due_date), 'MMM dd')}
-                          </Text>
-                        </View>
+                        <Text style={styles.taskDueText}>
+                          Due {format(new Date(task.due_date), 'MMM dd')}
+                        </Text>
                       ) : null}
-                    </View>
+                    </Pressable>
                   );
                 })}
-              </View>
-            </View>
-          )}
+            </Section>
+          ) : null}
         </ScrollView>
       </Modal>
 
@@ -303,7 +371,7 @@ export function WorkLogDetail({
                 onPress={() => setSelectedPhoto(null)}
                 style={styles.closeFullImageBtn}
               >
-                <Feather name="x" size={24} color={Colors.white} />
+                <Feather name="x" size={24} color={AppTheme.white} />
               </Pressable>
             </View>
           )}
@@ -313,197 +381,282 @@ export function WorkLogDetail({
   );
 }
 
+/**
+ * Content sits directly on the sheet, divided by a hairline. Wrapping every
+ * block in its own filled card stacked boxes inside boxes and made the sheet
+ * read as a pile of containers rather than a document.
+ */
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionLabel}>{label}</Text>
+      {children}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.surface,
-    margin: 16,
+    backgroundColor: AppTheme.card,
+    // Percentage width keeps the inset on phones while the cap stops the sheet
+    // stretching across a desktop browser window.
+    width: '92%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    marginVertical: 16,
     borderRadius: 24,
     padding: 20,
     maxHeight: '85%',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    ...appSoftShadow,
   },
   header: {
-    gap: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  weekday: {
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+    color: AppTheme.mute,
+    marginBottom: 1,
   },
   dateTitle: {
-    fontSize: 18,
+    fontSize: 22,
     fontFamily: 'Inter_700Bold',
-    color: Colors.text,
+    color: AppTheme.ink,
+    letterSpacing: -0.6,
   },
-  headerActions: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 14,
+    marginBottom: 18,
+    gap: 12,
   },
-  navButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  statusChip: {
-    alignSelf: 'center',
-  },
-  statusText: {
-    fontSize: 11,
-    fontFamily: 'Inter_600SemiBold',
-  },
-  divider: {
-    backgroundColor: Colors.divider,
-    marginVertical: 16,
-  },
-  timeRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
-  },
-  timeCard: {
-    flex: 1,
-    backgroundColor: Colors.primaryLight,
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-  },
-  iconWrapper: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  timeLabel: {
-    fontSize: 11,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.textSecondary,
-    marginBottom: 2,
-  },
-  timeValue: {
-    fontSize: 15,
-    fontFamily: 'Inter_700Bold',
-    color: Colors.text,
-  },
-  section: {
-    marginBottom: 16,
-  },
-  sectionTitleRow: {
+  statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 8,
+    height: 28,
+    paddingHorizontal: 11,
+    borderRadius: 999,
   },
-  sectionTitle: {
-    fontSize: 14,
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontSize: 12,
     fontFamily: 'Inter_600SemiBold',
-    color: Colors.textSecondary,
   },
-  sectionContent: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: 10,
-    padding: 14,
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: AppTheme.soft,
+    borderRadius: 999,
+    overflow: 'hidden',
   },
-  rejectionContent: {
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.error,
-  },
-  sectionText: {
-    fontSize: 14,
-    color: Colors.text,
-    lineHeight: 22,
-  },
-  // Tasks
-  closeBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.surfaceLighter,
+  stepBtn: {
+    width: 40,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tasksList: {
+  stepDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: AppTheme.soft2,
+  },
+  session: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: AppTheme.soft,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 22,
     gap: 10,
   },
-  taskItem: {
-    backgroundColor: Colors.primaryLight,
+  sessionSide: {
+    gap: 3,
+  },
+  sessionSideEnd: {
+    alignItems: 'flex-end',
+  },
+  sessionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  endpoint: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  sessionLabel: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+    color: AppTheme.mute,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sessionTime: {
+    fontSize: 16,
+    fontFamily: 'Inter_700Bold',
+    color: AppTheme.ink,
+    letterSpacing: -0.3,
+  },
+  sessionMid: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 0,
+  },
+  sessionLine: {
+    flex: 1,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: AppTheme.soft2,
+  },
+  hoursPill: {
+    paddingHorizontal: 9,
+    height: 24,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: AppTheme.card,
+  },
+  hoursText: {
+    fontSize: 12,
+    fontFamily: 'Inter_700Bold',
+    color: AppTheme.inkSoft,
+  },
+  section: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: AppTheme.hairline,
+    paddingTop: 16,
+    marginBottom: 18,
+  },
+  sectionLabel: {
+    fontSize: 11.5,
+    fontFamily: 'Inter_700Bold',
+    color: AppTheme.mute,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
+  body: {
+    fontSize: 14.5,
+    color: AppTheme.ink,
+    lineHeight: 23,
+    fontFamily: 'Inter_400Regular',
+  },
+  // The one tinted block in the sheet, because a rejection is the only thing
+  // here that needs to interrupt someone reading.
+  alertBox: {
+    backgroundColor: AppTheme.coralSoft,
     borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    padding: 13,
+  },
+  alertText: {
+    fontSize: 14,
+    color: AppTheme.ink,
+    lineHeight: 21,
+    fontFamily: 'Inter_400Regular',
+  },
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: AppTheme.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  taskRow: {
+    paddingVertical: 12,
+  },
+  taskRowDivided: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: AppTheme.hairline,
   },
   taskHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4,
   },
-  taskStatusDot: {
+  taskDot: {
     width: 7,
     height: 7,
     borderRadius: 4,
-    flexShrink: 0,
   },
   taskTitle: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 14.5,
     fontFamily: 'Inter_600SemiBold',
-    color: Colors.text,
+    color: AppTheme.ink,
+    letterSpacing: -0.2,
   },
-  taskStatusBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  taskStatusText: {
-    fontSize: 10,
+  taskStatus: {
+    fontSize: 10.5,
     fontFamily: 'Inter_700Bold',
     textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   taskDesc: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    lineHeight: 18,
+    fontSize: 13.5,
+    color: AppTheme.inkSoft,
+    lineHeight: 21,
+    marginTop: 6,
     marginLeft: 15,
-    marginTop: 2,
     fontFamily: 'Inter_400Regular',
   },
-  taskDueRow: {
+  moreRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
+    marginTop: 8,
+    marginLeft: 15,
+  },
+  moreText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12.5,
+    color: AppTheme.blue,
+  },
+  taskDueText: {
+    fontSize: 11.5,
+    color: AppTheme.mute,
+    fontFamily: 'Inter_500Medium',
     marginTop: 6,
     marginLeft: 15,
   },
-  taskDueText: {
-    fontSize: 11,
-    color: Colors.textTertiary,
-    fontFamily: 'Inter_500Medium',
-  },
   completionNoteBox: {
-    backgroundColor: 'rgba(52, 199, 89, 0.08)',
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 8,
+    backgroundColor: AppTheme.greenSoft,
+    borderRadius: 10,
+    padding: 11,
+    marginTop: 10,
     marginLeft: 15,
-    borderLeftWidth: 2,
-    borderLeftColor: Colors.success,
-  },
-  completionNoteHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
   },
   completionNoteLabel: {
-    fontSize: 11,
-    fontFamily: 'Inter_600SemiBold',
-    color: Colors.textSecondary,
+    fontSize: 10.5,
+    fontFamily: 'Inter_700Bold',
+    color: AppTheme.green,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginBottom: 4,
   },
   completionNoteText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'Inter_400Regular',
-    color: Colors.text,
-    lineHeight: 18,
+    color: AppTheme.ink,
+    lineHeight: 19,
   },
   photosScroll: {
     marginTop: 8,
@@ -516,10 +669,8 @@ const styles = StyleSheet.create({
   photoWrapper: {
     width: 100,
     height: 100,
-    borderRadius: 12,
+    borderRadius: 14,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   photo: {
     width: '100%',

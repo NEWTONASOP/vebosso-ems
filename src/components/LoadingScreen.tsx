@@ -6,7 +6,7 @@
 import { Image } from 'expo-image';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
-import { Colors } from '../constants/colors';
+import { AppTheme } from '../constants/theme';
 
 export function LoadingScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -86,7 +86,7 @@ function Dot({ delay }: { delay: number }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: AppTheme.bg,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 48,
@@ -103,6 +103,6 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: Colors.accent,
+    backgroundColor: AppTheme.charcoal,
   },
 });

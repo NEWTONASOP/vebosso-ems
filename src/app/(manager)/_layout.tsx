@@ -5,7 +5,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { Colors } from '../../constants/colors';
+import { AppTheme, RoleAccent } from '../../constants/theme';
 import { useWorkStore } from '../../store/workStore';
 
 import { CustomTabBar } from '../../components/CustomTabBar';
@@ -24,7 +24,7 @@ const badgeStyles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -10,
-    backgroundColor: Colors.badge,
+    backgroundColor: AppTheme.coral,
     borderRadius: 9,
     minWidth: 16,
     height: 16,
@@ -34,7 +34,7 @@ const badgeStyles = StyleSheet.create({
     zIndex: 10,
   },
   text: {
-    color: Colors.white,
+    color: AppTheme.white,
     fontSize: 9,
     fontFamily: 'Inter_700Bold',
   },
@@ -50,6 +50,8 @@ export default function ManagerLayout() {
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
+        tabBarActiveTintColor: RoleAccent.manager.color,
+        tabBarInactiveTintColor: AppTheme.mute,
       }}
     >
       <Tabs.Screen

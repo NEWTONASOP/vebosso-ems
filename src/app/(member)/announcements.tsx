@@ -1,16 +1,20 @@
 // ============================================================================
-// VEBOSSO EMS — Member Announcements Screen (Premium Fintech Aesthetic)
+// VEBOSSO EMS — Member Announcements Screen
 // ============================================================================
 
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, Platform } from 'react-native';
+import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { AnnouncementCard } from '../../components/AnnouncementCard';
 import { EmptyState } from '../../components/EmptyState';
 import { PageTransition } from '../../components/PageTransition';
-import { Colors } from '../../constants/colors';
+import {
+  AppTheme as T,
+  AppSpace,
+  screenChrome,
+} from '../../constants/theme';
 
 export default function MemberAnnouncementsScreen() {
   const { profile } = useAuthStore();
@@ -29,72 +33,51 @@ export default function MemberAnnouncementsScreen() {
 
   return (
     <PageTransition>
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Announcements</Text>
-        <Text style={styles.subtitle}>
-          {announcements.length} announcement{announcements.length !== 1 ? 's' : ''}
-        </Text>
-      </View>
+      <View style={screenChrome.root}>
+        <View style={screenChrome.header}>
+          <Text style={screenChrome.title}>Announcements</Text>
+          <Text style={screenChrome.subtitle}>
+            {announcements.length === 0
+              ? 'Company updates will appear here'
+              : `${announcements.length} update${announcements.length !== 1 ? 's' : ''}`}
+          </Text>
+        </View>
 
-      <FlatList
-        data={announcements}
-        renderItem={({ item, index }) => <AnnouncementCard announcement={item} index={index} />}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyCard}>
+        <FlatList
+          data={announcements}
+          renderItem={({ item, index }) => (
+            <AnnouncementCard announcement={item} index={index} />
+          )}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={T.charcoal}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
             <EmptyState
               icon="bullhorn-outline"
-              title="No Announcements"
-              subtitle="You'll see company announcements here"
+              title="No announcements yet"
+              subtitle="When leadership posts an update, you'll see it here. Pull down to refresh."
             />
-          </View>
-        }
-      />
-    </View>
+          }
+        />
+      </View>
     </PageTransition>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
-    paddingBottom: 12,
-  },
-  title: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 28,
-    color: Colors.textPrimary,
-    letterSpacing: -0.7,
-  },
-  subtitle: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
   list: {
-    paddingHorizontal: 20,
+    paddingHorizontal: AppSpace.screen,
     paddingBottom: 110,
     width: '100%',
     maxWidth: 600,
     alignSelf: 'center',
-  },
-  emptyCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    padding: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    gap: 12,
   },
 });

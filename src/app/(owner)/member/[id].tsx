@@ -16,9 +16,16 @@ import {
     StyleSheet,
     View,
 } from 'react-native';
-import { Button, Divider, IconButton, Snackbar, Switch, Text, TextInput } from 'react-native-paper';
+import { Snackbar, Switch, Text, TextInput } from 'react-native-paper';
 import { InlineError } from '../../../components/InlineError';
-import { Colors } from '../../../constants/colors';
+import {
+  AppRadius,
+  AppSpace,
+  AppTheme as T,
+  screenChrome,
+  appShadow,
+  appSoftShadow,
+} from '../../../constants/theme';
 import { ROLE_LABELS } from '../../../constants/roles';
 import { parseFunctionError, parseSupabaseError } from '../../../lib/errors';
 import { supabase } from '../../../lib/supabase';
@@ -321,7 +328,7 @@ export default function MemberProfileManagementScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.accent} />
+        <ActivityIndicator size="large" color={T.charcoal} />
         <Text style={styles.loadingText}>Loading profile controls...</Text>
       </View>
     );
@@ -331,10 +338,17 @@ export default function MemberProfileManagementScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <IconButton icon="arrow-left" iconColor={Colors.text} size={24} onPress={() => router.back()} />
+          <Pressable
+            style={screenChrome.iconButton}
+            onPress={() => router.back()}
+            accessibilityLabel="Go back"
+          >
+            <Feather name="arrow-left" size={18} color={T.charcoal} />
+          </Pressable>
           <Text style={styles.headerTitle}>Error</Text>
+          <View style={styles.headerSpacer} />
         </View>
-        <View style={{ padding: 20 }}>
+        <View style={styles.errorPad}>
           <InlineError message={fetchError || 'Profile not found'} onRetry={loadMemberData} />
         </View>
       </View>
@@ -344,25 +358,35 @@ export default function MemberProfileManagementScreen() {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.header}>
-        <IconButton icon="arrow-left" iconColor={Colors.text} size={24} onPress={() => router.back()} style={styles.backBtn} />
+        <Pressable
+          style={screenChrome.iconButton}
+          onPress={() => router.back()}
+          accessibilityLabel="Go back"
+        >
+          <Feather name="arrow-left" size={18} color={T.charcoal} />
+        </Pressable>
         <Text style={styles.headerTitle}>Manage Profile</Text>
-        <View style={{ width: 48 }} />
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Top Profile Summary Card */}
         <View style={styles.heroCard}>
-          <View style={[styles.avatar, { backgroundColor: member.role === 'manager' ? Colors.managerAccent : Colors.memberAccent }]}>
-            <Text style={styles.avatarText}>{member.full_name.substring(0, 2).toUpperCase()}</Text>
+          <View style={[styles.avatar, { backgroundColor: member.role === 'manager' ? T.violetSoft : T.blueSoft }]}>
+            <Text style={[styles.avatarText, { color: member.role === 'manager' ? T.violet : T.blue }]}>
+              {member.full_name.substring(0, 2).toUpperCase()}
+            </Text>
           </View>
           <View style={styles.heroInfo}>
             <Text style={styles.heroName}>{member.full_name}</Text>
             <View style={styles.badgeRow}>
-              <View style={[styles.badge, { backgroundColor: Colors.accent }]}>
-                <Text style={styles.badgeText}>{ROLE_LABELS[member.role]}</Text>
+              <View style={[styles.badge, { backgroundColor: member.role === 'manager' ? T.violetSoft : T.blueSoft }]}>
+                <Text style={[styles.badgeText, { color: member.role === 'manager' ? T.violet : T.blue }]}>
+                  {ROLE_LABELS[member.role]}
+                </Text>
               </View>
-              <View style={[styles.badge, { backgroundColor: member.is_active ? Colors.successLight : Colors.errorLight }]}>
-                <Text style={[styles.badgeText, { color: member.is_active ? Colors.success : Colors.error }]}>
+              <View style={[styles.badge, { backgroundColor: member.is_active ? T.greenSoft : T.coralSoft }]}>
+                <Text style={[styles.badgeText, { color: member.is_active ? T.green : T.coral }]}>
                   {member.is_active ? 'Active' : 'Deactivated'}
                 </Text>
               </View>
@@ -379,10 +403,11 @@ export default function MemberProfileManagementScreen() {
             value={fullName}
             onChangeText={setFullName}
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.text}
-            theme={{ colors: { surface: Colors.surface } }}
+            outlineColor={T.soft}
+            activeOutlineColor={T.charcoal}
+            textColor={T.ink}
+            outlineStyle={styles.inputOutline}
+            theme={{ colors: { onSurfaceVariant: T.mute, surface: T.soft } }}
           />
 
           <TextInput
@@ -391,10 +416,11 @@ export default function MemberProfileManagementScreen() {
             value={department}
             onChangeText={setDepartment}
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.text}
-            theme={{ colors: { surface: Colors.surface } }}
+            outlineColor={T.soft}
+            activeOutlineColor={T.charcoal}
+            textColor={T.ink}
+            outlineStyle={styles.inputOutline}
+            theme={{ colors: { onSurfaceVariant: T.mute, surface: T.soft } }}
           />
 
           <TextInput
@@ -403,46 +429,58 @@ export default function MemberProfileManagementScreen() {
             value={employeeId}
             onChangeText={setEmployeeId}
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.text}
-            theme={{ colors: { surface: Colors.surface } }}
+            outlineColor={T.soft}
+            activeOutlineColor={T.charcoal}
+            textColor={T.ink}
+            outlineStyle={styles.inputOutline}
+            theme={{ colors: { onSurfaceVariant: T.mute, surface: T.soft } }}
           />
 
           {/* Role Segment */}
           <Text style={styles.fieldLabel}>Role</Text>
-          <View style={styles.segmentedContainer}>
+          <View style={[screenChrome.segmentTrack, styles.segmentSpacing]}>
             <Pressable
-              style={[styles.segmentBtn, role === 'member' && styles.segmentBtnActive]}
+              style={[screenChrome.segmentBtn, role === 'member' && screenChrome.segmentBtnActive]}
               onPress={() => {
                 setRole('member');
                 setShowManagerPicker(false);
               }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: role === 'member' }}
+              accessibilityLabel="Member"
             >
-              <Text style={[styles.segmentText, role === 'member' && styles.segmentTextActive]}>Member</Text>
+              <Text style={[screenChrome.segmentText, role === 'member' && screenChrome.segmentTextActive]}>
+                Member
+              </Text>
             </Pressable>
             <Pressable
-              style={[styles.segmentBtn, role === 'manager' && styles.segmentBtnActive]}
+              style={[screenChrome.segmentBtn, role === 'manager' && screenChrome.segmentBtnActive]}
               onPress={() => {
                 setRole('manager');
                 setManagerId('');
                 setShowManagerPicker(false);
               }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: role === 'manager' }}
+              accessibilityLabel="Manager"
             >
-              <Text style={[styles.segmentText, role === 'manager' && styles.segmentTextActive]}>Manager</Text>
+              <Text style={[screenChrome.segmentText, role === 'manager' && screenChrome.segmentTextActive]}>
+                Manager
+              </Text>
             </Pressable>
           </View>
 
           {/* Assigned Manager Dropdown (only visible for member role) */}
           {role === 'member' && (
-            <View style={{ marginBottom: 16 }}>
+            <View style={styles.managerBlock}>
               <Text style={styles.fieldLabel}>Assigned Manager</Text>
               <Pressable
                 style={styles.dropdownBtn}
                 onPress={() => setShowManagerPicker(!showManagerPicker)}
+                accessibilityLabel="Assigned Manager"
               >
                 <Text style={styles.dropdownBtnText}>{getSelectedManagerName()}</Text>
-                <Feather name={showManagerPicker ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.textSecondary} />
+                <Feather name={showManagerPicker ? 'chevron-up' : 'chevron-down'} size={18} color={T.mute} />
               </Pressable>
 
               {showManagerPicker && (
@@ -477,17 +515,22 @@ export default function MemberProfileManagementScreen() {
             </View>
           )}
 
-          <Button
-            mode="contained"
+          <Pressable
+            style={({ pressed }) => [
+              styles.primaryBtn,
+              pressed && styles.btnPressed,
+              isSaving && styles.btnDisabled,
+            ]}
             onPress={handleSaveProfile}
-            loading={isSaving}
             disabled={isSaving}
-            style={styles.saveBtn}
-            buttonColor={Colors.accent}
-            textColor={Colors.white}
+            accessibilityLabel="Save Profile Details"
           >
-            Save Profile Details
-          </Button>
+            {isSaving ? (
+              <ActivityIndicator color={T.white} size="small" />
+            ) : (
+              <Text style={styles.primaryBtnText}>Save Profile Details</Text>
+            )}
+          </Pressable>
         </View>
 
         {/* Security / Password section */}
@@ -500,42 +543,48 @@ export default function MemberProfileManagementScreen() {
             onChangeText={setNewPassword}
             secureTextEntry={!showPassword}
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.accent}
-            textColor={Colors.text}
-            theme={{ colors: { surface: Colors.surface } }}
+            outlineColor={T.soft}
+            activeOutlineColor={T.charcoal}
+            textColor={T.ink}
+            outlineStyle={styles.inputOutline}
+            theme={{ colors: { onSurfaceVariant: T.mute, surface: T.soft } }}
             right={
               <TextInput.Icon
                 icon={showPassword ? 'eye-off' : 'eye'}
                 onPress={() => setShowPassword(!showPassword)}
-                color={Colors.textSecondary}
+                color={T.mute}
               />
             }
           />
 
           <View style={styles.toggleRow}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
+            <View style={styles.toggleCopy}>
               <Text style={styles.toggleLabel}>Force Password Change</Text>
               <Text style={styles.toggleSubtitle}>Require password update on next sign-in</Text>
             </View>
             <Switch
               value={mustChangePassword}
               onValueChange={setMustChangePassword}
-              color={Colors.accent}
+              color={T.charcoal}
             />
           </View>
 
-          <Button
-            mode="contained"
+          <Pressable
+            style={({ pressed }) => [
+              styles.secondaryBtn,
+              pressed && styles.btnPressed,
+              (isUpdatingPassword || !newPassword.trim()) && styles.btnDisabled,
+            ]}
             onPress={handleUpdatePassword}
-            loading={isUpdatingPassword}
             disabled={isUpdatingPassword || !newPassword.trim()}
-            style={styles.saveBtn}
-            buttonColor={Colors.accent}
-            textColor={Colors.white}
+            accessibilityLabel="Update Password"
           >
-            Update Password
-          </Button>
+            {isUpdatingPassword ? (
+              <ActivityIndicator color={T.ink} size="small" />
+            ) : (
+              <Text style={styles.secondaryBtnText}>Update Password</Text>
+            )}
+          </Pressable>
         </View>
 
         {/* Active Sessions */}
@@ -551,19 +600,24 @@ export default function MemberProfileManagementScreen() {
                       Active {formatDistanceToNow(new Date(session.last_active), { addSuffix: true })}
                     </Text>
                   </View>
-                  <Button
-                    mode="outlined"
-                    compact
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.sessionLogoutBtn,
+                      pressed && styles.btnPressed,
+                      isLoggingOutSessions !== null && styles.btnDisabled,
+                    ]}
                     onPress={() => handleForceLogoutSession(session.id)}
-                    loading={isLoggingOutSessions === session.id}
                     disabled={isLoggingOutSessions !== null}
-                    textColor={Colors.error}
-                    style={styles.sessionLogoutBtn}
+                    accessibilityLabel="Logout session"
                   >
-                    Logout
-                  </Button>
+                    {isLoggingOutSessions === session.id ? (
+                      <ActivityIndicator color={T.coral} size="small" />
+                    ) : (
+                      <Text style={styles.sessionLogoutText}>Logout</Text>
+                    )}
+                  </Pressable>
                 </View>
-                {index < sessions.length - 1 && <Divider style={styles.divider} />}
+                {index < sessions.length - 1 && <View style={styles.divider} />}
               </View>
             ))
           ) : (
@@ -572,34 +626,41 @@ export default function MemberProfileManagementScreen() {
         </View>
 
         {/* Danger Zone */}
-        <Text style={[styles.sectionLabel, { color: Colors.error }]}>Danger Zone</Text>
+        <Text style={[styles.sectionLabel, styles.dangerLabel]}>Danger Zone</Text>
         <View style={[styles.card, styles.dangerCard]}>
           <View style={styles.toggleRow}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={[styles.toggleLabel, { color: Colors.error }]}>Account Deactivated</Text>
+            <View style={styles.toggleCopy}>
+              <Text style={[styles.toggleLabel, styles.dangerLabel]}>Account Deactivated</Text>
               <Text style={styles.toggleSubtitle}>Deactivating immediately logs user out & prevents login</Text>
             </View>
             <Switch
               value={!member.is_active}
               onValueChange={(deactivate) => handleToggleActive(!deactivate)}
-              color={Colors.error}
+              color={T.coral}
             />
           </View>
 
-          <Divider style={[styles.divider, { marginVertical: 16 }]} />
+          <View style={[styles.divider, styles.dangerDivider]} />
 
-          <Button
-            mode="contained"
+          <Pressable
+            style={({ pressed }) => [
+              styles.deleteBtn,
+              pressed && styles.btnPressed,
+              isDeleting && styles.btnDisabled,
+            ]}
             onPress={handleDeleteMember}
-            loading={isDeleting}
             disabled={isDeleting}
-            style={styles.deleteBtn}
-            buttonColor={Colors.error}
-            textColor={Colors.white}
-            icon="trash-can-outline"
+            accessibilityLabel="Delete Member Account"
           >
-            Delete Member Account
-          </Button>
+            {isDeleting ? (
+              <ActivityIndicator color={T.white} size="small" />
+            ) : (
+              <>
+                <Feather name="trash-2" size={15} color={T.white} />
+                <Text style={styles.deleteBtnText}>Delete Member Account</Text>
+              </>
+            )}
+          </Pressable>
         </View>
       </ScrollView>
 
@@ -613,53 +674,52 @@ export default function MemberProfileManagementScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: T.bg,
   },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background,
-    gap: 12,
+    backgroundColor: T.bg,
+    gap: AppSpace.md,
   },
   loadingText: {
     fontSize: 14,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.textSecondary,
+    fontFamily: 'Inter_400Regular',
+    color: T.mute,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
+    paddingHorizontal: AppSpace.screen,
     paddingTop: Platform.OS === 'ios' ? 60 : 48,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    backgroundColor: Colors.surface,
+    paddingBottom: AppSpace.md,
   },
-  backBtn: {
-    margin: 0,
+  headerSpacer: {
+    width: 44,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: 'Inter_700Bold',
-    color: Colors.text,
+    color: T.ink,
+    letterSpacing: -0.4,
+  },
+  errorPad: {
+    padding: AppSpace.screen,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: AppSpace.screen,
     paddingBottom: 120,
   },
   heroCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    padding: 20,
-    marginTop: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    backgroundColor: T.card,
+    borderRadius: 22,
+    padding: AppSpace.xl,
+    marginTop: AppSpace.md,
+    ...appShadow,
   },
   avatar: {
     width: 60,
@@ -669,195 +729,238 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: {
-    color: Colors.white,
     fontFamily: 'Inter_700Bold',
     fontSize: 22,
+    letterSpacing: -0.4,
   },
   heroInfo: {
-    marginLeft: 16,
+    marginLeft: AppSpace.lg,
     flex: 1,
   },
   heroName: {
-    fontSize: 18,
-    fontFamily: 'Inter_700Bold',
-    color: Colors.text,
+    fontSize: 17,
+    fontFamily: 'Inter_600SemiBold',
+    color: T.ink,
+    letterSpacing: -0.3,
   },
   badgeRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: AppSpace.sm,
     marginTop: 6,
   },
   badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: AppRadius.chip,
   },
   badgeText: {
-    color: Colors.white,
-    fontSize: 11,
-    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+    fontFamily: 'Inter_500Medium',
   },
   sectionLabel: {
-    fontSize: 15,
-    fontFamily: 'Inter_700Bold',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 26,
+    fontSize: 17,
+    fontFamily: 'Inter_600SemiBold',
+    color: T.ink,
+    letterSpacing: -0.3,
+    marginTop: 24,
     marginBottom: 10,
-    marginLeft: 4,
+  },
+  dangerLabel: {
+    color: T.coral,
   },
   card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    backgroundColor: T.card,
+    borderRadius: 22,
+    padding: AppSpace.lg,
+    ...appSoftShadow,
   },
   dangerCard: {
-    borderColor: Colors.error + '40',
+    backgroundColor: T.card,
   },
   input: {
     marginBottom: 14,
-    backgroundColor: Colors.surface,
+    backgroundColor: T.soft,
+    fontSize: 15,
+  },
+  inputOutline: {
+    borderRadius: 14,
+    borderWidth: 0,
   },
   fieldLabel: {
-    fontSize: 12,
-    fontFamily: 'Inter_700Bold',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    marginBottom: 6,
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+    color: T.mute,
+    marginBottom: AppSpace.sm,
     marginLeft: 2,
   },
-  segmentedContainer: {
-    flexDirection: 'row',
-    backgroundColor: Colors.systemGray6,
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 16,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  segmentSpacing: {
+    marginBottom: AppSpace.lg,
   },
-  segmentBtn: {
-    flex: 1,
-    height: 36,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  segmentBtnActive: {
-    backgroundColor: Colors.surface,
-    ...Colors.shadow,
-  },
-  segmentText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  segmentTextActive: {
-    color: Colors.accent,
+  managerBlock: {
+    marginBottom: AppSpace.lg,
   },
   dropdownBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.inputBackground,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 16,
-    height: 48,
+    backgroundColor: T.soft,
+    borderRadius: 14,
+    paddingHorizontal: AppSpace.lg,
+    minHeight: 48,
   },
   dropdownBtnText: {
     fontFamily: 'Inter_500Medium',
     fontSize: 14,
-    color: Colors.text,
+    color: T.ink,
   },
   dropdownMenu: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 12,
+    backgroundColor: T.card,
+    borderRadius: 14,
     marginTop: 6,
     overflow: 'hidden',
-    ...Colors.shadowHeavy,
+    ...appSoftShadow,
   },
   dropdownItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: AppSpace.lg,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   dropdownItemActive: {
-    backgroundColor: Colors.accentSubtle,
+    backgroundColor: T.violetSoft,
   },
   dropdownItemText: {
     fontSize: 14,
     fontFamily: 'Inter_500Medium',
-    color: Colors.text,
+    color: T.ink,
   },
   dropdownItemTextActive: {
-    fontFamily: 'Inter_700Bold',
-    color: Colors.text,
+    fontFamily: 'Inter_600SemiBold',
+    color: T.violet,
   },
-  saveBtn: {
-    borderRadius: 12,
+  primaryBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: T.charcoal,
+    borderRadius: AppRadius.pill,
+    height: 48,
     marginTop: 6,
+    ...appSoftShadow,
+  },
+  primaryBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    color: T.white,
+    letterSpacing: -0.1,
+  },
+  secondaryBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: T.soft,
+    borderRadius: AppRadius.pill,
+    height: 48,
+    marginTop: 6,
+  },
+  secondaryBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    color: T.ink,
+    letterSpacing: -0.1,
+  },
+  btnPressed: {
+    transform: [{ scale: 0.97 }],
+    opacity: 0.9,
+  },
+  btnDisabled: {
+    opacity: 0.55,
   },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: AppSpace.lg,
+    minHeight: 44,
+  },
+  toggleCopy: {
+    flex: 1,
+    paddingRight: AppSpace.md,
   },
   toggleLabel: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'Inter_600SemiBold',
-    color: Colors.text,
+    color: T.ink,
+    letterSpacing: -0.2,
   },
   toggleSubtitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'Inter_400Regular',
-    color: Colors.textSecondary,
+    color: T.mute,
     marginTop: 2,
   },
   sessionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: AppSpace.md,
+    minHeight: 56,
   },
   sessionInfo: {
     flex: 1,
     paddingRight: 10,
   },
   sessionDevice: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'Inter_600SemiBold',
-    color: Colors.text,
+    color: T.ink,
+    letterSpacing: -0.2,
   },
   sessionTime: {
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: 'Inter_400Regular',
-    color: Colors.textTertiary,
+    color: T.mute,
     marginTop: 2,
   },
   sessionLogoutBtn: {
-    borderColor: Colors.border,
-    borderRadius: 8,
+    backgroundColor: T.coralSoft,
+    borderRadius: AppRadius.pill,
+    paddingHorizontal: 14,
+    minHeight: 44,
+    minWidth: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sessionLogoutText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: T.coral,
   },
   noSessionsText: {
     fontSize: 13,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.textTertiary,
+    fontFamily: 'Inter_400Regular',
+    color: T.mute,
     textAlign: 'center',
-    paddingVertical: 12,
+    paddingVertical: AppSpace.md,
   },
   deleteBtn: {
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: T.coral,
+    borderRadius: AppRadius.pill,
+    height: 48,
+    gap: AppSpace.sm,
+  },
+  deleteBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    color: T.white,
+    letterSpacing: -0.1,
   },
   divider: {
-    backgroundColor: Colors.border,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: T.hairline,
+  },
+  dangerDivider: {
+    marginVertical: AppSpace.lg,
   },
 });

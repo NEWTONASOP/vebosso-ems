@@ -4,12 +4,12 @@
 
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Platform, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { Searchbar, Text } from 'react-native-paper';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { MemberCard } from '../../components/MemberCard';
-import { Colors } from '../../constants/colors';
+import { AppSpace, AppTheme, screenChrome } from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Profile } from '../../types/database';
@@ -78,23 +78,28 @@ export default function ManagerMyTeamScreen() {
     );
   }, [memberLiveStatus]);
 
+  const headerSubtitle =
+    teamMembers.length === 0
+      ? 'People assigned to you'
+      : `${teamMembers.length} member${teamMembers.length === 1 ? '' : 's'}`;
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>My Team</Text>
-        <Text style={styles.subtitle}>{teamMembers.length} members</Text>
+    <View style={screenChrome.root}>
+      <View style={screenChrome.header}>
+        <Text style={screenChrome.title}>My Team</Text>
+        <Text style={screenChrome.subtitle}>{headerSubtitle}</Text>
       </View>
 
       <View style={styles.searchSection}>
         <Searchbar
-          placeholder="Search..."
+          placeholder="Search by name or ID…"
           value={searchQuery}
           onChangeText={setSearchQuery}
-          style={styles.searchbar}
+          style={styles.searchbar as any}
           inputStyle={styles.searchInput}
-          iconColor={Colors.textSecondary}
-          placeholderTextColor={Colors.placeholder}
-          theme={{ colors: { onSurface: Colors.text, elevation: { level3: Colors.inputBackground } } }}
+          iconColor={AppTheme.mute}
+          placeholderTextColor={AppTheme.mute}
+          theme={{ colors: { onSurface: AppTheme.ink, elevation: { level3: AppTheme.card } } }}
         />
       </View>
 
@@ -106,8 +111,18 @@ export default function ManagerMyTeamScreen() {
           renderItem={renderMember}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
-          ListEmptyComponent={<EmptyState icon="account-group-outline" title="No Team Members" subtitle="No members are assigned to your team yet" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AppTheme.charcoal} />}
+          ListEmptyComponent={
+            <EmptyState
+              icon="account-group-outline"
+              title={searchQuery ? 'No matches' : 'No team members yet'}
+              subtitle={
+                searchQuery
+                  ? 'Try a different name or employee ID.'
+                  : 'Ask your owner to assign members to you. Once they join, their live status appears here.'
+              }
+            />
+          }
         />
       )}
     </View>
@@ -115,13 +130,23 @@ export default function ManagerMyTeamScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 8 },
-  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
-  subtitle: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
-  searchSection: { paddingHorizontal: 20, paddingTop: 12 },
-  searchbar: { backgroundColor: Colors.inputBackground, borderRadius: 12, elevation: 0, borderWidth: 1, borderColor: Colors.border },
-  searchInput: { color: Colors.text, fontSize: 14 },
-  content: { paddingHorizontal: 20 },
-  list: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 110 },
+  searchSection: {
+    paddingHorizontal: AppSpace.screen,
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
+  searchbar: {
+    ...screenChrome.searchbar,
+  },
+  searchInput: {
+    color: AppTheme.ink,
+    fontSize: 14,
+    fontFamily: 'Inter_400Regular',
+  },
+  content: { paddingHorizontal: AppSpace.screen },
+  list: {
+    ...screenChrome.listPad,
+    paddingTop: 4,
+    flexGrow: 1,
+  },
 });

@@ -1,456 +1,320 @@
 // ============================================================================
-// VEBOSSO EMS — Member History Screen (Premium Fintech / Apple Wallet Aesthetic)
+// VEBOSSO EMS — Member History Screen
+// Month date rail + sequential day timeline.
 // ============================================================================
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
-import { Text, Snackbar } from 'react-native-paper';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
+import { Feather } from '@expo/vector-icons';
+import { addDays, format, isSameDay, parseISO, startOfMonth, startOfWeek } from 'date-fns';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Snackbar, Text } from 'react-native-paper';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
+import { BackfillModal } from '../../components/BackfillModal';
+import { DayAction, DayHeaderCard } from '../../components/DayHeaderCard';
+import { DayTimeline } from '../../components/DayTimeline';
+import { InlineError } from '../../components/InlineError';
+import { PageTransition } from '../../components/PageTransition';
+import { DateRail } from '../../components/DateRail';
+import { WorkLogDetail } from '../../components/WorkLogDetail';
+import {
+  adjacentLogDate,
+  buildDayTimeline,
+  DAY_STATUS_LABEL,
+  getDayStatus,
+  getMonthRange,
+} from '../../lib/attendanceTimeline';
+import {
+  AppTheme as T,
+  RoleAccent,
+  appSoftShadow,
+  screenChrome,
+} from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
-import { WorkLog } from '../../types/database';
-import { WorkLogDetail } from '../../components/WorkLogDetail';
-import { BackfillModal } from '../../components/BackfillModal';
-import { InlineError } from '../../components/InlineError';
-import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
-import { Feather } from '@expo/vector-icons';
-import { PageTransition } from '../../components/PageTransition';
-import { Colors } from '../../constants/colors';
+import { LeaveRequest, Task, WorkLog } from '../../types/database';
+
+const memberAccent = RoleAccent.member;
+const KEY = (d: Date) => format(d, 'yyyy-MM-dd');
 
 export default function MemberHistoryScreen() {
   const { profile } = useAuthStore();
-  const { fetchWorkHistory, backfillPermissions, fetchBackfillPermissions, submitBackfill } = useWorkStore();
-  const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
-  const [selectedLog, setSelectedLog] = useState<WorkLog | null>(null);
-  const [showDetail, setShowDetail] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const {
+    fetchWorkHistory,
+    fetchCompletedTasksInRange,
+    fetchLeaveInRange,
+    backfillPermissions,
+    fetchBackfillPermissions,
+    submitBackfill,
+  } = useWorkStore();
 
-  // Backfill modal states
-  const [backfillModalVisible, setBackfillModalVisible] = useState(false);
-  const [selectedBackfillDate, setSelectedBackfillDate] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()));
+  const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [backfillVisible, setBackfillVisible] = useState(false);
   const [submittingBackfill, setSubmittingBackfill] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
-  const [backfillInitialPlan, setBackfillInitialPlan] = useState('');
-  const [backfillInitialIn, setBackfillInitialIn] = useState('09:00');
-  const [backfillInitialOut, setBackfillInitialOut] = useState('18:00');
-  const [backfillInitialReport, setBackfillInitialReport] = useState('');
 
-  const loadHistory = useCallback(async () => {
+  // The rail scrolls across the whole month, so the whole month is fetched.
+  // Anything narrower leaves scrolled-to days with no status dot, which would
+  // read as "absent" rather than "not loaded".
+  const load = useCallback(async () => {
     if (!profile) return;
     setFetchError(null);
-    const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-    const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-    
-    const [historyRes] = await Promise.all([
+
+    const { start, end } = getMonthRange(visibleMonth);
+
+    const [logsRes, tasksRes, leavesRes] = await Promise.all([
       fetchWorkHistory(profile.id, start, end),
+      fetchCompletedTasksInRange(profile.id, start, end),
+      fetchLeaveInRange(profile.id, start, end),
       fetchBackfillPermissions(profile.id),
     ]);
 
-    if (historyRes.success) {
-      setWorkLogs(historyRes.data);
+    if (logsRes.success) {
+      setWorkLogs(logsRes.data);
     } else {
-      setFetchError(historyRes.error || 'Failed to load work history.');
+      setFetchError(logsRes.error || 'Failed to load your attendance.');
       setWorkLogs([]);
     }
-  }, [profile, currentMonth, fetchWorkHistory, fetchBackfillPermissions]);
-
-  const handleBackfillSubmit = async (inTime: string, planStr: string, outTime: string, reportStr: string) => {
-    if (!profile) return;
-    setSubmittingBackfill(true);
-    const result = await submitBackfill(profile.id, selectedBackfillDate, inTime, planStr, outTime, reportStr);
-    setSubmittingBackfill(false);
-    
-    if (result.success) {
-      setSnackMessage('Attendance logged successfully! 🎉');
-      setBackfillModalVisible(false);
-      loadHistory();
-    } else {
-      setSnackMessage(result.error || 'Failed to submit attendance backfill.');
-    }
-  };
+    setTasks(tasksRes.success ? tasksRes.data : []);
+    setLeaves(leavesRes.success ? leavesRes.data : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id, visibleMonth]);
 
   useEffect(() => {
-    // eslint-disable-next-line
-    void loadHistory();
-  }, [loadHistory]);
+    void load();
+  }, [load]);
 
-  const currentIndex = selectedLog ? workLogs.findIndex((l) => l.id === selectedLog.id) : -1;
-  const hasNextDay = selectedLog ? currentIndex > 0 : false;
-  const hasPrevDay = selectedLog ? (currentIndex !== -1 && currentIndex < workLogs.length - 1) : false;
-
-  const handleNextDay = () => {
-    if (hasNextDay && currentIndex !== -1) {
-      setSelectedLog(workLogs[currentIndex - 1]);
-    }
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
   };
 
-  const handlePrevDay = () => {
-    if (hasPrevDay && currentIndex !== -1) {
-      setSelectedLog(workLogs[currentIndex + 1]);
+  const logFor = useCallback(
+    (date: Date) => workLogs.find((l) => isSameDay(new Date(l.date), date)) ?? null,
+    [workLogs]
+  );
+  const leaveFor = useCallback(
+    (date: Date) => leaves.find((l) => l.date === KEY(date)) ?? null,
+    [leaves]
+  );
+
+  const selectedKey = KEY(selectedDate);
+  const selectedLog = logFor(selectedDate);
+  const selectedLeave = leaveFor(selectedDate);
+  const selectedStatus = getDayStatus({ workLog: selectedLog, leave: selectedLeave });
+
+  const timeline = useMemo(
+    () =>
+      buildDayTimeline({
+        day: selectedKey,
+        workLog: selectedLog,
+        tasks,
+        leave: selectedLeave,
+      }),
+    [selectedKey, selectedLog, tasks, selectedLeave]
+  );
+
+  // Stepping in the detail sheet skips days with no record, so it never opens
+  // onto an empty sheet.
+  const prevLogDate = adjacentLogDate(workLogs, selectedKey, -1);
+  const nextLogDate = adjacentLogDate(workLogs, selectedKey, 1);
+
+  const backfill = backfillPermissions.find((p) => p.date === selectedKey && !p.is_used);
+
+  // Summary follows whichever week the selected day belongs to.
+  const weekSummary = useMemo(() => {
+    const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+    const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+    const logs = days.map((d) => logFor(d)).filter(Boolean) as WorkLog[];
+    const hours = logs.reduce((sum, l) => sum + (l.total_hours || 0), 0);
+    const worked = logs.filter((l) => l.status === 'done').length;
+    return { worked, hours };
+  }, [selectedDate, logFor]);
+
+  const handleBackfillSubmit = async (
+    inTime: string,
+    plan: string,
+    outTime: string,
+    report: string
+  ) => {
+    if (!profile) return;
+    setSubmittingBackfill(true);
+    const result = await submitBackfill(profile.id, selectedKey, inTime, plan, outTime, report);
+    setSubmittingBackfill(false);
+
+    if (result.success) {
+      setSnackMessage('Attendance logged');
+      setBackfillVisible(false);
+      void load();
+    } else {
+      setSnackMessage(result.error || 'Failed to log attendance.');
     }
   };
-
-  const daysInMonth = eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) });
-  const getLogForDay = (day: Date) => workLogs.find((l) => isSameDay(new Date(l.date), day));
-
-  // Monthly summary stats
-  const totalDaysWorked = workLogs.filter((l) => l.status === 'done').length;
-  const totalHours = workLogs.reduce((sum, l) => sum + (l.total_hours || 0), 0);
 
   return (
     <>
-    <PageTransition>
-    <View style={styles.container}>
-      {/* Header title */}
-      <View style={styles.header}>
-        <Text style={styles.title}>History</Text>
-      </View>
+      <PageTransition>
+        <View style={screenChrome.root}>
+          <View style={screenChrome.header}>
+            <Text style={screenChrome.title}>History</Text>
+            <Text style={screenChrome.subtitle}>Your attendance, day by day</Text>
+          </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Month Navigation */}
-        <View style={styles.monthNav}>
-          <TouchableOpacity
-            style={styles.navBtn}
-            onPress={() => setCurrentMonth((p) => new Date(p.getFullYear(), p.getMonth() - 1))}
-            activeOpacity={0.7}
+          <ScrollView
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={T.charcoal}
+              />
+            }
           >
-            <Feather name="chevron-left" size={18} color={Colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.monthTitle}>{format(currentMonth, 'MMMM yyyy')}</Text>
-          <TouchableOpacity
-            style={styles.navBtn}
-            onPress={() => setCurrentMonth((p) => new Date(p.getFullYear(), p.getMonth() + 1))}
-            activeOpacity={0.7}
-          >
-            <Feather name="chevron-right" size={18} color={Colors.textPrimary} />
-          </TouchableOpacity>
-        </View>
+            <DateRail
+              selectedDate={selectedDate}
+              onSelectDate={setSelectedDate}
+              visibleMonth={visibleMonth}
+              onChangeMonth={setVisibleMonth}
+              getDayStatus={(d) => getDayStatus({ workLog: logFor(d), leave: leaveFor(d) })}
+              accentColor={memberAccent.color}
+            />
 
-        {fetchError && (
-          <InlineError
-            message={fetchError}
-            onRetry={loadHistory}
-            compact
-          />
-        )}
-
-        {/* Unified Summary Stats Card */}
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryCol}>
-            <Text style={styles.summaryValue}>{totalDaysWorked}</Text>
-            <Text style={styles.summaryLabel}>Days Worked</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryCol}>
-            <Text style={styles.summaryValue}>{totalHours.toFixed(1)}h</Text>
-            <Text style={styles.summaryLabel}>Total Hours</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryCol}>
-            <Text style={styles.summaryValue}>
-              {totalDaysWorked > 0 ? (totalHours / totalDaysWorked).toFixed(1) : '0'}h
-            </Text>
-            <Text style={styles.summaryLabel}>Avg Hours/Day</Text>
-          </View>
-        </View>
-
-        {/* Grouped Calendar Widget */}
-        <View style={styles.calendarCard}>
-          {/* Weekday Row */}
-          <View style={styles.weekdayRow}>
-            {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d) => (
-              <Text key={d} style={styles.weekdayLabel}>{d}</Text>
-            ))}
-          </View>
-
-          {/* Calendar Grid */}
-          <View style={styles.calendarGrid}>
-            {/* Pad blank days at start of month */}
-            {Array.from({ length: daysInMonth[0].getDay() }).map((_, i) => (
-              <View key={`empty-${i}`} style={styles.dayCell} />
-            ))}
-            
-            {/* Days in Month */}
-            {daysInMonth.map((day) => {
-              const log = getLogForDay(day);
-              const backfill = backfillPermissions.find((p) => p.date === format(day, 'yyyy-MM-dd') && !p.is_used);
-              const isToday = isSameDay(day, new Date());
-              const statusColor = log ? WORK_LOG_STATUS_CONFIG[log.status]?.color : undefined;
-              return (
-                <TouchableOpacity
-                  key={day.toISOString()}
-                  style={[
-                    styles.dayCell,
-                    log && {
-                      backgroundColor: WORK_LOG_STATUS_CONFIG[log.status]?.backgroundColor,
-                      borderColor: statusColor,
-                      borderWidth: 1.5
-                    },
-                    backfill && {
-                      backgroundColor: Colors.warningLight,
-                      borderColor: Colors.warning,
-                      borderWidth: 1.5
-                    },
-                    isToday && styles.todayCell,
-                  ]}
-                  onPress={() => {
-                    if (log) {
-                      if (backfill) {
-                        setSelectedBackfillDate(format(day, 'yyyy-MM-dd'));
-                        setBackfillInitialPlan(log.check_in_plan || '');
-                        setBackfillInitialIn(log.check_in_time || '09:00');
-                        setBackfillInitialOut(log.check_out_time || '18:00');
-                        setBackfillInitialReport(log.day_report || '');
-                        setBackfillModalVisible(true);
-                      } else {
-                        setSelectedLog(log);
-                        setShowDetail(true);
-                      }
-                    } else if (backfill) {
-                      setSelectedBackfillDate(format(day, 'yyyy-MM-dd'));
-                      setBackfillInitialPlan('');
-                      setBackfillInitialIn('09:00');
-                      setBackfillInitialOut('18:00');
-                      setBackfillInitialReport('');
-                      setBackfillModalVisible(true);
-                    }
-                  }}
-                  disabled={!log && !backfill}
-                  activeOpacity={0.6}
-                >
-                  <Text style={[styles.dayNumber, isToday && styles.todayText]}>
-                    {format(day, 'd')}
-                  </Text>
-                  {log && !backfill ? (
-                    <Text style={[styles.dayHours, { color: statusColor }]}>
-                      {log.total_hours ? `${log.total_hours}h` : '·'}
-                    </Text>
-                  ) : backfill ? (
-                    <Feather name="edit-2" size={9} color={Colors.warning} style={{ marginTop: 2 }} />
-                  ) : null}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <View style={styles.legendDivider} />
-
-          {/* Legend nested inside Calendar Card */}
-          <View style={styles.legend}>
-            {Object.entries(WORK_LOG_STATUS_CONFIG).map(([key, config]) => (
-              <View key={key} style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: config.color }]} />
-                <Text style={styles.legendText}>{config.label}</Text>
+            {fetchError ? (
+              <View style={styles.errorPad}>
+                <InlineError message={fetchError} onRetry={load} compact />
               </View>
-            ))}
-          </View>
+            ) : null}
+
+            <View style={styles.weekSummary}>
+              <Text style={styles.weekSummaryText}>
+                {weekSummary.worked} {weekSummary.worked === 1 ? 'day' : 'days'} ·{' '}
+                {weekSummary.hours.toFixed(1)}h this week
+              </Text>
+            </View>
+
+            <DayHeaderCard
+              date={selectedDate}
+              status={selectedStatus}
+              checkInTime={selectedLog?.check_in_time}
+              checkOutTime={selectedLog?.check_out_time}
+              totalHours={selectedLog?.total_hours}
+              actions={[
+                {
+                  key: 'log',
+                  label: 'View full log',
+                  icon: 'file-text',
+                  tone: selectedLog && !backfill ? 'primary' : 'neutral',
+                  disabled: !selectedLog,
+                  onPress: () => setDetailVisible(true),
+                },
+                ...(backfill
+                  ? ([
+                      {
+                        key: 'backfill',
+                        label: 'Log this day',
+                        icon: 'edit-2' as const,
+                        tone: 'primary' as const,
+                        onPress: () => setBackfillVisible(true),
+                      },
+                    ] as DayAction[])
+                  : []),
+              ]}
+              note={
+                backfill
+                  ? 'Your owner opened this date for a late entry.'
+                  : null
+              }
+            />
+
+            <DayTimeline
+              timeline={timeline}
+              onPressEvent={(event) => {
+                if (event.kind === 'check-in' || event.kind === 'check-out') {
+                  setDetailVisible(true);
+                }
+              }}
+            />
+          </ScrollView>
         </View>
-      </ScrollView>
-    </View>
-    </PageTransition>
+      </PageTransition>
 
-    <WorkLogDetail
-      visible={showDetail}
-      onDismiss={() => setShowDetail(false)}
-      workLog={selectedLog}
-      onNextDay={handleNextDay}
-      onPrevDay={handlePrevDay}
-      hasNextDay={hasNextDay}
-      hasPrevDay={hasPrevDay}
-    />
+      {detailVisible && selectedLog ? (
+        <WorkLogDetail
+          visible
+          workLog={selectedLog}
+          tasks={tasks.filter((t) => t.completed_at?.slice(0, 10) === selectedKey)}
+          onDismiss={() => setDetailVisible(false)}
+          onPrevDay={() => prevLogDate && setSelectedDate(parseISO(prevLogDate))}
+          onNextDay={() => nextLogDate && setSelectedDate(parseISO(nextLogDate))}
+          hasPrevDay={!!prevLogDate}
+          hasNextDay={!!nextLogDate}
+        />
+      ) : null}
 
-    {backfillModalVisible && selectedBackfillDate ? (
       <BackfillModal
-        key={`${selectedBackfillDate}-${backfillInitialPlan}`}
-        visible
-        date={selectedBackfillDate}
-        onDismiss={() => setBackfillModalVisible(false)}
+        visible={backfillVisible}
+        date={selectedKey}
+        onDismiss={() => setBackfillVisible(false)}
         onSubmit={handleBackfillSubmit}
         isLoading={submittingBackfill}
-        initialCheckInPlan={backfillInitialPlan}
-        initialCheckInTime={backfillInitialIn}
-        initialCheckOutTime={backfillInitialOut}
-        initialDayReport={backfillInitialReport}
+        initialCheckInPlan={selectedLog?.check_in_plan || ''}
+        initialCheckInTime={selectedLog?.check_in_time || '09:00'}
+        initialCheckOutTime={selectedLog?.check_out_time || '18:00'}
+        initialDayReport={selectedLog?.day_report || ''}
       />
-    ) : null}
 
-    <Snackbar
-      visible={!!snackMessage}
-      onDismiss={() => setSnackMessage('')}
-      duration={3000}
-      wrapperStyle={{ marginBottom: 90 }}
-    >
-      {snackMessage}
-    </Snackbar>
+      <Snackbar
+        visible={!!snackMessage}
+        onDismiss={() => setSnackMessage('')}
+        duration={3000}
+        theme={{ colors: { inverseSurface: T.charcoal, inverseOnSurface: T.white } }}
+        wrapperStyle={{ marginBottom: 90 }}
+      >
+        {snackMessage}
+      </Snackbar>
     </>
   );
 }
 
-// ============================================================================
-// Styles
-// ============================================================================
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
+  content: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
-    paddingBottom: 8,
+    paddingBottom: 120,
   },
-  title: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 28,
-    color: Colors.textPrimary,
-    letterSpacing: -0.7,
+  errorPad: {
+    marginTop: 14,
   },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 110,
-    width: '100%',
-    maxWidth: 600,
-    alignSelf: 'center',
+  weekSummary: {
+    marginTop: 14,
+    alignItems: 'center',
   },
-  monthNav: {
+  weekSummaryText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    color: T.mute,
+  },
+  dayHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 4,
+    marginTop: 24,
+    marginBottom: 16,
+    gap: 12,
   },
-  navBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
-  },
-  monthTitle: {
+  dayTitle: {
+    flex: 1,
     fontFamily: 'Inter_700Bold',
     fontSize: 17,
-    color: Colors.textPrimary,
-    letterSpacing: -0.2,
-  },
-  // Unified Summary Card
-  summaryCard: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    paddingVertical: 18,
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
-    marginBottom: 20,
-  },
-  summaryCol: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  summaryValue: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 20,
-    color: Colors.textPrimary,
-    letterSpacing: -0.3,
-  },
-  summaryLabel: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginTop: 3,
-  },
-  summaryDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: Colors.divider,
-  },
-  // Grouped Calendar Card
-  calendarCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
-  },
-  weekdayRow: {
-    flexDirection: 'row',
-    marginBottom: 8,
-    paddingBottom: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.divider,
-  },
-  weekdayLabel: {
-    flex: 1,
-    textAlign: 'center',
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-    color: Colors.textTertiary,
-  },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  dayCell: {
-    width: '14.28%',
-    aspectRatio: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    marginBottom: 4,
-  },
-  todayCell: {
-    borderColor: Colors.memberAccent,
-    borderWidth: 1.5,
-    backgroundColor: Colors.memberAccent + '12',
-  },
-  dayNumber: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 14,
-    color: Colors.textPrimary,
-  },
-  todayText: {
-    fontFamily: 'Inter_700Bold',
-    color: Colors.memberAccent,
-  },
-  dayHours: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 9,
-    marginTop: 1,
-  },
-  legendDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.divider,
-    marginVertical: 14,
-  },
-  legend: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 12,
-    paddingHorizontal: 8,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    color: Colors.textSecondary,
+    color: T.ink,
+    letterSpacing: -0.35,
   },
 });

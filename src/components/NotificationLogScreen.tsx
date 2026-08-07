@@ -20,7 +20,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useAuthStore } from '../store/authStore';
 import { useNotificationStore } from '../store/notificationStore';
 import { EmptyState } from './EmptyState';
-import { Colors } from '../constants/colors';
+import { AppTheme, appSoftShadow } from '../constants/theme';
 import { Alert } from '../lib/alert';
 import { PageTransition } from './PageTransition';
 
@@ -130,42 +130,42 @@ export default function NotificationLogScreen() {
     if (text.includes('check-in') || text.includes('checkin') || text.includes('checked in')) {
       return {
         name: 'clock' as const,
-        bg: Colors.warningLight,
-        color: Colors.warning,
+        bg: AppTheme.amberSoft,
+        color: AppTheme.amber,
       };
     }
     if (text.includes('check-out') || text.includes('checkout') || text.includes('checked out')) {
       return {
         name: 'log-out' as const,
-        bg: Colors.infoLight,
-        color: Colors.info,
+        bg: AppTheme.blueSoft,
+        color: AppTheme.blue,
       };
     }
     if (text.includes('task') || text.includes('assigned')) {
       return {
         name: 'check-square' as const,
-        bg: Colors.successLight,
-        color: Colors.success,
+        bg: AppTheme.greenSoft,
+        color: AppTheme.green,
       };
     }
     if (text.includes('leave') || text.includes('request')) {
       return {
         name: 'calendar' as const,
-        bg: Colors.warningLight,
-        color: Colors.warning,
+        bg: AppTheme.violetSoft,
+        color: AppTheme.violet,
       };
     }
     if (text.includes('announcement') || text.includes('news')) {
       return {
         name: 'volume-2' as const,
-        bg: Colors.errorLight,
-        color: Colors.error,
+        bg: AppTheme.coralSoft,
+        color: AppTheme.coral,
       };
     }
     return {
       name: 'bell' as const,
-      bg: Colors.accentSubtle,
-      color: Colors.accent,
+      bg: AppTheme.soft,
+      color: AppTheme.inkSoft,
     };
   };
 
@@ -188,7 +188,7 @@ export default function NotificationLogScreen() {
             style={({ pressed }) => [styles.iconBtn, pressed && styles.btnPressed]}
             onPress={() => router.back()}
           >
-            <Feather name="arrow-left" size={18} color={Colors.textPrimary} />
+            <Feather name="arrow-left" size={18} color={AppTheme.ink} />
           </Pressable>
           
           <Text style={styles.title}>Notifications</Text>
@@ -201,14 +201,14 @@ export default function NotificationLogScreen() {
                   style={({ pressed }) => [styles.iconBtn, pressed && styles.btnPressed]}
                   onPress={handleMarkAllReadPress}
                 >
-                  <Feather name="check-square" size={18} color={Colors.success} />
+                  <Feather name="check-square" size={18} color={AppTheme.green} />
                 </Pressable>
               )}
               <Pressable
                 style={({ pressed }) => [styles.iconBtn, pressed && styles.btnPressed]}
                 onPress={handleClearAllPress}
               >
-                <Feather name="trash-2" size={18} color={Colors.error} />
+                <Feather name="trash-2" size={18} color={AppTheme.coral} />
               </Pressable>
             </View>
           )}
@@ -217,7 +217,7 @@ export default function NotificationLogScreen() {
         {/* Content */}
         {isLoading && !refreshing && notifications.length === 0 ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.accent} />
+            <ActivityIndicator size="large" color={AppTheme.charcoal} />
           </View>
         ) : (
           <FlatList
@@ -228,8 +228,8 @@ export default function NotificationLogScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor={Colors.accent}
-                colors={[Colors.accent]}
+                tintColor={AppTheme.charcoal}
+                colors={[AppTheme.charcoal]}
               />
             }
             ListEmptyComponent={
@@ -271,7 +271,7 @@ export default function NotificationLogScreen() {
                     style={({ pressed }) => [styles.deleteBtn, pressed && styles.btnPressed]}
                     onPress={() => handleDeletePress(item.id)}
                   >
-                    <Feather name="x" size={16} color={Colors.textTertiary} />
+                    <Feather name="x" size={16} color={AppTheme.mute} />
                   </Pressable>
                 </View>
               );
@@ -286,7 +286,7 @@ export default function NotificationLogScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: AppTheme.bg,
   },
   header: {
     flexDirection: 'row',
@@ -297,22 +297,20 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: {
-    fontFamily: 'Inter_800ExtraBold',
+    fontFamily: 'Inter_700Bold',
     fontSize: 24,
-    color: Colors.textPrimary,
+    color: AppTheme.ink,
     letterSpacing: -0.5,
+    flex: 1,
   },
   iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.surface,
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: AppTheme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
-    elevation: 1,
+    ...appSoftShadow,
   },
   btnPressed: {
     transform: [{ scale: 0.97 }],
@@ -337,42 +335,36 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   emptyCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: AppTheme.card,
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    ...appSoftShadow,
     marginTop: 20,
   },
   card: {
     flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: AppTheme.card,
+    borderRadius: 18,
     overflow: 'hidden',
     position: 'relative',
-    ...Colors.shadow,
-    elevation: 1,
+    ...appSoftShadow,
   },
   unreadCard: {
-    borderColor: Colors.border,
     borderLeftWidth: 4,
-    borderLeftColor: Colors.accent,
+    borderLeftColor: AppTheme.charcoal,
   },
   cardPressable: {
     flex: 1,
     flexDirection: 'row',
     padding: 16,
-    paddingRight: 40, // Space for delete X button
+    paddingRight: 40,
     gap: 14,
   },
   iconContainer: {
     width: 38,
     height: 38,
-    borderRadius: 19,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -389,29 +381,29 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: AppTheme.mute,
     flex: 1,
   },
   unreadTitle: {
-    color: Colors.textPrimary,
+    color: AppTheme.ink,
     fontFamily: 'Inter_700Bold',
   },
   unreadDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.info,
+    backgroundColor: AppTheme.blue,
   },
   cardBody: {
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: AppTheme.inkSoft,
     lineHeight: 18,
   },
   cardTime: {
     fontFamily: 'Inter_500Medium',
     fontSize: 11,
-    color: Colors.textTertiary,
+    color: AppTheme.mute,
     marginTop: 2,
   },
   deleteBtn: {

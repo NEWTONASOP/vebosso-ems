@@ -5,7 +5,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, HelperText, Modal, Portal, Text } from 'react-native-paper';
-import { Colors } from '../constants/colors';
+import { Feather } from '@expo/vector-icons';
+import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/theme';
 import { format, parse } from 'date-fns';
 import { PaperOutlinedField } from './PaperOutlinedField';
 
@@ -109,7 +110,9 @@ export function BackfillModal({
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.header}>
-              <Text style={styles.emoji}>📝</Text>
+              <View style={styles.iconCircle}>
+                <Feather name="calendar" size={22} color={AppTheme.charcoal} />
+              </View>
               <Text style={styles.title}>Backfill Attendance</Text>
               <Text style={styles.subtitle}>
                 {(() => {
@@ -187,10 +190,11 @@ export function BackfillModal({
 
             <View style={styles.actions}>
               <Button
-                mode="outlined"
+                mode="contained"
                 onPress={onDismiss}
                 style={styles.cancelButton}
-                textColor={Colors.textSecondary}
+                buttonColor={AppTheme.soft2}
+                textColor={AppTheme.inkSoft}
                 disabled={isLoading}
               >
                 Cancel
@@ -201,7 +205,8 @@ export function BackfillModal({
                 loading={isLoading}
                 disabled={isLoading}
                 style={styles.submitButton}
-                buttonColor={Colors.accent}
+                buttonColor={AppTheme.charcoal}
+                textColor={AppTheme.white}
               >
                 Submit Attendance
               </Button>
@@ -215,32 +220,38 @@ export function BackfillModal({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.background,
+    backgroundColor: AppTheme.card,
     padding: 24,
     margin: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    borderRadius: AppRadius.sheet,
     maxHeight: '90%',
+    ...appShadow,
   },
   header: {
     alignItems: 'center',
     marginBottom: 20,
   },
-  emoji: {
-    fontSize: 32,
-    marginBottom: 8,
+  iconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: AppTheme.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    ...appSoftShadow,
   },
   title: {
     fontFamily: 'Inter_700Bold',
     fontSize: 20,
-    color: Colors.text,
+    color: AppTheme.ink,
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_400Regular',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: AppTheme.mute,
     marginTop: 4,
     textAlign: 'center',
   },
@@ -253,22 +264,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   errorText: {
-    color: Colors.error,
+    color: AppTheme.coral,
     textAlign: 'center',
     marginBottom: 12,
     fontSize: 13,
+    fontFamily: 'Inter_500Medium',
   },
   actions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 12,
-    marginTop: 8,
+    marginTop: 20,
   },
   cancelButton: {
     flex: 1,
-    borderColor: Colors.border,
+    borderRadius: 24,
+    ...appSoftShadow,
   },
   submitButton: {
     flex: 2,
+    borderRadius: 24,
+    ...appSoftShadow,
   },
 });

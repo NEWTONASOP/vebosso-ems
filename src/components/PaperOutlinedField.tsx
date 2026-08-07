@@ -2,14 +2,14 @@
 // VEBOSSO EMS — Paper Outlined Field (uncontrolled by default for smooth typing)
 // ============================================================================
 
-import { StyleSheet, ViewStyle } from 'react-native';
+import { StyleProp, StyleSheet, TextStyle } from 'react-native';
 import { TextInput as PaperTextInput } from 'react-native-paper';
-import { Colors } from '../constants/colors';
+import { AppTheme } from '../constants/theme';
 
 const INPUT_THEME = {
   colors: {
-    onSurfaceVariant: Colors.textTertiary,
-    surface: Colors.inputBackground,
+    onSurfaceVariant: AppTheme.mute,
+    surface: AppTheme.card,
   },
 };
 
@@ -21,7 +21,7 @@ type BaseProps = {
   maxLength?: number;
   editable?: boolean;
   keyboardType?: 'default' | 'numbers-and-punctuation';
-  style?: ViewStyle;
+  style?: StyleProp<TextStyle>;
   dense?: boolean;
 };
 
@@ -60,9 +60,9 @@ export function PaperOutlinedField({
       editable={editable}
       keyboardType={keyboardType}
       dense={dense}
-      outlineColor={Colors.border}
-      activeOutlineColor={Colors.accent}
-      textColor={Colors.text}
+      outlineColor={AppTheme.soft2}
+      activeOutlineColor={AppTheme.charcoal}
+      textColor={AppTheme.ink}
       style={[styles.input, style]}
       contentStyle={multiline ? styles.multilineContent : undefined}
       theme={INPUT_THEME}
@@ -74,7 +74,8 @@ export function PaperOutlinedField({
 
 const styles = StyleSheet.create({
   input: {
-    backgroundColor: Colors.inputBackground,
+    backgroundColor: AppTheme.card,
+    borderRadius: 14,
     marginBottom: 4,
   },
   multilineContent: {

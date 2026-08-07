@@ -3,17 +3,29 @@
 // ============================================================================
 
 import { StyleSheet, View, ViewStyle } from 'react-native';
-import { Colors } from '../constants/colors';
+import { AppTheme, AppRadius, appSoftShadow } from '../constants/theme';
 
 interface BoneProps {
   width?: number | string;
   height?: number;
   borderRadius?: number;
   style?: ViewStyle;
+  /** Lighter highlight bone for layered shimmer-like contrast */
+  highlight?: boolean;
 }
 
-/** Static placeholder block — lightweight, no Reanimated loops. */
-function Bone({ width = '100%', height = 16, borderRadius = 8, style }: BoneProps) {
+/**
+ * Static placeholder block.
+ * soft2 reads on white cards; a lighter soft overlay reads as the “highlight”
+ * so bones stay visible on both the app canvas and white card surfaces.
+ */
+function Bone({
+  width = '100%',
+  height = 16,
+  borderRadius = 8,
+  style,
+  highlight = false,
+}: BoneProps) {
   return (
     <View
       style={[
@@ -21,7 +33,7 @@ function Bone({ width = '100%', height = 16, borderRadius = 8, style }: BoneProp
           width: width as ViewStyle['width'],
           height,
           borderRadius,
-          backgroundColor: Colors.skeleton,
+          backgroundColor: highlight ? AppTheme.soft : AppTheme.soft2,
         },
         style,
       ]}
@@ -36,10 +48,10 @@ export function MemberCardSkeleton() {
         <Bone width={40} height={40} borderRadius={20} />
         <View style={styles.memberInfo}>
           <Bone width="72%" height={15} borderRadius={6} />
-          <Bone width="48%" height={12} borderRadius={6} style={{ marginTop: 6 }} />
+          <Bone width="48%" height={12} borderRadius={6} style={{ marginTop: 6 }} highlight />
           <View style={styles.memberStatusRow}>
-            <Bone width={88} height={22} borderRadius={10} />
-            <Bone width={64} height={22} borderRadius={8} />
+            <Bone width={88} height={22} borderRadius={10} highlight />
+            <Bone width={64} height={22} borderRadius={8} highlight />
           </View>
         </View>
       </View>
@@ -54,15 +66,15 @@ export function ApprovalCardSkeleton() {
         <Bone width={44} height={44} borderRadius={22} />
         <View style={styles.memberInfo}>
           <Bone width="65%" height={15} borderRadius={6} />
-          <Bone width="35%" height={12} borderRadius={6} style={{ marginTop: 6 }} />
+          <Bone width="35%" height={12} borderRadius={6} style={{ marginTop: 6 }} highlight />
         </View>
-        <Bone width={72} height={24} borderRadius={10} />
+        <Bone width={72} height={24} borderRadius={10} highlight />
       </View>
       <View style={styles.approvalTimeRow}>
-        <Bone width="46%" height={40} borderRadius={12} />
-        <Bone width="46%" height={40} borderRadius={12} />
+        <Bone width="46%" height={40} borderRadius={12} highlight />
+        <Bone width="46%" height={40} borderRadius={12} highlight />
       </View>
-      <Bone width="100%" height={56} borderRadius={12} style={{ marginTop: 12 }} />
+      <Bone width="100%" height={56} borderRadius={12} style={{ marginTop: 12 }} highlight />
       <View style={styles.approvalActions}>
         <Bone width="48%" height={40} borderRadius={12} />
         <Bone width="48%" height={40} borderRadius={12} />
@@ -77,9 +89,9 @@ export function TaskRowSkeleton() {
       <Bone width={36} height={36} borderRadius={10} />
       <View style={styles.taskRowText}>
         <Bone width="70%" height={14} borderRadius={6} />
-        <Bone width="45%" height={11} borderRadius={6} style={{ marginTop: 6 }} />
+        <Bone width="45%" height={11} borderRadius={6} style={{ marginTop: 6 }} highlight />
       </View>
-      <Bone width={72} height={32} borderRadius={10} />
+      <Bone width={72} height={32} borderRadius={10} highlight />
     </View>
   );
 }
@@ -88,11 +100,11 @@ export function StatusCardSkeleton() {
   return (
     <View style={styles.statusCard}>
       <Bone width={64} height={64} borderRadius={32} />
-      <Bone width="55%" height={12} borderRadius={6} style={{ marginTop: 14 }} />
+      <Bone width="55%" height={12} borderRadius={6} style={{ marginTop: 14 }} highlight />
       <Bone width="40%" height={28} borderRadius={8} style={{ marginTop: 8 }} />
       <View style={styles.statusDetails}>
-        <Bone width="100%" height={38} borderRadius={10} />
-        <Bone width="100%" height={38} borderRadius={10} style={{ marginTop: 8 }} />
+        <Bone width="100%" height={38} borderRadius={10} highlight />
+        <Bone width="100%" height={38} borderRadius={10} style={{ marginTop: 8 }} highlight />
       </View>
       <Bone width="100%" height={44} borderRadius={14} style={{ marginTop: 16 }} />
     </View>
@@ -156,7 +168,7 @@ function StatCardSkeleton() {
       <Bone width={36} height={36} borderRadius={10} />
       <View style={styles.statCardText}>
         <Bone width="50%" height={18} borderRadius={6} />
-        <Bone width="70%" height={11} borderRadius={6} style={{ marginTop: 6 }} />
+        <Bone width="70%" height={11} borderRadius={6} style={{ marginTop: 6 }} highlight />
       </View>
     </View>
   );
@@ -167,21 +179,19 @@ export function ProfileSkeleton() {
     <View style={styles.profileSkeleton}>
       <Bone width={80} height={80} borderRadius={40} />
       <Bone width="50%" height={18} borderRadius={6} style={{ marginTop: 12 }} />
-      <Bone width="30%" height={14} borderRadius={6} style={{ marginTop: 8 }} />
-      <Bone width="40%" height={14} borderRadius={6} style={{ marginTop: 4 }} />
+      <Bone width="30%" height={14} borderRadius={6} style={{ marginTop: 8 }} highlight />
+      <Bone width="40%" height={14} borderRadius={6} style={{ marginTop: 4 }} highlight />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   memberCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 18,
+    backgroundColor: AppTheme.card,
+    borderRadius: AppRadius.card,
     padding: 12,
     marginBottom: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    ...appSoftShadow,
   },
   memberTopRow: {
     flexDirection: 'row',
@@ -198,13 +208,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   approvalCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
+    backgroundColor: AppTheme.card,
+    borderRadius: AppRadius.card,
     padding: 20,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    ...appSoftShadow,
   },
   approvalTimeRow: {
     flexDirection: 'row',
@@ -223,23 +231,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     marginBottom: 4,
-    backgroundColor: Colors.surface,
+    backgroundColor: AppTheme.card,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    ...appSoftShadow,
   },
   taskRowText: {
     flex: 1,
     minWidth: 0,
   },
   statusCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 28,
+    backgroundColor: AppTheme.card,
+    borderRadius: AppRadius.hero,
     padding: 24,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadowHeavy,
+    ...appSoftShadow,
   },
   statusDetails: {
     width: '100%',
@@ -256,12 +261,10 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: AppTheme.card,
     borderRadius: 16,
     padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    ...appSoftShadow,
   },
   statCardText: {
     flex: 1,

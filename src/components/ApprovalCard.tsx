@@ -11,7 +11,7 @@ import { AnimatedPressable } from './AnimatedPressable';
 
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Colors } from '../constants/colors';
+import { AppTheme, appSoftShadow } from '../constants/theme';
 import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
 import { formatWorkLogDateLabel } from '../lib/workLogDates';
 import { WorkLogWithProfile } from '../types/database';
@@ -29,41 +29,68 @@ interface ApprovalCardProps {
 
 export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove, index = 0, isApproving = false, isRejecting = false }: ApprovalCardProps) {
   const [showTaskDialog, setShowTaskDialog] = useState(false);
-  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [checkInPhotoUrls, setCheckInPhotoUrls] = useState<string[]>([]);
+  const [checkOutPhotoUrls, setCheckOutPhotoUrls] = useState<string[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   // Reset state during render when workLog changes
   const [prevWorkLogId, setPrevWorkLogId] = useState<string | undefined>(undefined);
   if (workLog?.id !== prevWorkLogId) {
     setPrevWorkLogId(workLog?.id);
-    setPhotoUrls([]);
+    setCheckInPhotoUrls([]);
+    setCheckOutPhotoUrls([]);
   }
 
   useEffect(() => {
-    if (workLog?.check_out_photos && workLog.check_out_photos.length > 0) {
-      let isMounted = true;
-      const loadPhotos = async () => {
-        try {
-          const urls = await Promise.all(
-            workLog.check_out_photos!.map(async (path) => {
-              const { data } = await supabase.storage
-                .from('checkouts')
-                .createSignedUrl(path, 3600); // 1 hour
-              return data?.signedUrl || '';
-            })
-          );
-          if (isMounted) {
-            setPhotoUrls(urls.filter(Boolean));
-          }
-        } catch (err) {
-          console.error('Failed to load signed URLs:', err);
-        }
-      };
-      loadPhotos();
-      return () => {
-        isMounted = false;
-      };
+    const paths = workLog?.check_in_photos;
+    if (!paths?.length) {
+      setCheckInPhotoUrls([]);
+      return;
     }
+    let isMounted = true;
+    const loadPhotos = async () => {
+      try {
+        const urls = await Promise.all(
+          paths.map(async (path) => {
+            const { data } = await supabase.storage.from('checkouts').createSignedUrl(path, 3600);
+            return data?.signedUrl || '';
+          })
+        );
+        if (isMounted) setCheckInPhotoUrls(urls.filter(Boolean));
+      } catch (err) {
+        console.error('Failed to load check-in photo URLs:', err);
+      }
+    };
+    void loadPhotos();
+    return () => {
+      isMounted = false;
+    };
+  }, [workLog?.check_in_photos]);
+
+  useEffect(() => {
+    const paths = workLog?.check_out_photos;
+    if (!paths?.length) {
+      setCheckOutPhotoUrls([]);
+      return;
+    }
+    let isMounted = true;
+    const loadPhotos = async () => {
+      try {
+        const urls = await Promise.all(
+          paths.map(async (path) => {
+            const { data } = await supabase.storage.from('checkouts').createSignedUrl(path, 3600);
+            return data?.signedUrl || '';
+          })
+        );
+        if (isMounted) setCheckOutPhotoUrls(urls.filter(Boolean));
+      } catch (err) {
+        console.error('Failed to load checkout photo URLs:', err);
+      }
+    };
+    void loadPhotos();
+    return () => {
+      isMounted = false;
+    };
   }, [workLog?.check_out_photos]);
   
   const profile = workLog.profiles;
@@ -90,9 +117,9 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
     // @ts-ignore - role might be missing if not explicitly fetched in the join, defaulting safely
     const role = profile.role || 'member';
     switch (role) {
-      case 'owner': return { bg: Colors.ownerAccent + '15', text: Colors.ownerAccent };
-      case 'manager': return { bg: Colors.managerAccent + '15', text: Colors.managerAccent };
-      case 'member': default: return { bg: Colors.memberAccent + '15', text: Colors.memberAccent };
+      case 'owner': return { bg: AppTheme.violetSoft, text: AppTheme.violet };
+      case 'manager': return { bg: AppTheme.blueSoft, text: AppTheme.blue };
+      case 'member': default: return { bg: AppTheme.soft, text: AppTheme.inkSoft };
     }
   };
 
@@ -128,7 +155,7 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
     >
       {/* Header Info */}
       <View style={styles.header}>
-        <View style={[styles.avatar, { backgroundColor: avatarColors.bg, borderColor: avatarColors.text + '30' }]}>
+        <View style={[styles.avatar, { backgroundColor: avatarColors.bg }]}>
           <Text style={[styles.avatarLabel, { color: avatarColors.text }]}>
             {profile.full_name.substring(0, 2).toUpperCase()}
           </Text>
@@ -146,14 +173,14 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
 
       {dateLabel && (
         <View style={styles.dateBanner}>
-          <Feather name="calendar" size={14} color={Colors.warning} />
+          <Feather name="calendar" size={14} color={AppTheme.amber} />
           <Text style={styles.dateBannerText}>{dateLabel}</Text>
         </View>
       )}
 
       {checkInWasNeverApproved && (
         <View style={styles.unapprovedBanner}>
-          <Feather name="alert-circle" size={14} color={Colors.warning} />
+          <Feather name="alert-circle" size={14} color={AppTheme.amber} />
           <Text style={styles.unapprovedBannerText}>
             Check-in was not approved before the member ended their day.
           </Text>
@@ -186,10 +213,27 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
       {workLog.check_in_plan && (
         <View style={styles.planSection}>
           <View style={styles.planLabelRow}>
-            <Feather name="clipboard" size={14} color="#007AFF" />
+            <Feather name="clipboard" size={14} color={AppTheme.blue} />
             <Text style={styles.planLabel}> Plan for Today</Text>
           </View>
           <Text style={styles.planText}>{workLog.check_in_plan}</Text>
+          {checkInPhotoUrls.length > 0 && (
+            <View style={styles.photosSection}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosScroll}>
+                <View style={styles.photosContainer}>
+                  {checkInPhotoUrls.map((url, index) => (
+                    <Pressable
+                      key={`in-${index}`}
+                      onPress={() => setSelectedPhoto(url)}
+                      style={({ pressed }) => [styles.photoWrapper, pressed && { opacity: 0.9 }]}
+                    >
+                      <Image source={{ uri: url }} style={styles.photo} />
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          )}
         </View>
       )}
 
@@ -197,7 +241,7 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
       {hasEndOfDayDetails && (
         <View style={styles.planSection}>
           <View style={styles.planLabelRow}>
-            <Feather name="file-text" size={14} color="#007AFF" />
+            <Feather name="file-text" size={14} color={AppTheme.blue} />
             <Text style={styles.planLabel}> Day Report</Text>
           </View>
           {workLog.day_report ? (
@@ -206,13 +250,13 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
             <Text style={styles.planPlaceholder}>No day report provided.</Text>
           )}
 
-          {photoUrls.length > 0 && (
+          {checkOutPhotoUrls.length > 0 && (
             <View style={styles.photosSection}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosScroll}>
                 <View style={styles.photosContainer}>
-                  {photoUrls.map((url, index) => (
+                  {checkOutPhotoUrls.map((url, index) => (
                     <Pressable
-                      key={index}
+                      key={`out-${index}`}
                       onPress={() => setSelectedPhoto(url)}
                       style={({ pressed }) => [styles.photoWrapper, pressed && { opacity: 0.9 }]}
                     >
@@ -240,7 +284,7 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
             }}
             disabled={isApproving || isRejecting}
           >
-            <Feather name="x" size={14} color="#FF3B30" />
+            <Feather name="x" size={14} color={AppTheme.coral} />
             <Text style={styles.rejectBtnText}>
               {isRejecting ? 'Rejecting...' : 'Reject'}
             </Text>
@@ -254,7 +298,7 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
             onPress={handleApproveClick}
             disabled={isApproving || isRejecting}
           >
-            <Feather name="check" size={14} color="#FFFFFF" />
+            <Feather name="check" size={14} color={AppTheme.white} />
             <Text style={styles.approveBtnText}>
               {isApproving ? 'Approving...' : 'Approve'}
             </Text>
@@ -281,8 +325,8 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
               onPress={handleApproveWithTask}
               style={styles.dialogButtonSecondary}
               contentStyle={styles.dialogButtonContent}
-              buttonColor={Colors.systemGray6}
-              textColor={Colors.textPrimary}
+              buttonColor={AppTheme.soft}
+              textColor={AppTheme.ink}
               labelStyle={styles.dialogButtonSecondaryText}
             >
               Assign Task
@@ -292,8 +336,8 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
               onPress={handleApproveOnly}
               style={styles.dialogButtonPrimary}
               contentStyle={styles.dialogButtonContent}
-              buttonColor={Colors.accent}
-              textColor="#FFFFFF"
+              buttonColor={AppTheme.charcoal}
+              textColor={AppTheme.white}
               labelStyle={styles.dialogButtonPrimaryText}
             >
               Just Approve
@@ -316,7 +360,7 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
                 onPress={() => setSelectedPhoto(null)}
                 style={styles.closeFullImageBtn}
               >
-                <Feather name="x" size={24} color={Colors.white} />
+                <Feather name="x" size={24} color={AppTheme.white} />
               </Pressable>
             </View>
           )}
@@ -332,17 +376,11 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
+    backgroundColor: AppTheme.card,
+    borderRadius: 22,
     padding: 20,
     marginBottom: 14,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    elevation: 3,
+    ...appSoftShadow,
   },
   header: {
     flexDirection: 'row',
@@ -352,15 +390,11 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#8B5CF6' + '15',
-    borderWidth: 1,
-    borderColor: '#8B5CF6' + '30',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarLabel: {
     fontFamily: 'Inter_800ExtraBold',
-    color: '#8B5CF6',
     fontSize: 16,
   },
   headerInfo: {
@@ -370,18 +404,18 @@ const styles = StyleSheet.create({
   name: {
     fontFamily: 'Inter_700Bold',
     fontSize: 16,
-    color: '#1C1C1E',
+    color: AppTheme.ink,
     letterSpacing: -0.2,
   },
   employeeId: {
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: '#5E6672', // Raised from #8E8E93 for readable contrast
+    color: AppTheme.mute,
     marginTop: 2,
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 10,
   },
   statusBadgeText: {
@@ -396,13 +430,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     alignSelf: 'flex-start',
-    backgroundColor: Colors.warningLight,
-    borderRadius: 8,
+    backgroundColor: AppTheme.amberSoft,
+    borderRadius: 10,
   },
   dateBannerText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
-    color: Colors.warning,
+    color: AppTheme.amber,
   },
   unapprovedBanner: {
     flexDirection: 'row',
@@ -411,20 +445,20 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: Colors.warningLight,
-    borderRadius: 10,
+    backgroundColor: AppTheme.amberSoft,
+    borderRadius: 12,
   },
   unapprovedBannerText: {
     flex: 1,
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
     lineHeight: 18,
-    color: Colors.warning,
+    color: AppTheme.amber,
   },
   departmentCaption: {
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: AppTheme.mute,
     marginTop: 8,
   },
   timeRow: {
@@ -434,24 +468,24 @@ const styles = StyleSheet.create({
   },
   timeItem: {
     flex: 1,
-    backgroundColor: '#F4F4F6', // System Gray 6
+    backgroundColor: AppTheme.soft,
     padding: 12,
     borderRadius: 14,
   },
   timeLabel: {
     fontFamily: 'Inter_500Medium',
     fontSize: 11,
-    color: '#5E6672', // Raised from #8E8E93 for contrast on Gray 6 background
+    color: AppTheme.mute,
     marginBottom: 4,
   },
   timeValue: {
     fontFamily: 'Inter_700Bold',
     fontSize: 14,
-    color: '#1C1C1E',
+    color: AppTheme.ink,
   },
   planSection: {
     marginTop: 14,
-    backgroundColor: 'rgba(0, 122, 255, 0.04)', // Tinted soft blue
+    backgroundColor: AppTheme.blueSoft,
     borderRadius: 14,
     padding: 14,
   },
@@ -463,18 +497,18 @@ const styles = StyleSheet.create({
   planLabel: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
-    color: '#007AFF',
+    color: AppTheme.blue,
   },
   planText: {
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
-    color: '#3A3A3C',
+    color: AppTheme.inkSoft,
     lineHeight: 18,
   },
   planPlaceholder: {
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: AppTheme.mute,
     fontStyle: 'italic',
     lineHeight: 18,
   },
@@ -488,7 +522,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 59, 48, 0.08)', // Soft red
+    backgroundColor: AppTheme.coralSoft,
     borderRadius: 20,
     height: 40,
     gap: 6,
@@ -496,14 +530,14 @@ const styles = StyleSheet.create({
   rejectBtnText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 13,
-    color: '#FF3B30',
+    color: AppTheme.coral,
   },
   approveBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000000', // Solid black
+    backgroundColor: AppTheme.charcoal,
     borderRadius: 20,
     height: 40,
     gap: 6,
@@ -511,27 +545,28 @@ const styles = StyleSheet.create({
   approveBtnText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 13,
-    color: '#FFFFFF',
+    color: AppTheme.white,
   },
   btnPressed: {
     transform: [{ scale: 0.97 }],
     opacity: 0.9,
   },
   dialog: {
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
+    borderRadius: 22,
+    backgroundColor: AppTheme.card,
+    ...appSoftShadow,
   },
   dialogTitle: {
     fontFamily: 'Inter_700Bold',
     fontSize: 20,
-    color: Colors.text,
+    color: AppTheme.ink,
     paddingHorizontal: 24,
     paddingTop: 24,
   },
   dialogText: {
     fontFamily: 'Inter_400Regular',
     fontSize: 15,
-    color: Colors.textSecondary,
+    color: AppTheme.mute,
     lineHeight: 22,
     paddingHorizontal: 24,
   },
@@ -574,10 +609,8 @@ const styles = StyleSheet.create({
   photoWrapper: {
     width: 60,
     height: 60,
-    borderRadius: 8,
+    borderRadius: 10,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   photo: {
     width: '100%',

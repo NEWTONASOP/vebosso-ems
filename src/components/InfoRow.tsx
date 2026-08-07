@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { Colors } from '../constants/colors';
+import { AppTheme, AppRadius } from '../constants/theme';
 
 interface InfoRowProps {
   label: string;
@@ -38,7 +38,7 @@ export function InfoRow({
 
 const styles = StyleSheet.create({
   rowWrapper: {
-    backgroundColor: Colors.surface,
+    backgroundColor: AppTheme.card,
   },
   rowContent: {
     flexDirection: 'row',
@@ -50,9 +50,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   label: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 15,
-    color: Colors.textSecondary,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: AppTheme.mute,
     flexShrink: 0,
     maxWidth: '38%',
     paddingTop: 1,
@@ -61,8 +61,8 @@ const styles = StyleSheet.create({
     flex: 1,
     flexShrink: 1,
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
-    color: Colors.textPrimary,
+    fontSize: 14,
+    color: AppTheme.ink,
     letterSpacing: -0.1,
     textAlign: 'right',
   },
@@ -70,15 +70,15 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     paddingHorizontal: 10,
     paddingVertical: 3,
-    borderRadius: 12,
+    borderRadius: AppRadius.chip,
   },
   badgeText: {
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.divider,
+    backgroundColor: AppTheme.hairline,
     marginHorizontal: 16,
   },
 });

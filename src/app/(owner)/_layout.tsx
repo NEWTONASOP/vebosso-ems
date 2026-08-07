@@ -8,6 +8,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useWorkStore } from '../../store/workStore';
 
 import { CustomTabBar } from '../../components/CustomTabBar';
+import { AppTheme } from '../../constants/theme';
 
 function TabBarBadge({ count }: { count: number }) {
   if (count === 0) return null;
@@ -23,7 +24,7 @@ const badgeStyles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -10,
-    backgroundColor: '#FF3B30', // System Red badge
+    backgroundColor: AppTheme.coral,
     borderRadius: 9,
     minWidth: 16,
     height: 16,
@@ -33,7 +34,7 @@ const badgeStyles = StyleSheet.create({
     zIndex: 10,
   },
   text: {
-    color: '#FFFFFF',
+    color: AppTheme.white,
     fontSize: 9,
     fontFamily: 'Inter_700Bold',
   },

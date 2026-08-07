@@ -6,7 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
 import { Button, Modal, Portal, Text } from 'react-native-paper';
-import { Colors } from '../constants/colors';
+import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/theme';
 
 interface TaskCompleteModalProps {
   visible: boolean;
@@ -47,28 +47,25 @@ export function TaskCompleteModal({
           style={styles.keyboardView}
         >
           <View style={styles.container}>
-            {/* Header */}
             <View style={styles.header}>
               <View style={styles.iconContainer}>
-                <Feather name="check-circle" size={24} color={Colors.success} />
+                <Feather name="check-circle" size={22} color={AppTheme.green} />
               </View>
               <Text style={styles.title}>Complete Task</Text>
             </View>
 
-            {/* Task Title */}
             <View style={styles.taskTitleContainer}>
               <Text style={styles.taskTitle} numberOfLines={2}>
                 {taskTitle}
               </Text>
             </View>
 
-            {/* Input Section */}
             <View style={styles.inputSection}>
               <Text style={styles.inputLabel}>What did you accomplish? (optional)</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Brief summary of your work..."
-                placeholderTextColor={Colors.textTertiary}
+                placeholderTextColor={AppTheme.mute}
                 value={note}
                 onChangeText={setNote}
                 multiline
@@ -79,14 +76,14 @@ export function TaskCompleteModal({
               <Text style={styles.charCounter}>{note.length}/500</Text>
             </View>
 
-            {/* Buttons */}
             <View style={styles.buttonRow}>
               <Button
-                mode="outlined"
+                mode="contained"
                 onPress={handleSkip}
                 style={styles.skipButton}
                 contentStyle={styles.buttonContent}
-                textColor={Colors.textSecondary}
+                buttonColor={AppTheme.soft2}
+                textColor={AppTheme.inkSoft}
                 labelStyle={styles.skipButtonText}
               >
                 Skip
@@ -97,8 +94,8 @@ export function TaskCompleteModal({
                 onPress={handleSubmit}
                 style={styles.submitButton}
                 contentStyle={styles.buttonContent}
-                buttonColor={Colors.success}
-                textColor={Colors.white}
+                buttonColor={AppTheme.charcoal}
+                textColor={AppTheme.white}
                 labelStyle={styles.submitButtonText}
               >
                 {note.trim() ? 'Submit' : 'Mark Done'}
@@ -120,44 +117,41 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   container: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
+    backgroundColor: AppTheme.card,
+    borderRadius: AppRadius.sheet,
     padding: 24,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    ...appShadow,
   },
   header: {
     alignItems: 'center',
     marginBottom: 20,
   },
   iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(52, 199, 89, 0.12)',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: AppTheme.greenSoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
+    ...appSoftShadow,
   },
   title: {
     fontFamily: 'Inter_700Bold',
     fontSize: 20,
-    color: Colors.text,
-    letterSpacing: -0.3,
+    color: AppTheme.ink,
+    letterSpacing: -0.5,
   },
   taskTitleContainer: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: 12,
+    backgroundColor: AppTheme.soft,
+    borderRadius: 14,
     padding: 14,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   taskTitle: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
-    color: Colors.text,
+    color: AppTheme.ink,
     lineHeight: 20,
     textAlign: 'center',
   },
@@ -167,25 +161,23 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: AppTheme.inkSoft,
     marginBottom: 10,
   },
   input: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: AppTheme.soft,
+    borderRadius: 14,
     padding: 14,
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
-    color: Colors.text,
+    color: AppTheme.ink,
     minHeight: 100,
     maxHeight: 150,
   },
   charCounter: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    color: Colors.textTertiary,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: AppTheme.mute,
     textAlign: 'right',
     marginTop: 6,
   },
@@ -198,23 +190,22 @@ const styles = StyleSheet.create({
   },
   skipButton: {
     flex: 1,
-    borderRadius: 14,
-    borderColor: Colors.border,
+    borderRadius: 24,
+    ...appSoftShadow,
   },
   skipButtonText: {
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
-    color: Colors.textSecondary,
     letterSpacing: -0.1,
   },
   submitButton: {
     flex: 1,
-    borderRadius: 14,
+    borderRadius: 24,
+    ...appSoftShadow,
   },
   submitButtonText: {
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
-    color: Colors.white,
     letterSpacing: -0.1,
   },
 });

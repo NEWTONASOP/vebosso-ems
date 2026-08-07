@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, BackHandler, Platform, StyleSheet, View } from 'react-native';
 import { Button, Modal, Portal, ProgressBar, Text } from 'react-native-paper';
-import { Colors } from '../constants/colors';
+import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/theme';
 import {
   checkAppVersion,
   downloadAndInstallApk,
@@ -168,11 +168,9 @@ export function UpdateChecker() {
         dismissable={false}
         contentContainerStyle={styles.modal}
       >
-        <Text variant="titleLarge" style={styles.title}>
-          Update Required
-        </Text>
+        <Text style={styles.title}>Update Required</Text>
 
-        <Text variant="bodyMedium" style={styles.subtitle}>
+        <Text style={styles.subtitle}>
           {phase === 'error'
             ? errorMessage
             : phase === 'installing'
@@ -182,10 +180,10 @@ export function UpdateChecker() {
 
         {phase !== 'error' && (
           <View style={styles.keepOpenNotice}>
-            <Text variant="labelMedium" style={styles.keepOpenTitle}>
+            <Text style={styles.keepOpenTitle}>
               Keep this app open
             </Text>
-            <Text variant="bodySmall" style={styles.keepOpenText}>
+            <Text style={styles.keepOpenText}>
               {phase === 'installing'
                 ? 'Do not close or swipe away VEBOSSO EMS until the update is fully installed.'
                 : 'Do not close or swipe away the app while the update is downloading.'}
@@ -195,15 +193,15 @@ export function UpdateChecker() {
 
         {phase !== 'error' && (
           <View style={styles.progressSection}>
-            <Text variant="labelMedium" style={styles.progressLabel}>
+            <Text style={styles.progressLabel}>
               {progressLabel}
             </Text>
             <ProgressBar
               progress={phase === 'installing' ? 1 : progress}
-              color={Colors.info}
+              color={AppTheme.blue}
               style={styles.progressBar}
             />
-            <Text variant="labelSmall" style={styles.progressPercent}>
+            <Text style={styles.progressPercent}>
               {Math.round((phase === 'installing' ? 1 : progress) * 100)}%
             </Text>
           </View>
@@ -217,15 +215,18 @@ export function UpdateChecker() {
               loading={isOpeningInstaller}
               disabled={actionsDisabled}
               style={styles.button}
-              buttonColor={Colors.accent}
+              buttonColor={AppTheme.charcoal}
+              textColor={AppTheme.white}
             >
               Install Now
             </Button>
             <Button
-              mode="outlined"
+              mode="contained"
               onPress={handleRedownload}
               disabled={actionsDisabled}
               style={styles.button}
+              buttonColor={AppTheme.soft2}
+              textColor={AppTheme.inkSoft}
             >
               Redownload
             </Button>
@@ -233,6 +234,8 @@ export function UpdateChecker() {
               mode="text"
               onPress={handleOpenSettings}
               disabled={actionsDisabled}
+              textColor={AppTheme.inkSoft}
+              labelStyle={styles.textActionLabel}
             >
               Open Install Settings
             </Button>
@@ -242,10 +245,12 @@ export function UpdateChecker() {
         {phase === 'downloading' && (
           <View style={styles.actions}>
             <Button
-              mode="outlined"
+              mode="contained"
               onPress={handleRedownload}
               disabled={actionsDisabled}
               style={styles.button}
+              buttonColor={AppTheme.soft2}
+              textColor={AppTheme.inkSoft}
             >
               Redownload
             </Button>
@@ -254,13 +259,30 @@ export function UpdateChecker() {
 
         {phase === 'error' && (
           <View style={styles.actions}>
-            <Button mode="contained" onPress={handleRetry} style={styles.button}>
+            <Button
+              mode="contained"
+              onPress={handleRetry}
+              style={styles.button}
+              buttonColor={AppTheme.charcoal}
+              textColor={AppTheme.white}
+            >
               Try Again
             </Button>
-            <Button mode="outlined" onPress={handleOpenSettings} style={styles.button}>
+            <Button
+              mode="contained"
+              onPress={handleOpenSettings}
+              style={styles.button}
+              buttonColor={AppTheme.soft2}
+              textColor={AppTheme.inkSoft}
+            >
               Open Install Settings
             </Button>
-            <Button mode="text" onPress={handleBrowserFallback}>
+            <Button
+              mode="text"
+              onPress={handleBrowserFallback}
+              textColor={AppTheme.inkSoft}
+              labelStyle={styles.textActionLabel}
+            >
               Download in Browser
             </Button>
           </View>
@@ -272,52 +294,62 @@ export function UpdateChecker() {
 
 const styles = StyleSheet.create({
   modal: {
-    backgroundColor: Colors.surface,
+    backgroundColor: AppTheme.card,
     marginHorizontal: 24,
-    borderRadius: 16,
+    borderRadius: AppRadius.sheet,
     padding: 24,
+    ...appShadow,
   },
   title: {
-    color: Colors.text,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    fontSize: 20,
+    color: AppTheme.ink,
+    letterSpacing: -0.5,
     marginBottom: 8,
   },
   subtitle: {
-    color: Colors.textSecondary,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: AppTheme.inkSoft,
     marginBottom: 16,
     lineHeight: 22,
   },
   keepOpenNotice: {
-    backgroundColor: Colors.warningLight,
-    borderRadius: 12,
+    backgroundColor: AppTheme.amberSoft,
+    borderRadius: AppRadius.chip,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(180, 83, 9, 0.2)',
   },
   keepOpenTitle: {
-    color: Colors.warning,
-    fontWeight: '700',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: AppTheme.amber,
     marginBottom: 4,
   },
   keepOpenText: {
-    color: Colors.textSecondary,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: AppTheme.inkSoft,
     lineHeight: 18,
   },
   progressSection: {
     gap: 8,
   },
   progressLabel: {
-    color: Colors.textSecondary,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: AppTheme.inkSoft,
   },
   progressBar: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.borderLight,
+    backgroundColor: AppTheme.soft2,
   },
   progressPercent: {
-    color: Colors.textTertiary,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: AppTheme.mute,
     textAlign: 'right',
   },
   actions: {
@@ -325,6 +357,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   button: {
-    borderRadius: 10,
+    borderRadius: 24,
+    ...appSoftShadow,
+  },
+  textActionLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
   },
 });

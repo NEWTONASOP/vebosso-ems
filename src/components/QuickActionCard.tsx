@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { Colors } from '../constants/colors';
+import { AppTheme, AppRadius, appSoftShadow } from '../constants/theme';
 import { AnimatedPressable } from './AnimatedPressable';
 
 const SLIM_WIDTH = 400;
@@ -19,9 +19,9 @@ export function QuickActionCard({ icon, title, subtitle, onPress }: QuickActionC
 
   if (isSlim) {
     return (
-      <AnimatedPressable style={styles.slimContainer} onPress={onPress}>
+      <AnimatedPressable style={styles.slimContainer} onPress={onPress} scaleTo={0.97}>
         <View style={styles.slimIconBg}>
-          <Feather name={icon as any} size={16} color={Colors.accent} />
+          <Feather name={icon as any} size={16} color={AppTheme.blue} />
         </View>
         <Text style={styles.slimTitle} numberOfLines={2}>
           {title}
@@ -31,9 +31,9 @@ export function QuickActionCard({ icon, title, subtitle, onPress }: QuickActionC
   }
 
   return (
-    <AnimatedPressable style={styles.container} onPress={onPress}>
+    <AnimatedPressable style={styles.container} onPress={onPress} scaleTo={0.97}>
       <View style={styles.iconBg}>
-        <Feather name={icon as any} size={18} color={Colors.accent} />
+        <Feather name={icon as any} size={18} color={AppTheme.blue} />
       </View>
       <View style={styles.content}>
         <Text style={styles.title} numberOfLines={1}>
@@ -52,22 +52,21 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    backgroundColor: AppTheme.card,
+    borderRadius: AppRadius.card,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    minHeight: 56,
+    ...appSoftShadow,
   },
   iconBg: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: Colors.accent + '12',
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: AppTheme.blueSoft,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 12,
   },
   content: {
     flex: 1,
@@ -76,41 +75,41 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontFamily: 'Inter_600SemiBold',
-    color: Colors.text,
+    color: AppTheme.ink,
+    letterSpacing: -0.2,
   },
   subtitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: 'Inter_400Regular',
-    color: Colors.textSecondary,
-    marginTop: 1,
+    color: AppTheme.mute,
+    marginTop: 2,
   },
   slimContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    minHeight: 72,
-    ...Colors.shadow,
+    backgroundColor: AppTheme.card,
+    borderRadius: AppRadius.card,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    minHeight: 80,
+    ...appSoftShadow,
   },
   slimIconBg: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
-    backgroundColor: Colors.accent + '12',
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    backgroundColor: AppTheme.blueSoft,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   slimTitle: {
     fontSize: 12,
     fontFamily: 'Inter_600SemiBold',
-    color: Colors.text,
+    color: AppTheme.ink,
     textAlign: 'center',
-    lineHeight: 15,
+    lineHeight: 16,
+    letterSpacing: -0.1,
   },
 });

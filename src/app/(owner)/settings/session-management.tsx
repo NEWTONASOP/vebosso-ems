@@ -1,5 +1,5 @@
 // ============================================================================
-// VEBOSSO EMS — Session Management Screen (Premium Fintech Aesthetic)
+// VEBOSSO EMS — Session Management Screen
 // ============================================================================
 
 import React, { useEffect, useState } from 'react';
@@ -14,7 +14,13 @@ import { EmptyState } from '../../../components/EmptyState';
 import { InlineError } from '../../../components/InlineError';
 import { ListSkeleton } from '../../../components/LoadingSkeleton';
 import { Feather } from '@expo/vector-icons';
-import { Colors } from '../../../constants/colors';
+import {
+  AppRadius,
+  AppSpace,
+  AppTheme as T,
+  appSoftShadow,
+  screenChrome,
+} from '../../../constants/theme';
 
 interface SessionInfo {
   id: string;
@@ -101,19 +107,20 @@ export default function SessionManagementScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Header with circular outline back button */}
+    <View style={screenChrome.root}>
       <View style={styles.header}>
         <Pressable
           style={({ pressed }) => [
-            styles.backBtn,
-            pressed && styles.btnPressed
+            screenChrome.iconButton,
+            pressed && styles.btnPressed,
           ]}
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
-          <Feather name="arrow-left" size={18} color={Colors.textPrimary} />
+          <Feather name="arrow-left" size={18} color={T.charcoal} />
         </Pressable>
-        <Text style={styles.title}>Active Sessions</Text>
+        <Text style={screenChrome.title}>Active Sessions</Text>
       </View>
 
       {isLoading ? (
@@ -121,7 +128,7 @@ export default function SessionManagementScreen() {
           <ListSkeleton count={3} variant="task-row" />
         </View>
       ) : fetchError ? (
-        <View style={{ paddingHorizontal: 20, marginTop: 14 }}>
+        <View style={styles.errorWrap}>
           <InlineError
             message={fetchError}
             onRetry={async () => { setIsLoading(true); await fetchSessions(); }}
@@ -130,51 +137,60 @@ export default function SessionManagementScreen() {
       ) : (
         <ScrollView
           contentContainerStyle={styles.scrollContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.charcoal} />}
           showsVerticalScrollIndicator={false}
         >
           {sessions.length > 0 ? (
-            <View style={styles.groupedCard}>
-              {sessions.map((session, index) => {
-                const timeAgo = formatDistanceToNow(new Date(session.last_active), { addSuffix: true });
-                return (
-                  <View key={session.id} style={styles.rowWrapper}>
-                    <View style={styles.rowContent}>
-                      {/* Left: Device Info and Profile */}
-                      <View style={styles.infoCol}>
-                        <Text style={styles.sessionName}>{session.profiles.full_name}</Text>
-                        <Text style={styles.sessionDetail}>
-                          {session.profiles.employee_id} • {session.device_info || 'Unknown device'}
-                        </Text>
-                        <Text style={styles.sessionTime}>Active {timeAgo}</Text>
-                      </View>
-
-                      {/* Right: Active Pill and Logout Button */}
-                      <View style={styles.actionCol}>
-                        <View style={styles.activeBadge}>
-                          <View style={styles.activeDot} />
-                          <Text style={styles.activeText}>Active</Text>
+            <>
+              <Text style={styles.sectionHint}>
+                {sessions.length} active {sessions.length === 1 ? 'session' : 'sessions'}
+              </Text>
+              <View style={styles.groupedCard}>
+                {sessions.map((session, index) => {
+                  const timeAgo = formatDistanceToNow(new Date(session.last_active), { addSuffix: true });
+                  return (
+                    <View key={session.id} style={styles.rowWrapper}>
+                      <View style={styles.rowContent}>
+                        <View style={styles.infoCol}>
+                          <Text style={styles.sessionName}>{session.profiles.full_name}</Text>
+                          <Text style={styles.sessionDetail}>
+                            {session.profiles.employee_id} • {session.device_info || 'Unknown device'}
+                          </Text>
+                          <Text style={styles.sessionTime}>Active {timeAgo}</Text>
                         </View>
 
-                        <Pressable
-                          style={({ pressed }) => [
-                            styles.logoutBtn,
-                            pressed && styles.btnPressed
-                          ]}
-                          onPress={() => handleForceLogout(session)}
-                        >
-                          <Text style={styles.logoutBtnText}>Logout</Text>
-                        </Pressable>
+                        <View style={styles.actionCol}>
+                          <View style={styles.activeBadge}>
+                            <View style={styles.activeDot} />
+                            <Text style={styles.activeText}>Active</Text>
+                          </View>
+
+                          <Pressable
+                            style={({ pressed }) => [
+                              styles.logoutBtn,
+                              pressed && styles.btnPressed,
+                            ]}
+                            onPress={() => handleForceLogout(session)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Force logout ${session.profiles.full_name}`}
+                          >
+                            <Text style={styles.logoutBtnText}>Logout</Text>
+                          </Pressable>
+                        </View>
                       </View>
+                      {index < sessions.length - 1 && <View style={styles.separator} />}
                     </View>
-                    {index < sessions.length - 1 && <View style={styles.separator} />}
-                  </View>
-                );
-              })}
-            </View>
+                  );
+                })}
+              </View>
+            </>
           ) : (
             <View style={styles.emptyCard}>
-              <EmptyState icon="cellphone" title="No Active Sessions" subtitle="No users are currently logged in" />
+              <EmptyState
+                icon="cellphone"
+                title="No Active Sessions"
+                subtitle="No users are currently logged in"
+              />
             </View>
           )}
         </ScrollView>
@@ -184,6 +200,7 @@ export default function SessionManagementScreen() {
         visible={!!snackMessage}
         onDismiss={() => setSnackMessage('')}
         duration={4000}
+        theme={{ colors: { inverseSurface: T.charcoal, inverseOnSurface: T.white } }}
         wrapperStyle={{ marginBottom: 90 }}
       >
         {snackMessage}
@@ -192,64 +209,43 @@ export default function SessionManagementScreen() {
   );
 }
 
-// ============================================================================
-// Styles
-// ============================================================================
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background, // Premium Fintech light grey
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
+    paddingHorizontal: AppSpace.screen,
+    paddingTop: Platform.OS === 'ios' ? 60 : 44,
     paddingBottom: 12,
     gap: 12,
   },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
-    elevation: 1,
-  },
-  title: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 24,
-    color: Colors.textPrimary,
-    letterSpacing: -0.5,
-  },
   skeletonContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: AppSpace.screen,
+    marginTop: 14,
+  },
+  errorWrap: {
+    paddingHorizontal: AppSpace.screen,
     marginTop: 14,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingHorizontal: AppSpace.screen,
+    paddingBottom: 110,
     width: '100%',
     maxWidth: 600,
     alignSelf: 'center',
   },
+  sectionHint: {
+    ...screenChrome.sectionHint,
+    marginTop: 8,
+    marginBottom: 10,
+  },
   groupedCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
+    backgroundColor: T.card,
+    borderRadius: AppRadius.card,
     overflow: 'hidden',
-    ...Colors.shadow,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    elevation: 3,
-    marginTop: 14,
+    ...appSoftShadow,
   },
   rowWrapper: {
-    backgroundColor: Colors.surface,
+    backgroundColor: T.card,
   },
   rowContent: {
     flexDirection: 'row',
@@ -257,27 +253,28 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 16,
     justifyContent: 'space-between',
+    minHeight: 72,
   },
   infoCol: {
     flex: 1,
     paddingRight: 12,
   },
   sessionName: {
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 16,
-    color: Colors.textPrimary,
+    color: T.ink,
     letterSpacing: -0.2,
   },
   sessionDetail: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    color: Colors.textSecondary,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: T.mute,
     marginTop: 3,
   },
   sessionTime: {
     fontFamily: 'Inter_400Regular',
-    fontSize: 11,
-    color: Colors.textTertiary,
+    fontSize: 12,
+    color: T.mute,
     marginTop: 4,
   },
   actionCol: {
@@ -287,33 +284,35 @@ const styles = StyleSheet.create({
   activeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.successLight, // Soft Green capsule
+    backgroundColor: T.greenSoft,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingVertical: 4,
+    borderRadius: AppRadius.chip,
     gap: 4,
   },
   activeDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.success,
+    backgroundColor: T.green,
   },
   activeText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 10,
-    color: Colors.success,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+    color: T.green,
   },
   logoutBtn: {
-    backgroundColor: Colors.errorLight, // Soft red
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
+    backgroundColor: T.coralSoft,
+    paddingHorizontal: 14,
+    minHeight: 44,
+    borderRadius: AppRadius.chip,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logoutBtnText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-    color: Colors.error,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: T.coral,
   },
   btnPressed: {
     transform: [{ scale: 0.97 }],
@@ -321,18 +320,15 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.divider,
+    backgroundColor: T.hairline,
     marginHorizontal: 16,
   },
   emptyCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
+    backgroundColor: T.card,
+    borderRadius: AppRadius.card,
     padding: 24,
     alignItems: 'center',
-    ...Colors.shadow,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    elevation: 3,
+    ...appSoftShadow,
     marginTop: 14,
   },
 });

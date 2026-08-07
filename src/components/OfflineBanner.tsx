@@ -2,16 +2,17 @@
 // VEBOSSO EMS — Offline Banner Component
 // ============================================================================
 
-import React, { useEffect, useState } from 'react';
-import { Text, StyleSheet } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, Text } from 'react-native';
 import Animated, {
-  useSharedValue,
   useAnimatedStyle,
-  withTiming,
+  useSharedValue,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
-import { Colors } from '../constants/colors';
+import { AppTheme, AppSpace } from '../constants/theme';
 
 export function OfflineBanner() {
   const [isOffline, setIsOffline] = useState(false);
@@ -44,36 +45,32 @@ export function OfflineBanner() {
 
   return (
     <Animated.View style={[styles.container, animatedStyle]}>
-      <Text style={styles.icon}>📡</Text>
+      <Feather name="wifi-off" size={14} color={AppTheme.amber} style={styles.icon} />
       <Text style={styles.text}>You&apos;re offline. Some features may not work.</Text>
     </Animated.View>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FEF3C7', // Soft premium amber
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    backgroundColor: AppTheme.amberSoft,
+    paddingVertical: 12,
+    paddingHorizontal: AppSpace.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderBottomWidth: 1,
-    borderColor: '#FDE68A', // Light border
     zIndex: 1000,
   },
   icon: {
     marginRight: 8,
-    fontSize: 14,
   },
   text: {
-    color: '#78350F', // Dark amber text (high contrast and matching tone)
+    color: AppTheme.amber,
     fontSize: 13,
-    fontWeight: '600',
     fontFamily: 'Inter_600SemiBold',
   },
 });
-

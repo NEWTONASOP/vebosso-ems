@@ -2,11 +2,12 @@
 // VEBOSSO EMS — Leave Request Modal
 // ============================================================================
 
+import { Feather } from '@expo/vector-icons';
 import { addDays, format, isValid, parseISO } from 'date-fns';
 import { useCallback, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Button, Chip, HelperText, Modal, Portal, Text } from 'react-native-paper';
-import { Colors } from '../constants/colors';
+import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/theme';
 import { PaperOutlinedField } from './PaperOutlinedField';
 
 interface LeaveRequestModalProps {
@@ -93,6 +94,8 @@ export function LeaveRequestModal({
 
   if (!visible) return null;
 
+  const monday = nextMonday();
+
   return (
     <Portal>
       <Modal
@@ -102,7 +105,9 @@ export function LeaveRequestModal({
       >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.header}>
-            <Text style={styles.emoji}>✈️</Text>
+            <View style={styles.iconCircle}>
+              <Feather name="send" size={22} color={AppTheme.charcoal} />
+            </View>
             <Text style={styles.title}>Request Leave</Text>
             <Text style={styles.subtitle}>
               Apply for leave approval from your manager/owner
@@ -115,27 +120,48 @@ export function LeaveRequestModal({
               <Chip
                 selected={dateStr === today}
                 onPress={() => handleQuickDateSelect(today)}
-                style={styles.chip}
-                selectedColor={Colors.accent}
-                showSelectedOverlay
+                style={[
+                  styles.chip,
+                  dateStr === today ? styles.chipActive : styles.chipInactive,
+                ]}
+                textStyle={[
+                  styles.chipText,
+                  dateStr === today && styles.chipTextSelected,
+                ]}
+                selectedColor={AppTheme.white}
+                mode={dateStr === today ? 'flat' : 'outlined'}
               >
                 Today
               </Chip>
               <Chip
                 selected={dateStr === tomorrow}
                 onPress={() => handleQuickDateSelect(tomorrow)}
-                style={styles.chip}
-                selectedColor={Colors.accent}
-                showSelectedOverlay
+                style={[
+                  styles.chip,
+                  dateStr === tomorrow ? styles.chipActive : styles.chipInactive,
+                ]}
+                textStyle={[
+                  styles.chipText,
+                  dateStr === tomorrow && styles.chipTextSelected,
+                ]}
+                selectedColor={AppTheme.white}
+                mode={dateStr === tomorrow ? 'flat' : 'outlined'}
               >
                 Tomorrow
               </Chip>
               <Chip
-                selected={dateStr === nextMonday()}
-                onPress={() => handleQuickDateSelect(nextMonday())}
-                style={styles.chip}
-                selectedColor={Colors.accent}
-                showSelectedOverlay
+                selected={dateStr === monday}
+                onPress={() => handleQuickDateSelect(monday)}
+                style={[
+                  styles.chip,
+                  dateStr === monday ? styles.chipActive : styles.chipInactive,
+                ]}
+                textStyle={[
+                  styles.chipText,
+                  dateStr === monday && styles.chipTextSelected,
+                ]}
+                selectedColor={AppTheme.white}
+                mode={dateStr === monday ? 'flat' : 'outlined'}
               >
                 Next Mon
               </Chip>
@@ -180,10 +206,11 @@ export function LeaveRequestModal({
 
           <View style={styles.actions}>
             <Button
-              mode="outlined"
+              mode="contained"
               onPress={onDismiss}
               style={styles.cancelButton}
-              textColor={Colors.textSecondary}
+              buttonColor={AppTheme.soft2}
+              textColor={AppTheme.inkSoft}
             >
               Cancel
             </Button>
@@ -193,8 +220,8 @@ export function LeaveRequestModal({
               loading={isLoading}
               disabled={isLoading}
               style={styles.submitButton}
-              buttonColor={Colors.accent}
-              textColor={Colors.white}
+              buttonColor={AppTheme.charcoal}
+              textColor={AppTheme.white}
             >
               Submit Request
             </Button>
@@ -207,33 +234,37 @@ export function LeaveRequestModal({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.surface,
+    backgroundColor: AppTheme.card,
     margin: 20,
-    borderRadius: 24,
+    borderRadius: AppRadius.sheet,
     padding: 24,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadowHeavy,
+    ...appShadow,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  emoji: {
-    fontSize: 40,
-    marginBottom: 8,
+  iconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: AppTheme.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    ...appSoftShadow,
   },
   title: {
-    fontSize: 24,
-    fontFamily: 'Inter_800ExtraBold',
-    color: Colors.text,
+    fontSize: 20,
+    fontFamily: 'Inter_700Bold',
+    color: AppTheme.ink,
     marginBottom: 4,
-    letterSpacing: -0.6,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 13,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.textSecondary,
+    fontSize: 14,
+    fontFamily: 'Inter_400Regular',
+    color: AppTheme.mute,
     textAlign: 'center',
   },
   section: {
@@ -241,33 +272,46 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    fontSize: 14,
+    color: AppTheme.ink,
+    marginBottom: 10,
   },
   chipsRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 10,
+    marginBottom: 12,
     flexWrap: 'wrap',
   },
   chip: {
-    backgroundColor: Colors.surfaceLight,
-    borderColor: Colors.border,
+    borderRadius: 14,
+  },
+  chipActive: {
+    backgroundColor: AppTheme.charcoal,
+    borderColor: AppTheme.charcoal,
+  },
+  chipInactive: {
+    backgroundColor: AppTheme.soft,
+    borderColor: AppTheme.soft2,
+  },
+  chipText: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: AppTheme.inkSoft,
+  },
+  chipTextSelected: {
+    color: AppTheme.white,
   },
   charCountRow: {
     alignItems: 'flex-end',
     marginTop: 4,
   },
   charCount: {
-    fontSize: 11,
-    color: Colors.textTertiary,
-    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    color: AppTheme.mute,
+    fontFamily: 'Inter_400Regular',
   },
   errorText: {
-    color: Colors.error,
+    color: AppTheme.coral,
     fontFamily: 'Inter_500Medium',
     textAlign: 'center',
     marginTop: 8,
@@ -276,13 +320,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 12,
-    marginTop: 16,
+    marginTop: 20,
   },
   cancelButton: {
-    borderColor: Colors.border,
-    borderRadius: 12,
+    borderRadius: 24,
+    ...appSoftShadow,
   },
   submitButton: {
-    borderRadius: 12,
+    borderRadius: 24,
+    ...appSoftShadow,
   },
 });

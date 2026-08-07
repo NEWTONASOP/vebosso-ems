@@ -17,6 +17,7 @@ import {
   AnnouncementWithCreator,
   AppSetting,
   BackfillPermission,
+  LeaveRequest,
   LeaveRequestWithProfile,
   Profile,
   Task,
@@ -93,7 +94,7 @@ interface WorkState {
   channels: RealtimeChannel[];
 
   // Actions — Member
-  checkIn: (plan: string) => Promise<{ success: boolean; error?: string }>;
+  checkIn: (plan: string, photoUris?: string[]) => Promise<{ success: boolean; error?: string }>;
   updateCheckInPlan: (plan: string) => Promise<{ success: boolean; error?: string }>;
   checkOut: (report: string, photoUris?: string[]) => Promise<{ success: boolean; error?: string }>;
   fetchTodayLog: (userId: string) => Promise<{ success: boolean; error?: string }>;
@@ -122,6 +123,12 @@ interface WorkState {
 
   // Actions — Work History
   fetchWorkHistory: (userId: string, startDate?: string, endDate?: string) => Promise<{ data: WorkLog[], success: boolean; error?: string }>;
+  /** Tasks a user completed within a date range, for the attendance timeline. */
+  fetchCompletedTasksInRange: (userId: string, startDate: string, endDate: string) => Promise<{ data: Task[], success: boolean; error?: string }>;
+  /** Every team member's work log for a single day, for the team day view. */
+  fetchTeamDay: (date: string, managerId?: string) => Promise<{ data: WorkLogWithProfile[], success: boolean; error?: string }>;
+  /** Leave requests for a user within a date range. */
+  fetchLeaveInRange: (userId: string, startDate: string, endDate: string) => Promise<{ data: LeaveRequest[], success: boolean; error?: string }>;
 
   // Actions — Backfill Attendance
   fetchBackfillPermissions: (userId: string) => Promise<{ success: boolean; error?: string }>;
@@ -276,12 +283,34 @@ export const useWorkStore = create<WorkState>((set, get) => ({
   // MEMBER ACTIONS
   // ============================================================================
 
-  checkIn: async (plan: string) => {
+  checkIn: async (plan: string, photoUris?: string[]) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return { success: false, error: 'Not authenticated' };
 
       const today = format(new Date(), 'yyyy-MM-dd');
+
+      // Upload optional start-of-day photos into the same private bucket as
+      // checkout photos — paths are already user-scoped by RLS.
+      const uploadedPaths: string[] = [];
+      if (photoUris && photoUris.length > 0) {
+        for (let i = 0; i < photoUris.length; i++) {
+          const uri = photoUris[i];
+          const ext = uri.split('.').pop()?.split('?')[0] || 'jpg';
+          const path = `${user.id}/checkin_${Date.now()}_${i}.${ext}`;
+
+          try {
+            await uploadCheckoutPhoto(path, uri, ext);
+          } catch (uploadError: any) {
+            console.error('Failed to upload check-in image:', uploadError);
+            throw new Error(
+              `Failed to upload photo ${i + 1}: ${uploadError.message || uploadError}`
+            );
+          }
+
+          uploadedPaths.push(path);
+        }
+      }
 
       const { data, error } = await supabase
         .from('work_logs')
@@ -290,6 +319,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
           date: today,
           check_in_time: new Date().toISOString(),
           check_in_plan: plan,
+          check_in_photos: uploadedPaths.length > 0 ? uploadedPaths : null,
           status: 'pending_approval' as WorkLogStatus,
         })
         .select()
@@ -1157,6 +1187,74 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       const { data, error } = await query;
       if (error) return { data: [], success: false, error: error.message };
       return { data: (data || []) as WorkLog[], success: true };
+    } catch (err: any) {
+      return { data: [], success: false, error: err.message };
+    }
+  },
+
+  fetchCompletedTasksInRange: async (userId: string, startDate: string, endDate: string) => {
+    try {
+      // completed_at is a timestamp, so the upper bound must cover the whole end day.
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('assigned_to', userId)
+        .eq('status', 'done')
+        .not('completed_at', 'is', null)
+        .gte('completed_at', `${startDate}T00:00:00`)
+        .lte('completed_at', `${endDate}T23:59:59`)
+        .order('completed_at', { ascending: true });
+
+      if (error) return { data: [], success: false, error: error.message };
+      return { data: (data || []) as Task[], success: true };
+    } catch (err: any) {
+      return { data: [], success: false, error: err.message };
+    }
+  },
+
+  fetchLeaveInRange: async (userId: string, startDate: string, endDate: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('leave_requests')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      if (error) return { data: [], success: false, error: error.message };
+      return { data: (data || []) as LeaveRequest[], success: true };
+    } catch (err: any) {
+      return { data: [], success: false, error: err.message };
+    }
+  },
+
+  fetchTeamDay: async (date: string, managerId?: string) => {
+    try {
+      let query = supabase
+        .from('work_logs')
+        .select(`
+          *,
+          profiles!work_logs_user_id_fkey(full_name, employee_id, avatar_url, department, role)
+        `)
+        .eq('date', date);
+
+      // A manager only sees their own reports; an owner sees everyone.
+      if (managerId) {
+        const { data: reports, error: reportsError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('manager_id', managerId);
+
+        if (reportsError) return { data: [], success: false, error: reportsError.message };
+
+        const ids = (reports || []).map((r: { id: string }) => r.id);
+        if (ids.length === 0) return { data: [], success: true };
+        query = query.in('user_id', ids);
+      }
+
+      const { data, error } = await query;
+      if (error) return { data: [], success: false, error: error.message };
+      return { data: (data || []) as WorkLogWithProfile[], success: true };
     } catch (err: any) {
       return { data: [], success: false, error: err.message };
     }

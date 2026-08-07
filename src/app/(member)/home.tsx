@@ -1,5 +1,5 @@
 // ============================================================================
-// VEBOSSO EMS — Member Home Screen (Premium Fintech / Apple Wallet Aesthetic)
+// VEBOSSO EMS — Member Home Screen
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -12,14 +12,22 @@ import { CheckInModal } from '../../components/CheckInModal';
 import { CheckOutModal } from '../../components/CheckOutModal';
 import { InlineError } from '../../components/InlineError';
 import { StatusCardSkeleton } from '../../components/LoadingSkeleton';
+import { NotificationBell } from '../../components/NotificationBell';
 import { PageTransition } from '../../components/PageTransition';
 import { TaskCard } from '../../components/TaskCard';
-import { Colors } from '../../constants/colors';
+import {
+  AppTheme as T,
+  AppSpace,
+  AppRadius,
+  appShadow,
+  appSoftShadow,
+  RoleAccent,
+} from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { TaskStatus } from '../../types/database';
-import { NotificationBell } from '../../components/NotificationBell';
 
+const memberAccent = RoleAccent.member;
 
 export default function MemberHomeScreen() {
   const { profile } = useAuthStore();
@@ -52,12 +60,12 @@ export default function MemberHomeScreen() {
       console.warn('Profile not loaded yet');
       return;
     }
-    
+
     fetchTodayLog(profile.id);
     fetchTodayTasks(profile.id);
     fetchSettings();
     subscribeToRealtime(profile.id, 'member');
-    
+
     return () => unsubscribeFromRealtime();
   }, [profile?.id, fetchTodayLog, fetchTodayTasks, fetchSettings, subscribeToRealtime, unsubscribeFromRealtime]);
 
@@ -78,7 +86,7 @@ export default function MemberHomeScreen() {
 
   const onRefresh = async () => {
     if (!profile?.id) return;
-    
+
     setRefreshing(true);
     try {
       await Promise.all([
@@ -92,9 +100,9 @@ export default function MemberHomeScreen() {
     }
   };
 
-  const handleCheckIn = useCallback(async (plan: string) => {
+  const handleCheckIn = useCallback(async (plan: string, photoUris?: string[]) => {
     setCheckInLoading(true);
-    const result = await checkIn(plan);
+    const result = await checkIn(plan, photoUris);
     setCheckInLoading(false);
     if (result.success) {
       setShowCheckIn(false);
@@ -150,6 +158,8 @@ export default function MemberHomeScreen() {
     }
   };
 
+  const doneCount = todayTasks.filter((t) => t.status === 'done').length;
+
   const renderPlanSection = () => {
     const canEditPlan =
       todayLog?.status === 'working' || todayLog?.status === 'pending_approval';
@@ -158,9 +168,14 @@ export default function MemberHomeScreen() {
     return (
       <View style={styles.planSection}>
         <View style={styles.planHeader}>
-          <Text style={rowStyles.label}>Today&apos;s Plan</Text>
-          <AnimatedPressable style={styles.editPlanBtn} onPress={() => setShowEditPlan(true)}>
-            <Feather name="edit-2" size={14} color={Colors.accent} />
+          <Text style={styles.detailLabel}>Today&apos;s Plan</Text>
+          <AnimatedPressable
+            style={styles.editPlanBtn}
+            onPress={() => setShowEditPlan(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Update today's plan"
+          >
+            <Feather name="edit-2" size={14} color={T.inkSoft} />
             <Text style={styles.editPlanBtnText}>Update</Text>
           </AnimatedPressable>
         </View>
@@ -180,17 +195,21 @@ export default function MemberHomeScreen() {
     if (!todayLog) {
       return (
         <View style={styles.statusCard}>
-          <View style={styles.statusIconCircle}>
-            <Feather name="sun" size={32} color={Colors.warning} />
+          <View style={[styles.statusIconCircle, { backgroundColor: T.amberSoft }]}>
+            <Feather name="sun" size={28} color={T.amber} />
           </View>
-          <Text style={styles.statusTitle}>Good {new Date().getHours() < 12 ? 'morning' : 'afternoon'}!</Text>
+          <Text style={styles.statusTitle}>
+            Good {new Date().getHours() < 12 ? 'morning' : 'afternoon'}!
+          </Text>
           <Text style={styles.statusSubtitle}>Ready to start your work day?</Text>
           <AnimatedPressable
-            style={styles.startBtn}
+            style={styles.primaryBtn}
             onPress={() => setShowCheckIn(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Start day"
           >
-            <Feather name="play" size={16} color={Colors.white} />
-            <Text style={styles.startBtnText}>Start Day</Text>
+            <Feather name="play" size={16} color={T.white} />
+            <Text style={styles.primaryBtnText}>Start Day</Text>
           </AnimatedPressable>
         </View>
       );
@@ -200,39 +219,35 @@ export default function MemberHomeScreen() {
     if (todayLog.status === 'pending_approval') {
       return (
         <View style={styles.statusCard}>
-          <View style={styles.statusIconCircle}>
-            <Feather name="clock" size={32} color={Colors.warning} />
+          <View style={[styles.statusIconCircle, { backgroundColor: T.amberSoft }]}>
+            <Feather name="clock" size={28} color={T.amber} />
           </View>
-          <Text style={styles.heroLabel}>CHECK-IN REQUEST</Text>
-          <Text style={styles.heroValue}>Awaiting Approval</Text>
-          <Text style={styles.statusSubtitle}>Your check-in plan is being reviewed by your manager.</Text>
-          
+          <View style={[styles.stateChip, { backgroundColor: T.amberSoft }]}>
+            <Text style={[styles.stateChipText, { color: T.amber }]}>Awaiting approval</Text>
+          </View>
+          <Text style={styles.heroValue}>Check-in sent</Text>
+          <Text style={styles.statusSubtitle}>
+            Your manager is reviewing your plan. You can still end your day if needed.
+          </Text>
+
           <View style={styles.cardDetailsGroup}>
-            <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Status</Text>
-              <View style={[rowStyles.badge, { backgroundColor: Colors.warningLight }]}>
-                <Text style={[rowStyles.badgeText, { color: Colors.warning }]}>Pending</Text>
-              </View>
-            </View>
-            <View style={rowStyles.separator} />
-            <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Check-in Sent</Text>
-              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Sent at</Text>
+              <Text style={styles.detailValue}>{formatLogTime(todayLog.check_in_time)}</Text>
             </View>
           </View>
 
           {renderPlanSection()}
 
           <AnimatedPressable
-            style={styles.endBtn}
+            style={styles.destructiveBtn}
             onPress={() => setShowCheckOut(true)}
+            accessibilityRole="button"
+            accessibilityLabel="End day"
           >
-            <Feather name="power" size={16} color={Colors.error} />
-            <Text style={styles.endBtnText}>End Day</Text>
+            <Feather name="power" size={16} color={T.coral} />
+            <Text style={styles.destructiveBtnText}>End Day</Text>
           </AnimatedPressable>
-          <Text style={styles.endDayHint}>
-            You may end your day even if your check-in has not been approved.
-          </Text>
         </View>
       );
     }
@@ -241,38 +256,41 @@ export default function MemberHomeScreen() {
     if (todayLog.status === 'working') {
       return (
         <View style={styles.statusCard}>
-          <Text style={styles.heroLabel}>ELAPSED TIME TODAY</Text>
+          <View style={[styles.stateChip, { backgroundColor: memberAccent.soft }]}>
+            <View style={[styles.stateDot, { backgroundColor: memberAccent.color }]} />
+            <Text style={[styles.stateChipText, { color: memberAccent.color }]}>Working</Text>
+          </View>
+          <Text style={styles.heroLabel}>Elapsed today</Text>
           <Text style={styles.heroValue}>{elapsed || '00h 00m'}</Text>
-          
+
           <View style={styles.cardDetailsGroup}>
-            <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Status</Text>
-              <View style={[rowStyles.badge, { backgroundColor: Colors.successLight }]}>
-                <Text style={[rowStyles.badgeText, { color: Colors.memberAccent }]}>Working</Text>
-              </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Started</Text>
+              <Text style={styles.detailValue}>{formatLogTime(todayLog.check_in_time)}</Text>
             </View>
-            <View style={rowStyles.separator} />
-            <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Started At</Text>
-              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
-            </View>
-            <View style={rowStyles.separator} />
-            <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Tasks Completed</Text>
-              <Text style={rowStyles.value}>
-                {todayTasks.filter((t) => t.status === 'done').length}/{todayTasks.length}
-              </Text>
-            </View>
+            {todayTasks.length > 0 ? (
+              <>
+                <View style={styles.detailSeparator} />
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Tasks done</Text>
+                  <Text style={styles.detailValue}>
+                    {doneCount}/{todayTasks.length}
+                  </Text>
+                </View>
+              </>
+            ) : null}
           </View>
 
           {renderPlanSection()}
 
           <AnimatedPressable
-            style={styles.endBtn}
+            style={styles.destructiveBtn}
             onPress={() => setShowCheckOut(true)}
+            accessibilityRole="button"
+            accessibilityLabel="End day"
           >
-            <Feather name="power" size={16} color={Colors.error} />
-            <Text style={styles.endBtnText}>End Day</Text>
+            <Feather name="power" size={16} color={T.coral} />
+            <Text style={styles.destructiveBtnText}>End Day</Text>
           </AnimatedPressable>
         </View>
       );
@@ -282,21 +300,27 @@ export default function MemberHomeScreen() {
     if (todayLog.status === 'rejected') {
       return (
         <View style={styles.statusCard}>
-          <View style={styles.statusIconCircle}>
-            <Feather name="x-circle" size={32} color={Colors.error} />
+          <View style={[styles.statusIconCircle, { backgroundColor: T.coralSoft }]}>
+            <Feather name="x-circle" size={28} color={T.coral} />
           </View>
-          <Text style={styles.heroLabel}>CHECK-IN REJECTED</Text>
-          <Text style={styles.heroValue}>Try Again</Text>
-          {todayLog.rejection_reason && (
-            <Text style={styles.rejectionReason}>Reason: &quot;{todayLog.rejection_reason}&quot;</Text>
-          )}
-          <Text style={styles.statusSubtitle}>Please update your plan and submit another check-in.</Text>
+          <View style={[styles.stateChip, { backgroundColor: T.coralSoft }]}>
+            <Text style={[styles.stateChipText, { color: T.coral }]}>Rejected</Text>
+          </View>
+          <Text style={styles.heroValue}>Try again</Text>
+          {todayLog.rejection_reason ? (
+            <Text style={styles.rejectionReason}>{todayLog.rejection_reason}</Text>
+          ) : null}
+          <Text style={styles.statusSubtitle}>
+            Update your plan and submit another check-in.
+          </Text>
           <AnimatedPressable
-            style={styles.startBtn}
+            style={styles.primaryBtn}
             onPress={() => setShowCheckIn(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Re-submit check-in"
           >
-            <Feather name="refresh-cw" size={16} color={Colors.white} />
-            <Text style={styles.startBtnText}>Re-submit Check-in</Text>
+            <Feather name="refresh-cw" size={16} color={T.white} />
+            <Text style={styles.primaryBtnText}>Re-submit Check-in</Text>
           </AnimatedPressable>
         </View>
       );
@@ -306,29 +330,26 @@ export default function MemberHomeScreen() {
     if (todayLog.status === 'pending_checkout') {
       return (
         <View style={styles.statusCard}>
-          <View style={styles.statusIconCircle}>
-            <Feather name="clock" size={32} color={Colors.warning} />
+          <View style={[styles.statusIconCircle, { backgroundColor: T.amberSoft }]}>
+            <Feather name="clock" size={28} color={T.amber} />
           </View>
-          <Text style={styles.heroLabel}>CHECK-OUT REQUEST</Text>
-          <Text style={styles.heroValue}>Awaiting Approval</Text>
-          <Text style={styles.statusSubtitle}>Your day report and check-out are being reviewed by your manager.</Text>
-          
+          <View style={[styles.stateChip, { backgroundColor: T.amberSoft }]}>
+            <Text style={[styles.stateChipText, { color: T.amber }]}>Checkout pending</Text>
+          </View>
+          <Text style={styles.heroValue}>Awaiting review</Text>
+          <Text style={styles.statusSubtitle}>
+            Your day report is with your manager.
+          </Text>
+
           <View style={styles.cardDetailsGroup}>
-            <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Status</Text>
-              <View style={[rowStyles.badge, { backgroundColor: Colors.warningLight }]}>
-                <Text style={[rowStyles.badgeText, { color: Colors.warning }]}>Pending Review</Text>
-              </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Check-in</Text>
+              <Text style={styles.detailValue}>{formatLogTime(todayLog.check_in_time)}</Text>
             </View>
-            <View style={rowStyles.separator} />
-            <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Check-in</Text>
-              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
-            </View>
-            <View style={rowStyles.separator} />
-            <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Check-out Sent</Text>
-              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_out_time)}</Text>
+            <View style={styles.detailSeparator} />
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Check-out sent</Text>
+              <Text style={styles.detailValue}>{formatLogTime(todayLog.check_out_time)}</Text>
             </View>
           </View>
         </View>
@@ -337,31 +358,29 @@ export default function MemberHomeScreen() {
 
     // Done
     if (todayLog.status === 'done') {
-      const formattedHours = todayLog.total_hours ? `${Math.floor(todayLog.total_hours)}h ${Math.round((todayLog.total_hours % 1) * 60)}m` : '--';
+      const formattedHours = todayLog.total_hours
+        ? `${Math.floor(todayLog.total_hours)}h ${Math.round((todayLog.total_hours % 1) * 60)}m`
+        : '--';
       return (
         <View style={styles.statusCard}>
-          <View style={styles.statusIconCircle}>
-            <Feather name="check-circle" size={32} color={Colors.success} />
+          <View style={[styles.statusIconCircle, { backgroundColor: T.greenSoft }]}>
+            <Feather name="check-circle" size={28} color={T.green} />
           </View>
-          <Text style={styles.heroLabel}>TOTAL HOURS LOGGED</Text>
+          <View style={[styles.stateChip, { backgroundColor: T.greenSoft }]}>
+            <Text style={[styles.stateChipText, { color: T.green }]}>Day complete</Text>
+          </View>
+          <Text style={styles.heroLabel}>Hours logged</Text>
           <Text style={styles.heroValue}>{formattedHours}</Text>
-          
+
           <View style={styles.cardDetailsGroup}>
-            <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Status</Text>
-              <View style={[rowStyles.badge, { backgroundColor: Colors.successLight }]}>
-                <Text style={[rowStyles.badgeText, { color: Colors.success }]}>Completed</Text>
-              </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Check-in</Text>
+              <Text style={styles.detailValue}>{formatLogTime(todayLog.check_in_time)}</Text>
             </View>
-            <View style={rowStyles.separator} />
-            <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Check-in</Text>
-              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
-            </View>
-            <View style={rowStyles.separator} />
-            <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Check-out</Text>
-              <Text style={rowStyles.value}>{formatLogTime(todayLog.check_out_time)}</Text>
+            <View style={styles.detailSeparator} />
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Check-out</Text>
+              <Text style={styles.detailValue}>{formatLogTime(todayLog.check_out_time)}</Text>
             </View>
           </View>
         </View>
@@ -373,130 +392,96 @@ export default function MemberHomeScreen() {
 
   return (
     <>
-    <PageTransition>
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header Greeting */}
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.greeting}>
-            Hello, {profile?.full_name?.split(' ')[0] || 'there'} 👋
-          </Text>
-          <Text style={styles.date}>{format(new Date(), 'EEEE, MMMM dd')}</Text>
-        </View>
-        <NotificationBell role="member" />
-      </View>
-
-      {/* Primary Dashboard Card */}
-      <View style={styles.content}>
-        {todayError && !isLoadingToday ? (
-          <InlineError
-            message={todayError}
-            onRetry={() => profile?.id && fetchTodayLog(profile.id)}
-          />
-        ) : (
-          renderStatusCard()
-        )}
-      </View>
-
-      {/* Today's Tasks */}
-      {todayTasks.length > 0 && (
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Today&apos;s Tasks</Text>
-          <View style={styles.tasksContainer}>
-            {todayTasks.map((task, index) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onStatusChange={handleStatusChange}
-                isLast={index === todayTasks.length - 1}
-              />
-            ))}
+      <PageTransition>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.charcoal} />
+          }
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.greeting}>
+                Hello, {profile?.full_name?.split(' ')[0] || 'there'}
+              </Text>
+              <Text style={styles.date}>{format(new Date(), 'EEEE, MMMM dd')}</Text>
+            </View>
+            <NotificationBell role="member" />
           </View>
-        </View>
-      )}
 
-    </ScrollView>
-    </PageTransition>
+          <View style={styles.content}>
+            {todayError && !isLoadingToday ? (
+              <InlineError
+                message={todayError}
+                onRetry={() => profile?.id && fetchTodayLog(profile.id)}
+              />
+            ) : (
+              renderStatusCard()
+            )}
+          </View>
 
-    {showCheckIn ? (
-      <CheckInModal
-        visible
-        onDismiss={handleDismissCheckIn}
-        onSubmit={handleCheckIn}
-        isLoading={checkInLoading}
-      />
-    ) : null}
-    {showEditPlan ? (
-      <CheckInModal
-        visible
-        mode="edit"
-        initialPlan={todayLog?.check_in_plan ?? ''}
-        onDismiss={handleDismissEditPlan}
-        onSubmit={handleUpdatePlan}
-        isLoading={editPlanLoading}
-      />
-    ) : null}
-    {showCheckOut ? (
-      <CheckOutModal
-        visible
-        onDismiss={handleDismissCheckOut}
-        onSubmit={handleCheckOut}
-        isLoading={checkOutLoading}
-      />
-    ) : null}
-    <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>{snackMessage}</Snackbar>
+          {todayTasks.length > 0 && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Today&apos;s Tasks</Text>
+              <View style={styles.tasksContainer}>
+                {todayTasks.map((task, index) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    onStatusChange={handleStatusChange}
+                    isLast={index === todayTasks.length - 1}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
+        </ScrollView>
+      </PageTransition>
+
+      {showCheckIn ? (
+        <CheckInModal
+          visible
+          onDismiss={handleDismissCheckIn}
+          onSubmit={handleCheckIn}
+          isLoading={checkInLoading}
+        />
+      ) : null}
+      {showEditPlan ? (
+        <CheckInModal
+          visible
+          mode="edit"
+          initialPlan={todayLog?.check_in_plan ?? ''}
+          onDismiss={handleDismissEditPlan}
+          onSubmit={handleUpdatePlan}
+          isLoading={editPlanLoading}
+        />
+      ) : null}
+      {showCheckOut ? (
+        <CheckOutModal
+          visible
+          onDismiss={handleDismissCheckOut}
+          onSubmit={handleCheckOut}
+          isLoading={checkOutLoading}
+        />
+      ) : null}
+      <Snackbar
+        visible={!!snackMessage}
+        onDismiss={() => setSnackMessage('')}
+        duration={3000}
+        wrapperStyle={{ marginBottom: 90 }}
+      >
+        {snackMessage}
+      </Snackbar>
     </>
   );
 }
 
-// ============================================================================
-// Styles
-// ============================================================================
-
-const rowStyles = StyleSheet.create({
-  rowContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    minHeight: 46,
-  },
-  label: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  value: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-    color: Colors.textPrimary,
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  badgeText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 11,
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.divider,
-    marginHorizontal: 16,
-  },
-});
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: T.bg,
   },
   scrollContent: {
     paddingBottom: 110,
@@ -508,164 +493,188 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
+    paddingHorizontal: AppSpace.screen,
+    paddingTop: Platform.OS === 'ios' ? 60 : 44,
     paddingBottom: 12,
   },
   greeting: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 28,
-    color: Colors.textPrimary,
-    letterSpacing: -0.7,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 30,
+    color: T.ink,
+    letterSpacing: -0.9,
   },
   date: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 2,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: T.mute,
+    marginTop: 3,
   },
   content: {
-    paddingHorizontal: 20,
+    paddingHorizontal: AppSpace.screen,
     marginTop: 8,
   },
   statusCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 28,
+    backgroundColor: T.card,
+    borderRadius: AppRadius.hero,
     padding: 24,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.04)',
-    ...Colors.shadowHeavy,
+    ...appShadow,
   },
   statusIconCircle: {
     width: 64,
     height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
+  },
+  stateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    height: 28,
+    borderRadius: AppRadius.pill,
+    marginBottom: 10,
+  },
+  stateDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  stateChipText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    letterSpacing: -0.1,
   },
   statusTitle: {
-    fontFamily: 'Inter_800ExtraBold',
+    fontFamily: 'Inter_700Bold',
     fontSize: 22,
-    color: Colors.textPrimary,
+    color: T.ink,
     letterSpacing: -0.4,
   },
   statusSubtitle: {
     fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    color: Colors.textSecondary,
+    fontSize: 14,
+    color: T.inkSoft,
     marginTop: 6,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
     paddingHorizontal: 8,
   },
-  // Hero Values
   heroLabel: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 11,
-    color: Colors.textSecondary,
-    letterSpacing: 1,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: T.mute,
+    letterSpacing: -0.1,
     textAlign: 'center',
   },
   heroValue: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 38,
-    color: Colors.textPrimary,
-    letterSpacing: -1,
-    marginVertical: 4,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 36,
+    color: T.ink,
+    letterSpacing: -0.9,
+    marginVertical: 2,
     textAlign: 'center',
   },
   cardDetailsGroup: {
     width: '100%',
-    backgroundColor: Colors.surfaceLight,
+    backgroundColor: T.soft,
     borderRadius: 16,
     marginTop: 18,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.divider,
   },
-  // Buttons
-  startBtn: {
+  detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.accent,
-    borderRadius: 24,
-    width: '100%',
-    height: 48,
-    marginTop: 20,
-    gap: 8,
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    minHeight: 46,
   },
-  startBtnText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 14,
-    color: Colors.white,
-  },
-  endBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.errorLight,
-    borderRadius: 24,
-    width: '100%',
-    height: 48,
-    marginTop: 20,
-    gap: 8,
-  },
-  endBtnText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 14,
-    color: Colors.error,
-  },
-  endDayHint: {
+  detailLabel: {
     fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 10,
+    fontSize: 14,
+    color: T.inkSoft,
   },
-  btnPressed: {
-    transform: [{ scale: 0.97 }],
-    opacity: 0.9,
+  detailValue: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    color: T.ink,
+  },
+  detailSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: T.hairline,
+    marginHorizontal: 16,
+  },
+  primaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: T.charcoal,
+    borderRadius: AppRadius.pill,
+    width: '100%',
+    height: 52,
+    marginTop: 22,
+    gap: 8,
+    ...appSoftShadow,
+  },
+  primaryBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: T.white,
+    letterSpacing: -0.1,
+  },
+  destructiveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: T.coralSoft,
+    borderRadius: AppRadius.pill,
+    width: '100%',
+    height: 52,
+    marginTop: 20,
+    gap: 8,
+  },
+  destructiveBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: T.coral,
+    letterSpacing: -0.1,
   },
   rejectionReason: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_400Regular',
     fontSize: 13,
-    color: Colors.error,
-    backgroundColor: Colors.errorLight,
+    color: T.coral,
+    backgroundColor: T.coralSoft,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginTop: 8,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginTop: 10,
     textAlign: 'center',
+    overflow: 'hidden',
   },
-  // Task sections
   sectionContainer: {
-    marginTop: 24,
-    paddingHorizontal: 20,
+    marginTop: AppSpace.xxl,
+    paddingHorizontal: AppSpace.screen,
   },
   sectionTitle: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 8,
-    marginLeft: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    fontSize: 17,
+    color: T.ink,
+    letterSpacing: -0.35,
+    marginBottom: 10,
   },
   tasksContainer: {
-    paddingTop: 4,
+    paddingTop: 2,
+    gap: 10,
   },
   planSection: {
     width: '100%',
     marginTop: 16,
     padding: 16,
-    backgroundColor: Colors.surfaceLight,
+    backgroundColor: T.soft,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   planHeader: {
     flexDirection: 'row',
@@ -676,26 +685,26 @@ const styles = StyleSheet.create({
   planText: {
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
-    color: Colors.textPrimary,
+    color: T.ink,
     lineHeight: 20,
   },
   planPlaceholder: {
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: T.mute,
     lineHeight: 20,
-    fontStyle: 'italic',
   },
   editPlanBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   editPlanBtnText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
-    color: Colors.accent,
+    color: T.inkSoft,
   },
 });

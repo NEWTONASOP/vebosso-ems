@@ -3,7 +3,7 @@
 // ============================================================================
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, Platform, Pressable } from 'react-native';
+import { View, StyleSheet, FlatList, RefreshControl, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Snackbar, Text } from 'react-native-paper';
 import { Feather } from '@expo/vector-icons';
@@ -14,7 +14,7 @@ import { LeaveCard } from '../../components/LeaveCard';
 import { LeaveRequestModal } from '../../components/LeaveRequestModal';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
-import { Colors } from '../../constants/colors';
+import { AppSpace, AppTheme, screenChrome } from '../../constants/theme';
 
 export default function LeavesScreen() {
   const router = useRouter();
@@ -65,33 +65,42 @@ export default function LeavesScreen() {
   const myLeaves = leaveRequests.filter((l) => l.user_id === profile?.id);
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
+    <View style={screenChrome.root}>
       <View style={styles.header}>
         <Pressable
           style={({ pressed }) => [
+            screenChrome.iconButton,
             styles.backBtn,
-            pressed && styles.btnPressed
+            pressed && styles.btnPressed,
           ]}
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
-          <Feather name="arrow-left" size={18} color={Colors.textPrimary} />
+          <Feather name="arrow-left" size={18} color={AppTheme.ink} />
         </Pressable>
-        <Text style={styles.title}>My Leaves</Text>
-        <View style={{ flex: 1 }} />
+        <View style={styles.headerText}>
+          <Text style={screenChrome.title}>My Leaves</Text>
+          <Text style={screenChrome.subtitle}>
+            {myLeaves.length === 0
+              ? 'Request time off when you need it'
+              : `${myLeaves.length} request${myLeaves.length === 1 ? '' : 's'}`}
+          </Text>
+        </View>
         <Pressable
           style={({ pressed }) => [
-            styles.newBtn,
-            pressed && styles.btnPressed
+            screenChrome.primaryPill,
+            pressed && styles.btnPressed,
           ]}
           onPress={() => setModalVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Apply for leave"
         >
-          <Feather name="plus" size={16} color={Colors.white} />
-          <Text style={styles.newBtnText}>Apply</Text>
+          <Feather name="plus" size={16} color={AppTheme.white} />
+          <Text style={screenChrome.primaryPillText}>Apply</Text>
         </Pressable>
       </View>
 
-      {/* Main List */}
       {isLoadingLeaves && !refreshing ? (
         <View style={styles.skeletonContainer}>
           <ListSkeleton count={3} variant="approval" />
@@ -108,15 +117,15 @@ export default function LeavesScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={Colors.accent}
-              colors={[Colors.accent]}
+              tintColor={AppTheme.charcoal}
+              colors={[AppTheme.charcoal]}
             />
           }
           ListEmptyComponent={
             <EmptyState
               icon="calendar-blank"
-              title="No Leave Requests"
-              subtitle="You haven't requested any leaves yet."
+              title="No leave requests yet"
+              subtitle="Need a day off? Submit a request and your owner will review it."
               actionLabel="Apply for Leave"
               onAction={() => setModalVisible(true)}
             />
@@ -124,7 +133,6 @@ export default function LeavesScreen() {
         />
       )}
 
-      {/* Leave Request Modal */}
       {modalVisible ? (
         <LeaveRequestModal
           visible
@@ -134,12 +142,11 @@ export default function LeavesScreen() {
         />
       ) : null}
 
-      {/* Success/Error Toast */}
       <Snackbar
         visible={!!snackMessage}
         onDismiss={() => setSnackMessage('')}
         duration={3000}
-        theme={{ colors: { inverseSurface: '#1C1C1E', inverseOnSurface: '#FFFFFF' } }}
+        theme={{ colors: { inverseSurface: AppTheme.charcoal, inverseOnSurface: AppTheme.white } }}
         wrapperStyle={{ marginBottom: 20 }}
       >
         {snackMessage}
@@ -149,61 +156,31 @@ export default function LeavesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
+    paddingHorizontal: AppSpace.screen,
+    paddingTop: screenChrome.headerRow.paddingTop,
     paddingBottom: 12,
     gap: 12,
   },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
-    elevation: 1,
+    flexShrink: 0,
+  },
+  headerText: {
+    flex: 1,
   },
   btnPressed: {
     transform: [{ scale: 0.97 }],
     opacity: 0.9,
   },
-  title: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 24,
-    color: Colors.textPrimary,
-    letterSpacing: -0.5,
-  },
-  newBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.accent,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-    gap: 6,
-  },
-  newBtnText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 13,
-    color: Colors.white,
-  },
   skeletonContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: AppSpace.screen,
     paddingTop: 14,
   },
   list: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    paddingTop: 14,
+    ...screenChrome.listPad,
+    paddingTop: 8,
+    flexGrow: 1,
   },
 });

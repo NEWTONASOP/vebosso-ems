@@ -6,12 +6,20 @@ import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { InfoRow } from '../../components/InfoRow';
 import { PageTransition } from '../../components/PageTransition';
-import { Colors } from '../../constants/colors';
 import { APP_NAME, ROLE_LABELS } from '../../constants/roles';
+import {
+  AppRadius,
+  AppSpace,
+  AppTheme,
+  RoleAccent,
+  appShadow,
+  appSoftShadow,
+  screenChrome,
+} from '../../constants/theme';
 import { Alert } from '../../lib/alert';
 import { useAuthStore } from '../../store/authStore';
 
@@ -28,8 +36,6 @@ export default function ManagerSettingsScreen() {
 
   if (!profile) return null;
 
-  const roleColor = Colors.managerAccent;
-
   const getJoinedDate = () => {
     try {
       return format(new Date(profile.created_at), 'MMM d, yyyy');
@@ -40,67 +46,86 @@ export default function ManagerSettingsScreen() {
 
   return (
     <PageTransition>
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <View style={[styles.miniAvatar, { backgroundColor: roleColor }]}>
-              <Text style={styles.miniAvatarText}>
-                {profile.full_name.substring(0, 1).toUpperCase()}
+      <ScrollView
+        style={screenChrome.root}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={screenChrome.header}>
+          <Text style={screenChrome.title}>Profile</Text>
+        </View>
+
+        {/* Profile card — role accent on avatar only */}
+        <View style={styles.profileCard}>
+          <View style={styles.profileAvatar}>
+            <Text style={styles.avatarText}>
+              {profile.full_name.substring(0, 2).toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>{profile.full_name}</Text>
+            <View style={styles.roleBadge}>
+              <View style={styles.roleDot} />
+              <Text style={styles.profileRole}>
+                {ROLE_LABELS[profile.role]} • {profile.employee_id}
               </Text>
             </View>
           </View>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <View style={styles.headerRight} />
         </View>
 
-        {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <Text style={styles.heroLabel}>EMPLOYEE CODE</Text>
-          <Text style={styles.heroValue}>{profile.employee_id}</Text>
-          <View style={styles.badgeContainer}>
-            <View style={[styles.rolePill, { backgroundColor: roleColor }]}>
-              <Text style={styles.rolePillText}>{ROLE_LABELS[profile.role]}</Text>
+        <Text style={styles.sectionLabel}>Details</Text>
+        <View style={styles.groupedCard}>
+          <InfoRow
+            label="Status"
+            value="Active"
+            valueBadge
+            badgeColor={AppTheme.greenSoft}
+            badgeTextColor={AppTheme.green}
+          />
+          <InfoRow label="Full Name" value={profile.full_name} />
+          <InfoRow label="Designation" value={profile.department || 'Not assigned'} />
+          <InfoRow label="Joined" value={getJoinedDate()} isLast />
+        </View>
+
+        <Text style={styles.sectionLabel}>Security & settings</Text>
+        <View style={styles.groupedCard}>
+          <ActionRow
+            label="Change Password"
+            subtitle="Update your account password"
+            icon="key"
+            iconColor={AppTheme.amber}
+            iconBg={AppTheme.amberSoft}
+            onPress={() => router.push('/(auth)/change-password')}
+          />
+          <View style={styles.separator} />
+          <ActionRow
+            label="Leave Requests"
+            subtitle="Apply for time off and track status"
+            icon="calendar"
+            iconColor={AppTheme.blue}
+            iconBg={AppTheme.blueSoft}
+            onPress={() => router.push('/(manager)/leaves')}
+          />
+        </View>
+
+        <View style={styles.signOutCard}>
+          <Pressable
+            style={({ pressed }) => [styles.actionRow, pressed && styles.rowPressed]}
+            onPress={handleSignOut}
+            accessibilityRole="button"
+            accessibilityLabel="Sign Out"
+          >
+            <View style={[styles.iconContainer, { backgroundColor: AppTheme.coralSoft }]}>
+              <Feather name="log-out" size={18} color={AppTheme.coral} />
             </View>
-          </View>
+            <View style={styles.actionInfo}>
+              <Text style={styles.signOutTitle}>Sign Out</Text>
+              <Text style={styles.actionSubtitle}>Log out of your account</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={AppTheme.coral} />
+          </Pressable>
         </View>
 
-        {/* Details Card */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Details</Text>
-          <View style={styles.groupedCard}>
-            <InfoRow label="Status" value="Active" valueBadge badgeColor={Colors.successLight} badgeTextColor={Colors.success} />
-            <InfoRow label="Full Name" value={profile.full_name} />
-            <InfoRow label="Designation" value={profile.department || 'Not assigned'} />
-            <InfoRow label="Joined" value={getJoinedDate()} isLast />
-          </View>
-        </View>
-
-        {/* Security & Settings Card */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Security & Settings</Text>
-          <View style={styles.groupedCard}>
-            <ActionRow
-              label="Change Password"
-              icon="key"
-              onPress={() => router.push('/(auth)/change-password')}
-            />
-            <ActionRow
-              label="Leave Requests"
-              icon="calendar"
-              onPress={() => router.push('/(manager)/leaves')}
-            />
-            <ActionRow
-              label="Sign Out"
-              icon="log-out"
-              onPress={handleSignOut}
-              isDestructive
-              isLast
-            />
-          </View>
-        </View>
-
-        {/* App Info */}
         <View style={styles.appInfo}>
           <Text style={styles.appName}>{APP_NAME} EMS</Text>
           <Text style={styles.appVersion}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
@@ -116,172 +141,174 @@ export default function ManagerSettingsScreen() {
 
 interface ActionRowProps {
   label: string;
+  subtitle: string;
   icon: string;
+  iconColor: string;
+  iconBg: string;
   onPress: () => void;
-  isDestructive?: boolean;
-  isLast?: boolean;
 }
 
-function ActionRow({ label, icon, onPress, isDestructive, isLast }: ActionRowProps) {
+function ActionRow({ label, subtitle, icon, iconColor, iconBg, onPress }: ActionRowProps) {
   return (
     <Pressable
-      style={({ pressed }) => [rowStyles.rowWrapper, pressed && rowStyles.pressed]}
+      style={({ pressed }) => [styles.actionRow, pressed && styles.rowPressed]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
-      <View style={rowStyles.rowContent}>
-        <Text style={[rowStyles.label, isDestructive && rowStyles.destructiveText]}>
-          {label}
-        </Text>
-        <Feather
-          name={icon as any}
-          size={16}
-          color={isDestructive ? Colors.error : Colors.textSecondary}
-        />
+      <View style={[styles.iconContainer, { backgroundColor: iconBg }]}>
+        <Feather name={icon as any} size={18} color={iconColor} />
       </View>
-      {!isLast && <View style={rowStyles.separator} />}
+      <View style={styles.actionInfo}>
+        <Text style={styles.actionTitle}>{label}</Text>
+        <Text style={styles.actionSubtitle}>{subtitle}</Text>
+      </View>
+      <Feather name="chevron-right" size={16} color={AppTheme.mute} />
     </Pressable>
   );
 }
 
-const rowStyles = StyleSheet.create({
-  rowWrapper: {
-    backgroundColor: Colors.surface,
-  },
-  pressed: {
-    backgroundColor: Colors.surfacePressed,
-  },
-  rowContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    minHeight: 48,
-  },
-  label: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 15,
-    color: Colors.textSecondary,
-  },
-  destructiveText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: Colors.error,
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.divider,
-    marginHorizontal: 16,
-  },
-});
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
   scrollContent: {
     paddingBottom: 110,
     width: '100%',
     maxWidth: 600,
     alignSelf: 'center',
   },
-  header: {
+  profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
-    paddingBottom: 12,
+    backgroundColor: AppTheme.card,
+    marginHorizontal: AppSpace.screen,
+    marginTop: 8,
+    borderRadius: AppRadius.hero,
+    padding: 20,
+    ...appShadow,
+    gap: 16,
   },
-  headerLeft: {
-    width: 40,
-    alignItems: 'flex-start',
-  },
-  miniAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  profileAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: RoleAccent.manager.soft,
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarText: {
+    fontFamily: 'Inter_700Bold',
+    color: RoleAccent.manager.color,
+    fontSize: 20,
+    letterSpacing: -0.4,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 18,
+    color: AppTheme.ink,
+    letterSpacing: -0.3,
+  },
+  roleBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 4,
   },
-  miniAvatarText: {
-    fontFamily: 'Inter_700Bold',
-    color: Colors.white,
-    fontSize: 14,
+  roleDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: RoleAccent.manager.color,
+    marginRight: 6,
   },
-  headerTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 17,
-    color: Colors.textPrimary,
-  },
-  headerRight: {
-    width: 40,
-    alignItems: 'flex-end',
-  },
-  heroSection: {
-    alignItems: 'center',
-    paddingVertical: 28,
-  },
-  heroLabel: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-    color: Colors.textSecondary,
-    letterSpacing: 1,
-  },
-  heroValue: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 42,
-    color: Colors.textPrimary,
-    letterSpacing: -1,
-    marginVertical: 4,
-  },
-  badgeContainer: {
-    marginTop: 6,
-  },
-  rolePill: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
-  },
-  rolePillText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: Colors.white,
-    fontSize: 12,
-  },
-  sectionContainer: {
-    marginTop: 20,
-    paddingHorizontal: 20,
-  },
-  sectionTitle: {
-    fontFamily: 'Inter_700Bold',
+  profileRole: {
+    fontFamily: 'Inter_500Medium',
     fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 8,
-    marginLeft: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    color: AppTheme.mute,
+  },
+  sectionLabel: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    color: AppTheme.mute,
+    letterSpacing: -0.1,
+    paddingHorizontal: AppSpace.screen,
+    marginTop: 24,
+    marginBottom: 10,
   },
   groupedCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
+    backgroundColor: AppTheme.card,
+    marginHorizontal: AppSpace.screen,
+    borderRadius: AppRadius.card,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    ...appSoftShadow,
+  },
+  signOutCard: {
+    backgroundColor: AppTheme.card,
+    marginHorizontal: AppSpace.screen,
+    marginTop: 16,
+    borderRadius: AppRadius.card,
+    overflow: 'hidden',
+    ...appSoftShadow,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 56,
+    backgroundColor: AppTheme.card,
+  },
+  rowPressed: {
+    backgroundColor: AppTheme.soft,
+  },
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  actionInfo: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  actionTitle: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: AppTheme.ink,
+    letterSpacing: -0.2,
+  },
+  actionSubtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: AppTheme.mute,
+    marginTop: 2,
+  },
+  signOutTitle: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: AppTheme.coral,
+    letterSpacing: -0.2,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: AppTheme.hairline,
+    marginLeft: 64,
   },
   appInfo: {
     alignItems: 'center',
     paddingVertical: 36,
   },
   appName: {
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
-    color: Colors.textTertiary,
+    color: AppTheme.mute,
   },
   appVersion: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 10,
-    color: Colors.textTertiary,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: AppTheme.mute,
     marginTop: 2,
   },
 });

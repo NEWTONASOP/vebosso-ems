@@ -7,7 +7,7 @@ import { addDays, format, isValid, parseISO } from 'date-fns';
 import { useCallback, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Chip, HelperText, Icon, Modal, Portal, Text } from 'react-native-paper';
-import { Colors } from '../constants/colors';
+import { AppTheme, appShadow, appSoftShadow } from '../constants/theme';
 import { ROLE_LABELS } from '../constants/roles';
 import { Profile } from '../types/database';
 import { PaperOutlinedField } from './PaperOutlinedField';
@@ -18,6 +18,17 @@ interface AssignTaskModalProps {
   onSubmit: (title: string, description: string | null, dueDate: string | null) => Promise<void>;
   targetMember: Profile | null;
   isLoading?: boolean;
+}
+
+function getAvatarColors(role: Profile['role'] | undefined) {
+  switch (role) {
+    case 'owner':
+      return { bg: AppTheme.coralSoft, text: AppTheme.coral };
+    case 'manager':
+      return { bg: AppTheme.blueSoft, text: AppTheme.blue };
+    default:
+      return { bg: AppTheme.greenSoft, text: AppTheme.green };
+  }
 }
 
 export function AssignTaskModal({
@@ -88,15 +99,6 @@ export function AssignTaskModal({
   const today = format(new Date(), 'yyyy-MM-dd');
   const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd');
 
-  const getAvatarColors = () => {
-    if (!targetMember) return { bg: Colors.accent + '15', text: Colors.accent };
-    switch (targetMember.role) {
-      case 'owner': return { bg: '#FF6B6B15', text: '#FF6B6B' };
-      case 'manager': return { bg: '#4ECDC415', text: '#4ECDC4' };
-      case 'member': default: return { bg: '#95E1D315', text: '#95E1D3' };
-    }
-  };
-
   const formatDueDateDisplay = (date: string | null) => {
     if (!date) return 'No due date';
     if (date === today) return 'Today';
@@ -108,7 +110,7 @@ export function AssignTaskModal({
     }
   };
 
-  const avatarColors = getAvatarColors();
+  const avatarColors = getAvatarColors(targetMember?.role);
 
   return (
     <Portal>
@@ -123,7 +125,6 @@ export function AssignTaskModal({
             keyboardShouldPersistTaps="handled"
             bounces={false}
           >
-          {/* Member Info Header */}
           {targetMember && (
             <View style={styles.memberHeader}>
               <Avatar.Text
@@ -134,15 +135,16 @@ export function AssignTaskModal({
               />
               <View style={styles.memberInfo}>
                 <Text style={styles.memberName}>{targetMember.full_name}</Text>
-                <Text style={styles.memberRole}>{ROLE_LABELS[targetMember.role]}</Text>
+                <View style={styles.roleChip}>
+                  <Text style={styles.memberRole}>{ROLE_LABELS[targetMember.role]}</Text>
+                </View>
               </View>
             </View>
           )}
 
-          {/* Header */}
           <View style={styles.header}>
             <View style={styles.iconCircle}>
-              <Feather name="clipboard" size={24} color={Colors.accent} />
+              <Feather name="clipboard" size={22} color={AppTheme.charcoal} />
             </View>
             <Text style={styles.title}>Assign Task</Text>
             <Text style={styles.subtitle}>
@@ -173,7 +175,6 @@ export function AssignTaskModal({
             editable={!isLoading}
           />
 
-          {/* Due Date Section */}
           <View style={styles.dueDateSection}>
             <Text style={styles.dueDateLabel}>Due Date</Text>
             <View style={styles.quickChipsContainer}>
@@ -188,7 +189,7 @@ export function AssignTaskModal({
                   styles.chipText,
                   dueDate === today && styles.chipTextSelected,
                 ]}
-                selectedColor={Colors.white}
+                selectedColor={AppTheme.white}
                 mode={dueDate === today ? 'flat' : 'outlined'}
               >
                 Today
@@ -204,7 +205,7 @@ export function AssignTaskModal({
                   styles.chipText,
                   dueDate === tomorrow && styles.chipTextSelected,
                 ]}
-                selectedColor={Colors.white}
+                selectedColor={AppTheme.white}
                 mode={dueDate === tomorrow ? 'flat' : 'outlined'}
               >
                 Tomorrow
@@ -220,38 +221,38 @@ export function AssignTaskModal({
                   styles.chipText,
                   dueDate === null && styles.chipTextSelected,
                 ]}
-                selectedColor={Colors.white}
+                selectedColor={AppTheme.white}
                 mode={dueDate === null ? 'flat' : 'outlined'}
               >
                 No Date
               </Chip>
             </View>
 
-            {/* Custom Date Trigger Button */}
             {!showDateInput && (!dueDate || dueDate === today || dueDate === tomorrow) && (
               <Button
                 mode="text"
                 compact
                 icon="calendar-plus"
-                textColor={Colors.accent}
+                textColor={AppTheme.charcoal}
                 onPress={() => setShowDateInput(true)}
                 style={styles.customDateTrigger}
+                labelStyle={styles.customDateTriggerLabel}
               >
                 Or select custom date...
               </Button>
             )}
 
-            {/* Custom Date Input */}
             {!showDateInput && dueDate && dueDate !== today && dueDate !== tomorrow && (
               <View style={styles.customDateDisplay}>
                 <View style={styles.customDateBadge}>
-                  <Icon source="calendar" size={16} color={Colors.accent} />
+                  <Icon source="calendar" size={16} color={AppTheme.charcoal} />
                   <Text style={styles.customDateText}>{formatDueDateDisplay(dueDate)}</Text>
                 </View>
                 <Button
                   compact
-                  textColor={Colors.textSecondary}
+                  textColor={AppTheme.mute}
                   onPress={() => setShowDateInput(true)}
+                  labelStyle={styles.changeDateLabel}
                 >
                   Change
                 </Button>
@@ -273,11 +274,12 @@ export function AssignTaskModal({
                 </View>
                 <Button
                   compact
-                  textColor={Colors.textSecondary}
+                  textColor={AppTheme.mute}
                   onPress={() => {
                     setShowDateInput(false);
                     dateInputRef.current = '';
                   }}
+                  labelStyle={styles.changeDateLabel}
                 >
                   Cancel
                 </Button>
@@ -285,20 +287,19 @@ export function AssignTaskModal({
             )}
           </View>
 
-          {/* Error Message */}
           {error && (
             <HelperText type="error" visible={!!error} style={styles.errorText}>
               {error}
             </HelperText>
           )}
 
-          {/* Action Buttons */}
           <View style={styles.actions}>
             <Button
-              mode="outlined"
+              mode="contained"
               onPress={onDismiss}
               style={styles.cancelButton}
-              textColor={Colors.textSecondary}
+              buttonColor={AppTheme.soft2}
+              textColor={AppTheme.inkSoft}
             >
               Cancel
             </Button>
@@ -308,8 +309,8 @@ export function AssignTaskModal({
               loading={isLoading}
               disabled={isLoading}
               style={styles.submitButton}
-              buttonColor={Colors.accent}
-              textColor={Colors.white}
+              buttonColor={AppTheme.charcoal}
+              textColor={AppTheme.white}
             >
               Assign Task
             </Button>
@@ -323,22 +324,20 @@ export function AssignTaskModal({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.surface,
+    backgroundColor: AppTheme.card,
     margin: 20,
-    borderRadius: 24,
+    borderRadius: 28,
     padding: 24,
-    borderWidth: 1,
-    borderColor: Colors.border,
     maxHeight: '85%',
-    ...Colors.shadowHeavy,
+    ...appShadow,
   },
   memberHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
     paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: AppTheme.hairline,
   },
   avatar: {
     marginRight: 12,
@@ -352,45 +351,47 @@ const styles = StyleSheet.create({
   memberName: {
     fontSize: 16,
     fontFamily: 'Inter_600SemiBold',
-    color: Colors.text,
-    marginBottom: 2,
+    color: AppTheme.ink,
+    marginBottom: 4,
+  },
+  roleChip: {
+    alignSelf: 'flex-start',
+    backgroundColor: AppTheme.soft,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
   memberRole: {
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
-    color: Colors.textSecondary,
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: AppTheme.mute,
   },
   header: {
     alignItems: 'center',
     marginBottom: 20,
   },
   iconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.accentSubtle,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: AppTheme.soft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
+    ...appSoftShadow,
   },
   title: {
-    fontSize: 28,
-    fontFamily: 'Inter_800ExtraBold',
-    color: Colors.text,
+    fontSize: 26,
+    fontFamily: 'Inter_700Bold',
+    color: AppTheme.ink,
     marginBottom: 4,
     letterSpacing: -0.7,
   },
   subtitle: {
     fontSize: 14,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.textSecondary,
+    fontFamily: 'Inter_400Regular',
+    color: AppTheme.mute,
     textAlign: 'center',
-  },
-  fieldLabel: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginBottom: 6,
   },
   dueDateSection: {
     marginBottom: 16,
@@ -398,7 +399,7 @@ const styles = StyleSheet.create({
   dueDateLabel: {
     fontSize: 14,
     fontFamily: 'Inter_600SemiBold',
-    color: Colors.text,
+    color: AppTheme.ink,
     marginBottom: 10,
   },
   quickChipsContainer: {
@@ -408,39 +409,41 @@ const styles = StyleSheet.create({
   },
   chip: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: 14,
   },
   chipActive: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
+    backgroundColor: AppTheme.charcoal,
+    borderColor: AppTheme.charcoal,
   },
   chipInactive: {
-    backgroundColor: Colors.surface,
-    borderColor: Colors.border,
+    backgroundColor: AppTheme.soft,
+    borderColor: AppTheme.soft2,
   },
   chipText: {
     fontSize: 12,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.accent,
+    fontFamily: 'Inter_600SemiBold',
+    color: AppTheme.inkSoft,
   },
   chipTextSelected: {
-    color: Colors.white,
+    color: AppTheme.white,
   },
   customDateTrigger: {
     alignSelf: 'flex-start',
     marginTop: -4,
     marginBottom: 8,
   },
+  customDateTriggerLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+  },
   customDateDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: AppTheme.soft,
+    borderRadius: 14,
   },
   customDateBadge: {
     flexDirection: 'row',
@@ -449,8 +452,12 @@ const styles = StyleSheet.create({
   },
   customDateText: {
     fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+    color: AppTheme.ink,
+  },
+  changeDateLabel: {
     fontFamily: 'Inter_500Medium',
-    color: Colors.text,
+    fontSize: 13,
   },
   dateInputContainer: {
     flexDirection: 'row',
@@ -458,7 +465,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   errorText: {
-    color: Colors.error,
+    color: AppTheme.coral,
     fontFamily: 'Inter_500Medium',
     marginBottom: 12,
   },
@@ -469,10 +476,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   cancelButton: {
-    borderColor: Colors.border,
-    borderRadius: 12,
+    borderRadius: 24,
+    ...appSoftShadow,
   },
   submitButton: {
-    borderRadius: 12,
+    borderRadius: 24,
+    ...appSoftShadow,
   },
 });

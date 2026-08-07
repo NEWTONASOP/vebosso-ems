@@ -2,6 +2,8 @@
 // VEBOSSO EMS — Brand Colors (Premium SaaS Aesthetic)
 // ============================================================================
 
+import { AppTheme } from './theme';
+
 export const Colors = {
   // Primary palette (Vibrant but professional)
   primary: '#FFFFFF',        // Pure white background for elements
@@ -95,46 +97,46 @@ export const Colors = {
   transparent: 'transparent',
 } as const;
 
-// React Native Paper custom theme colors
+// React Native Paper custom theme colors — derived from AppTheme
 export const PaperThemeColors = {
-  primary: Colors.accent,
-  onPrimary: Colors.white,
-  primaryContainer: Colors.accentSubtle,
-  onPrimaryContainer: Colors.accent,
-  secondary: Colors.surfaceLight,
-  onSecondary: Colors.text,
-  secondaryContainer: Colors.surfaceLighter,
-  onSecondaryContainer: Colors.text,
-  tertiary: Colors.info,
-  onTertiary: Colors.white,
-  tertiaryContainer: Colors.infoLight,
-  onTertiaryContainer: Colors.info,
-  error: Colors.error,
-  onError: Colors.white,
-  errorContainer: Colors.errorLight,
-  onErrorContainer: Colors.error,
-  background: Colors.background,
-  onBackground: Colors.text,
-  surface: Colors.surface,
-  onSurface: Colors.text,
-  surfaceVariant: Colors.surfaceLight,
-  onSurfaceVariant: Colors.textSecondary,
-  outline: Colors.border,
-  outlineVariant: Colors.borderLight,
-  inverseSurface: Colors.text,
-  inverseOnSurface: Colors.white,
-  inversePrimary: Colors.accentLight,
+  primary: AppTheme.charcoal,
+  onPrimary: AppTheme.white,
+  primaryContainer: AppTheme.soft,
+  onPrimaryContainer: AppTheme.charcoal,
+  secondary: AppTheme.soft,
+  onSecondary: AppTheme.ink,
+  secondaryContainer: AppTheme.soft2,
+  onSecondaryContainer: AppTheme.ink,
+  tertiary: AppTheme.blue,
+  onTertiary: AppTheme.white,
+  tertiaryContainer: AppTheme.blueSoft,
+  onTertiaryContainer: AppTheme.blue,
+  error: AppTheme.coral,
+  onError: AppTheme.white,
+  errorContainer: AppTheme.coralSoft,
+  onErrorContainer: AppTheme.coral,
+  background: AppTheme.bg,
+  onBackground: AppTheme.ink,
+  surface: AppTheme.card,
+  onSurface: AppTheme.ink,
+  surfaceVariant: AppTheme.soft,
+  onSurfaceVariant: AppTheme.mute,
+  outline: AppTheme.soft2,
+  outlineVariant: AppTheme.soft,
+  inverseSurface: AppTheme.ink,
+  inverseOnSurface: AppTheme.white,
+  inversePrimary: AppTheme.inkSoft,
   elevation: {
-    level0: Colors.transparent,
-    level1: Colors.surface,
-    level2: Colors.surfaceLight,
-    level3: Colors.surfaceLighter,
-    level4: Colors.surfaceLighter,
-    level5: Colors.surfaceLighter,
+    level0: 'transparent',
+    level1: AppTheme.card,
+    level2: AppTheme.soft,
+    level3: AppTheme.soft2,
+    level4: AppTheme.soft2,
+    level5: AppTheme.soft2,
   },
-  surfaceDisabled: 'rgba(17, 24, 39, 0.08)',
-  onSurfaceDisabled: 'rgba(17, 24, 39, 0.38)',
-  backdrop: Colors.backgroundOverlay,
+  surfaceDisabled: 'rgba(15, 17, 22, 0.08)',
+  onSurfaceDisabled: 'rgba(15, 17, 22, 0.38)',
+  backdrop: 'rgba(0, 0, 0, 0.4)',
 };
 
 export type ColorKey = keyof typeof Colors;

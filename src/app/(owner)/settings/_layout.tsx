@@ -3,14 +3,14 @@
 // ============================================================================
 
 import { Stack } from 'expo-router';
-import { Colors } from '../../../constants/colors';
+import { AppTheme } from '../../../constants/theme';
 
 export default function SettingsLayout() {
   return (
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: Colors.background },
+        contentStyle: { backgroundColor: AppTheme.bg },
         animation: 'slide_from_right',
       }}
     />

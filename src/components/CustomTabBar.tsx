@@ -6,7 +6,8 @@ import React from 'react';
 import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '../constants/colors';
+import { AppTheme, RoleAccent, type Role, appShadow } from '../constants/theme';
+import { useAuthStore } from '../store/authStore';
 
 const SLIM_WIDTH = 400;
 
@@ -47,6 +48,12 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
   const bottomOffset = Math.max(insets.bottom, Platform.OS === 'android' ? 12 : 16) + (isSlim ? 8 : 12);
   const currentRoute = state.routes[state.index];
   const currentOptions = descriptors[currentRoute.key]?.options;
+  const profileRole = useAuthStore((s) => s.profile?.role);
+  const role: Role =
+    profileRole === 'owner' || profileRole === 'manager' || profileRole === 'member'
+      ? profileRole
+      : 'member';
+  const accent = RoleAccent[role];
 
   // Hide the tab bar entirely on detail/modal screens (those with href: null or dynamic segments)
   const shouldHide =
@@ -66,7 +73,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
     >
       <BlurView
         tint="light"
-        intensity={80}
+        intensity={90}
         style={styles.blurContainer}
       >
         <View style={[styles.innerContainer, isSlim && styles.innerContainerSlim]}>
@@ -120,6 +127,8 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
                 renderIcon={renderIcon}
                 onPress={onPress}
                 isSlim={isSlim}
+                activeColor={accent.color}
+                activeSoft={accent.soft}
               />
             );
           })}
@@ -136,9 +145,20 @@ interface TabItemProps {
   renderIcon: ((props: { focused: boolean; color: string; size: number }) => React.ReactNode) | undefined;
   onPress: () => void;
   isSlim: boolean;
+  activeColor: string;
+  activeSoft: string;
 }
 
-function TabItem({ isFocused, label, iconName, renderIcon, onPress, isSlim }: TabItemProps) {
+function TabItem({
+  isFocused,
+  label,
+  iconName,
+  renderIcon,
+  onPress,
+  isSlim,
+  activeColor,
+  activeSoft,
+}: TabItemProps) {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -158,7 +178,7 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress, isSlim }: Ta
     scale.value = withSpring(1, { damping: 10, stiffness: 300 });
   };
 
-  const color = isFocused ? Colors.tabActive : Colors.tabInactive;
+  const color = isFocused ? activeColor : AppTheme.mute;
   const iconSize = isSlim ? (isFocused ? 22 : 20) : (isFocused ? 28 : 26);
   const iconElement = renderIcon
     ? renderIcon({ focused: isFocused, color, size: iconSize })
@@ -169,13 +189,16 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress, isSlim }: Ta
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: isFocused }}
       style={[styles.tabButton, isSlim && styles.tabButtonSlim]}
     >
       <Animated.View
         style={[
           styles.pillContainer,
           isSlim && styles.pillContainerSlim,
-          isFocused && styles.pillActive,
+          isFocused && { backgroundColor: activeSoft },
           animatedStyle,
         ]}
       >
@@ -198,22 +221,12 @@ const styles = StyleSheet.create({
     right: 10,
   },
   blurContainer: {
-    borderRadius: 36,
+    borderRadius: 28,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
     width: '100%',
     maxWidth: 550,
-    backgroundColor: Platform.OS === 'web' 
-      ? 'rgba(255, 255, 255, 0.85)' 
-      : Platform.OS === 'android' 
-        ? 'rgba(255, 255, 255, 0.75)' 
-        : 'rgba(255, 255, 255, 0.2)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.06,
-    shadowRadius: 20,
-    elevation: 8,
+    backgroundColor: AppTheme.card,
+    ...appShadow,
     ...Platform.select({
       web: {
         backdropFilter: 'blur(20px)',
@@ -237,6 +250,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 64,
+    minHeight: 44,
   },
   tabButtonSlim: {
     minWidth: 0,
@@ -255,8 +269,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: 20,
     minHeight: 44,
-  },
-  pillActive: {
-    backgroundColor: 'rgba(0, 0, 0, 0.08)', // Slightly darker for better visibility
   },
 });

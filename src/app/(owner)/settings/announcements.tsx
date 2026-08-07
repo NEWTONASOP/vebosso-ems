@@ -9,7 +9,13 @@ import { FlatList, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Snackbar, Text, TextInput } from 'react-native-paper';
 import { AnnouncementCard } from '../../../components/AnnouncementCard';
 import { EmptyState } from '../../../components/EmptyState';
-import { Colors } from '../../../constants/colors';
+import {
+  AppRadius,
+  AppSpace,
+  AppTheme as T,
+  appSoftShadow,
+  screenChrome,
+} from '../../../constants/theme';
 import { useAuthStore } from '../../../store/authStore';
 import { useWorkStore } from '../../../store/workStore';
 import { Alert } from '../../../lib/alert';
@@ -91,30 +97,33 @@ export default function AnnouncementsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.root}>
       <View style={styles.header}>
         <Pressable
           style={({ pressed }) => [
-            styles.backBtn,
-            pressed && styles.btnPressed
+            screenChrome.iconButton,
+            pressed && styles.btnPressed,
           ]}
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
-          <Feather name="arrow-left" size={18} color={Colors.textPrimary} />
+          <Feather name="arrow-left" size={18} color={T.charcoal} />
         </Pressable>
-        <Text style={styles.title}>Announcements</Text>
-        <View style={{ flex: 1 }} />
+        <Text style={screenChrome.title}>Announcements</Text>
+        <View style={styles.headerSpacer} />
         {isOwner && (
           <Pressable
             style={({ pressed }) => [
-              styles.newBtn,
+              showForm ? styles.cancelBtn : screenChrome.primaryPill,
               pressed && styles.btnPressed,
-              showForm && styles.newBtnActive
             ]}
             onPress={() => setShowForm(!showForm)}
+            accessibilityRole="button"
+            accessibilityLabel={showForm ? 'Cancel' : 'New announcement'}
           >
-            <Feather name={showForm ? 'x' : 'plus'} size={16} color={showForm ? Colors.textPrimary : Colors.white} />
-            <Text style={[styles.newBtnText, showForm && styles.newBtnTextActive]}>
+            <Feather name={showForm ? 'x' : 'plus'} size={16} color={showForm ? T.inkSoft : T.white} />
+            <Text style={showForm ? styles.cancelBtnText : screenChrome.primaryPillText}>
               {showForm ? 'Cancel' : 'New'}
             </Text>
           </Pressable>
@@ -130,11 +139,11 @@ export default function AnnouncementsScreen() {
             onChangeText={setTitle}
             maxLength={200}
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.textPrimary}
-            textColor={Colors.textPrimary}
+            outlineColor={T.soft2}
+            activeOutlineColor={T.charcoal}
+            textColor={T.ink}
             outlineStyle={styles.inputOutline}
-            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.systemGray6 } }}
+            theme={{ colors: { onSurfaceVariant: T.mute, surface: T.soft } }}
           />
           <TextInput
             mode="outlined"
@@ -145,42 +154,56 @@ export default function AnnouncementsScreen() {
             numberOfLines={3}
             maxLength={2000}
             style={styles.input}
-            outlineColor={Colors.border}
-            activeOutlineColor={Colors.textPrimary}
-            textColor={Colors.textPrimary}
+            outlineColor={T.soft2}
+            activeOutlineColor={T.charcoal}
+            textColor={T.ink}
             outlineStyle={styles.inputOutline}
-            theme={{ colors: { onSurfaceVariant: Colors.textTertiary, surface: Colors.systemGray6 } }}
+            theme={{ colors: { onSurfaceVariant: T.mute, surface: T.soft } }}
           />
 
-          <Text style={styles.fieldLabel}>Target Audience</Text>
-          <View style={styles.segmentedContainer}>
+          <Text style={styles.fieldLabel}>Target audience</Text>
+          <View style={[screenChrome.segmentTrack, styles.segmentMargin]}>
             {[
               { value: 'all', label: 'Everyone' },
               { value: 'manager', label: 'Managers' },
-              { value: 'member', label: 'Members' }
+              { value: 'member', label: 'Members' },
             ].map((option) => (
               <Pressable
                 key={option.value}
-                style={[styles.segmentBtn, targetRole === option.value && styles.segmentBtnActive]}
+                style={[
+                  screenChrome.segmentBtn,
+                  targetRole === option.value && screenChrome.segmentBtnActive,
+                ]}
                 onPress={() => setTargetRole(option.value)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: targetRole === option.value }}
+                accessibilityLabel={option.label}
               >
-                <Text style={[styles.segmentText, targetRole === option.value && styles.segmentTextActive]}>
+                <Text
+                  style={[
+                    screenChrome.segmentText,
+                    targetRole === option.value && screenChrome.segmentTextActive,
+                  ]}
+                >
                   {option.label}
                 </Text>
               </Pressable>
             ))}
           </View>
 
+          {/* Single charcoal primary when form is open */}
           <Pressable
             style={({ pressed }) => [
               styles.sendBtn,
               pressed && styles.btnPressed,
-              isLoading && { opacity: 0.7 }
+              isLoading && styles.sendBtnDisabled,
             ]}
             onPress={handleSend}
             disabled={isLoading}
+            accessibilityRole="button"
+            accessibilityLabel="Send Announcement"
           >
-            <Feather name="send" size={16} color={Colors.white} />
+            <Feather name="send" size={16} color={T.white} />
             <Text style={styles.sendBtnText}>Send Announcement</Text>
           </Pressable>
         </View>
@@ -198,11 +221,21 @@ export default function AnnouncementsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          <EmptyState icon="bullhorn-outline" title="No Announcements" subtitle="Create your first announcement to get started" />
+          <EmptyState
+            icon="bullhorn-outline"
+            title="No Announcements"
+            subtitle="Create your first announcement to get started"
+          />
         }
       />
 
-      <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>
+      <Snackbar
+        visible={!!snackMessage}
+        onDismiss={() => setSnackMessage('')}
+        duration={3000}
+        theme={{ colors: { inverseSurface: T.charcoal, inverseOnSurface: T.white } }}
+        wrapperStyle={{ marginBottom: 90 }}
+      >
         {snackMessage}
       </Snackbar>
     </View>
@@ -210,130 +243,87 @@ export default function AnnouncementsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
+    paddingHorizontal: AppSpace.screen,
+    paddingTop: Platform.OS === 'ios' ? 60 : 44,
     paddingBottom: 12,
     gap: 12,
   },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
-    elevation: 1,
-  },
+  headerSpacer: { flex: 1 },
   btnPressed: {
     transform: [{ scale: 0.97 }],
     opacity: 0.9,
   },
-  title: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 24,
-    color: Colors.textPrimary,
-    letterSpacing: -0.5,
-  },
-  newBtn: {
+  cancelBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.accent,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
+    justifyContent: 'center',
+    backgroundColor: T.soft,
+    borderRadius: AppRadius.pill,
+    paddingHorizontal: 16,
+    height: 44,
     gap: 6,
   },
-  newBtnActive: {
-    backgroundColor: Colors.surfaceLight,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  newBtnText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 13,
-    color: Colors.white,
-  },
-  newBtnTextActive: {
-    color: Colors.textPrimary,
+  cancelBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    color: T.inkSoft,
+    letterSpacing: -0.1,
   },
   formSection: {
-    backgroundColor: Colors.surface,
-    marginHorizontal: 16,
-    borderRadius: 24,
+    backgroundColor: T.card,
+    marginHorizontal: AppSpace.screen,
+    borderRadius: AppRadius.card,
     padding: 20,
-    ...Colors.shadow,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    elevation: 3,
-    marginTop: 14,
+    ...appSoftShadow,
+    marginTop: 8,
+    marginBottom: 4,
   },
   input: {
     marginBottom: 14,
-    backgroundColor: Colors.systemGray6,
+    backgroundColor: T.soft,
     fontSize: 15,
   },
   inputOutline: {
     borderRadius: 14,
-    borderWidth: 1,
+    borderWidth: 0,
   },
   fieldLabel: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginBottom: 8,
-    marginLeft: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  segmentedContainer: {
-    flexDirection: 'row',
-    backgroundColor: Colors.systemGray6,
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 16,
-    gap: 4,
-  },
-  segmentBtn: {
-    flex: 1,
-    height: 38,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  segmentBtnActive: {
-    backgroundColor: Colors.surface,
-    ...Colors.shadow,
-  },
-  segmentText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Inter_500Medium',
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: T.mute,
+    marginBottom: 8,
+    marginLeft: 2,
   },
-  segmentTextActive: {
-    color: Colors.accent,
+  segmentMargin: {
+    marginBottom: 16,
   },
   sendBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.accent, // Solid Black pill
-    borderRadius: 24,
+    backgroundColor: T.charcoal,
+    borderRadius: AppRadius.pill,
     width: '100%',
     height: 48,
-    marginTop: 8,
+    marginTop: 4,
     gap: 8,
+    ...appSoftShadow,
+  },
+  sendBtnDisabled: {
+    opacity: 0.7,
   },
   sendBtnText: {
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
-    color: Colors.white,
+    color: T.white,
+    letterSpacing: -0.1,
   },
-  list: { paddingHorizontal: 20, paddingBottom: 110, paddingTop: 14 },
+  list: {
+    ...screenChrome.listPad,
+    paddingTop: 14,
+    flexGrow: 1,
+  },
 });

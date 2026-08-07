@@ -12,6 +12,7 @@ import { TaskCompleteModal } from './TaskCompleteModal';
 import { TaskDetailModal } from './TaskDetailModal';
 
 import { Feather } from '@expo/vector-icons';
+import { AppTheme, appSoftShadow } from '../constants/theme';
 import { Task, TaskStatus } from '../types/database';
 
 interface TaskCardProps {
@@ -39,20 +40,20 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
       case 'done':
         return {
           icon: 'check-circle',
-          color: '#34C759', // Green
-          bgColor: 'rgba(52, 199, 89, 0.12)',
+          color: AppTheme.green,
+          bgColor: AppTheme.greenSoft,
         };
       case 'in_progress':
         return {
           icon: 'play-circle',
-          color: '#007AFF', // Blue
-          bgColor: 'rgba(0, 122, 255, 0.12)',
+          color: AppTheme.blue,
+          bgColor: AppTheme.blueSoft,
         };
       default:
         return {
           icon: 'circle',
-          color: '#8E8E93', // Grey
-          bgColor: 'rgba(142, 142, 147, 0.12)',
+          color: AppTheme.mute,
+          bgColor: AppTheme.soft,
         };
     }
   };
@@ -114,7 +115,7 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
                 <Text style={[styles.title, task.status === 'done' && styles.titleDone]} numberOfLines={1}>
                   {task.title}
                 </Text>
-                <Feather name="chevron-right" size={14} color="#C7C7CC" />
+                <Feather name="chevron-right" size={14} color={AppTheme.soft2} />
               </View>
               <View style={styles.metaRow}>
                 {dueDate && (
@@ -181,18 +182,11 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
 
 const styles = StyleSheet.create({
   rowWrapper: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: AppTheme.card,
     marginVertical: 4,
     marginHorizontal: 2,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.06)',
-    // Use lighter shadow to avoid Android elevation bleeding between cards
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    borderRadius: 20,
+    ...appSoftShadow,
   },
   rowContent: {
     flexDirection: 'row',
@@ -212,7 +206,7 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 32,
     height: 32,
-    borderRadius: 16, // Circular icon container
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
@@ -230,12 +224,12 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
-    color: '#1C1C1E',
+    color: AppTheme.ink,
     flex: 1,
   },
   titleDone: {
     textDecorationLine: 'line-through',
-    color: '#AEAEB2',
+    color: AppTheme.mute,
   },
   metaRow: {
     flexDirection: 'row',
@@ -245,12 +239,12 @@ const styles = StyleSheet.create({
   metaText: {
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: '#8E8E93',
+    color: AppTheme.mute,
   },
   description: {
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
-    color: '#6B7280', // Raised from #AEAEB2 — passes WCAG AA at 4.6:1
+    color: AppTheme.mute,
     flex: 1,
   },
   actionBtn: {
@@ -261,19 +255,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   startBtn: {
-    backgroundColor: '#000000', // Solid Black
+    backgroundColor: AppTheme.charcoal,
   },
   startBtnText: {
-    color: '#FFFFFF',
+    color: AppTheme.white,
   },
   completeBtn: {
-    backgroundColor: 'rgba(4, 120, 87, 0.08)', // Soft emerald tint
-    borderWidth: 1.5,
-    borderColor: '#047857',  // Solid emerald border for contrast
+    backgroundColor: AppTheme.greenSoft,
     borderRadius: 14,
   },
   completeBtnText: {
-    color: '#047857', // Deeper emerald — passes WCAG AA at 4.5:1 on white tint
+    color: AppTheme.green,
   },
   actionBtnText: {
     fontFamily: 'Inter_700Bold',
@@ -287,7 +279,7 @@ const styles = StyleSheet.create({
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   statusBadgeText: {
     fontFamily: 'Inter_700Bold',

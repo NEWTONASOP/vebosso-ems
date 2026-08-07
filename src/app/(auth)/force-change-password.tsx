@@ -7,7 +7,13 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, ProgressBar, Snackbar, Text, TextInput } from 'react-native-paper';
-import { Colors } from '../../constants/colors';
+import {
+  AppTheme,
+  AppSpace,
+  AppRadius,
+  appShadow,
+  screenChrome,
+} from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
 
 export default function ForceChangePasswordScreen() {
@@ -26,10 +32,10 @@ export default function ForceChangePasswordScreen() {
     if (/[0-9]/.test(newPassword)) score += 0.25;
     if (/[^A-Za-z0-9]/.test(newPassword)) score += 0.25;
 
-    if (score <= 0.25) return { score, label: 'Weak', color: Colors.error };
-    if (score <= 0.5) return { score, label: 'Fair', color: Colors.warning };
-    if (score <= 0.75) return { score, label: 'Good', color: Colors.accent };
-    return { score, label: 'Strong', color: Colors.success };
+    if (score <= 0.25) return { score, label: 'Weak', color: AppTheme.coral };
+    if (score <= 0.5) return { score, label: 'Fair', color: AppTheme.amber };
+    if (score <= 0.75) return { score, label: 'Good', color: AppTheme.charcoal };
+    return { score, label: 'Strong', color: AppTheme.green };
   };
 
   const strength = getPasswordStrength();
@@ -75,7 +81,7 @@ export default function ForceChangePasswordScreen() {
     >
       <View style={styles.header}>
         <View style={styles.iconCircle}>
-          <Feather name="lock" size={28} color={Colors.accent} />
+          <Feather name="lock" size={28} color={AppTheme.charcoal} />
         </View>
         <Text style={styles.title}>Change Your Password</Text>
         <Text style={styles.subtitle}>
@@ -91,20 +97,20 @@ export default function ForceChangePasswordScreen() {
           onChangeText={setNewPassword}
           secureTextEntry={!showPassword}
           style={styles.input}
-          outlineColor={Colors.border}
-          activeOutlineColor={Colors.accent}
-          textColor={Colors.text}
+          outlineColor={AppTheme.soft2}
+          activeOutlineColor={AppTheme.charcoal}
+          textColor={AppTheme.ink}
           right={
             <TextInput.Icon
               icon={showPassword ? 'eye-off' : 'eye'}
-              color={Colors.textSecondary}
+              color={AppTheme.inkSoft}
               onPress={() => setShowPassword(!showPassword)}
             />
           }
           theme={{
             colors: {
-              onSurfaceVariant: Colors.textTertiary,
-              surface: Colors.inputBackground,
+              onSurfaceVariant: AppTheme.mute,
+              surface: AppTheme.card,
             },
           }}
         />
@@ -129,13 +135,13 @@ export default function ForceChangePasswordScreen() {
           onChangeText={setConfirmPassword}
           secureTextEntry={!showPassword}
           style={styles.input}
-          outlineColor={Colors.border}
-          activeOutlineColor={Colors.accent}
-          textColor={Colors.text}
+          outlineColor={AppTheme.soft2}
+          activeOutlineColor={AppTheme.charcoal}
+          textColor={AppTheme.ink}
           theme={{
             colors: {
-              onSurfaceVariant: Colors.textTertiary,
-              surface: Colors.inputBackground,
+              onSurfaceVariant: AppTheme.mute,
+              surface: AppTheme.card,
             },
           }}
         />
@@ -159,8 +165,9 @@ export default function ForceChangePasswordScreen() {
           disabled={isLoading || newPassword.length < 8 || newPassword !== confirmPassword}
           style={styles.button}
           contentStyle={styles.buttonContent}
-          buttonColor={Colors.accent}
-          textColor={Colors.white}
+          buttonColor={AppTheme.charcoal}
+          textColor={AppTheme.white}
+          labelStyle={styles.buttonLabel}
         >
           Set New Password
         </Button>
@@ -170,7 +177,6 @@ export default function ForceChangePasswordScreen() {
         visible={!!snackMessage}
         onDismiss={() => setSnackMessage('')}
         duration={4000}
-       
       >
         {snackMessage}
       </Snackbar>
@@ -191,35 +197,85 @@ function Requirement({ met, text }: { met: boolean; text: string }) {
 
 const reqStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  icon: { fontSize: 14, color: Colors.textTertiary, marginRight: 8, width: 16 },
-  iconMet: { color: Colors.success },
-  text: { fontSize: 13, color: Colors.textTertiary },
-  textMet: { color: Colors.success },
+  icon: { fontSize: 14, color: AppTheme.mute, marginRight: 8, width: 16 },
+  iconMet: { color: AppTheme.green },
+  text: { fontSize: 13, color: AppTheme.mute, fontFamily: 'Inter_400Regular' },
+  textMet: { color: AppTheme.green },
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  scrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
-  header: { alignItems: 'center', marginBottom: 32 },
+  container: { ...screenChrome.root },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: AppSpace.screen,
+    paddingVertical: 40,
+  },
+  header: { alignItems: 'center', marginBottom: AppSpace.xxl },
   iconCircle: {
     width: 64,
     height: 64,
-    borderRadius: 32,
-    backgroundColor: Colors.accentSubtle,
+    borderRadius: 20,
+    backgroundColor: AppTheme.soft,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: AppSpace.md,
   },
-  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, marginBottom: 8, letterSpacing: -0.7 },
-  subtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 },
-  formSection: { backgroundColor: Colors.surface, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.border, ...Colors.shadow },
-  input: { marginBottom: 12, backgroundColor: Colors.inputBackground },
-  strengthSection: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  strengthBar: { flex: 1, height: 4, borderRadius: 2, backgroundColor: Colors.surfaceLighter },
+  title: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 28,
+    color: AppTheme.ink,
+    marginBottom: AppSpace.sm,
+    letterSpacing: -0.7,
+  },
+  subtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: AppTheme.mute,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: AppSpace.lg,
+  },
+  formSection: {
+    backgroundColor: AppTheme.card,
+    borderRadius: AppRadius.card,
+    padding: 24,
+    ...appShadow,
+  },
+  input: { marginBottom: AppSpace.md, backgroundColor: AppTheme.card },
+  strengthSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: AppSpace.md,
+  },
+  strengthBar: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: AppTheme.soft2,
+  },
   strengthLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', width: 50 },
-  mismatchText: { fontSize: 12, color: Colors.error, marginBottom: 8, marginLeft: 4 },
-  requirements: { backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginBottom: 20, borderWidth: 1, borderColor: Colors.border },
-  reqTitle: { fontSize: 13, color: Colors.textSecondary, fontFamily: 'Inter_600SemiBold', marginBottom: 8 },
-  button: { borderRadius: 12 },
+  mismatchText: {
+    fontSize: 12,
+    color: AppTheme.coral,
+    marginBottom: AppSpace.sm,
+    marginLeft: 4,
+    fontFamily: 'Inter_400Regular',
+  },
+  requirements: {
+    backgroundColor: AppTheme.soft,
+    borderRadius: AppRadius.chip,
+    padding: 14,
+    marginBottom: AppSpace.xl,
+  },
+  reqTitle: {
+    fontSize: 13,
+    color: AppTheme.inkSoft,
+    fontFamily: 'Inter_600SemiBold',
+    marginBottom: AppSpace.sm,
+  },
+  button: { borderRadius: AppRadius.pill },
   buttonContent: { height: 50 },
+  buttonLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
 });

@@ -7,8 +7,8 @@ import { format } from 'date-fns';
 import { StyleSheet, View } from 'react-native';
 import { Avatar, Text } from 'react-native-paper';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
-import { Colors } from '../constants/colors';
-import { ROLE_LABELS, TASK_STATUS_CONFIG, WORK_LOG_STATUS_CONFIG } from '../constants/roles';
+import { AppTheme, appSoftShadow } from '../constants/theme';
+import { ROLE_LABELS, WORK_LOG_STATUS_CONFIG } from '../constants/roles';
 import { Profile, WorkLogStatus } from '../types/database';
 import { AnimatedPressable } from './AnimatedPressable';
 
@@ -33,40 +33,54 @@ interface MemberCardProps {
   index?: number;
 }
 
+const TASK_CHIP = {
+  pending: { color: AppTheme.amber, bg: AppTheme.amberSoft },
+  in_progress: { color: AppTheme.blue, bg: AppTheme.blueSoft },
+  done: { color: AppTheme.green, bg: AppTheme.greenSoft },
+} as const;
+
 function getStatusDisplay(status: WorkLogStatus | 'offline' | 'on_leave') {
   if (status === 'offline') {
-    return { label: 'Not checked in', color: Colors.textTertiary, bg: Colors.surfaceLight };
+    return { label: 'Not checked in', color: AppTheme.mute, bg: AppTheme.soft };
   }
   if (status === 'on_leave') {
-    return { label: 'On Leave', color: Colors.warning, bg: Colors.warningLight };
+    return { label: 'On Leave', color: AppTheme.amber, bg: AppTheme.amberSoft };
   }
   const config = WORK_LOG_STATUS_CONFIG[status];
+  const statusTheme: Record<string, { color: string; bg: string }> = {
+    pending_approval: { color: AppTheme.amber, bg: AppTheme.amberSoft },
+    working: { color: AppTheme.green, bg: AppTheme.greenSoft },
+    pending_checkout: { color: AppTheme.violet, bg: AppTheme.violetSoft },
+    done: { color: AppTheme.inkSoft, bg: AppTheme.soft },
+    rejected: { color: AppTheme.coral, bg: AppTheme.coralSoft },
+  };
+  const theme = statusTheme[status];
   return {
     label: config?.label || 'Unknown',
-    color: config?.color || Colors.textTertiary,
-    bg: config?.backgroundColor || Colors.surfaceLight,
+    color: theme?.color || AppTheme.mute,
+    bg: theme?.bg || AppTheme.soft,
   };
 }
 
 function getAvatarColors(role: Profile['role']) {
   switch (role) {
     case 'owner':
-      return { bg: Colors.ownerAccent + '15', text: Colors.ownerAccent };
+      return { bg: AppTheme.violetSoft, text: AppTheme.violet };
     case 'manager':
-      return { bg: Colors.managerAccent + '15', text: Colors.managerAccent };
+      return { bg: AppTheme.blueSoft, text: AppTheme.blue };
     default:
-      return { bg: Colors.memberAccent + '15', text: Colors.memberAccent };
+      return { bg: AppTheme.greenSoft, text: AppTheme.green };
   }
 }
 
 function getRoleMutedColor(role: Profile['role']) {
   switch (role) {
     case 'owner':
-      return Colors.ownerAccent;
+      return AppTheme.violet;
     case 'manager':
-      return Colors.managerAccent;
+      return AppTheme.blue;
     default:
-      return Colors.memberAccent;
+      return AppTheme.green;
   }
 }
 
@@ -100,10 +114,15 @@ export function MemberCard({
   const workSummary = isDone && dayReport ? dayReport : checkInPlan || null;
   const workLabel = isDone && dayReport ? 'Worked today' : isWorking ? 'Working on' : checkInPlan ? 'Plan' : null;
   const workLabelColor = isDone
-    ? Colors.success
+    ? AppTheme.green
     : isWorking
-      ? Colors.warning
-      : Colors.info;
+      ? AppTheme.amber
+      : AppTheme.blue;
+  const workLabelBg = isDone
+    ? AppTheme.greenSoft
+    : isWorking
+      ? AppTheme.amberSoft
+      : AppTheme.blueSoft;
 
   const openTaskTotal = pendingTaskCount + inProgressTaskCount;
   const hasTaskSummary = openTaskTotal > 0 || doneTaskCount > 0;
@@ -132,7 +151,7 @@ export function MemberCard({
               <Text style={styles.name} numberOfLines={1}>
                 {member.full_name}
               </Text>
-              {onPress && <Feather name="chevron-right" size={16} color={Colors.textTertiary} />}
+              {onPress && <Feather name="chevron-right" size={16} color={AppTheme.mute} />}
             </View>
 
             <Text style={styles.metaLine} numberOfLines={1}>
@@ -154,13 +173,13 @@ export function MemberCard({
               </View>
               {formattedCheckIn && (
                 <View style={[styles.timeChip, styles.timeChipIn]}>
-                  <Feather name="log-in" size={10} color={Colors.success} />
+                  <Feather name="log-in" size={10} color={AppTheme.green} />
                   <Text style={[styles.timeChipText, styles.timeChipTextIn]}>{formattedCheckIn}</Text>
                 </View>
               )}
               {formattedCheckOut && (
                 <View style={[styles.timeChip, styles.timeChipOut]}>
-                  <Feather name="log-out" size={10} color={Colors.textSecondary} />
+                  <Feather name="log-out" size={10} color={AppTheme.mute} />
                   <Text style={styles.timeChipText}>{formattedCheckOut}</Text>
                 </View>
               )}
@@ -175,7 +194,7 @@ export function MemberCard({
             )}
 
             {workSummary && workLabel && (
-              <View style={[styles.summaryBlock, { backgroundColor: workLabelColor + '0D' }]}>
+              <View style={[styles.summaryBlock, { backgroundColor: workLabelBg }]}>
                 <Text style={[styles.footerLabel, { color: workLabelColor }]}>{workLabel}</Text>
                 <Text style={styles.footerBody} numberOfLines={2}>
                   {workSummary}
@@ -186,22 +205,22 @@ export function MemberCard({
             {hasTaskSummary && (
               <View style={styles.taskSummary}>
                 {inProgressTaskCount > 0 && (
-                  <View style={[styles.taskPill, { backgroundColor: TASK_STATUS_CONFIG.in_progress.backgroundColor }]}>
-                    <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.in_progress.color }]}>
+                  <View style={[styles.taskPill, { backgroundColor: TASK_CHIP.in_progress.bg }]}>
+                    <Text style={[styles.taskStat, { color: TASK_CHIP.in_progress.color }]}>
                       {inProgressTaskCount} active
                     </Text>
                   </View>
                 )}
                 {pendingTaskCount > 0 && (
-                  <View style={[styles.taskPill, { backgroundColor: TASK_STATUS_CONFIG.pending.backgroundColor }]}>
-                    <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.pending.color }]}>
+                  <View style={[styles.taskPill, { backgroundColor: TASK_CHIP.pending.bg }]}>
+                    <Text style={[styles.taskStat, { color: TASK_CHIP.pending.color }]}>
                       {pendingTaskCount} pending
                     </Text>
                   </View>
                 )}
                 {doneTaskCount > 0 && (
-                  <View style={[styles.taskPill, { backgroundColor: TASK_STATUS_CONFIG.done.backgroundColor }]}>
-                    <Text style={[styles.taskStat, { color: TASK_STATUS_CONFIG.done.color }]}>
+                  <View style={[styles.taskPill, { backgroundColor: TASK_CHIP.done.bg }]}>
+                    <Text style={[styles.taskStat, { color: TASK_CHIP.done.color }]}>
                       {doneTaskCount} done
                     </Text>
                   </View>
@@ -212,7 +231,7 @@ export function MemberCard({
             {activeTasks.length > 0 && (
               <View style={styles.taskList}>
                 {activeTasks.slice(0, 2).map((task, i) => {
-                  const taskColor = TASK_STATUS_CONFIG[task.status]?.color || Colors.textTertiary;
+                  const taskColor = TASK_CHIP[task.status]?.color || AppTheme.mute;
                   return (
                     <View key={`${task.title}-${i}`} style={styles.taskRow}>
                       <View style={[styles.taskDot, { backgroundColor: taskColor }]} />
@@ -233,20 +252,18 @@ export function MemberCard({
 
 const styles = StyleSheet.create({
   cardContainer: {
-    marginBottom: 8,
+    marginBottom: 10,
   },
   card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 18,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    backgroundColor: AppTheme.card,
+    borderRadius: 22,
+    padding: 14,
+    ...appSoftShadow,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: 12,
   },
   info: {
     flex: 1,
@@ -261,7 +278,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontFamily: 'Inter_700Bold',
-    color: Colors.text,
+    color: AppTheme.ink,
     letterSpacing: -0.2,
   },
   metaLine: {
@@ -271,15 +288,15 @@ const styles = StyleSheet.create({
   },
   metaSep: {
     fontFamily: 'Inter_400Regular',
-    color: Colors.textTertiary,
+    color: AppTheme.mute,
   },
   roleText: {
     fontFamily: 'Inter_500Medium',
-    opacity: 0.85,
+    opacity: 0.9,
   },
   department: {
     fontFamily: 'Inter_400Regular',
-    color: Colors.textSecondary,
+    color: AppTheme.mute,
   },
   statusRow: {
     flexDirection: 'row',
@@ -293,7 +310,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 10,
+    borderRadius: 12,
     gap: 5,
   },
   statusDot: {
@@ -309,33 +326,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 10,
   },
   timeChipIn: {
-    backgroundColor: Colors.successLight,
-    borderColor: 'rgba(4, 120, 87, 0.15)',
+    backgroundColor: AppTheme.greenSoft,
   },
   timeChipOut: {
-    backgroundColor: Colors.surfaceLight,
-    borderColor: Colors.borderLight,
+    backgroundColor: AppTheme.soft,
   },
   timeChipText: {
     fontSize: 10,
     fontFamily: 'Inter_600SemiBold',
-    color: Colors.textSecondary,
+    color: AppTheme.mute,
   },
   timeChipTextIn: {
-    color: Colors.success,
+    color: AppTheme.green,
   },
   footer: {
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: 12,
+    paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.divider,
-    gap: 6,
+    borderTopColor: AppTheme.hairline,
+    gap: 8,
   },
   footerLabel: {
     fontSize: 10,
@@ -347,18 +361,18 @@ const styles = StyleSheet.create({
   footerBody: {
     fontSize: 13,
     fontFamily: 'Inter_500Medium',
-    color: Colors.text,
+    color: AppTheme.ink,
     lineHeight: 18,
   },
   footerMuted: {
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
-    color: Colors.textTertiary,
+    color: AppTheme.mute,
   },
   summaryBlock: {
     gap: 2,
-    padding: 10,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 14,
   },
   taskSummary: {
     flexDirection: 'row',
@@ -366,9 +380,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   taskPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
   taskStat: {
     fontSize: 11,
@@ -392,6 +406,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontFamily: 'Inter_500Medium',
-    color: Colors.text,
+    color: AppTheme.ink,
   },
 });

@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Button, Text, Icon } from 'react-native-paper';
-import { Colors } from '../constants/colors';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Icon, Text } from 'react-native-paper';
+import { AppTheme, appSoftShadow } from '../constants/theme';
 
 interface EmptyStateProps {
   icon: string;
@@ -15,20 +15,17 @@ export function EmptyState({ icon, title, subtitle, actionLabel, onAction }: Emp
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
-        <Icon source={icon} size={36} color={Colors.textTertiary} />
+        <Icon source={icon} size={32} color={AppTheme.mute} />
       </View>
       <Text style={styles.title}>{title}</Text>
       {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
       {actionLabel && onAction && (
-        <Button
-          mode="contained"
+        <Pressable
           onPress={onAction}
-          style={styles.button}
-          buttonColor={Colors.accent}
-          textColor={Colors.white}
+          style={({ pressed }) => [styles.actionBtn, pressed && styles.actionBtnPressed]}
         >
-          {actionLabel}
-        </Button>
+          <Text style={styles.actionBtnText}>{actionLabel}</Text>
+        </Pressable>
       )}
     </View>
   );
@@ -43,31 +40,44 @@ const styles = StyleSheet.create({
     paddingVertical: 48,
   },
   iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.accentSubtle,
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    backgroundColor: AppTheme.soft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 17,
+    color: AppTheme.ink,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
+    letterSpacing: -0.3,
   },
   subtitle: {
+    fontFamily: 'Inter_400Regular',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: AppTheme.mute,
     textAlign: 'center',
     lineHeight: 20,
   },
-  button: {
-    marginTop: 20,
-    borderRadius: 20,
+  actionBtn: {
+    marginTop: 22,
+    backgroundColor: AppTheme.charcoal,
+    borderRadius: 22,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    ...appSoftShadow,
+  },
+  actionBtnPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.97 }],
+  },
+  actionBtnText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 14,
+    color: AppTheme.white,
   },
 });

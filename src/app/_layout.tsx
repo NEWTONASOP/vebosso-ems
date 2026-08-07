@@ -16,7 +16,8 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LoadingScreen } from '../components/LoadingScreen';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { UpdateChecker } from '../components/UpdateChecker';
-import { Colors, PaperThemeColors } from '../constants/colors';
+import { PaperThemeColors } from '../constants/colors';
+import { AppTheme } from '../constants/theme';
 import {
   setupAuthSessionLifecycle,
   teardownAuthSessionLifecycle,
@@ -260,7 +261,7 @@ export default function RootLayout() {
               <Stack
                 screenOptions={{
                   headerShown: false,
-                  contentStyle: { backgroundColor: Colors.background },
+                  contentStyle: { backgroundColor: AppTheme.bg },
                   animation: 'slide_from_right',
                 }}
               />
@@ -275,7 +276,7 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: AppTheme.bg,
   },
 });
 

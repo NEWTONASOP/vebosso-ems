@@ -6,7 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Divider, Modal, Portal, Text } from 'react-native-paper';
-import { Colors } from '../constants/colors';
+import { AppTheme, appSoftShadow } from '../constants/theme';
 import { TaskStatus } from '../types/database';
 import { AnimatedPressable } from './AnimatedPressable';
 
@@ -50,22 +50,22 @@ export function TaskDetailModal({
       case 'done':
         return {
           icon: 'check-circle',
-          color: Colors.success,
-          bgColor: Colors.success + '12',
+          color: AppTheme.green,
+          bgColor: AppTheme.greenSoft,
           label: 'Completed',
         };
       case 'in_progress':
         return {
           icon: 'play-circle',
-          color: Colors.accent,
-          bgColor: Colors.accent + '12',
+          color: AppTheme.blue,
+          bgColor: AppTheme.blueSoft,
           label: 'In Progress',
         };
       default:
         return {
           icon: 'clock',
-          color: Colors.textSecondary,
-          bgColor: Colors.textSecondary + '12',
+          color: AppTheme.mute,
+          bgColor: AppTheme.soft,
           label: 'Pending',
         };
     }
@@ -109,7 +109,7 @@ export function TaskDetailModal({
               style={styles.closeButton}
               onPress={onDismiss}
             >
-              <Feather name="x" size={22} color={Colors.textSecondary} />
+              <Feather name="x" size={22} color={AppTheme.mute} />
             </AnimatedPressable>
           </View>
 
@@ -127,7 +127,7 @@ export function TaskDetailModal({
           {task.description && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Feather name="file-text" size={16} color={Colors.textSecondary} />
+                <Feather name="file-text" size={16} color={AppTheme.mute} />
                 <Text style={styles.sectionLabel}>Description</Text>
               </View>
               <Text style={styles.descriptionText}>{task.description}</Text>
@@ -140,7 +140,7 @@ export function TaskDetailModal({
           {task.assignee && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Feather name="user" size={16} color={Colors.textSecondary} />
+                <Feather name="user" size={16} color={AppTheme.mute} />
                 <Text style={styles.sectionLabel}>Assigned To</Text>
               </View>
               <View style={styles.assigneeRow}>
@@ -162,7 +162,7 @@ export function TaskDetailModal({
           {task.assigned_by_profile && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Feather name="user-check" size={16} color={Colors.textSecondary} />
+                <Feather name="user-check" size={16} color={AppTheme.mute} />
                 <Text style={styles.sectionLabel}>Assigned By</Text>
               </View>
               <View style={styles.assigneeRow}>
@@ -184,7 +184,7 @@ export function TaskDetailModal({
           {task.due_date && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Feather name="calendar" size={16} color={Colors.textSecondary} />
+                <Feather name="calendar" size={16} color={AppTheme.mute} />
                 <Text style={styles.sectionLabel}>Due Date</Text>
               </View>
               <Text style={styles.infoText}>{getFormattedDate(task.due_date)}</Text>
@@ -195,8 +195,8 @@ export function TaskDetailModal({
           {task.status === 'done' && task.completion_note && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Feather name="edit-3" size={16} color={Colors.success} />
-                <Text style={[styles.sectionLabel, { color: Colors.success }]}>
+                <Feather name="edit-3" size={16} color={AppTheme.green} />
+                <Text style={[styles.sectionLabel, { color: AppTheme.green }]}>
                   Completion Note
                 </Text>
               </View>
@@ -210,7 +210,7 @@ export function TaskDetailModal({
           {task.status === 'done' && task.completed_at && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Feather name="check" size={16} color={Colors.textSecondary} />
+                <Feather name="check" size={16} color={AppTheme.mute} />
                 <Text style={styles.sectionLabel}>Completed At</Text>
               </View>
               <Text style={styles.infoText}>{getFormattedDateTime(task.completed_at)}</Text>
@@ -220,7 +220,7 @@ export function TaskDetailModal({
           {/* Created At */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Feather name="clock" size={16} color={Colors.textSecondary} />
+              <Feather name="clock" size={16} color={AppTheme.mute} />
               <Text style={styles.sectionLabel}>Created</Text>
             </View>
             <Text style={styles.infoText}>{getFormattedDateTime(task.created_at)}</Text>
@@ -238,7 +238,7 @@ export function TaskDetailModal({
                   onReassign();
                 }}
               >
-                <Feather name="users" size={18} color={Colors.white} />
+                <Feather name="users" size={18} color={AppTheme.white} />
                 <Text style={styles.reassignButtonText}>Reassign Task</Text>
               </AnimatedPressable>
             </>
@@ -251,14 +251,12 @@ export function TaskDetailModal({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.surface,
+    backgroundColor: AppTheme.card,
     margin: 20,
     borderRadius: 24,
     padding: 24,
     maxHeight: '85%',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    ...appSoftShadow,
   },
   header: {
     flexDirection: 'row',
@@ -277,17 +275,15 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: AppTheme.soft,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   statusBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 10,
     marginBottom: 16,
   },
   statusBadgeText: {
@@ -298,12 +294,13 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: 'Inter_700Bold',
     fontSize: 20,
-    color: Colors.text,
+    color: AppTheme.ink,
     lineHeight: 28,
     marginBottom: 20,
+    letterSpacing: -0.3,
   },
   divider: {
-    backgroundColor: Colors.divider,
+    backgroundColor: AppTheme.hairline,
     marginVertical: 16,
   },
   section: {
@@ -318,14 +315,14 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: AppTheme.mute,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   descriptionText: {
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
-    color: Colors.text,
+    color: AppTheme.inkSoft,
     lineHeight: 22,
   },
   assigneeRow: {
@@ -334,12 +331,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   avatar: {
-    backgroundColor: '#F2F2F7',
+    backgroundColor: AppTheme.soft,
   },
   avatarLabel: {
     fontSize: 14,
     fontFamily: 'Inter_700Bold',
-    color: Colors.textSecondary,
+    color: AppTheme.inkSoft,
   },
   assigneeInfo: {
     flex: 1,
@@ -347,34 +344,34 @@ const styles = StyleSheet.create({
   assigneeName: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
-    color: Colors.text,
+    color: AppTheme.ink,
   },
   assigneeId: {
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: AppTheme.mute,
     marginTop: 2,
   },
   infoText: {
     fontFamily: 'Inter_500Medium',
     fontSize: 14,
-    color: Colors.text,
+    color: AppTheme.ink,
   },
   completionNoteBox: {
-    backgroundColor: 'rgba(52, 199, 89, 0.08)',
-    borderRadius: 12,
+    backgroundColor: AppTheme.greenSoft,
+    borderRadius: 14,
     padding: 14,
     borderLeftWidth: 3,
-    borderLeftColor: Colors.success,
+    borderLeftColor: AppTheme.green,
   },
   completionNoteText: {
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
-    color: Colors.text,
+    color: AppTheme.inkSoft,
     lineHeight: 22,
   },
   reassignButton: {
-    backgroundColor: Colors.accent,
+    backgroundColor: AppTheme.charcoal,
     borderRadius: 14,
     paddingVertical: 14,
     flexDirection: 'row',
@@ -382,11 +379,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     marginTop: 8,
+    ...appSoftShadow,
   },
   reassignButtonText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 15,
-    color: Colors.white,
+    color: AppTheme.white,
     letterSpacing: -0.2,
   },
 });

@@ -4,8 +4,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
-import { Modal, Portal, Text, Searchbar, Avatar, IconButton, Divider, Icon } from 'react-native-paper';
-import { Colors } from '../constants/colors';
+import { Modal, Portal, Text, Searchbar, Avatar, IconButton, Icon } from 'react-native-paper';
+import { AppTheme, appShadow, appSoftShadow } from '../constants/theme';
 import { Profile } from '../types/database';
 import { ROLE_LABELS } from '../constants/roles';
 import { AnimatedPressable } from './AnimatedPressable';
@@ -16,6 +16,17 @@ interface MemberPickerModalProps {
   members: Profile[];
   selectedMember: Profile | null;
   onSelectMember: (member: Profile) => void;
+}
+
+function getRoleAvatarColors(role: Profile['role']) {
+  switch (role) {
+    case 'owner':
+      return { bg: AppTheme.coralSoft, text: AppTheme.coral };
+    case 'manager':
+      return { bg: AppTheme.blueSoft, text: AppTheme.blue };
+    default:
+      return { bg: AppTheme.greenSoft, text: AppTheme.green };
+  }
 }
 
 export function MemberPickerModal({
@@ -59,9 +70,10 @@ export function MemberPickerModal({
           <Text style={styles.title}>Select Team Member</Text>
           <IconButton
             icon="close"
-            iconColor={Colors.textSecondary}
+            iconColor={AppTheme.mute}
             size={22}
             onPress={handleDismiss}
+            style={styles.closeBtn}
           />
         </View>
 
@@ -71,64 +83,77 @@ export function MemberPickerModal({
           onChangeText={setSearchQuery}
           style={styles.searchbar}
           inputStyle={styles.searchInput}
-          iconColor={Colors.textSecondary}
-          placeholderTextColor={Colors.placeholder}
-          theme={{ colors: { onSurface: Colors.text, elevation: { level3: Colors.inputBackground } } }}
-        />
-
-        <FlatList
-          data={filteredMembers}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          style={styles.list}
-          ItemSeparatorComponent={() => <Divider style={styles.separator} />}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Icon source="account-search-outline" size={40} color={Colors.textTertiary} />
-              <Text style={styles.emptyText}>No members found</Text>
-            </View>
-          }
-          renderItem={({ item }) => {
-            const isSelected = selectedMember?.id === item.id;
-            return (
-              <AnimatedPressable
-                style={[
-                  styles.itemContainer,
-                  isSelected && styles.selectedItemContainer,
-                ]}
-                onPress={() => {
-                  handleSelectMember(item);
-                }}
-              >
-                <Avatar.Text
-                  size={40}
-                  label={item.full_name.substring(0, 2).toUpperCase()}
-                  style={[
-                    styles.avatar,
-                    isSelected ? styles.selectedAvatar : styles.defaultAvatar
-                  ]}
-                  labelStyle={[
-                    styles.avatarLabel,
-                    isSelected ? styles.selectedAvatarLabel : styles.defaultAvatarLabel
-                  ]}
-                />
-                <View style={styles.info}>
-                  <Text style={[styles.name, isSelected && styles.selectedText]}>{item.full_name}</Text>
-                  <Text style={styles.details}>
-                    {item.employee_id} {item.department ? `• ${item.department}` : ''}
-                  </Text>
-                </View>
-                {isSelected ? (
-                  <View style={styles.checkIcon}>
-                    <Icon source="check" size={20} color={Colors.ownerAccent} />
-                  </View>
-                ) : (
-                  <Text style={styles.roleLabel}>{ROLE_LABELS[item.role]}</Text>
-                )}
-              </AnimatedPressable>
-            );
+          iconColor={AppTheme.mute}
+          placeholderTextColor={AppTheme.mute}
+          theme={{
+            colors: {
+              onSurface: AppTheme.ink,
+              elevation: { level3: AppTheme.card },
+            },
           }}
         />
+
+        <View style={styles.listWrap}>
+          <FlatList
+            data={filteredMembers}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Icon source="account-search-outline" size={40} color={AppTheme.mute} />
+                <Text style={styles.emptyText}>No members found</Text>
+              </View>
+            }
+            renderItem={({ item }) => {
+              const isSelected = selectedMember?.id === item.id;
+              const avatarColors = getRoleAvatarColors(item.role);
+              return (
+                <AnimatedPressable
+                  style={[
+                    styles.itemContainer,
+                    isSelected && styles.selectedItemContainer,
+                  ]}
+                  onPress={() => {
+                    handleSelectMember(item);
+                  }}
+                >
+                  <Avatar.Text
+                    size={40}
+                    label={item.full_name.substring(0, 2).toUpperCase()}
+                    style={[
+                      styles.avatar,
+                      isSelected
+                        ? styles.selectedAvatar
+                        : { backgroundColor: avatarColors.bg },
+                    ]}
+                    labelStyle={[
+                      styles.avatarLabel,
+                      isSelected
+                        ? styles.selectedAvatarLabel
+                        : { color: avatarColors.text },
+                    ]}
+                  />
+                  <View style={styles.info}>
+                    <Text style={[styles.name, isSelected && styles.selectedText]}>
+                      {item.full_name}
+                    </Text>
+                    <Text style={styles.details}>
+                      {item.employee_id} {item.department ? `• ${item.department}` : ''}
+                    </Text>
+                  </View>
+                  {isSelected ? (
+                    <View style={styles.checkIcon}>
+                      <Icon source="check" size={18} color={AppTheme.charcoal} />
+                    </View>
+                  ) : (
+                    <Text style={styles.roleLabel}>{ROLE_LABELS[item.role]}</Text>
+                  )}
+                </AnimatedPressable>
+              );
+            }}
+          />
+        </View>
       </Modal>
     </Portal>
   );
@@ -136,14 +161,12 @@ export function MemberPickerModal({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.surface,
+    backgroundColor: AppTheme.card,
     margin: 20,
-    borderRadius: 16,
+    borderRadius: 28,
     padding: 20,
     maxHeight: '80%',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadowHeavy,
+    ...appShadow,
   },
   header: {
     flexDirection: 'row',
@@ -152,89 +175,98 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
+    fontFamily: 'Inter_700Bold',
     fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text,
+    color: AppTheme.ink,
+    letterSpacing: -0.3,
+  },
+  closeBtn: {
+    margin: 0,
   },
   searchbar: {
-    backgroundColor: Colors.inputBackground,
-    borderRadius: 12,
-    elevation: 0,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 16,
+    backgroundColor: AppTheme.card,
+    borderRadius: 16,
+    borderWidth: 0,
+    marginBottom: 12,
     height: 48,
+    ...appSoftShadow,
   },
   searchInput: {
     minHeight: 48,
     alignSelf: 'center',
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: AppTheme.ink,
   },
-  list: {
-    marginTop: 8,
+  listWrap: {
+    backgroundColor: AppTheme.bg,
+    borderRadius: 20,
+    overflow: 'hidden',
+    maxHeight: 400,
+  },
+  listContent: {
+    padding: 8,
+    gap: 6,
   },
   itemContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 10,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: AppTheme.card,
+    ...appSoftShadow,
   },
   selectedItemContainer: {
-    backgroundColor: Colors.accentSubtle,
+    backgroundColor: AppTheme.blueSoft,
   },
   avatar: {
     marginRight: 12,
   },
-  defaultAvatar: {
-    backgroundColor: Colors.surfaceLight,
-  },
   selectedAvatar: {
-    backgroundColor: Colors.ownerAccent,
+    backgroundColor: AppTheme.charcoal,
   },
   avatarLabel: {
+    fontFamily: 'Inter_700Bold',
     fontSize: 14,
-    fontWeight: '700',
-  },
-  defaultAvatarLabel: {
-    color: Colors.textSecondary,
   },
   selectedAvatarLabel: {
-    color: Colors.white,
+    color: AppTheme.white,
   },
   info: {
     flex: 1,
   },
   name: {
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
+    color: AppTheme.ink,
   },
   selectedText: {
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
   },
   details: {
+    fontFamily: 'Inter_400Regular',
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: AppTheme.mute,
     marginTop: 2,
   },
   checkIcon: {
     justifyContent: 'center',
     alignItems: 'center',
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: AppTheme.card,
   },
   roleLabel: {
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 11,
-    color: Colors.textTertiary,
-    backgroundColor: Colors.surfaceLight,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    color: AppTheme.mute,
+    backgroundColor: AppTheme.soft,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
     overflow: 'hidden',
-  },
-  separator: {
-    backgroundColor: Colors.divider,
-    height: StyleSheet.hairlineWidth,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -243,7 +275,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyText: {
+    fontFamily: 'Inter_400Regular',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: AppTheme.mute,
   },
 });

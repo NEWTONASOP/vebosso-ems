@@ -3,6 +3,7 @@
 // ============================================================================
 
 import { UserRole } from '../types/database';
+import { AppTheme } from './theme';
 
 export const ROLES = {
   OWNER: 'owner' as UserRole,
@@ -22,36 +23,38 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   member: 'Can check in, view tasks, and submit reports',
 };
 
-// Status labels and colors for work logs
+// Status labels and colours for work logs.
+// Colours come from AppTheme so status chips stay in step with the design
+// system; the `*Soft` tints are deliberately strong enough to read as coloured.
 export const WORK_LOG_STATUS_CONFIG = {
   pending_approval: {
     label: 'Pending Approval',
-    color: '#B45309',
-    backgroundColor: 'rgba(180, 83, 9, 0.08)',
+    color: AppTheme.amber,
+    backgroundColor: AppTheme.amberSoft,
     icon: 'clock-outline',
   },
   working: {
     label: 'Working',
-    color: '#047857',
-    backgroundColor: 'rgba(4, 120, 87, 0.08)',
+    color: AppTheme.green,
+    backgroundColor: AppTheme.greenSoft,
     icon: 'briefcase-outline',
   },
   pending_checkout: {
     label: 'Pending Checkout',
-    color: '#4F46E5',
-    backgroundColor: 'rgba(79, 70, 229, 0.08)',
+    color: AppTheme.violet,
+    backgroundColor: AppTheme.violetSoft,
     icon: 'clock-check-outline',
   },
   done: {
     label: 'Done',
-    color: '#475569',
-    backgroundColor: 'rgba(71, 85, 105, 0.08)',
+    color: AppTheme.inkSoft,
+    backgroundColor: AppTheme.soft,
     icon: 'check-circle-outline',
   },
   rejected: {
     label: 'Rejected',
-    color: '#B91C1C',
-    backgroundColor: 'rgba(185, 28, 28, 0.08)',
+    color: AppTheme.coral,
+    backgroundColor: AppTheme.coralSoft,
     icon: 'close-circle-outline',
   },
 } as const;
@@ -59,20 +62,20 @@ export const WORK_LOG_STATUS_CONFIG = {
 export const TASK_STATUS_CONFIG = {
   pending: {
     label: 'Pending',
-    color: '#B45309',
-    backgroundColor: 'rgba(180, 83, 9, 0.08)',
+    color: AppTheme.amber,
+    backgroundColor: AppTheme.amberSoft,
     icon: 'circle-outline',
   },
   in_progress: {
     label: 'In Progress',
-    color: '#2563EB',
-    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    color: AppTheme.blue,
+    backgroundColor: AppTheme.blueSoft,
     icon: 'progress-clock',
   },
   done: {
     label: 'Done',
-    color: '#047857',
-    backgroundColor: 'rgba(4, 120, 87, 0.08)',
+    color: AppTheme.green,
+    backgroundColor: AppTheme.greenSoft,
     icon: 'check-circle',
   },
 } as const;
@@ -80,18 +83,18 @@ export const TASK_STATUS_CONFIG = {
 export const LEAVE_STATUS_CONFIG = {
   pending: {
     label: 'Pending',
-    color: '#B45309',
-    backgroundColor: 'rgba(180, 83, 9, 0.08)',
+    color: AppTheme.amber,
+    backgroundColor: AppTheme.amberSoft,
   },
   approved: {
     label: 'Approved',
-    color: '#047857',
-    backgroundColor: 'rgba(4, 120, 87, 0.08)',
+    color: AppTheme.green,
+    backgroundColor: AppTheme.greenSoft,
   },
   rejected: {
     label: 'Rejected',
-    color: '#B91C1C',
-    backgroundColor: 'rgba(185, 28, 28, 0.08)',
+    color: AppTheme.coral,
+    backgroundColor: AppTheme.coralSoft,
   },
 } as const;
 

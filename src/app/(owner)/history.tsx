@@ -1,21 +1,65 @@
 // ============================================================================
 // VEBOSSO EMS — Owner History Screen
+// Team day view + per-person month rail / sequential timeline.
 // ============================================================================
 
-import { eachDayOfInterval, endOfMonth, format, isSameDay, startOfMonth } from 'date-fns';
-import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View, Platform, ActivityIndicator } from 'react-native';
-import { Button, Text, Snackbar } from 'react-native-paper';
 import { Feather } from '@expo/vector-icons';
-import { EmptyState } from '../../components/EmptyState';
+import {
+  addDays,
+  format,
+  isSameDay,
+  parseISO,
+  startOfMonth,
+  startOfWeek,
+} from 'date-fns';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { Avatar, Snackbar, Text } from 'react-native-paper';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
+import { DayAction, DayHeaderCard } from '../../components/DayHeaderCard';
+import { DayTimeline } from '../../components/DayTimeline';
+import { InlineError } from '../../components/InlineError';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
+import { PageTransition } from '../../components/PageTransition';
+import { TeamDayList, buildTeamDayRows } from '../../components/TeamDayList';
+import { DateRail } from '../../components/DateRail';
 import { WorkLogDetail } from '../../components/WorkLogDetail';
-import { Colors } from '../../constants/colors';
-import { WORK_LOG_STATUS_CONFIG } from '../../constants/roles';
-import { useWorkStore } from '../../store/workStore';
+import {
+  adjacentLogDate,
+  buildDayTimeline,
+  DAY_STATUS_LABEL,
+  DAY_STATUS_COLOR,
+  getDayStatus,
+  getMonthRange,
+} from '../../lib/attendanceTimeline';
+import {
+  AppTheme as T,
+  AppRadius,
+  AppSpace,
+  RoleAccent,
+  appShadow,
+  appSoftShadow,
+  screenChrome,
+} from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
-import { BackfillPermission, Profile, Task, WorkLog } from '../../types/database';
-import { supabase } from '../../lib/supabase';
+import { useWorkStore } from '../../store/workStore';
+import {
+  LeaveRequest,
+  Profile,
+  Task,
+  WorkLog,
+  WorkLogWithProfile,
+} from '../../types/database';
+
+const ownerAccent = RoleAccent.owner;
+const KEY = (d: Date) => format(d, 'yyyy-MM-dd');
+
+type ViewMode = 'team' | 'person';
 
 export default function OwnerHistoryScreen() {
   const { profile } = useAuthStore();
@@ -23,402 +67,591 @@ export default function OwnerHistoryScreen() {
     teamMembers,
     fetchTeamMembers,
     fetchWorkHistory,
+    fetchCompletedTasksInRange,
+    fetchLeaveInRange,
+    fetchTeamDay,
     grantBackfillPermission,
     backfillPermissions,
     fetchBackfillPermissions,
   } = useWorkStore();
+
+  const [mode, setMode] = useState<ViewMode>('team');
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()));
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
+
+  // Person-mode week data
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
-  const [selectedLog, setSelectedLog] = useState<WorkLog | null>(null);
-  const [selectedLogTasks, setSelectedLogTasks] = useState<Task[]>([]);
-  const [showDetail, setShowDetail] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
 
-  const [isLoading, setIsLoading] = useState(false);
+  // Team-mode day data
+  const [teamLogs, setTeamLogs] = useState<WorkLogWithProfile[]>([]);
 
-  // Authorize-edit mode: pick a calendar date instead of dialogs
-  const [authorizeMode, setAuthorizeMode] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [detailVisible, setDetailVisible] = useState(false);
+
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
 
-  const loadTasksForLog = async (log: WorkLog) => {
-    if (!selectedMember) return;
-    try {
-      const { data } = await supabase
-        .from('tasks')
-        .select('*')
-        .or(`work_log_id.eq.${log.id},and(assigned_to.eq.${selectedMember.id},due_date.eq.${log.date})`)
-        .order('created_at', { ascending: true });
-      setSelectedLogTasks((data as Task[]) || []);
-    } catch {
-      setSelectedLogTasks([]);
+  const selectedKey = KEY(selectedDate);
+
+  // ── Team members (needed for Team rows + Person picker) ──────────────────
+  useEffect(() => {
+    void fetchTeamMembers();
+  }, [fetchTeamMembers]);
+
+  // ── Team day load ────────────────────────────────────────────────────────
+  const loadTeamDay = useCallback(async () => {
+    setFetchError(null);
+    const [dayRes] = await Promise.all([
+      fetchTeamDay(selectedKey),
+      fetchTeamMembers(),
+    ]);
+    if (dayRes.success) {
+      setTeamLogs(dayRes.data);
+    } else {
+      setFetchError(dayRes.error || 'Failed to load team attendance.');
+      setTeamLogs([]);
     }
+  }, [selectedKey, fetchTeamDay, fetchTeamMembers]);
+
+  // ── Person load ──────────────────────────────────────────────────────────
+  // The rail scrolls across the whole month, so the whole month loads at once.
+  // Anything narrower would leave scrolled-to days without a status dot, which
+  // reads as "absent" rather than "not loaded".
+  const loadPerson = useCallback(async () => {
+    if (!selectedMember) return;
+    setFetchError(null);
+
+    const { start, end } = getMonthRange(visibleMonth);
+
+    const [logsRes, tasksRes, leavesRes] = await Promise.all([
+      fetchWorkHistory(selectedMember.id, start, end),
+      fetchCompletedTasksInRange(selectedMember.id, start, end),
+      fetchLeaveInRange(selectedMember.id, start, end),
+      fetchBackfillPermissions(selectedMember.id),
+    ]);
+
+    if (logsRes.success) {
+      setWorkLogs(logsRes.data);
+    } else {
+      setFetchError(logsRes.error || 'Failed to load attendance.');
+      setWorkLogs([]);
+    }
+    setTasks(tasksRes.success ? tasksRes.data : []);
+    setLeaves(leavesRes.success ? leavesRes.data : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMember?.id, visibleMonth]);
+
+  useEffect(() => {
+    if (mode === 'team') {
+      void loadTeamDay();
+    } else if (selectedMember) {
+      void loadPerson();
+    }
+  }, [mode, loadTeamDay, loadPerson, selectedMember]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    if (mode === 'team') {
+      await loadTeamDay();
+    } else {
+      await loadPerson();
+    }
+    setRefreshing(false);
   };
 
-  const openLogDetail = async (log: WorkLog) => {
-    setSelectedLog(log);
-    setShowDetail(true);
-    await loadTasksForLog(log);
-  };
+  // ── Person-mode derived data ─────────────────────────────────────────────
+  const logFor = useCallback(
+    (date: Date) => workLogs.find((l) => isSameDay(new Date(l.date), date)) ?? null,
+    [workLogs]
+  );
+  const leaveFor = useCallback(
+    (date: Date) => leaves.find((l) => l.date === KEY(date)) ?? null,
+    [leaves]
+  );
 
-  const getPermissionForDay = (day: Date): BackfillPermission | undefined =>
-    backfillPermissions.find(
-      (p) => p.date === format(day, 'yyyy-MM-dd') && !p.is_used
-    );
+  const selectedLog = logFor(selectedDate);
+  const selectedLeave = leaveFor(selectedDate);
+  const selectedStatus = getDayStatus({ workLog: selectedLog, leave: selectedLeave });
+
+  const timeline = useMemo(
+    () =>
+      buildDayTimeline({
+        day: selectedKey,
+        workLog: selectedLog,
+        tasks,
+        leave: selectedLeave,
+      }),
+    [selectedKey, selectedLog, tasks, selectedLeave]
+  );
+
+  // Stepping in the detail sheet skips days with no record, so it never opens
+  // onto an empty sheet.
+  const prevLogDate = adjacentLogDate(workLogs, selectedKey, -1);
+  const nextLogDate = adjacentLogDate(workLogs, selectedKey, 1);
+
+  // Summary follows whichever week the selected day belongs to.
+  const weekSummary = useMemo(() => {
+    const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+    const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+    const logs = days.map((d) => logFor(d)).filter(Boolean) as WorkLog[];
+    const hours = logs.reduce((sum, l) => sum + (l.total_hours || 0), 0);
+    const worked = logs.filter((l) => l.status === 'done').length;
+    return { worked, hours };
+  }, [selectedDate, logFor]);
+
+  const teamRows = useMemo(
+    () =>
+      buildTeamDayRows({
+        day: selectedKey,
+        members: teamMembers,
+        workLogs: teamLogs,
+        leaves: [],
+      }),
+    [selectedKey, teamMembers, teamLogs]
+  );
+
+  const getPermissionForDay = (day: Date) =>
+    backfillPermissions.find((p) => p.date === KEY(day) && !p.is_used);
+
+  const activePermission = getPermissionForDay(selectedDate);
 
   const handleAuthorizeDate = async (day: Date) => {
     if (!selectedMember || !profile || isAuthorizing) return;
 
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    if (day >= startOfToday) {
-      setSnackMessage('Select a past date to authorize edit.');
-      return;
-    }
-
-    if (getPermissionForDay(day)) {
-      setSnackMessage(`Edit already authorized for ${format(day, 'MMM dd, yyyy')}.`);
-      return;
-    }
-
     setIsAuthorizing(true);
-    const dateStr = format(day, 'yyyy-MM-dd');
-    const result = await grantBackfillPermission(selectedMember.id, dateStr, profile.id);
+    const result = await grantBackfillPermission(selectedMember.id, KEY(day), profile.id);
     setIsAuthorizing(false);
 
     if (result.success) {
       await fetchBackfillPermissions(selectedMember.id);
-      setSnackMessage(`Authorized edit for ${format(day, 'MMM dd, yyyy')}.`);
-      setAuthorizeMode(false);
+      setSnackMessage(`${selectedMember.full_name} can now edit ${format(day, 'MMM d')}.`);
     } else {
       setSnackMessage(result.error || 'Failed to authorize edit.');
     }
   };
 
-  const currentIndex = selectedLog ? workLogs.findIndex((l) => l.id === selectedLog.id) : -1;
-  const hasNextDay = selectedLog ? currentIndex > 0 : false;
-  const hasPrevDay = selectedLog ? (currentIndex !== -1 && currentIndex < workLogs.length - 1) : false;
+  // Actions apply to the day already selected, so granting an edit is one tap
+  // rather than a mode you enter and then a date you have to find.
+  const isPastDay = selectedKey < KEY(new Date());
+  const dayActions: DayAction[] = [
+    {
+      key: 'log',
+      label: 'View full log',
+      icon: 'file-text',
+      tone: 'primary',
+      disabled: !selectedLog,
+      onPress: () => setDetailVisible(true),
+    },
+    {
+      key: 'authorize',
+      label: activePermission
+        ? 'Edit allowed'
+        : isAuthorizing
+          ? 'Allowing…'
+          : 'Allow edit',
+      icon: activePermission ? 'check' : 'edit-2',
+      tone: 'warn',
+      // Only a finished day can be backfilled, and only once.
+      disabled: !isPastDay || !!activePermission || isAuthorizing,
+      onPress: () => void handleAuthorizeDate(selectedDate),
+    },
+  ];
 
-  const handleNextDay = async () => {
-    if (hasNextDay && currentIndex !== -1) {
-      const nextLog = workLogs[currentIndex - 1];
-      setSelectedLog(nextLog);
-      loadTasksForLog(nextLog);
+  const openPicker = () => setPickerVisible(true);
+
+  const selectMemberFromTeam = (userId: string) => {
+    const member = teamMembers.find((m) => m.id === userId) ?? null;
+    if (member) {
+      setSelectedMember(member);
+      setMode('person');
     }
   };
-
-  const handlePrevDay = async () => {
-    if (hasPrevDay && currentIndex !== -1) {
-      const prevLog = workLogs[currentIndex + 1];
-      setSelectedLog(prevLog);
-      loadTasksForLog(prevLog);
-    }
-  };
-
-  const loadHistory = useCallback(async () => {
-    if (!selectedMember) return;
-    setIsLoading(true);
-    const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-    const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-    const [historyResult] = await Promise.all([
-      fetchWorkHistory(selectedMember.id, start, end),
-      fetchBackfillPermissions(selectedMember.id),
-    ]);
-    setWorkLogs(historyResult.data);
-    setIsLoading(false);
-  }, [selectedMember, currentMonth, fetchWorkHistory, fetchBackfillPermissions]);
-
-  useEffect(() => {
-    fetchTeamMembers();
-  }, [fetchTeamMembers]);
-
-  useEffect(() => {
-    setAuthorizeMode(false);
-  }, [selectedMember?.id]);
-
-  useEffect(() => {
-    // eslint-disable-next-line
-    if (selectedMember) void loadHistory();
-  }, [selectedMember, loadHistory]);
-
-  const daysInMonth = eachDayOfInterval({
-    start: startOfMonth(currentMonth),
-    end: endOfMonth(currentMonth),
-  });
-
-  const getLogForDay = (day: Date) =>
-    workLogs.find((log) => isSameDay(new Date(log.date), day));
-
-  const getDayColor = (log: WorkLog | undefined) => {
-    if (!log) return Colors.surfaceLight;
-    return WORK_LOG_STATUS_CONFIG[log.status]?.backgroundColor || Colors.surfaceLight;
-  };
-
-  const getDayBorderColor = (log: WorkLog | undefined) => {
-    if (!log) return 'transparent';
-    return WORK_LOG_STATUS_CONFIG[log.status]?.color || 'transparent';
-  };
-
-  const minDate = new Date();
-  minDate.setMonth(minDate.getMonth() - 6);
-  const isMinMonth = currentMonth <= startOfMonth(minDate);
-  const isMaxMonth = currentMonth >= startOfMonth(new Date());
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Attendance History</Text>
-      </View>
-
-      {/* Member Picker */}
-      <View style={styles.pickerSection}>
-        <Button
-          mode="outlined"
-          onPress={() => setPickerVisible(true)}
-          style={styles.pickerButton}
-          textColor={Colors.text}
-          icon="account"
-        >
-          {selectedMember?.full_name || 'Select a member'}
-        </Button>
-      </View>
-
-      <MemberPickerModal
-        visible={pickerVisible}
-        onDismiss={() => setPickerVisible(false)}
-        members={teamMembers}
-        selectedMember={selectedMember}
-        onSelectMember={(member) => {
-          setSelectedMember(member);
-          setPickerVisible(false);
-        }}
-      />
-
-      {!selectedMember ? (
-        <EmptyState icon="calendar-month-outline" title="Select a Member" subtitle="Choose a team member to view their attendance history" />
-      ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Authorize edit — above calendar */}
-          <View style={styles.authorizeSection}>
-            <Button
-              mode={authorizeMode ? 'contained' : 'outlined'}
-              onPress={() => setAuthorizeMode((prev) => !prev)}
-              icon="pencil-lock-outline"
-              buttonColor={authorizeMode ? Colors.warning : undefined}
-              textColor={authorizeMode ? Colors.white : Colors.warning}
-              style={[
-                styles.authorizeButton,
-                !authorizeMode && { borderColor: Colors.warning },
-              ]}
-              loading={isAuthorizing}
-              disabled={isAuthorizing}
-            >
-              {authorizeMode ? 'Tap a date to authorize' : 'Authorize Edit'}
-            </Button>
-            {authorizeMode && (
-              <Text style={styles.authorizeHint}>
-                Select a past date so {selectedMember.full_name} can edit attendance for that day.
-              </Text>
-            )}
+    <>
+      <PageTransition>
+        <View style={screenChrome.root}>
+          <View style={screenChrome.header}>
+            <Text style={screenChrome.title}>Attendance</Text>
+            <Text style={screenChrome.subtitle}>
+              {mode === 'team'
+                ? 'Everyone on this day'
+                : selectedMember
+                  ? `${selectedMember.full_name}'s week`
+                  : 'Pick someone to review'}
+            </Text>
           </View>
 
-          {/* Month Navigation */}
-          <View style={styles.monthNav}>
-            <TouchableOpacity
-              onPress={() => setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1))}
-              disabled={isMinMonth}
-              style={{ opacity: isMinMonth ? 0.3 : 1, padding: 8 }}
-            >
-              <Feather name="chevron-left" size={24} color={Colors.accent} />
-            </TouchableOpacity>
-            <Text style={styles.monthTitle}>{format(currentMonth, 'MMMM yyyy')}</Text>
-            <TouchableOpacity
-              onPress={() => setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1))}
-              disabled={isMaxMonth}
-              style={{ opacity: isMaxMonth ? 0.3 : 1, padding: 8 }}
-            >
-              <Feather name="chevron-right" size={24} color={Colors.accent} />
-            </TouchableOpacity>
+          <View style={styles.segmentPad}>
+            <View style={screenChrome.segmentTrack}>
+              <AnimatedPressable
+                scaleTo={0.98}
+                onPress={() => setMode('team')}
+                style={[
+                  screenChrome.segmentBtn,
+                  mode === 'team' && screenChrome.segmentBtnActive,
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: mode === 'team' }}
+                accessibilityLabel="Team day view"
+              >
+                <Feather
+                  name="users"
+                  size={15}
+                  color={mode === 'team' ? T.ink : T.inkSoft}
+                />
+                <Text
+                  style={[
+                    screenChrome.segmentText,
+                    mode === 'team' && screenChrome.segmentTextActive,
+                  ]}
+                >
+                  Team
+                </Text>
+              </AnimatedPressable>
+              <AnimatedPressable
+                scaleTo={0.98}
+                onPress={() => setMode('person')}
+                style={[
+                  screenChrome.segmentBtn,
+                  mode === 'person' && screenChrome.segmentBtnActive,
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: mode === 'person' }}
+                accessibilityLabel="Person history view"
+              >
+                <Feather
+                  name="user"
+                  size={15}
+                  color={mode === 'person' ? T.ink : T.inkSoft}
+                />
+                <Text
+                  style={[
+                    screenChrome.segmentText,
+                    mode === 'person' && screenChrome.segmentTextActive,
+                  ]}
+                >
+                  Person
+                </Text>
+              </AnimatedPressable>
+            </View>
           </View>
 
-          {/* Calendar Grid */}
-          <View style={styles.weekdayRow}>
-            {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
-              <Text key={d} style={styles.weekdayLabel}>{d}</Text>
-            ))}
-          </View>
+          <MemberPickerModal
+            visible={pickerVisible}
+            onDismiss={() => setPickerVisible(false)}
+            members={teamMembers}
+            selectedMember={selectedMember}
+            onSelectMember={(member) => {
+              setSelectedMember(member);
+              setPickerVisible(false);
+            }}
+          />
 
-          {isLoading ? (
-            <View style={{ height: 300, justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="large" color={Colors.accent} />
+          {mode === 'person' && !selectedMember ? (
+            <View style={styles.emptyWrap}>
+              <View style={styles.emptyCard}>
+                <View style={styles.emptyIconWrap}>
+                  <Feather name="calendar" size={28} color={T.charcoal} />
+                </View>
+                <Text style={styles.emptyTitle}>Attendance History</Text>
+                <Text style={styles.emptyBody}>
+                  See any team member's attendance day by day
+                </Text>
+                <AnimatedPressable
+                  scaleTo={0.97}
+                  style={styles.chooseMemberBtn}
+                  onPress={openPicker}
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose a member"
+                >
+                  <Feather name="user" size={18} color={T.white} />
+                  <Text style={styles.chooseMemberText}>Choose a member</Text>
+                </AnimatedPressable>
+              </View>
             </View>
           ) : (
-            <View style={styles.calendarGrid}>
-              {/* Empty cells for offset */}
-              {Array.from({ length: daysInMonth[0].getDay() }).map((_, i) => (
-                <View key={`empty-${i}`} style={styles.dayCell} />
-              ))}
-              {daysInMonth.map((day) => {
-                const log = getLogForDay(day);
-                const isToday = isSameDay(day, new Date());
-                const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
-                const permission = getPermissionForDay(day);
-                const canSelectInAuthorizeMode = authorizeMode && isPast;
+            <ScrollView
+              contentContainerStyle={styles.content}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  tintColor={T.charcoal}
+                />
+              }
+            >
+              {mode === 'person' && selectedMember ? (
+                <AnimatedPressable
+                  scaleTo={0.98}
+                  style={styles.memberControl}
+                  onPress={openPicker}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Selected member ${selectedMember.full_name}. Change member`}
+                >
+                  <Avatar.Text
+                    size={40}
+                    label={selectedMember.full_name?.substring(0, 2).toUpperCase() || '??'}
+                    style={styles.memberAvatar}
+                    labelStyle={styles.memberAvatarLabel}
+                  />
+                  <View style={styles.memberMeta}>
+                    <Text style={styles.memberName} numberOfLines={1}>
+                      {selectedMember.full_name}
+                    </Text>
+                    {selectedMember.employee_id ? (
+                      <Text style={styles.memberId} numberOfLines={1}>
+                        {selectedMember.employee_id}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.changeAffordance}>
+                    <Text style={styles.changeText}>Change</Text>
+                    <Feather name="chevron-down" size={16} color={T.inkSoft} />
+                  </View>
+                </AnimatedPressable>
+              ) : null}
 
-                return (
-                  <TouchableOpacity
-                    key={day.toISOString()}
-                    style={[
-                      styles.dayCell,
-                      { backgroundColor: getDayColor(log) },
-                      log && { borderColor: getDayBorderColor(log), borderWidth: 1.5 },
-                      isToday && styles.todayCell,
-                      permission && styles.authorizedCell,
-                      canSelectInAuthorizeMode && styles.authorizeSelectableCell,
-                    ]}
-                    onPress={() => {
-                      if (authorizeMode) {
-                        void handleAuthorizeDate(day);
-                        return;
-                      }
-                      if (log) {
-                        void openLogDetail(log);
+              <DateRail
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                visibleMonth={visibleMonth}
+                onChangeMonth={setVisibleMonth}
+                getDayStatus={(d) =>
+                  mode === 'person'
+                    ? getDayStatus({ workLog: logFor(d), leave: leaveFor(d) })
+                    : 'none'
+                }
+                accentColor={ownerAccent.color}
+              />
+
+              {fetchError ? (
+                <View style={styles.errorPad}>
+                  <InlineError
+                    message={fetchError}
+                    onRetry={mode === 'team' ? loadTeamDay : loadPerson}
+                    compact
+                  />
+                </View>
+              ) : null}
+
+              {mode === 'team' ? (
+                <>
+                  <View style={styles.dayHead}>
+                    <Text style={styles.dayTitle}>
+                      {format(selectedDate, 'EEEE, d MMMM')}
+                    </Text>
+                  </View>
+                  <TeamDayList
+                    rows={teamRows}
+                    onSelectMember={selectMemberFromTeam}
+                  />
+                </>
+              ) : (
+                <>
+                  <View style={styles.weekSummary}>
+                    <Text style={styles.weekSummaryText}>
+                      {weekSummary.worked}{' '}
+                      {weekSummary.worked === 1 ? 'day' : 'days'} ·{' '}
+                      {weekSummary.hours.toFixed(1)}h this week
+                    </Text>
+                  </View>
+
+                  <DayHeaderCard
+                    date={selectedDate}
+                    status={selectedStatus}
+                    checkInTime={selectedLog?.check_in_time}
+                    checkOutTime={selectedLog?.check_out_time}
+                    totalHours={selectedLog?.total_hours}
+                    actions={dayActions}
+                    note={
+                      activePermission
+                        ? `${selectedMember?.full_name?.split(' ')[0] ?? 'They'} can edit this day's attendance until it's used.`
+                        : null
+                    }
+                  />
+
+                  <DayTimeline
+                    timeline={timeline}
+                    onPressEvent={(event) => {
+                      if (event.kind === 'check-in' || event.kind === 'check-out') {
+                        setDetailVisible(true);
                       }
                     }}
-                    disabled={authorizeMode ? !isPast : !log}
-                  >
-                    <Text style={[styles.dayNumber, isToday && styles.todayText]}>
-                      {format(day, 'd')}
-                    </Text>
-                    {log && (
-                      <Text style={[styles.dayHours, { color: WORK_LOG_STATUS_CONFIG[log.status]?.color }]}>
-                        {log.total_hours ? `${log.total_hours}h` : '·'}
-                      </Text>
-                    )}
-                    {permission && !log && (
-                      <Text style={styles.authorizedMark}>Edit</Text>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                  />
+                </>
+              )}
+            </ScrollView>
           )}
+        </View>
+      </PageTransition>
 
-          {/* Legend */}
-          <View style={styles.legend}>
-            {Object.entries(WORK_LOG_STATUS_CONFIG).map(([key, config]) => (
-              <View key={key} style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: config.color }]} />
-                <Text style={styles.legendText}>{config.label}</Text>
-              </View>
-            ))}
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: Colors.warning }]} />
-              <Text style={styles.legendText}>Edit authorized</Text>
-            </View>
-          </View>
-        </ScrollView>
-      )}
-
-      <WorkLogDetail
-        visible={showDetail}
-        onDismiss={() => {
-          setShowDetail(false);
-          setSelectedLogTasks([]);
-        }}
-        workLog={selectedLog}
-        tasks={selectedLogTasks}
-        onNextDay={handleNextDay}
-        onPrevDay={handlePrevDay}
-        hasNextDay={hasNextDay}
-        hasPrevDay={hasPrevDay}
-      />
+      {detailVisible && selectedLog ? (
+        <WorkLogDetail
+          visible
+          workLog={selectedLog}
+          tasks={tasks.filter((t) => t.completed_at?.slice(0, 10) === selectedKey)}
+          onDismiss={() => setDetailVisible(false)}
+          onPrevDay={() => prevLogDate && setSelectedDate(parseISO(prevLogDate))}
+          onNextDay={() => nextLogDate && setSelectedDate(parseISO(nextLogDate))}
+          hasPrevDay={!!prevLogDate}
+          hasNextDay={!!nextLogDate}
+        />
+      ) : null}
 
       <Snackbar
         visible={!!snackMessage}
         onDismiss={() => setSnackMessage('')}
         duration={3000}
+        theme={{ colors: { inverseSurface: T.charcoal, inverseOnSurface: T.white } }}
         wrapperStyle={{ marginBottom: 90 }}
       >
         {snackMessage}
       </Snackbar>
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 8 },
-  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
-  pickerSection: { paddingHorizontal: 20, paddingTop: 12 },
-  pickerButton: { borderColor: Colors.border, borderRadius: 12, justifyContent: 'flex-start' },
-  authorizeSection: { marginTop: 8 },
-  authorizeButton: { borderRadius: 12 },
-  authorizeHint: {
-    marginTop: 8,
+  segmentPad: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  content: {
+    paddingHorizontal: 20,
+    paddingBottom: 120,
+  },
+  errorPad: {
+    marginTop: 14,
+  },
+  memberControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: T.card,
+    borderRadius: AppRadius.card,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 64,
+    marginBottom: 14,
+    ...appSoftShadow,
+  },
+  memberAvatar: {
+    backgroundColor: T.soft,
+  },
+  memberAvatarLabel: {
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+    color: T.inkSoft,
+  },
+  memberMeta: {
+    flex: 1,
+    gap: 2,
+  },
+  memberName: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: T.ink,
+    letterSpacing: -0.2,
+  },
+  memberId: {
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
-    color: Colors.textSecondary,
-    lineHeight: 18,
+    color: T.mute,
   },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 110 },
-  monthNav: {
+  changeAffordance: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 10,
+    height: 34,
+    borderRadius: AppRadius.pill,
+    backgroundColor: T.soft,
+  },
+  changeText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    color: T.inkSoft,
+  },
+  emptyWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: AppSpace.screen,
+    paddingBottom: 100,
+  },
+  emptyCard: {
+    backgroundColor: T.card,
+    borderRadius: AppRadius.hero,
+    paddingHorizontal: 28,
+    paddingVertical: 36,
+    alignItems: 'center',
+    ...appShadow,
+  },
+  emptyIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: T.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 22,
+    color: T.ink,
+    letterSpacing: -0.5,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  emptyBody: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: T.inkSoft,
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 28,
+    paddingHorizontal: 8,
+  },
+  chooseMemberBtn: {
+    ...screenChrome.primaryPill,
+    minWidth: 200,
+    height: 48,
+    paddingHorizontal: 22,
+  },
+  chooseMemberText: {
+    ...screenChrome.primaryPillText,
+    fontSize: 15,
+  },
+  weekSummary: {
+    marginTop: 14,
+    alignItems: 'center',
+  },
+  weekSummaryText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    color: T.mute,
+  },
+  dayHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-  },
-  monthTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
-  weekdayRow: { flexDirection: 'row', marginBottom: 4 },
-  weekdayLabel: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 12,
-    color: Colors.textTertiary,
-    fontWeight: '600',
-  },
-  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  dayCell: {
-    width: '14.28%',
-    aspectRatio: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    marginBottom: 2,
-  },
-  todayCell: { borderColor: Colors.accent, borderWidth: 1.5, backgroundColor: Colors.accentSubtle },
-  authorizedCell: {
-    backgroundColor: Colors.warningLight,
-    borderColor: Colors.warning,
-    borderWidth: 1.5,
-  },
-  authorizeSelectableCell: {
-    opacity: 1,
-  },
-  dayNumber: { fontSize: 14, color: Colors.text, fontWeight: '500' },
-  todayText: { color: Colors.accent, fontWeight: '700' },
-  dayHours: { fontSize: 9, marginTop: 1, fontWeight: '600' },
-  authorizedMark: {
-    fontSize: 8,
-    marginTop: 1,
-    fontWeight: '700',
-    color: Colors.warning,
-  },
-  legend: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    marginTop: 24,
+    marginBottom: 16,
     gap: 12,
-    marginTop: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
   },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 11, color: Colors.textSecondary },
+  dayTitle: {
+    flex: 1,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 17,
+    color: T.ink,
+    letterSpacing: -0.35,
+  },
 });

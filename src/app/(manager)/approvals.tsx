@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Platform, RefreshControl, StyleSheet, View, Pressable } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, View, Pressable } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
 import { Alert } from '../../lib/alert';
 import { ApprovalCard } from '../../components/ApprovalCard';
@@ -8,7 +8,7 @@ import { AssignTaskModal } from '../../components/AssignTaskModal';
 import { EmptyState } from '../../components/EmptyState';
 import { InlineError } from '../../components/InlineError';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
-import { Colors } from '../../constants/colors';
+import { AppSpace, AppTheme, screenChrome } from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { WorkLogWithProfile, LeaveRequestWithProfile } from '../../types/database';
@@ -183,29 +183,56 @@ export default function ManagerApprovalsScreen() {
   const pendingLeaves = leaveRequests.filter((l) => l.status === 'pending' && l.user_id !== profile?.id);
   const isLoading = activeTab === 'attendance' ? isLoadingApprovals : isLoadingLeaves;
   const currentError = activeTab === 'attendance' ? approvalsError : null;
+  const attendanceCount = pendingApprovals.length;
+  const leavesCount = pendingLeaves.length;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Approvals</Text>
-        
-        {/* Tab Selector */}
-        <View style={styles.segmentedContainer}>
+    <View style={screenChrome.root}>
+      <View style={screenChrome.header}>
+        <Text style={screenChrome.title}>Approvals</Text>
+
+        <View style={[screenChrome.segmentTrack, styles.segmentMargin]}>
           <Pressable
-            style={[styles.segmentBtn, activeTab === 'attendance' && styles.segmentBtnActive]}
+            style={[
+              screenChrome.segmentBtn,
+              activeTab === 'attendance' && screenChrome.segmentBtnActive,
+            ]}
             onPress={() => setActiveTab('attendance')}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === 'attendance' }}
+            accessibilityLabel={`Attendance${attendanceCount > 0 ? `, ${attendanceCount} pending` : ''}`}
           >
-            <Text style={[styles.segmentText, activeTab === 'attendance' && styles.segmentTextActive]}>
-              Attendance ({pendingApprovals.length})
+            <Text style={[screenChrome.segmentText, activeTab === 'attendance' && screenChrome.segmentTextActive]}>
+              Attendance
             </Text>
+            {attendanceCount > 0 ? (
+              <View style={[styles.countBadge, activeTab === 'attendance' && styles.countBadgeActive]}>
+                <Text style={[styles.countBadgeText, activeTab === 'attendance' && styles.countBadgeTextActive]}>
+                  {attendanceCount}
+                </Text>
+              </View>
+            ) : null}
           </Pressable>
           <Pressable
-            style={[styles.segmentBtn, activeTab === 'leaves' && styles.segmentBtnActive]}
+            style={[
+              screenChrome.segmentBtn,
+              activeTab === 'leaves' && screenChrome.segmentBtnActive,
+            ]}
             onPress={() => setActiveTab('leaves')}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === 'leaves' }}
+            accessibilityLabel={`Leaves${leavesCount > 0 ? `, ${leavesCount} pending` : ''}`}
           >
-            <Text style={[styles.segmentText, activeTab === 'leaves' && styles.segmentTextActive]}>
-              Leaves ({pendingLeaves.length})
+            <Text style={[screenChrome.segmentText, activeTab === 'leaves' && screenChrome.segmentTextActive]}>
+              Leaves
             </Text>
+            {leavesCount > 0 ? (
+              <View style={[styles.countBadge, activeTab === 'leaves' && styles.countBadgeActive]}>
+                <Text style={[styles.countBadgeText, activeTab === 'leaves' && styles.countBadgeTextActive]}>
+                  {leavesCount}
+                </Text>
+              </View>
+            ) : null}
           </Pressable>
         </View>
       </View>
@@ -213,7 +240,7 @@ export default function ManagerApprovalsScreen() {
       {isLoading && !refreshing ? (
         <View style={styles.content}><ListSkeleton count={3} variant="approval" /></View>
       ) : currentError ? (
-        <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
+        <View style={{ paddingHorizontal: AppSpace.screen, marginTop: 8 }}>
           <InlineError
             message={currentError}
             onRetry={loadData}
@@ -225,8 +252,14 @@ export default function ManagerApprovalsScreen() {
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
-          ListEmptyComponent={<EmptyState icon="checkbox-marked-circle-outline" title="All caught up!" subtitle="No pending attendance approvals" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AppTheme.charcoal} />}
+          ListEmptyComponent={
+            <EmptyState
+              icon="checkbox-marked-circle-outline"
+              title="All caught up!"
+              subtitle="No pending attendance approvals from your team. Pull to refresh anytime."
+            />
+          }
         />
       ) : (
         <FlatList
@@ -234,8 +267,14 @@ export default function ManagerApprovalsScreen() {
           renderItem={renderLeaveItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
-          ListEmptyComponent={<EmptyState icon="calendar-check" title="No Pending Leaves" subtitle="No pending leave requests" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AppTheme.charcoal} />}
+          ListEmptyComponent={
+            <EmptyState
+              icon="calendar-check"
+              title="No pending leaves"
+              subtitle="When a team member requests leave, it will show up here for review."
+            />
+          }
         />
       )}
 
@@ -255,7 +294,7 @@ export default function ManagerApprovalsScreen() {
         visible={!!snackMessage}
         onDismiss={() => setSnackMessage('')}
         duration={3000}
-        theme={{ colors: { inverseSurface: '#1C1C1E', inverseOnSurface: '#FFFFFF' } }}
+        theme={{ colors: { inverseSurface: AppTheme.charcoal, inverseOnSurface: AppTheme.white } }}
         wrapperStyle={{ marginBottom: 90 }}
       >
         {snackMessage}
@@ -265,35 +304,31 @@ export default function ManagerApprovalsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 12 },
-  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7, marginBottom: 12 },
-  content: { paddingHorizontal: 20 },
-  list: { paddingHorizontal: 20, paddingBottom: 110 },
-  segmentedContainer: {
-    flexDirection: 'row',
-    backgroundColor: Colors.systemGray6,
-    borderRadius: 14,
-    padding: 4,
-    gap: 4,
-  },
-  segmentBtn: {
-    flex: 1,
-    height: 38,
+  segmentMargin: { marginTop: 12 },
+  countBadge: {
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
     borderRadius: 10,
-    justifyContent: 'center',
+    backgroundColor: AppTheme.soft2,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  segmentBtnActive: {
-    backgroundColor: Colors.surface,
-    ...Colors.shadow,
+  countBadgeActive: {
+    backgroundColor: AppTheme.charcoal,
   },
-  segmentText: {
+  countBadgeText: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    color: Colors.textSecondary,
+    fontSize: 11,
+    color: AppTheme.inkSoft,
+    letterSpacing: -0.2,
   },
-  segmentTextActive: {
-    color: Colors.accent,
+  countBadgeTextActive: {
+    color: AppTheme.white,
+  },
+  content: { paddingHorizontal: AppSpace.screen },
+  list: {
+    ...screenChrome.listPad,
+    flexGrow: 1,
   },
 });

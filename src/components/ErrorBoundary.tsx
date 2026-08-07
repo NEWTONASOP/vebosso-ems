@@ -10,7 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
-import { Colors } from '../constants/colors';
+import { AppTheme, AppRadius, AppSpace, screenChrome } from '../constants/theme';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -95,11 +95,13 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     return (
       <View style={styles.container}>
         <View style={styles.iconContainer}>
-          <Feather 
-            name={isExhausted ? 'x-octagon' : 'alert-triangle'} 
-            size={48} 
-            color={isExhausted ? Colors.error : Colors.warning} 
-          />
+          <View style={[styles.iconChip, isExhausted && styles.iconChipError]}>
+            <Feather
+              name={isExhausted ? 'x-octagon' : 'alert-triangle'}
+              size={28}
+              color={isExhausted ? AppTheme.coral : AppTheme.amber}
+            />
+          </View>
         </View>
 
         <Text style={styles.title}>
@@ -117,8 +119,10 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             mode="contained"
             onPress={this.reset}
             style={styles.button}
-            buttonColor={Colors.accent}
-            textColor={Colors.white}
+            contentStyle={styles.buttonContent}
+            buttonColor={AppTheme.charcoal}
+            textColor={AppTheme.white}
+            labelStyle={styles.buttonLabel}
           >
             Try Again ({MAX_RETRIES - this.state.retryCount} attempts left)
           </Button>
@@ -137,44 +141,61 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: Colors.background,
+    ...screenChrome.root,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
+    padding: AppSpace.xxl,
   },
   iconContainer: {
-    marginBottom: 16,
+    marginBottom: AppSpace.lg,
+  },
+  iconChip: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: AppTheme.amberSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconChipError: {
+    backgroundColor: AppTheme.coralSoft,
   },
   title: {
     fontFamily: 'Inter_700Bold',
     fontSize: 22,
-    color: Colors.text,
+    color: AppTheme.ink,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: AppSpace.md,
     letterSpacing: -0.5,
   },
   message: {
     fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    color: Colors.textSecondary,
+    fontSize: 14,
+    color: AppTheme.mute,
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 32,
+    marginBottom: AppSpace.xxl,
   },
   button: {
-    borderRadius: 12,
+    borderRadius: AppRadius.pill,
     paddingHorizontal: 8,
   },
+  buttonContent: {
+    height: 44,
+  },
+  buttonLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  },
   devInfo: {
-    marginTop: 24,
+    marginTop: AppSpace.xxl,
     fontFamily: 'Inter_400Regular',
     fontSize: 10,
-    color: Colors.textTertiary,
+    color: AppTheme.mute,
     textAlign: 'left',
     alignSelf: 'stretch',
-    backgroundColor: Colors.surfaceLight,
-    padding: 8,
-    borderRadius: 8,
+    backgroundColor: AppTheme.soft,
+    padding: AppSpace.sm,
+    borderRadius: AppRadius.chip,
   },
 });

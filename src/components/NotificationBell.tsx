@@ -3,14 +3,15 @@
 // ============================================================================
 
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 
 import { useNotificationStore } from '../store/notificationStore';
 import { useAuthStore } from '../store/authStore';
-import { Colors } from '../constants/colors';
+import { AppTheme, appSoftShadow } from '../constants/theme';
+import { AnimatedPressable } from './AnimatedPressable';
 
 interface NotificationBellProps {
   role: 'owner' | 'manager' | 'member';
@@ -23,11 +24,9 @@ export function NotificationBell({ role }: NotificationBellProps) {
 
   useEffect(() => {
     if (!profile?.id) return;
-    
-    // Initial fetch
+
     fetchNotifications(profile.id);
 
-    // Setup subscription
     const unsubscribe = setupSubscription(profile.id);
     return () => unsubscribe();
   }, [profile?.id, fetchNotifications, setupSubscription]);
@@ -43,14 +42,8 @@ export function NotificationBell({ role }: NotificationBellProps) {
   };
 
   return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.container,
-        pressed && styles.pressed
-      ]}
-      onPress={handlePress}
-    >
-      <Feather name="bell" size={20} color={Colors.textPrimary} />
+    <AnimatedPressable style={styles.container} onPress={handlePress} scaleTo={0.92}>
+      <Feather name="bell" size={19} color={AppTheme.inkSoft} />
       {unreadCount > 0 && (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>
@@ -58,47 +51,40 @@ export function NotificationBell({ role }: NotificationBellProps) {
           </Text>
         </View>
       )}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: AppTheme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
     position: 'relative',
-    ...Colors.shadow,
-    elevation: 2,
-  },
-  pressed: {
-    transform: [{ scale: 0.95 }],
-    opacity: 0.9,
+    ...appSoftShadow,
   },
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#FF3B30', // Vibrant system red
+    top: -2,
+    right: -2,
+    backgroundColor: AppTheme.coral,
     borderRadius: 9,
-    minWidth: 18,
-    height: 18,
+    minWidth: 17,
+    height: 17,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
-    borderWidth: 1.5,
-    borderColor: Colors.surface,
+    borderWidth: 2,
+    borderColor: AppTheme.card,
     zIndex: 10,
   },
   badgeText: {
-    color: '#FFFFFF',
+    color: AppTheme.white,
     fontSize: 9,
     fontFamily: 'Inter_700Bold',
-    lineHeight: 12,
+    lineHeight: 11,
   },
 });

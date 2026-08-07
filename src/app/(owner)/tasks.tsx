@@ -6,14 +6,20 @@ import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Snackbar, Text } from 'react-native-paper';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
 import { PageTransition } from '../../components/PageTransition';
 import { TaskDetailModal } from '../../components/TaskDetailModal';
-import { Colors } from '../../constants/colors';
+import {
+  AppTheme as T,
+  AppSpace,
+  AppRadius,
+  appSoftShadow,
+  screenChrome,
+} from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
@@ -137,22 +143,22 @@ export default function OwnerTaskTrackingScreen() {
       case 'done':
         return {
           icon: 'check-circle',
-          color: Colors.success,
-          bgColor: Colors.success + '12',
+          color: T.green,
+          bgColor: T.greenSoft,
           label: 'Completed',
         };
       case 'in_progress':
         return {
           icon: 'play-circle',
-          color: Colors.accent,
-          bgColor: Colors.accent + '12',
+          color: T.blue,
+          bgColor: T.blueSoft,
           label: 'Running',
         };
       default:
         return {
           icon: 'clock',
-          color: Colors.textSecondary,
-          bgColor: Colors.textSecondary + '12',
+          color: T.amber,
+          bgColor: T.amberSoft,
           label: 'Pending',
         };
     }
@@ -167,23 +173,32 @@ export default function OwnerTaskTrackingScreen() {
     }
   };
 
+  const filterOptions = [
+    { key: 'all' as const, label: 'All', count: stats.total },
+    { key: 'pending' as const, label: 'Pending', count: stats.pending },
+    { key: 'in_progress' as const, label: 'Running', count: stats.inProgress },
+    { key: 'done' as const, label: 'Done', count: stats.done },
+  ];
+
   return (
     <PageTransition>
       <View style={styles.container}>
-        {/* Header with back button */}
         <View style={styles.header}>
           <Pressable
             style={({ pressed }) => [
+              screenChrome.iconButton,
               styles.backBtn,
-              pressed && styles.btnPressed
+              pressed && styles.btnPressed,
             ]}
             onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
           >
-            <Feather name="arrow-left" size={18} color={Colors.textPrimary} />
+            <Feather name="arrow-left" size={18} color={T.charcoal} />
           </Pressable>
           <View style={styles.headerTextContainer}>
-            <Text style={styles.title}>Track Tasks</Text>
-            <Text style={styles.subtitle}>
+            <Text style={screenChrome.title}>Track Tasks</Text>
+            <Text style={screenChrome.subtitle}>
               {stats.done}/{stats.total} completed
             </Text>
           </View>
@@ -191,10 +206,9 @@ export default function OwnerTaskTrackingScreen() {
 
         <ScrollView
           contentContainerStyle={styles.scrollContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.charcoal} />}
           showsVerticalScrollIndicator={false}
         >
-          {/* Progress Analytics Card */}
           {stats.total > 0 && (
             <View style={styles.progressCard}>
               <View style={styles.progressHeader}>
@@ -211,27 +225,42 @@ export default function OwnerTaskTrackingScreen() {
             </View>
           )}
 
-          {/* Filter segment pills */}
           <View style={styles.filterRow}>
-            {(['all', 'pending', 'in_progress', 'done'] as const).map((f) => {
-              const isActive = filter === f;
-              const count = f === 'all' ? stats.total : f === 'pending' ? stats.pending : f === 'in_progress' ? stats.inProgress : stats.done;
-              const label = f === 'all' ? 'All' : f === 'pending' ? 'Pending' : f === 'in_progress' ? 'Running' : 'Done';
+            {filterOptions.map((f) => {
+              const isActive = filter === f.key;
               return (
                 <Pressable
-                  key={f}
-                  style={[styles.filterPill, isActive && styles.filterPillActive]}
-                  onPress={() => setFilter(f)}
+                  key={f.key}
+                  style={[
+                    screenChrome.filterChip,
+                    isActive && screenChrome.filterChipActive,
+                  ]}
+                  onPress={() => setFilter(f.key)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isActive }}
+                  accessibilityLabel={`${f.label}, ${f.count} tasks`}
                 >
-                  <Text style={[styles.filterText, isActive && styles.filterTextActive]}>
-                    {label} ({count})
+                  <Text
+                    style={[
+                      screenChrome.filterChipText,
+                      isActive && screenChrome.filterChipTextActive,
+                    ]}
+                  >
+                    {f.label}{' '}
+                    <Text
+                      style={[
+                        screenChrome.filterChipCount,
+                        isActive && screenChrome.filterChipCountActive,
+                      ]}
+                    >
+                      {f.count}
+                    </Text>
                   </Text>
                 </Pressable>
               );
             })}
           </View>
 
-          {/* Tasks List */}
           <View style={styles.listContainer}>
             {isLoading ? (
               <ListSkeleton count={4} variant="task-row" />
@@ -287,7 +316,7 @@ export default function OwnerTaskTrackingScreen() {
                         </View>
                         {dueDate && (
                           <View style={styles.dueDateContainer}>
-                            <Feather name="calendar" size={12} color={Colors.textTertiary} style={styles.calendarIcon} />
+                            <Feather name="calendar" size={12} color={T.mute} style={styles.calendarIcon} />
                             <Text style={styles.dueDateText}>Due {dueDate}</Text>
                           </View>
                         )}
@@ -312,7 +341,6 @@ export default function OwnerTaskTrackingScreen() {
           {snackMessage}
         </Snackbar>
 
-        {/* Task Detail Modal */}
         <TaskDetailModal
           visible={showDetailModal}
           onDismiss={() => setShowDetailModal(false)}
@@ -320,7 +348,6 @@ export default function OwnerTaskTrackingScreen() {
           onReassign={handleReassignPress}
         />
 
-        {/* Member Picker Modal for Reassignment */}
         <MemberPickerModal
           visible={showMemberPicker}
           onDismiss={() => setShowMemberPicker(false)}
@@ -334,28 +361,16 @@ export default function OwnerTaskTrackingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+  container: screenChrome.root,
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
+    paddingHorizontal: AppSpace.screen,
+    paddingTop: screenChrome.headerRow.paddingTop,
     paddingBottom: 12,
   },
   backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginRight: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
   },
   btnPressed: {
     opacity: 0.7,
@@ -363,30 +378,16 @@ const styles = StyleSheet.create({
   headerTextContainer: {
     flex: 1,
   },
-  title: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 24,
-    color: Colors.text,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
   scrollContent: {
     paddingBottom: 110,
   },
   progressCard: {
-    backgroundColor: Colors.surface,
-    marginHorizontal: 20,
+    backgroundColor: T.card,
+    marginHorizontal: AppSpace.screen,
     marginTop: 12,
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    padding: 18,
+    borderRadius: AppRadius.card,
+    ...appSoftShadow,
   },
   progressHeader: {
     flexDirection: 'row',
@@ -396,65 +397,46 @@ const styles = StyleSheet.create({
   },
   progressTitle: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-    color: Colors.text,
+    fontSize: 15,
+    color: T.ink,
+    letterSpacing: -0.2,
   },
   progressValue: {
-    fontFamily: 'Inter_800ExtraBold',
+    fontFamily: 'Inter_700Bold',
     fontSize: 18,
-    color: Colors.accent,
+    color: T.ink,
+    letterSpacing: -0.4,
   },
   progressBar: {
     height: 6,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: T.soft,
     borderRadius: 3,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: Colors.accent,
+    backgroundColor: T.charcoal,
     borderRadius: 3,
   },
   filterRow: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    flexWrap: 'wrap',
+    paddingHorizontal: AppSpace.screen,
     marginTop: 20,
     marginBottom: 12,
     gap: 8,
   },
-  filterPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  filterPillActive: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
-  },
-  filterText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  filterTextActive: {
-    color: Colors.white,
-  },
   listContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: AppSpace.screen,
   },
   tasksList: {
     gap: 12,
   },
   taskCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
+    backgroundColor: T.card,
+    borderRadius: AppRadius.card,
     padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.04)',
-    ...Colors.shadow,
+    ...appSoftShadow,
   },
   taskCardPressed: {
     opacity: 0.7,
@@ -468,7 +450,7 @@ const styles = StyleSheet.create({
   statusIconContainer: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
@@ -479,28 +461,28 @@ const styles = StyleSheet.create({
   taskTitle: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
-    color: Colors.text,
+    color: T.ink,
+    letterSpacing: -0.2,
     marginBottom: 4,
   },
   taskDesc: {
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: T.mute,
   },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: AppRadius.chip,
     alignSelf: 'flex-start',
   },
   statusBadgeText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 10,
-    textTransform: 'uppercase',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 11,
   },
   taskFooterDivider: {
     height: 1,
-    backgroundColor: Colors.border,
+    backgroundColor: T.hairline,
     marginVertical: 12,
   },
   taskFooter: {
@@ -515,17 +497,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   avatar: {
-    backgroundColor: '#F2F2F7',
+    backgroundColor: T.soft,
   },
   avatarLabel: {
     fontSize: 9,
-    fontFamily: 'Inter_700Bold',
-    color: Colors.textSecondary,
+    fontFamily: 'Inter_600SemiBold',
+    color: T.mute,
   },
   assigneeName: {
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: T.mute,
     flex: 1,
   },
   dueDateContainer: {
@@ -538,15 +520,13 @@ const styles = StyleSheet.create({
   dueDateText: {
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: T.mute,
   },
   emptyCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
+    backgroundColor: T.card,
+    borderRadius: AppRadius.card,
     padding: 24,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    ...appSoftShadow,
   },
 });

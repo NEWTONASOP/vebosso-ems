@@ -6,8 +6,8 @@ import { Feather } from '@expo/vector-icons';
 import { differenceInMinutes, format } from 'date-fns';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Snackbar, Text } from 'react-native-paper';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Snackbar, Text } from 'react-native-paper';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { ApprovalCard } from '../../components/ApprovalCard';
@@ -18,14 +18,20 @@ import { EmptyState } from '../../components/EmptyState';
 import { InlineError } from '../../components/InlineError';
 import { ListSkeleton, StatusCardSkeleton } from '../../components/LoadingSkeleton';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
+import { NotificationBell } from '../../components/NotificationBell';
 import { QuickActionCard } from '../../components/QuickActionCard';
 import { TaskCard } from '../../components/TaskCard';
-import { Colors } from '../../constants/colors';
+import {
+  AppTheme as T,
+  AppSpace,
+  AppRadius,
+  appShadow,
+  appSoftShadow,
+  screenChrome,
+} from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Profile } from '../../types/database';
-import { NotificationBell } from '../../components/NotificationBell';
-
 
 export default function ManagerDashboard() {
   const router = useRouter();
@@ -132,9 +138,9 @@ export default function ManagerDashboard() {
     }
   };
 
-  const handleCheckIn = useCallback(async (plan: string) => {
+  const handleCheckIn = useCallback(async (plan: string, photoUris?: string[]) => {
     setCheckInLoading(true);
-    const result = await checkIn(plan);
+    const result = await checkIn(plan, photoUris);
     setCheckInLoading(false);
     if (result.success) {
       setShowCheckIn(false);
@@ -269,10 +275,16 @@ export default function ManagerDashboard() {
     return (
       <View style={styles.planSection}>
         <View style={styles.planHeader}>
-          <Text style={styles.planLabel}>Today&apos;s Plan</Text>
-          <Button compact mode="text" textColor={Colors.accent} onPress={() => setShowEditPlan(true)}>
-            Update
-          </Button>
+          <Text style={styles.planLabel}>Today&apos;s plan</Text>
+          <AnimatedPressable
+            scaleTo={0.96}
+            onPress={() => setShowEditPlan(true)}
+            style={styles.planUpdateBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Update today&apos;s plan"
+          >
+            <Text style={styles.planUpdateText}>Update</Text>
+          </AnimatedPressable>
         </View>
         {todayLog.check_in_plan ? (
           <Text style={styles.planText}>{todayLog.check_in_plan}</Text>
@@ -295,26 +307,27 @@ export default function ManagerDashboard() {
       }
     };
 
-    // Not checked in
+    // Not checked in — charcoal primary CTA
     if (!todayLog) {
       return (
-        <View style={styles.statusCard}>
-          <View style={styles.statusIconCircle}>
-            <Feather name="sun" size={32} color={Colors.warning} />
+        <View style={[styles.statusCard, styles.statusCardHero]}>
+          <View style={[styles.statusIconCircle, { backgroundColor: T.amberSoft }]}>
+            <Feather name="sun" size={28} color={T.amber} />
           </View>
-          <Text style={styles.statusTitle}>Good {new Date().getHours() < 12 ? 'morning' : 'afternoon'}!</Text>
-          <Text style={styles.statusSubtitle}>Ready to start your work day?</Text>
-          <Button 
-            mode="contained" 
-            onPress={() => setShowCheckIn(true)} 
-            style={styles.startButton} 
-            contentStyle={styles.startButtonContent} 
-            buttonColor={Colors.accent} 
-            textColor={Colors.white} 
-            icon="play"
+          <Text style={styles.statusTitle}>Ready to start?</Text>
+          <Text style={styles.statusSubtitle}>
+            Check in with today&apos;s plan so your owner can approve and you can begin.
+          </Text>
+          <AnimatedPressable
+            scaleTo={0.97}
+            onPress={() => setShowCheckIn(true)}
+            style={styles.primaryCta}
+            accessibilityRole="button"
+            accessibilityLabel="Start Day"
           >
-            Start Day
-          </Button>
+            <Feather name="play" size={16} color={T.white} />
+            <Text style={styles.primaryCtaText}>Start Day</Text>
+          </AnimatedPressable>
         </View>
       );
     }
@@ -322,43 +335,35 @@ export default function ManagerDashboard() {
     // Pending approval
     if (todayLog.status === 'pending_approval') {
       return (
-        <Animated.View style={[styles.statusCard, styles.pendingCard, pulseStyle]}>
-          <View style={styles.statusIconCircle}>
-            <Feather name="clock" size={32} color={Colors.warning} />
+        <Animated.View style={[styles.statusCard, styles.statusCardHero, pulseStyle]}>
+          <View style={[styles.statusIconCircle, { backgroundColor: T.amberSoft }]}>
+            <Feather name="clock" size={28} color={T.amber} />
           </View>
-          <Text style={styles.heroLabel}>CHECK-IN REQUEST</Text>
-          <Text style={styles.heroValue}>Awaiting Approval</Text>
-          <Text style={styles.statusSubtitle}>Your check-in plan is being reviewed by the owner.</Text>
+          <Text style={styles.heroLabel}>Check-in request</Text>
+          <Text style={styles.heroValue}>Awaiting approval</Text>
+          <Text style={styles.statusSubtitle}>
+            Your plan is with the owner. You can still end your day if needed.
+          </Text>
           
           <View style={styles.cardDetailsGroup}>
             <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Status</Text>
-              <View style={[rowStyles.badge, { backgroundColor: Colors.warningLight }]}>
-                <Text style={[rowStyles.badgeText, { color: Colors.warning }]}>Pending</Text>
-              </View>
-            </View>
-            <View style={rowStyles.separator} />
-            <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Check-in Sent</Text>
+              <Text style={rowStyles.label}>Check-in sent</Text>
               <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
             </View>
           </View>
 
           {renderPlanSection()}
 
-          <Button
-            mode="contained"
+          <AnimatedPressable
+            scaleTo={0.97}
             onPress={() => setShowCheckOut(true)}
-            style={styles.endButton}
-            buttonColor={Colors.error}
-            textColor={Colors.white}
-            icon="power"
+            style={styles.destructiveCta}
+            accessibilityRole="button"
+            accessibilityLabel="End Day"
           >
-            End Day
-          </Button>
-          <Text style={styles.endDayHint}>
-            You may end your day even if your check-in has not been approved.
-          </Text>
+            <Feather name="power" size={16} color={T.white} />
+            <Text style={styles.destructiveCtaText}>End Day</Text>
+          </AnimatedPressable>
         </Animated.View>
       );
     }
@@ -366,25 +371,21 @@ export default function ManagerDashboard() {
     // Working
     if (todayLog.status === 'working') {
       return (
-        <View style={[styles.statusCard, styles.workingCard]}>
-          <Text style={styles.heroLabel}>ELAPSED TIME TODAY</Text>
-          <Text style={styles.heroValue}>{elapsed || '00h 00m'}</Text>
+        <View style={[styles.statusCard, styles.statusCardHero]}>
+          <View style={[styles.statusIconCircle, { backgroundColor: T.greenSoft }]}>
+            <Feather name="briefcase" size={28} color={T.green} />
+          </View>
+          <Text style={styles.heroLabel}>Elapsed today</Text>
+          <Text style={styles.heroValue}>{elapsed || '0h 0m'}</Text>
           
           <View style={styles.cardDetailsGroup}>
             <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Status</Text>
-              <View style={[rowStyles.badge, { backgroundColor: Colors.successLight }]}>
-                <Text style={[rowStyles.badgeText, { color: Colors.managerAccent }]}>Working</Text>
-              </View>
-            </View>
-            <View style={rowStyles.separator} />
-            <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Started At</Text>
+              <Text style={rowStyles.label}>Started at</Text>
               <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
             </View>
             <View style={rowStyles.separator} />
             <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Tasks Completed</Text>
+              <Text style={rowStyles.label}>Your tasks done</Text>
               <Text style={rowStyles.value}>
                 {todayTasks.filter((t) => t.status === 'done').length}/{todayTasks.length}
               </Text>
@@ -393,16 +394,16 @@ export default function ManagerDashboard() {
 
           {renderPlanSection()}
 
-          <Button
-            mode="contained" 
-            onPress={() => setShowCheckOut(true)} 
-            style={styles.endButton} 
-            buttonColor={Colors.error} 
-            textColor={Colors.white} 
-            icon="power"
+          <AnimatedPressable
+            scaleTo={0.97}
+            onPress={() => setShowCheckOut(true)}
+            style={styles.destructiveCta}
+            accessibilityRole="button"
+            accessibilityLabel="End Day"
           >
-            End Day
-          </Button>
+            <Feather name="power" size={16} color={T.white} />
+            <Text style={styles.destructiveCtaText}>End Day</Text>
+          </AnimatedPressable>
         </View>
       );
     }
@@ -411,28 +412,23 @@ export default function ManagerDashboard() {
     if (todayLog.status === 'pending_checkout') {
       return (
         <View style={styles.statusCard}>
-          <View style={styles.statusIconCircle}>
-            <Feather name="clock" size={32} color={Colors.warning} />
+          <View style={[styles.statusIconCircle, { backgroundColor: T.amberSoft }]}>
+            <Feather name="clock" size={28} color={T.amber} />
           </View>
-          <Text style={styles.heroLabel}>CHECK-OUT REQUEST</Text>
-          <Text style={styles.heroValue}>Awaiting Approval</Text>
-          <Text style={styles.statusSubtitle}>Your day report and check-out are being reviewed by the owner.</Text>
+          <Text style={styles.heroLabel}>Check-out request</Text>
+          <Text style={styles.heroValue}>Awaiting approval</Text>
+          <Text style={styles.statusSubtitle}>
+            Your day report is being reviewed by the owner.
+          </Text>
           
           <View style={styles.cardDetailsGroup}>
-            <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Status</Text>
-              <View style={[rowStyles.badge, { backgroundColor: Colors.warningLight }]}>
-                <Text style={[rowStyles.badgeText, { color: Colors.warning }]}>Pending Review</Text>
-              </View>
-            </View>
-            <View style={rowStyles.separator} />
             <View style={rowStyles.rowContent}>
               <Text style={rowStyles.label}>Check-in</Text>
               <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
             </View>
             <View style={rowStyles.separator} />
             <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Check-out Sent</Text>
+              <Text style={rowStyles.label}>Check-out sent</Text>
               <Text style={rowStyles.value}>{formatLogTime(todayLog.check_out_time)}</Text>
             </View>
           </View>
@@ -444,21 +440,14 @@ export default function ManagerDashboard() {
     if (todayLog.status === 'done') {
       const formattedHours = todayLog.total_hours ? `${Math.floor(todayLog.total_hours)}h ${Math.round((todayLog.total_hours % 1) * 60)}m` : '--';
       return (
-        <View style={[styles.statusCard, styles.doneCard]}>
-          <View style={styles.statusIconCircle}>
-            <Feather name="check-circle" size={32} color={Colors.success} />
+        <View style={styles.statusCard}>
+          <View style={[styles.statusIconCircle, { backgroundColor: T.greenSoft }]}>
+            <Feather name="check-circle" size={28} color={T.green} />
           </View>
-          <Text style={styles.heroLabel}>TOTAL HOURS LOGGED</Text>
+          <Text style={styles.heroLabel}>Total hours logged</Text>
           <Text style={styles.heroValue}>{formattedHours}</Text>
           
           <View style={styles.cardDetailsGroup}>
-            <View style={rowStyles.rowContent}>
-              <Text style={rowStyles.label}>Status</Text>
-              <View style={[rowStyles.badge, { backgroundColor: Colors.successLight }]}>
-                <Text style={[rowStyles.badgeText, { color: Colors.success }]}>Completed</Text>
-              </View>
-            </View>
-            <View style={rowStyles.separator} />
             <View style={rowStyles.rowContent}>
               <Text style={rowStyles.label}>Check-in</Text>
               <Text style={rowStyles.value}>{formatLogTime(todayLog.check_in_time)}</Text>
@@ -476,37 +465,36 @@ export default function ManagerDashboard() {
     return null;
   };
 
-  const today = format(new Date(), 'EEEE, MMMM dd');
+  const today = format(new Date(), 'EEEE, d MMMM');
+  const firstName = profile?.full_name?.split(' ')[0] || 'Manager';
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+  const pendingCount = pendingApprovals.length;
 
   return (
     <>
     <ScrollView
-      style={styles.container}
+      style={screenChrome.root}
       contentContainerStyle={styles.scrollContent}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.charcoal} />}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header Greeting */}
       <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.greeting}>
-            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'},
-          </Text>
-          <Text style={styles.name}>{profile?.full_name?.split(' ')[0] || 'Manager'} 👋</Text>
+        <View style={{ flex: 1, paddingRight: 12 }}>
+          <Text style={styles.greeting}>Good {greeting},</Text>
+          <Text style={styles.name}>{firstName}</Text>
           <Text style={styles.date}>{today}</Text>
         </View>
         <NotificationBell role="manager" />
       </View>
 
-      {/* My Work Status */}
       <View style={styles.workStatusContainer}>
         {renderWorkStatus()}
       </View>
 
-      {/* Today's Tasks */}
       {todayTasks.length > 0 && (
         <View style={styles.tasksSection}>
-          <Text style={styles.sectionTitle}>Today&apos;s Tasks</Text>
+          <Text style={styles.sectionLabel}>Today&apos;s tasks</Text>
           <View style={styles.tasksContainer}>
             {todayTasks.map((task, index) => (
               <TaskCard 
@@ -521,19 +509,7 @@ export default function ManagerDashboard() {
         </View>
       )}
 
-      {/* Pending Approvals Count Card */}
-      <View style={styles.approvalCountCard}>
-        <View style={[styles.iconBg, { backgroundColor: Colors.managerAccent + '12' }]}>
-          <Feather name="clock" size={24} color={Colors.managerAccent} />
-        </View>
-        <View style={styles.approvalCountInfo}>
-          <Text style={styles.approvalCountValue}>{pendingApprovals.length}</Text>
-          <Text style={styles.approvalCountLabel}>Pending Approvals</Text>
-        </View>
-      </View>
-
-      {/* Quick Actions */}
-      <Text style={styles.sectionTitle}>Quick Actions</Text>
+      <Text style={styles.sectionLabel}>Quick actions</Text>
       <View style={styles.quickActionsContainer}>
         <QuickActionCard
           icon="clipboard"
@@ -549,15 +525,25 @@ export default function ManagerDashboard() {
         />
       </View>
 
-      {/* Pending Approvals */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>
-          Team Check-in Requests
-        </Text>
-        {pendingApprovals.length > 5 && (
-          <Text style={styles.viewAllBtn} onPress={() => router.push('/(manager)/approvals')}>
-            View All
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.sectionLabel, styles.sectionLabelTight]}>
+            Team check-ins
+            {pendingCount > 0 ? ` · ${pendingCount}` : ''}
           </Text>
+          <Text style={styles.sectionHint}>Approve so your team can start their day</Text>
+        </View>
+        {pendingApprovals.length > 5 && (
+          <AnimatedPressable
+            scaleTo={0.96}
+            onPress={() => router.push('/(manager)/approvals')}
+            style={styles.viewAllBtn}
+            accessibilityRole="button"
+            accessibilityLabel="View all approvals"
+          >
+            <Text style={styles.viewAllText}>See all</Text>
+            <Feather name="chevron-right" size={16} color={T.mute} />
+          </AnimatedPressable>
         )}
       </View>
 
@@ -570,13 +556,13 @@ export default function ManagerDashboard() {
             onRetry={() => profile?.id && fetchPendingApprovals(profile.id)}
           />
         ) : pendingApprovals.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <EmptyState
-              icon="checkbox-marked-circle-outline"
-              title="All caught up!"
-              subtitle="No pending approvals from your team"
-            />
-          </View>
+          <EmptyState
+            icon="checkbox-marked-circle-outline"
+            title="All caught up"
+            subtitle="No pending check-ins from your team. Assign a task or check My Team for live status."
+            actionLabel="Assign a task"
+            onAction={handleOpenMemberPicker}
+          />
         ) : (
           pendingApprovals.slice(0, 5).map((workLog) => (
             <ApprovalCard
@@ -668,36 +654,23 @@ const rowStyles = StyleSheet.create({
     minHeight: 46,
   },
   label: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_400Regular',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: T.inkSoft,
   },
   value: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
-    color: Colors.textPrimary,
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  badgeText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 11,
+    color: T.ink,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.border,
+    backgroundColor: T.hairline,
     marginHorizontal: 16,
   },
 });
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
   scrollContent: {
     paddingBottom: 110,
     width: '100%',
@@ -706,245 +679,176 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
+    paddingHorizontal: AppSpace.screen,
+    paddingTop: screenChrome.headerRow.paddingTop,
     paddingBottom: 12,
   },
   greeting: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_400Regular',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: T.mute,
   },
   name: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 28,
-    color: Colors.textPrimary,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 30,
+    color: T.ink,
     marginTop: 2,
-    letterSpacing: -0.7,
+    letterSpacing: -0.9,
   },
   date: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    color: Colors.textTertiary,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: T.mute,
     marginTop: 4,
-  },
-  approvalCountCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    padding: 20,
-    marginHorizontal: 20,
-    marginTop: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
-  },
-  iconBg: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  approvalCountInfo: {
-    flex: 1,
-  },
-  approvalCountValue: {
-    fontSize: 32,
-    fontFamily: 'Inter_800ExtraBold',
-    color: Colors.textPrimary,
-    letterSpacing: -0.7,
-  },
-  approvalCountLabel: {
-    fontSize: 14,
-    fontFamily: 'Inter_600SemiBold',
-    color: Colors.textSecondary,
-    marginTop: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingRight: 20,
+    paddingRight: AppSpace.screen,
   },
-  sectionTitle: {
+  sectionLabel: {
     fontFamily: 'Inter_700Bold',
+    fontSize: 17,
+    color: T.ink,
+    letterSpacing: -0.35,
+    paddingHorizontal: AppSpace.screen,
+    marginTop: 28,
+    marginBottom: 10,
+  },
+  sectionLabelTight: {
+    marginBottom: 2,
+  },
+  sectionHint: {
+    fontFamily: 'Inter_400Regular',
     fontSize: 13,
-    color: Colors.textSecondary,
-    paddingHorizontal: 20,
-    marginTop: 26,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    color: T.mute,
+    paddingHorizontal: AppSpace.screen,
+    marginBottom: 10,
   },
   viewAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 28,
+    gap: 2,
+    minHeight: 44,
+    paddingHorizontal: 4,
+  },
+  viewAllText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
-    color: Colors.accent,
-    marginTop: 26,
-    marginBottom: 12,
+    color: T.mute,
   },
   listContainer: {
-    paddingHorizontal: 20,
-  },
-  emptyCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    padding: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    paddingHorizontal: AppSpace.screen,
   },
   workStatusContainer: {
-    paddingHorizontal: 20,
-    marginTop: 8,
+    paddingHorizontal: AppSpace.screen,
+    marginTop: 4,
   },
   statusCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    padding: 24,
+    backgroundColor: T.card,
+    borderRadius: AppRadius.card,
+    padding: 22,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    ...appSoftShadow,
+  },
+  statusCardHero: {
+    ...appShadow,
   },
   statusIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: Colors.primaryLight,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   heroLabel: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 10,
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: T.mute,
+    letterSpacing: -0.1,
     marginBottom: 4,
   },
   heroValue: {
-    fontFamily: 'Inter_800ExtraBold',
+    fontFamily: 'Inter_700Bold',
     fontSize: 28,
-    color: Colors.textPrimary,
+    color: T.ink,
     letterSpacing: -0.6,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   cardDetailsGroup: {
     width: '100%',
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: T.soft,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginTop: 16,
-    marginBottom: 16,
+    marginTop: 14,
+    marginBottom: 8,
     overflow: 'hidden',
   },
-  pendingCard: { 
-    borderColor: Colors.warning,
+  statusTitle: {
+    fontSize: 20,
+    fontFamily: 'Inter_700Bold',
+    color: T.ink,
+    letterSpacing: -0.4,
   },
-  workingCard: { 
-    borderColor: Colors.success,
-  },
-  doneCard: { 
-    borderColor: Colors.border,
-  },
-  statusEmoji: { 
-    fontSize: 44, 
-    marginBottom: 10,
-  },
-  statusTitle: { 
-    fontSize: 20, 
-    fontFamily: 'Inter_700Bold', 
-    color: Colors.textPrimary,
-  },
-  statusSubtitle: { 
-    fontSize: 14, 
-    fontFamily: 'Inter_500Medium', 
-    color: Colors.textSecondary, 
-    marginTop: 4, 
-    textAlign: 'center',
-  },
-  startButton: { 
-    borderRadius: 14, 
-    marginTop: 20, 
-    width: '100%',
-  },
-  startButtonContent: { 
-    height: 52,
-  },
-  pendingDots: { 
-    flexDirection: 'row', 
-    gap: 6, 
-    marginTop: 16,
-  },
-  dot: { 
-    width: 8, 
-    height: 8, 
-    borderRadius: 4,
-  },
-  workingInfo: { 
-    flexDirection: 'row', 
-    gap: 20, 
-    marginTop: 16, 
-    marginBottom: 16,
-  },
-  workingDetail: { 
-    alignItems: 'center',
-  },
-  workingLabel: { 
-    fontSize: 12, 
-    fontFamily: 'Inter_500Medium', 
-    color: Colors.textSecondary,
-  },
-  workingValue: { 
-    fontSize: 18, 
-    fontFamily: 'Inter_700Bold', 
-    color: Colors.textPrimary, 
-    marginTop: 2,
-  },
-  endButton: { 
-    borderRadius: 14, 
-    width: '100%',
-    marginTop: 16,
-  },
-  endDayHint: {
+  statusSubtitle: {
+    fontSize: 14,
     fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: Colors.textSecondary,
+    color: T.inkSoft,
+    marginTop: 6,
     textAlign: 'center',
-    marginTop: 10,
+    lineHeight: 20,
+    paddingHorizontal: 8,
   },
-  tasksSection: {
-    paddingHorizontal: 20,
+  primaryCta: {
+    ...screenChrome.primaryPill,
+    width: '100%',
+    height: 48,
     marginTop: 20,
   },
+  primaryCtaText: {
+    ...screenChrome.primaryPillText,
+    fontSize: 15,
+  },
+  destructiveCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: T.coral,
+    borderRadius: AppRadius.pill,
+    height: 48,
+    width: '100%',
+    marginTop: 12,
+    gap: 6,
+  },
+  destructiveCtaText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: T.white,
+    letterSpacing: -0.1,
+  },
+  tasksSection: {
+    marginTop: 4,
+  },
   tasksContainer: {
+    paddingHorizontal: AppSpace.screen,
     paddingTop: 2,
   },
   quickActionsContainer: {
     flexDirection: 'row',
     gap: 10,
-    paddingHorizontal: 20,
+    paddingHorizontal: AppSpace.screen,
   },
   planSection: {
     width: '100%',
     marginTop: 8,
-    marginBottom: 8,
+    marginBottom: 4,
     padding: 14,
-    backgroundColor: Colors.surfaceLight,
+    backgroundColor: T.soft,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   planHeader: {
     flexDirection: 'row',
@@ -954,19 +858,29 @@ const styles = StyleSheet.create({
   planLabel: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: T.inkSoft,
+  },
+  planUpdateBtn: {
+    minHeight: 36,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+  },
+  planUpdateText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: T.charcoal,
   },
   planText: {
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
-    color: Colors.textPrimary,
+    color: T.ink,
     lineHeight: 20,
     marginTop: 6,
   },
   planPlaceholder: {
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: T.mute,
     lineHeight: 20,
     marginTop: 6,
     fontStyle: 'italic',

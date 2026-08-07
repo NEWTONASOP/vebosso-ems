@@ -4,11 +4,11 @@
 // Displays an inline error message with an optional Retry button.
 // Use this inside screens when a data-fetch operation fails.
 
+import { Feather } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
-import { Colors } from '../constants/colors';
-import { Feather } from '@expo/vector-icons';
+import { AppTheme, AppRadius, AppSpace } from '../constants/theme';
 
 interface InlineErrorProps {
   message: string;
@@ -21,7 +21,7 @@ export function InlineError({ message, onRetry, compact = false }: InlineErrorPr
     <View style={[styles.container, compact && styles.containerCompact]}>
       <View style={styles.iconRow}>
         <View style={styles.iconBg}>
-          <Feather name="alert-circle" size={compact ? 18 : 22} color={Colors.error} />
+          <Feather name="alert-circle" size={compact ? 18 : 22} color={AppTheme.coral} />
         </View>
         <Text style={[styles.message, compact && styles.messageCompact]}>
           {message}
@@ -30,13 +30,13 @@ export function InlineError({ message, onRetry, compact = false }: InlineErrorPr
 
       {onRetry && (
         <Button
-          mode="outlined"
+          mode="contained"
           onPress={onRetry}
           style={styles.retryBtn}
           contentStyle={styles.retryContent}
-          textColor={Colors.accent}
-          theme={{ colors: { outline: Colors.border } }}
-          icon={() => <Feather name="refresh-cw" size={13} color={Colors.accent} />}
+          buttonColor={AppTheme.charcoal}
+          textColor={AppTheme.white}
+          icon={() => <Feather name="refresh-cw" size={13} color={AppTheme.white} />}
           compact
         >
           Retry
@@ -48,17 +48,15 @@ export function InlineError({ message, onRetry, compact = false }: InlineErrorPr
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.errorLight,
-    borderRadius: 16,
-    padding: 16,
-    marginVertical: 8,
-    borderWidth: 1,
-    borderColor: Colors.error + '30',
+    backgroundColor: AppTheme.coralSoft,
+    borderRadius: AppRadius.card,
+    padding: AppSpace.lg,
+    marginVertical: AppSpace.sm,
     alignItems: 'center',
     gap: 12,
   },
   containerCompact: {
-    padding: 12,
+    padding: AppSpace.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -73,16 +71,16 @@ const styles = StyleSheet.create({
   iconBg: {
     width: 32,
     height: 32,
-    borderRadius: 10,
-    backgroundColor: Colors.error + '18',
+    borderRadius: AppRadius.chip,
+    backgroundColor: AppTheme.coralSoft,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   message: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_400Regular',
     fontSize: 14,
-    color: Colors.error,
+    color: AppTheme.coral,
     lineHeight: 20,
     flex: 1,
   },
@@ -90,10 +88,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   retryBtn: {
-    borderRadius: 10,
+    borderRadius: AppRadius.pill,
     alignSelf: 'stretch',
   },
   retryContent: {
-    height: 36,
+    height: 44,
   },
 });

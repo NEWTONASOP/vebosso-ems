@@ -1,13 +1,20 @@
 // ============================================================================
-// VEBOSSO EMS — Member Profile Screen (Fintech / Neo-Brutalist Aesthetic)
+// VEBOSSO EMS — Member Profile Screen
 // ============================================================================
 
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View, TouchableOpacity, Platform, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import { Alert } from '../../lib/alert';
 import { Text } from 'react-native-paper';
-import { Colors } from '../../constants/colors';
 import { APP_NAME, ROLE_LABELS } from '../../constants/roles';
+import {
+  AppTheme as T,
+  AppSpace,
+  AppRadius,
+  appSoftShadow,
+  screenChrome,
+  RoleAccent,
+} from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
@@ -29,19 +36,12 @@ export default function MemberProfileScreen() {
 
   if (!profile) return null;
 
-  // Dynamically set accent color based on user role (Owner, Manager, Member)
-  const getRoleAccent = () => {
-    switch (profile.role) {
-      case 'owner':
-        return Colors.ownerAccent;
-      case 'manager':
-        return Colors.managerAccent;
-      default:
-        return Colors.memberAccent;
-    }
-  };
-
-  const roleColor = getRoleAccent();
+  const roleAccent =
+    profile.role === 'owner'
+      ? RoleAccent.owner
+      : profile.role === 'manager'
+        ? RoleAccent.manager
+        : RoleAccent.member;
 
   const getJoinedDate = () => {
     try {
@@ -53,81 +53,82 @@ export default function MemberProfileScreen() {
 
   return (
     <PageTransition>
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-      {/* Header bar: Avatar left, Outline icons right */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={[styles.miniAvatar, { backgroundColor: roleColor }]}>
-            <Text style={styles.miniAvatarText}>
-              {profile.full_name.substring(0, 1).toUpperCase()}
+      <ScrollView
+        style={screenChrome.root}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <View style={[styles.miniAvatar, { backgroundColor: roleAccent.soft }]}>
+              <Text style={[styles.miniAvatarText, { color: roleAccent.color }]}>
+                {profile.full_name.substring(0, 1).toUpperCase()}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.headerTitle}>Profile</Text>
+          <View style={styles.headerRight} />
+        </View>
+
+        <View style={styles.heroSection}>
+          <Text style={styles.heroLabel}>Employee code</Text>
+          <Text style={styles.heroValue}>{profile.employee_id}</Text>
+          <View style={[styles.rolePill, { backgroundColor: roleAccent.soft }]}>
+            <Text style={[styles.rolePillText, { color: roleAccent.color }]}>
+              {ROLE_LABELS[profile.role]}
             </Text>
           </View>
         </View>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <View style={styles.headerRight} />
-      </View>
 
-      {/* Hero Code/Balance View */}
-      <View style={styles.heroSection}>
-        <Text style={styles.heroLabel}>EMPLOYEE CODE</Text>
-        <Text style={styles.heroValue}>{profile.employee_id}</Text>
-        
-        {/* Capsule Badge */}
-        <View style={styles.badgeContainer}>
-          <View style={[styles.rolePill, { backgroundColor: Colors.accent }]}>
-            <Text style={styles.rolePillText}>{ROLE_LABELS[profile.role]}</Text>
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>Details</Text>
+          <View style={styles.groupedCard}>
+            <InfoRow
+              label="Status"
+              value="Active"
+              valueBadge
+              badgeColor={T.greenSoft}
+              badgeTextColor={T.green}
+            />
+            <InfoRow label="Full Name" value={profile.full_name} />
+            <InfoRow label="Designation" value={profile.department || 'Not assigned'} />
+            <InfoRow label="Joined" value={getJoinedDate()} isLast />
           </View>
         </View>
-      </View>
 
-      {/* Card 1: Operations / Details */}
-      <View style={styles.sectionContainer}>
-        <Text style={styles.sectionTitle}>Details</Text>
-        <View style={styles.groupedCard}>
-          <InfoRow label="Status" value="Active" valueBadge badgeColor={Colors.successLight} badgeTextColor={Colors.success} />
-          <InfoRow label="Full Name" value={profile.full_name} />
-          <InfoRow label="Designation" value={profile.department || 'Not assigned'} />
-          <InfoRow label="Joined" value={getJoinedDate()} isLast />
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>Security & Settings</Text>
+          <View style={styles.groupedCard}>
+            <ActionRow
+              label="Change Password"
+              icon="key"
+              onPress={() => router.push('/(auth)/change-password')}
+            />
+            <ActionRow
+              label="Leave Requests"
+              icon="calendar"
+              onPress={() => router.push('/(member)/leaves')}
+            />
+            <ActionRow
+              label="Sign Out"
+              icon="log-out"
+              onPress={handleSignOut}
+              isDestructive
+              isLast
+            />
+          </View>
         </View>
-      </View>
 
-      {/* Card 2: Security & Actions */}
-      <View style={styles.sectionContainer}>
-        <Text style={styles.sectionTitle}>Security & Settings</Text>
-        <View style={styles.groupedCard}>
-          <ActionRow
-            label="Change Password"
-            icon="key"
-            onPress={() => router.push('/(auth)/change-password')}
-          />
-          <ActionRow
-            label="Leave Requests"
-            icon="calendar"
-            onPress={() => router.push('/(member)/leaves')}
-          />
-          <ActionRow
-            label="Sign Out"
-            icon="log-out"
-            onPress={handleSignOut}
-            isDestructive
-            isLast
-          />
+        <View style={styles.appInfo}>
+          <Text style={styles.appName}>{APP_NAME} EMS</Text>
+          <Text style={styles.appVersion}>
+            Version {Constants.expoConfig?.version || '1.0.0'}
+          </Text>
         </View>
-      </View>
-
-      {/* App Info */}
-      <View style={styles.appInfo}>
-        <Text style={styles.appName}>{APP_NAME} EMS</Text>
-        <Text style={styles.appVersion}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
-      </View>
-    </ScrollView>
+      </ScrollView>
     </PageTransition>
   );
 }
-
-// ============================================================================
-// Row Components
-// ============================================================================
 
 interface ActionRowProps {
   label: string;
@@ -140,11 +141,10 @@ interface ActionRowProps {
 function ActionRow({ label, icon, onPress, isDestructive, isLast }: ActionRowProps) {
   return (
     <Pressable
-      style={({ pressed }) => [
-        rowStyles.rowWrapper,
-        pressed && rowStyles.pressed
-      ]}
+      style={({ pressed }) => [rowStyles.rowWrapper, pressed && rowStyles.pressed]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       <View style={rowStyles.rowContent}>
         <Text style={[rowStyles.label, isDestructive && rowStyles.destructiveText]}>
@@ -153,7 +153,7 @@ function ActionRow({ label, icon, onPress, isDestructive, isLast }: ActionRowPro
         <Feather
           name={icon as any}
           size={16}
-          color={isDestructive ? Colors.error : Colors.textSecondary}
+          color={isDestructive ? T.coral : T.inkSoft}
         />
       </View>
       {!isLast && <View style={rowStyles.separator} />}
@@ -163,10 +163,10 @@ function ActionRow({ label, icon, onPress, isDestructive, isLast }: ActionRowPro
 
 const rowStyles = StyleSheet.create({
   rowWrapper: {
-    backgroundColor: Colors.surface,
+    backgroundColor: T.card,
   },
   pressed: {
-    backgroundColor: Colors.surfacePressed,
+    backgroundColor: T.soft,
   },
   rowContent: {
     flexDirection: 'row',
@@ -177,26 +177,22 @@ const rowStyles = StyleSheet.create({
     minHeight: 48,
   },
   label: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_400Regular',
     fontSize: 15,
-    color: Colors.textSecondary,
+    color: T.inkSoft,
   },
   destructiveText: {
     fontFamily: 'Inter_600SemiBold',
-    color: Colors.error,
+    color: T.coral,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.divider,
+    backgroundColor: T.hairline,
     marginHorizontal: 16,
   },
 });
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
   scrollContent: {
     paddingBottom: 110,
     width: '100%',
@@ -207,118 +203,93 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
+    paddingHorizontal: AppSpace.screen,
+    paddingTop: screenChrome.header.paddingTop,
     paddingBottom: 12,
   },
   headerLeft: {
-    width: 40,
+    width: 44,
     alignItems: 'flex-start',
   },
   miniAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   miniAvatarText: {
     fontFamily: 'Inter_700Bold',
-    color: Colors.white,
-    fontSize: 14,
+    fontSize: 15,
   },
   headerTitle: {
     fontFamily: 'Inter_700Bold',
     fontSize: 17,
-    color: Colors.textPrimary,
+    color: T.ink,
+    letterSpacing: -0.35,
   },
   headerRight: {
-    width: 40,
-    alignItems: 'flex-end',
+    width: 44,
   },
-  headerBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  // Hero section
   heroSection: {
     alignItems: 'center',
     paddingVertical: 28,
   },
   heroLabel: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-    color: Colors.textSecondary,
-    letterSpacing: 1,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: T.mute,
+    letterSpacing: -0.1,
   },
   heroValue: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 42,
-    color: Colors.textPrimary,
-    letterSpacing: -1,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 40,
+    color: T.ink,
+    letterSpacing: -0.9,
     marginVertical: 4,
-  },
-  badgeContainer: {
-    marginTop: 6,
   },
   rolePill: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
+    height: 28,
+    borderRadius: AppRadius.pill,
+    marginTop: 6,
   },
   rolePillText: {
     fontFamily: 'Inter_600SemiBold',
-    color: Colors.white,
     fontSize: 12,
   },
-  roleChevron: {
-    marginLeft: 4,
-  },
-  // Sections
   sectionContainer: {
-    marginTop: 20,
-    paddingHorizontal: 20,
+    marginTop: AppSpace.xxl,
+    paddingHorizontal: AppSpace.screen,
   },
   sectionTitle: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 8,
-    marginLeft: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    fontSize: 17,
+    color: T.ink,
+    letterSpacing: -0.35,
+    marginBottom: 10,
   },
   groupedCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
+    backgroundColor: T.card,
+    borderRadius: AppRadius.card,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Colors.shadow,
+    ...appSoftShadow,
   },
-
-  // Footer
   appInfo: {
     alignItems: 'center',
     paddingVertical: 36,
   },
   appName: {
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
-    color: Colors.textTertiary,
+    color: T.mute,
   },
   appVersion: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 10,
-    color: Colors.textTertiary,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    color: T.mute,
     marginTop: 2,
   },
 });

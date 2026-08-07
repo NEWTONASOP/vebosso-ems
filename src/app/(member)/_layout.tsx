@@ -1,12 +1,11 @@
 // ============================================================================
-// VEBOSSO EMS — Member Tab Layout (Floating Premium Navigation)
+// VEBOSSO EMS — Member Tab Layout
 // ============================================================================
 
 import { Tabs } from 'expo-router';
-
 import { Feather } from '@expo/vector-icons';
-
 import { CustomTabBar } from '../../components/CustomTabBar';
+import { AppTheme, RoleAccent } from '../../constants/theme';
 
 export default function MemberLayout() {
   return (
@@ -14,6 +13,9 @@ export default function MemberLayout() {
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
+        tabBarActiveTintColor: RoleAccent.member.color,
+        tabBarInactiveTintColor: AppTheme.mute,
+        sceneStyle: { backgroundColor: AppTheme.bg },
       }}
     >
       <Tabs.Screen

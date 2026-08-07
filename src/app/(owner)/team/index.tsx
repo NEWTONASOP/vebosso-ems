@@ -5,8 +5,8 @@
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { Chip, Searchbar, Snackbar, Text } from 'react-native-paper';
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { Searchbar, Snackbar, Text } from 'react-native-paper';
 import { AssignManagerModal } from '../../../components/AssignManagerModal';
 import { AssignTaskModal } from '../../../components/AssignTaskModal';
 import { EmptyState } from '../../../components/EmptyState';
@@ -14,7 +14,7 @@ import { InlineError } from '../../../components/InlineError';
 import { ListSkeleton } from '../../../components/LoadingSkeleton';
 import { MemberActionsModal } from '../../../components/MemberActionsModal';
 import { MemberCard } from '../../../components/MemberCard';
-import { Colors } from '../../../constants/colors';
+import { AppSpace, AppTheme, screenChrome } from '../../../constants/theme';
 import { parseSupabaseError } from '../../../lib/errors';
 import { supabase } from '../../../lib/supabase';
 import { sortMembersByLiveStatus } from '../../../lib/teamSort';
@@ -148,6 +148,29 @@ export default function OwnerTeamScreen() {
     }
   };
 
+  const roleCounts = useMemo(() => {
+    let managers = 0;
+    let members = 0;
+    for (const m of teamMembers) {
+      if (m.role === 'manager') managers += 1;
+      else if (m.role === 'member') members += 1;
+    }
+    return { all: teamMembers.length, manager: managers, member: members };
+  }, [teamMembers]);
+
+  const workingNowCount = useMemo(
+    () => teamMembers.filter((m) => memberLiveStatus[m.id]?.status === 'working').length,
+    [teamMembers, memberLiveStatus]
+  );
+
+  const headerSubtitle = useMemo(() => {
+    const total = teamMembers.length;
+    if (Object.keys(memberLiveStatus).length > 0) {
+      return `${total} members · ${workingNowCount} working now`;
+    }
+    return `${total} members`;
+  }, [teamMembers.length, memberLiveStatus, workingNowCount]);
+
   // Filter and sort members (status priority, then name)
   const filteredMembers = useMemo(() => {
     const filtered = teamMembers.filter((member) => {
@@ -162,6 +185,15 @@ export default function OwnerTeamScreen() {
   }, [teamMembers, searchQuery, selectedRole, memberLiveStatus]);
 
   const managers = teamMembers.filter((m) => m.role === 'manager');
+
+  const filterOptions = useMemo(
+    () => [
+      { label: 'All', count: roleCounts.all, value: null as string | null },
+      { label: 'Managers', count: roleCounts.manager, value: 'manager' },
+      { label: 'Members', count: roleCounts.member, value: 'member' },
+    ],
+    [roleCounts]
+  );
 
   const renderMember = useCallback(({ item }: { item: Profile }) => {
     const live = memberLiveStatus[item.id];
@@ -183,18 +215,19 @@ export default function OwnerTeamScreen() {
   }, [handleMemberPress, memberLiveStatus]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={screenChrome.root}>
+      <View style={screenChrome.headerRow}>
         <View>
-          <Text style={styles.title}>Team</Text>
-          <Text style={styles.subtitle}>{teamMembers.length} members</Text>
+          <Text style={screenChrome.title}>Team</Text>
+          <Text style={screenChrome.subtitle}>{headerSubtitle}</Text>
         </View>
         <Pressable
-          style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+          style={({ pressed }) => [screenChrome.primaryPill, pressed && styles.addButtonPressed]}
           onPress={() => router.push('/(owner)/team/add-member')}
+          accessibilityLabel="Add Member"
         >
-          <Feather name="user-plus" size={15} color={Colors.white} />
-          <Text style={styles.addButtonText}>Add Member</Text>
+          <Feather name="user-plus" size={15} color={AppTheme.white} />
+          <Text style={screenChrome.primaryPillText}>Add Member</Text>
         </Pressable>
       </View>
 
@@ -203,26 +236,25 @@ export default function OwnerTeamScreen() {
           placeholder="Search by name or ID..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          style={styles.searchbar}
+          style={styles.searchbar as any}
           inputStyle={styles.searchInput}
-          iconColor={Colors.textSecondary}
-          placeholderTextColor={Colors.placeholder}
-          theme={{ colors: { onSurface: Colors.text, elevation: { level3: Colors.inputBackground } } }}
+          iconColor={AppTheme.mute}
+          placeholderTextColor={AppTheme.mute}
+          theme={{ colors: { onSurface: AppTheme.ink, elevation: { level3: AppTheme.card } } }}
         />
 
         <FlatList
           horizontal
-          data={[
-            { label: 'All', value: null },
-            { label: 'Managers', value: 'manager' },
-            { label: 'Members', value: 'member' },
-          ]}
+          data={filterOptions}
           renderItem={({ item }) => {
             const isActive = item.value ? selectedRole === item.value : !selectedRole;
 
             return (
-              <Chip
-                selected={isActive}
+              <Pressable
+                style={[
+                  screenChrome.filterChip,
+                  isActive && screenChrome.filterChipActive,
+                ]}
                 onPress={() => {
                   if (item.value) {
                     setSelectedRole(isActive ? null : item.value);
@@ -230,12 +262,28 @@ export default function OwnerTeamScreen() {
                     setSelectedRole(null);
                   }
                 }}
-                style={[styles.filterChip, isActive && styles.filterChipActive]}
-                textStyle={[styles.filterChipText, isActive && styles.filterChipTextActive]}
-                compact
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
+                accessibilityLabel={`${item.label}, ${item.count}`}
               >
-                {item.label}
-              </Chip>
+                <Text
+                  style={[
+                    screenChrome.filterChipText,
+                    isActive && screenChrome.filterChipTextActive,
+                  ]}
+                >
+                  {item.label}{' '}
+                  <Text
+                    style={[
+                      screenChrome.filterChipCount,
+                      isActive && screenChrome.filterChipCountActive,
+                    ]}
+                  >
+                    {item.count}
+                  </Text>
+                </Text>
+              </Pressable>
             );
           }}
           keyExtractor={(item) => item.label}
@@ -249,7 +297,7 @@ export default function OwnerTeamScreen() {
           <ListSkeleton count={5} variant="member" />
         </View>
       ) : teamError ? (
-        <View style={{ paddingHorizontal: 20 }}>
+        <View style={styles.errorPad}>
           <InlineError message={teamError} onRetry={() => fetchTeamMembers()} />
         </View>
       ) : (
@@ -259,7 +307,7 @@ export default function OwnerTeamScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AppTheme.charcoal} />
           }
           ListEmptyComponent={
             <EmptyState
@@ -340,56 +388,33 @@ export default function OwnerTeamScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
-    paddingBottom: 8,
+  searchSection: {
+    paddingHorizontal: AppSpace.screen,
+    paddingTop: AppSpace.sm,
   },
-  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.7 },
-  subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.accent,
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    height: 42,
-    gap: 6,
+  searchbar: {
+    ...screenChrome.searchbar,
   },
-  addButtonText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 13,
-    color: Colors.white,
+  searchInput: {
+    color: AppTheme.ink,
+    fontSize: 14,
+    fontFamily: 'Inter_400Regular',
+  },
+  filterRow: {
+    paddingTop: AppSpace.md,
+    paddingBottom: AppSpace.xs,
+    gap: AppSpace.sm,
+  },
+  list: {
+    paddingHorizontal: AppSpace.screen,
+    paddingTop: AppSpace.sm,
+    paddingBottom: 110,
+  },
+  errorPad: {
+    paddingHorizontal: AppSpace.screen,
   },
   addButtonPressed: {
     transform: [{ scale: 0.97 }],
     opacity: 0.9,
   },
-  searchSection: { paddingHorizontal: 20, paddingTop: 12 },
-  searchbar: {
-    backgroundColor: Colors.inputBackground,
-    borderRadius: 12,
-    elevation: 0,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  searchInput: { color: Colors.text, fontSize: 14 },
-  filterRow: { paddingTop: 12, paddingBottom: 8, gap: 8 },
-  filterChip: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  filterChipActive: {
-    backgroundColor: Colors.accentSubtle,
-    borderColor: Colors.accent,
-  },
-  filterChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600' },
-  filterChipTextActive: { color: Colors.accent, fontWeight: '700' },
-  list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 110 },
 });
