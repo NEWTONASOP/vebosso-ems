@@ -1,0 +1,5 @@
+# Vercel CLI uses this instead of .gitignore when deciding what to upload.
+# The root .gitignore excludes "node_modules/" unanchored, which would also
+# match dist/assets/node_modules/... (Expo's font/icon asset output) and
+# cause those files to 404 on the deployed site. Deploys only ever upload
+# the already-built ./dist folder, so nothing needs to be excluded here.
