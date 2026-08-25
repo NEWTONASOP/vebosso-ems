@@ -8,6 +8,7 @@
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { format } from 'date-fns';
 import { create } from 'zustand';
+import { parseSupabaseError } from '../lib/errors';
 import { sendPushNotification, sendPushNotificationToRole } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
 import { formatWorkLogDateForMessage } from '../lib/workLogDates';
@@ -1304,81 +1305,24 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
   submitBackfill: async (userId: string, date: string, checkInTime: string, checkInPlan: string, checkOutTime: string, dayReport: string) => {
     try {
-      // 1. Check if there is an active backfill permission for this user and date
-      const { data: permission, error: permError } = await supabase
-        .from('backfill_permissions')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('date', date)
-        .eq('is_used', false)
-        .single();
+      // The permission check, the work-log write and consuming the permission
+      // all happen inside submit_backfill() so they cannot be skipped or replayed.
+      const { data: log, error: rpcError } = await supabase.rpc('submit_backfill', {
+        p_date: date,
+        p_check_in_time: checkInTime,
+        p_check_in_plan: checkInPlan,
+        p_check_out_time: checkOutTime,
+        p_day_report: dayReport,
+      });
 
-      if (permError || !permission) {
-        return { success: false, error: 'You are not authorized by the owner to backfill this date.' };
+      if (rpcError) {
+        return { success: false, error: parseSupabaseError(rpcError) };
       }
 
-      // 2. See if a work log already exists for this date
-      const { data: existingLog } = await supabase
-        .from('work_logs')
-        .select('id, status')
-        .eq('user_id', userId)
-        .eq('date', date)
-        .single();
+      const logId: string = log.id;
+      const requireCheckoutApproval = log.status === 'pending_checkout';
 
-      const settings = get().settings;
-      const requireCheckoutApproval = settings['require_checkout_approval'] === 'true';
-      const newStatus: WorkLogStatus = requireCheckoutApproval ? 'pending_checkout' : 'done';
-
-      let logId: string;
-
-      if (existingLog) {
-        // Update existing log
-        const { data: updatedLog, error: updateError } = await supabase
-          .from('work_logs')
-          .update({
-            check_in_time: checkInTime,
-            check_in_plan: checkInPlan,
-            check_out_time: checkOutTime,
-            day_report: dayReport,
-            status: newStatus,
-          })
-          .eq('id', existingLog.id)
-          .select()
-          .single();
-
-        if (updateError) return { success: false, error: updateError.message };
-        logId = existingLog.id;
-      } else {
-        // Insert new log
-        const { data: newLog, error: insertError } = await supabase
-          .from('work_logs')
-          .insert({
-            user_id: userId,
-            date,
-            check_in_time: checkInTime,
-            check_in_plan: checkInPlan,
-            check_out_time: checkOutTime,
-            day_report: dayReport,
-            status: newStatus,
-          })
-          .select()
-          .single();
-
-        if (insertError) return { success: false, error: insertError.message };
-        logId = newLog.id;
-      }
-
-      // 3. Mark the backfill permission as used
-      const { error: markError } = await supabase
-        .from('backfill_permissions')
-        .update({ is_used: true })
-        .eq('id', permission.id);
-
-      if (markError) {
-        console.warn('Failed to mark backfill permission as used:', markError.message);
-      }
-
-      // 4. Send notifications to manager/owner if needed
+      // Send notifications to manager/owner if needed
       try {
         const { data: profile } = await supabase
           .from('profiles')

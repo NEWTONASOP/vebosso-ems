@@ -49,3 +49,5 @@ example
 .graphifyignore
 google-services.json
 graphify-out
+.vercel
+.env*

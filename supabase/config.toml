@@ -1,0 +1,34 @@
+# ============================================================================
+# VEBOSSO EMS — Supabase CLI config
+# ============================================================================
+# Kept in version control so Edge Function auth settings are explicit rather
+# than whatever was passed on the command line the last time someone deployed.
+
+project_id = "etojpskxcygjarostjio"
+
+# ----------------------------------------------------------------------------
+# Edge Functions
+# ----------------------------------------------------------------------------
+# verify_jwt = true makes the platform reject callers with no JWT at all before
+# our code runs. Note it does NOT distinguish the anon key from a signed-in
+# user's token — the anon key is itself a valid JWT — so each function still
+# checks auth.getUser() and the caller's role internally.
+
+[functions.create-member]
+verify_jwt = true
+
+[functions.admin-update-member]
+verify_jwt = true
+
+[functions.force-logout]
+verify_jwt = true
+
+[functions.send-push-notification]
+verify_jwt = true
+
+# Invoked by pg_cron (see 016_schedule_checkout_reminders_cron.sql), which posts
+# without an Authorization header, so the platform check has to stay off.
+# TODO: pass a shared secret from the cron job and verify it in the function —
+# as it stands this endpoint is publicly triggerable.
+[functions.send-checkout-reminders]
+verify_jwt = false

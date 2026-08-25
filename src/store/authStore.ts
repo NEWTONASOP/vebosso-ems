@@ -400,17 +400,20 @@ export const useAuthStore = create<AuthState>((set, get) => {
           return { success: false, error: error.message };
         }
 
-        const userId = get().userId;
-        if (userId) {
-          await supabase
-            .from('profiles')
-            .update({ must_change_password: false })
-            .eq('id', userId);
+        // must_change_password is no longer writable from the client — the RPC
+        // verifies the password really changed before clearing the flag.
+        const { error: rpcError } = await supabase.rpc('complete_password_change');
 
-          const profile = get().profile;
-          if (profile) {
-            set({ profile: { ...profile, must_change_password: false } });
-          }
+        if (rpcError) {
+          if (__DEV__) console.error('complete_password_change failed:', rpcError);
+          const msg = 'Password changed, but we could not update your account. Please sign in again.';
+          set({ isLoading: false, error: msg });
+          return { success: false, error: msg };
+        }
+
+        const profile = get().profile;
+        if (profile) {
+          set({ profile: { ...profile, must_change_password: false } });
         }
 
         set({ isLoading: false });

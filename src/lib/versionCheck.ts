@@ -19,6 +19,61 @@ interface VersionCheckResult {
 export type DownloadProgressCallback = (progress: number) => void;
 
 /**
+ * Hosts the APK may be downloaded from.
+ *
+ * This list is compiled into the build on purpose. `download_url` lives in
+ * app_settings, which any owner account can write — without this check, a
+ * single compromised owner login could point every device at an arbitrary APK.
+ * Changing where releases are hosted now requires shipping a new build.
+ *
+ * Caveat: only the URL we are given is validated. HTTP redirects (GitHub's
+ * /releases/latest sends you to objects.githubusercontent.com) are followed by
+ * the downloader and cannot be inspected here.
+ */
+const ALLOWED_DOWNLOAD_HOSTS = [
+  'github.com',
+  'githubusercontent.com',
+];
+
+function isHostAllowed(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return ALLOWED_DOWNLOAD_HOSTS.some(
+    (allowed) => host === allowed || host.endsWith(`.${allowed}`)
+  );
+}
+
+/**
+ * Reject a download URL that is not HTTPS or not on a host we trust.
+ * Throws with a user-facing message; callers surface it as a failed update.
+ */
+export function assertSafeDownloadUrl(rawUrl: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error('The configured update link is not a valid URL.');
+  }
+
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Updates can only be downloaded over HTTPS.');
+  }
+
+  // user:pass@host can be used to make a hostile host look like a trusted one.
+  if (parsed.username || parsed.password) {
+    throw new Error('The configured update link is not valid.');
+  }
+
+  if (!isHostAllowed(parsed.hostname)) {
+    if (__DEV__) console.error(`Blocked APK download from untrusted host: ${parsed.hostname}`);
+    throw new Error(
+      'This update comes from an unrecognised source and was blocked. Contact your administrator.'
+    );
+  }
+
+  return parsed.toString();
+}
+
+/**
  * Get the current app version from app.json
  */
 export function getCurrentVersion(): string {
@@ -110,7 +165,8 @@ export async function getDownloadUrl(): Promise<string> {
     throw new Error('No APK download URL configured');
   }
 
-  return downloadUrl;
+  // Validated here so both the in-app installer and the browser fallback are covered.
+  return assertSafeDownloadUrl(downloadUrl);
 }
 
 /**

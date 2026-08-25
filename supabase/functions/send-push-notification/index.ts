@@ -78,9 +78,10 @@ serve(async (req) => {
 
   // Validate required environment variables
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-  if (!supabaseUrl || !supabaseServiceKey) {
+  if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
     console.error('Missing required environment variables');
     return errorResponse('Server configuration error. Please contact support.', 500, 'ENV_MISSING');
   }
@@ -90,6 +91,42 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    // -------------------------------------------------------------------------
+    // Authenticate the caller
+    // -------------------------------------------------------------------------
+    // Without this, anyone holding the (public) anon key could push a spoofed
+    // "Check-in Approved" to the whole company and write rows into notifications.
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return errorResponse('Missing authorization header', 401, 'AUTH_MISSING');
+    }
+
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user: caller }, error: callerError } = await userClient.auth.getUser();
+    if (callerError || !caller) {
+      return errorResponse('Invalid or expired token. Please sign in again.', 401, 'AUTH_INVALID');
+    }
+
+    const { data: callerProfile, error: callerProfileError } = await adminClient
+      .from('profiles')
+      .select('id, role, manager_id, is_active')
+      .eq('id', caller.id)
+      .single();
+
+    if (callerProfileError || !callerProfile) {
+      return errorResponse('Caller profile not found', 403, 'FORBIDDEN');
+    }
+
+    if (!callerProfile.is_active) {
+      return errorResponse('Your account is deactivated', 403, 'FORBIDDEN');
+    }
+
+    const callerRole = callerProfile.role as 'owner' | 'manager' | 'member';
+    const callerIsOwner = callerRole === 'owner';
 
     // Parse request body
     let payload: PushNotificationBody;
@@ -107,6 +144,44 @@ serve(async (req) => {
 
     if (!user_id && !to_role) {
       return errorResponse('Either user_id or to_role is required', 400, 'VALIDATION_ERROR');
+    }
+
+    if (title.length > 200 || messageBody.length > 1000) {
+      return errorResponse('title or body is too long', 400, 'VALIDATION_ERROR');
+    }
+
+    // -------------------------------------------------------------------------
+    // Authorize the target
+    // -------------------------------------------------------------------------
+    // The damaging direction is notifying a *member*, since that is where a
+    // forged "approved / rejected" message would land. Notifying leads is how
+    // the normal request flows work, so any active employee may do that.
+    if (to_role) {
+      if (to_role === 'member' && !callerIsOwner) {
+        return errorResponse('Only owners can broadcast to members', 403, 'FORBIDDEN');
+      }
+    } else {
+      const { data: targetProfile, error: targetError } = await adminClient
+        .from('profiles')
+        .select('id, role, manager_id')
+        .eq('id', user_id!)
+        .single();
+
+      if (targetError || !targetProfile) {
+        return errorResponse('Target user not found', 404, 'NOT_FOUND');
+      }
+
+      const targetIsLead = targetProfile.role === 'owner' || targetProfile.role === 'manager';
+      const allowed =
+        callerIsOwner ||
+        targetIsLead ||
+        targetProfile.id === caller.id ||
+        (callerRole === 'manager' && targetProfile.manager_id === caller.id);
+
+      if (!allowed) {
+        console.warn(`Blocked notification from ${caller.id} (${callerRole}) to ${user_id}`);
+        return errorResponse('You are not allowed to notify this user', 403, 'FORBIDDEN');
+      }
     }
 
     // -------------------------------------------------------------------------
