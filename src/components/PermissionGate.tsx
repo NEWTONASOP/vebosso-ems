@@ -119,6 +119,11 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
     try {
       if (!state.notifications) {
         await requestNotificationPermission();
+        // Firing a second system permission dialog in the same tick the first
+        // one closes is a known Android/RN gotcha: the Activity hasn't fully
+        // returned to `resumed` yet, so the next dialog silently never shows —
+        // not an error, just dropped. A short gap lets it settle first.
+        await new Promise((resolve) => setTimeout(resolve, 400));
       }
       const location = await requestLocationPermissions();
       setState((prev) => ({
@@ -127,6 +132,14 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
         locationBackground: location.background,
         blocked: location.blocked,
       }));
+      // The call can resolve cleanly without granting anything — that path
+      // threw nothing, so it never hit the catch below, and previously showed
+      // no explanation at all. Report exactly what came back.
+      if (!location.foreground || !location.background) {
+        setRequestError(
+          `Location responded without granting access (foreground: ${location.foreground}, background: ${location.background}, blocked: ${location.blocked}).`
+        );
+      }
       await refresh();
     } catch (error) {
       // A thrown error here previously vanished as an unhandled rejection —

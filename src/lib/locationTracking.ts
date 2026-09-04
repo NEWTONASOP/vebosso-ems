@@ -219,13 +219,44 @@ export async function getLocationPermissionState(): Promise<LocationPermissionSt
  * order, and on Android 11+ the background one opens Settings rather than a
  * dialog.
  */
+/**
+ * If the OS dialog never appears — as opposed to appearing and being denied —
+ * the underlying native call can sit pending forever with nothing to catch.
+ * Racing it against a timeout turns an indefinitely spinning button into a
+ * concrete, reportable failure instead of silence.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${label} did not respond within ${ms / 1000}s.`)),
+        ms
+      )
+    ),
+  ]);
+}
+
 export async function requestLocationPermissions(): Promise<LocationPermissionState> {
-  const foreground = await Location.requestForegroundPermissionsAsync();
+  const foreground = await withTimeout(
+    Location.requestForegroundPermissionsAsync(),
+    15000,
+    'Location permission request'
+  );
   if (!foreground.granted) {
     return { foreground: false, background: false, blocked: !foreground.canAskAgain };
   }
 
-  const background = await Location.requestBackgroundPermissionsAsync();
+  // Same gap as before the foreground request: firing the background prompt
+  // in the same tick the foreground one closes can make Android silently drop
+  // it while the Activity is still settling back to resumed.
+  await new Promise((resolve) => setTimeout(resolve, 400));
+
+  const background = await withTimeout(
+    Location.requestBackgroundPermissionsAsync(),
+    15000,
+    'Background location permission request'
+  );
   return {
     foreground: true,
     background: background.granted,
