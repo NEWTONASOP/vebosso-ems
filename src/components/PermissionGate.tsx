@@ -10,6 +10,9 @@
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
+import * as Application from 'expo-application';
+import * as Clipboard from 'expo-clipboard';
+import Constants from 'expo-constants';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Linking from 'expo-linking';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -93,6 +96,11 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
   // any native-side failure in the request calls below looked identical to
   // "nothing happened" when the button was pressed, with no way to tell why.
   const [requestError, setRequestError] = useState<string | null>(null);
+  // The full raw diagnostic (device info + untouched permission-API
+  // response), kept separately from `requestError` so it can be copied
+  // verbatim instead of retyped or paraphrased from what's on screen.
+  const [diagnosticText, setDiagnosticText] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const refresh = useCallback(async () => {
     const next = await readState();
@@ -113,9 +121,22 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
     return () => sub.remove();
   }, [refresh]);
 
+  const buildDiagnosticText = (extra: Record<string, unknown>): string => {
+    const lines = [
+      `App: ${Constants.expoConfig?.version ?? '?'} (native ${Application.nativeApplicationVersion ?? '?'})`,
+      `OS: ${Platform.OS} ${Platform.Version}`,
+      `Device: ${Application.applicationName ?? '?'} / ${Application.applicationId ?? '?'}`,
+      `Gate state: ${JSON.stringify(state)}`,
+      ...Object.entries(extra).map(([key, value]) => `${key}: ${JSON.stringify(value, null, 2)}`),
+    ];
+    return lines.join('\n');
+  };
+
   const handleGrant = async () => {
     setIsRequesting(true);
     setRequestError(null);
+    setDiagnosticText(null);
+    setCopied(false);
     try {
       if (!state.notifications) {
         await requestNotificationPermission();
@@ -139,6 +160,7 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
         setRequestError(
           `Location responded without granting access (foreground: ${location.foreground}, background: ${location.background}, blocked: ${location.blocked}).`
         );
+        setDiagnosticText(buildDiagnosticText({ location }));
       }
       await refresh();
     } catch (error) {
@@ -146,6 +168,7 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
       // the spinner stopped and nothing else happened, indistinguishable from
       // the button doing nothing at all.
       const message = error instanceof Error ? error.message : String(error);
+      setDiagnosticText(buildDiagnosticText({ error: message }));
       setRequestError(message);
       if (__DEV__) console.error('Permission request failed:', error);
     } finally {
@@ -235,9 +258,33 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
         ) : null}
 
         {requestError ? (
-          <View style={styles.notice}>
-            <Feather name="alert-triangle" size={14} color={T.amber} />
-            <Text style={styles.noticeText}>Couldn’t request permissions: {requestError}</Text>
+          <View style={styles.errorNotice}>
+            <View style={styles.noticeHead}>
+              <Feather name="alert-circle" size={14} color={T.coral} />
+              <Text style={styles.errorNoticeText}>Couldn’t request permissions: {requestError}</Text>
+            </View>
+            {diagnosticText ? (
+              <>
+                <Text selectable style={styles.diagnosticText}>
+                  {diagnosticText}
+                </Text>
+                <AnimatedPressable
+                  scaleTo={0.98}
+                  style={styles.copyBtn}
+                  onPress={async () => {
+                    await Clipboard.setStringAsync(diagnosticText);
+                    setCopied(true);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Copy diagnostic details"
+                >
+                  <Feather name={copied ? 'check' : 'copy'} size={13} color={T.coral} />
+                  <Text style={styles.copyBtnText}>
+                    {copied ? 'Copied' : 'Copy details'}
+                  </Text>
+                </AnimatedPressable>
+              </>
+            ) : null}
           </View>
         ) : null}
 
@@ -375,6 +422,49 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     lineHeight: 18,
     color: T.ink,
+  },
+  errorNotice: {
+    backgroundColor: T.coralSoft,
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 16,
+  },
+  noticeHead: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-start',
+  },
+  errorNoticeText: {
+    flex: 1,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: T.ink,
+  },
+  diagnosticText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    lineHeight: 15,
+    color: T.inkSoft,
+    marginTop: 10,
+    backgroundColor: T.card,
+    borderRadius: 10,
+    padding: 10,
+  },
+  copyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
+    height: 36,
+    borderRadius: 999,
+    backgroundColor: T.card,
+  },
+  copyBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12.5,
+    color: T.coral,
   },
   primaryBtn: {
     marginTop: 24,

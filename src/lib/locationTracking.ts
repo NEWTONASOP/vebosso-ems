@@ -195,6 +195,13 @@ export interface LocationPermissionState {
   background: boolean;
   /** The OS will not prompt again; the user has to go to Settings. */
   blocked: boolean;
+  /**
+   * The untouched native responses, kept only for on-screen diagnostics when
+   * a request resolves without granting anything — `status`/`canAskAgain`
+   * distinguish "the user tapped Deny" from "the dialog never appeared" in a
+   * way the three booleans above collapse away.
+   */
+  raw?: { foreground: unknown; background?: unknown };
 }
 
 export async function getLocationPermissionState(): Promise<LocationPermissionState> {
@@ -244,7 +251,12 @@ export async function requestLocationPermissions(): Promise<LocationPermissionSt
     'Location permission request'
   );
   if (!foreground.granted) {
-    return { foreground: false, background: false, blocked: !foreground.canAskAgain };
+    return {
+      foreground: false,
+      background: false,
+      blocked: !foreground.canAskAgain,
+      raw: { foreground },
+    };
   }
 
   // Same gap as before the foreground request: firing the background prompt
@@ -261,6 +273,7 @@ export async function requestLocationPermissions(): Promise<LocationPermissionSt
     foreground: true,
     background: background.granted,
     blocked: !background.granted && !background.canAskAgain,
+    raw: { foreground, background },
   };
 }
 
