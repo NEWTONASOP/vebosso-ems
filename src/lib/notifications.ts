@@ -75,6 +75,45 @@ async function ensureAndroidNotificationChannels(): Promise<void> {
   androidChannelsConfigured = true;
 }
 
+export interface NotificationPermissionState {
+  granted: boolean;
+  /** False once the OS stops showing the prompt — only Settings can fix it. */
+  canAskAgain: boolean;
+}
+
+/**
+ * Current notification permission, without prompting. Expo Go on Android has no
+ * notifications module at all; reporting "granted" there keeps the permission
+ * gate from locking developers out of a build that cannot satisfy it.
+ */
+export async function getNotificationPermissionState(): Promise<NotificationPermissionState> {
+  if (!expoNotifications) return { granted: true, canAskAgain: false };
+  try {
+    const { status, canAskAgain } = await expoNotifications.getPermissionsAsync();
+    return { granted: status === 'granted', canAskAgain };
+  } catch {
+    return { granted: false, canAskAgain: true };
+  }
+}
+
+/** Prompt for notification permission and report the answer. */
+export async function requestNotificationPermission(): Promise<NotificationPermissionState> {
+  if (!expoNotifications) return { granted: true, canAskAgain: false };
+  try {
+    const existing = await expoNotifications.getPermissionsAsync();
+    if (existing.status === 'granted') {
+      await ensureAndroidNotificationChannels();
+      return { granted: true, canAskAgain: existing.canAskAgain };
+    }
+
+    const { status, canAskAgain } = await expoNotifications.requestPermissionsAsync();
+    if (status === 'granted') await ensureAndroidNotificationChannels();
+    return { granted: status === 'granted', canAskAgain };
+  } catch {
+    return { granted: false, canAskAgain: true };
+  }
+}
+
 /**
  * Register for push notifications and return the Expo push token
  */

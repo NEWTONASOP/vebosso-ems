@@ -23,6 +23,7 @@ import { Avatar, Snackbar, Text } from 'react-native-paper';
 import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { DayAction, DayHeaderCard } from '../../components/DayHeaderCard';
 import { DayTimeline } from '../../components/DayTimeline';
+import { MemberLocationSection } from '../../components/MemberLocationSection';
 import { InlineError } from '../../components/InlineError';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
 import { PageTransition } from '../../components/PageTransition';
@@ -477,6 +478,14 @@ export default function OwnerHistoryScreen() {
                         : null
                     }
                   />
+
+                  {selectedMember ? (
+                    <MemberLocationSection
+                      memberId={selectedMember.id}
+                      date={selectedDate}
+                      accentColor={ownerAccent.color}
+                    />
+                  ) : null}
 
                   <DayTimeline
                     timeline={timeline}

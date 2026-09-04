@@ -2,7 +2,7 @@
   "expo": {
     "name": "VEBOSSO EMS",
     "slug": "vebosso-ems",
-    "version": "1.4.1",
+    "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "vebossoems",
@@ -10,7 +10,16 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.vebosso.ems"
+      "bundleIdentifier": "com.vebosso.ems",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "VEBOSSO EMS uses your location for attendance while you are checked in.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "VEBOSSO EMS uses your location for attendance while you are checked in, including in the background. It stops when you check out.",
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "remote-notification"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +33,13 @@
       "predictiveBackGestureEnabled": false,
       "allowBackup": false,
       "permissions": [
-        "android.permission.REQUEST_INSTALL_PACKAGES"
+        "android.permission.REQUEST_INSTALL_PACKAGES",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS"
       ],
       "blockedPermissions": [
         "android.permission.USE_FINGERPRINT"
@@ -57,6 +72,15 @@
         "expo-notifications",
         {
           "color": "#2563EB"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "VEBOSSO EMS uses your location for attendance while you are checked in, including in the background. It stops when you check out.",
+          "locationWhenInUsePermission": "VEBOSSO EMS uses your location for attendance while you are checked in.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       "./plugins/withApkInstaller.js",

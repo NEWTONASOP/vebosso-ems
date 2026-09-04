@@ -7,14 +7,13 @@ import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable
 import { TextInput, Text, Snackbar } from 'react-native-paper';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useAuthStore } from '../../store/authStore';
-import { APP_NAME, APP_TAGLINE } from '../../constants/roles';
+import { APP_TAGLINE } from '../../constants/roles';
 import { Feather } from '@expo/vector-icons';
 import {
   AppTheme,
   AppSpace,
   AppRadius,
   appShadow,
-  appSoftShadow,
   screenChrome,
 } from '../../constants/theme';
 import Constants from 'expo-constants';
@@ -56,10 +55,10 @@ export default function LoginScreen() {
         {/* Logo / Branding */}
         <Animated.View entering={FadeInDown.duration(800).delay(200)} style={styles.brandSection}>
           <Image
-            source={require('../../../assets/images/vb_logo.png')}
+            source={require('../../../assets/images/vebosso-logo-mark.png')}
             style={styles.logoImage}
+            resizeMode="contain"
           />
-          <Text style={styles.appName}>{APP_NAME}</Text>
           <Text style={styles.tagline}>{APP_TAGLINE}</Text>
         </Animated.View>
 
@@ -187,24 +186,15 @@ const styles = StyleSheet.create({
     marginBottom: AppSpace.xxl,
   },
   logoImage: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
-    overflow: 'hidden',
-    marginBottom: AppSpace.lg,
-    ...appSoftShadow,
-  },
-  appName: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 30,
-    color: AppTheme.ink,
-    letterSpacing: -0.9,
+    width: 236,
+    height: 236 / 2.768,
+    marginBottom: AppSpace.md,
   },
   tagline: {
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
     color: AppTheme.mute,
-    marginTop: 4,
+    marginTop: 2,
   },
   formSection: {
     backgroundColor: AppTheme.card,

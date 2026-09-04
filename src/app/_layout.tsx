@@ -23,6 +23,9 @@ import {
   teardownAuthSessionLifecycle,
 } from '../lib/authSessionLifecycle';
 import { useAuthStore } from '../store/authStore';
+// Side-effect import: registers the background location task before the bundle
+// finishes evaluating, so a headless relaunch can deliver a fix to it.
+import '../lib/locationTracking';
 
 import {
   Inter_400Regular,

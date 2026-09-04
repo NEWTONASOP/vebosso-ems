@@ -23,6 +23,7 @@ import { Avatar, Text } from 'react-native-paper';
 import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { DayHeaderCard } from '../../components/DayHeaderCard';
 import { DayTimeline } from '../../components/DayTimeline';
+import { MemberLocationSection } from '../../components/MemberLocationSection';
 import { InlineError } from '../../components/InlineError';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
 import { PageTransition } from '../../components/PageTransition';
@@ -427,6 +428,14 @@ export default function ManagerHistoryScreen() {
                       },
                     ]}
                   />
+
+                  {selectedMember ? (
+                    <MemberLocationSection
+                      memberId={selectedMember.id}
+                      date={selectedDate}
+                      accentColor={managerAccent.color}
+                    />
+                  ) : null}
 
                   <DayTimeline
                     timeline={timeline}

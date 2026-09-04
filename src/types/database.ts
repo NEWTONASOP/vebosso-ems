@@ -54,6 +54,39 @@ export interface WorkLog {
   updated_at: string;
 }
 
+export interface LocationPing {
+  id: string;
+  user_id: string;
+  work_log_id: string | null;
+  date: string;
+  recorded_at: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  altitude: number | null;
+  speed: number | null;
+  heading: number | null;
+  battery_level: number | null;
+  is_moving: boolean | null;
+  created_at: string;
+}
+
+/** Newest fix per member, maintained by trigger from location_pings. */
+export interface MemberLocation {
+  user_id: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  speed: number | null;
+  heading: number | null;
+  battery_level: number | null;
+  is_moving: boolean | null;
+  recorded_at: string;
+  /** False once the member checked out — the marker is a last-seen position. */
+  is_tracking: boolean;
+  updated_at: string;
+}
+
 export interface BackfillPermission {
   id: string;
   user_id: string;
@@ -195,6 +228,10 @@ export interface TaskUpdate {
 // ============================================================================
 // Joined / Enriched Types (for UI display)
 // ============================================================================
+
+export interface MemberLocationWithProfile extends MemberLocation {
+  profiles: Pick<Profile, 'full_name' | 'employee_id' | 'role' | 'department'>;
+}
 
 export interface WorkLogWithProfile extends WorkLog {
   profiles: Pick<Profile, 'full_name' | 'employee_id' | 'avatar_url' | 'department' | 'role'>;

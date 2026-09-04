@@ -346,8 +346,38 @@ The app downloads the APK, then opens the Android package installer (`REQUEST_IN
 | `backfill_permissions` | One-time owner-granted permission to log a missed attendance day |
 | `sessions` | Active session tracking for force-logout |
 | `app_settings` | Global config including version control settings |
+| `location_pings` | Background location trail, recorded only between check-in and check-out (kept indefinitely) |
+| `member_locations` | Newest fix per member, maintained by trigger — powers the live marker |
 
 RLS is enabled on all tables. Policies are defined by role (`owner`, `manager`, `member`) with helper functions `is_owner()`, `get_user_role()`, and `is_manager_of(uuid)`. The private `checkouts` Storage bucket has its own RLS policies. A `SECURITY DEFINER` RPC `force_logout_user(uuid)` clears a target user's Supabase Auth sessions and refresh tokens. Migration `012` adds a `BEFORE DELETE` trigger on `profiles` that removes the deleted user's checkout photos from Storage.
+
+---
+
+## Location Tracking
+
+Owners and managers can see where a member is now and where they were across a
+day, on the member sheet in Team / My Team and in the Attendance screen's person
+view.
+
+- **When it records.** Only between check-in and check-out. The background task
+  starts on check-in, stops on check-out, and re-arms itself on app launch if
+  the day is still open. Nothing is recorded outside a work day.
+- **Rate.** GPS accuracy, a fix every 3 minutes or every 100 m moved. Fixes are
+  queued on device when offline and replayed on the next successful upload.
+- **Permission gate.** Members cannot use the app until they grant notifications
+  *and* "Allow all the time" location — see `src/components/PermissionGate.tsx`.
+  Owners and managers are unaffected. Android shows a persistent foreground
+  notification while tracking is on, so a member always knows it is running.
+- **Maps.** Leaflet on OpenStreetMap tiles inside a WebView
+  (`src/components/LocationMap.tsx`) — no Google Maps key and no billing
+  account. Maps do not render on the web build.
+- **Trail analysis.** `src/lib/locationTrail.ts` turns raw fixes into stops
+  (80 m radius, 8 minutes minimum), distance travelled, and tracked window, and
+  discards fixes worse than 150 m accuracy.
+
+Requires migration `019_location_tracking.sql` and a **new native build** —
+`expo-location`, `expo-task-manager`, `expo-battery`, and `react-native-webview`
+were added, so an OTA update alone will not pick this up.
 
 ---
 

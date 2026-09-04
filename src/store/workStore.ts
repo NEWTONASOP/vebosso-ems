@@ -20,6 +20,8 @@ import {
   BackfillPermission,
   LeaveRequest,
   LeaveRequestWithProfile,
+  LocationPing,
+  MemberLocationWithProfile,
   Profile,
   Task,
   TaskInsert,
@@ -130,6 +132,12 @@ interface WorkState {
   fetchTeamDay: (date: string, managerId?: string) => Promise<{ data: WorkLogWithProfile[], success: boolean; error?: string }>;
   /** Leave requests for a user within a date range. */
   fetchLeaveInRange: (userId: string, startDate: string, endDate: string) => Promise<{ data: LeaveRequest[], success: boolean; error?: string }>;
+
+  // Actions — Location
+  /** One member's recorded positions for a single day, oldest first. */
+  fetchDayLocations: (userId: string, date: string) => Promise<{ data: LocationPing[], success: boolean; error?: string }>;
+  /** Newest fix for everyone the caller may see, for the live team map. */
+  fetchLiveLocations: () => Promise<{ data: MemberLocationWithProfile[], success: boolean; error?: string }>;
 
   // Actions — Backfill Attendance
   fetchBackfillPermissions: (userId: string) => Promise<{ success: boolean; error?: string }>;
@@ -330,6 +338,18 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
       set({ todayLog: data as WorkLog });
 
+      // Location tracking runs only between check-in and check-out. A failure
+      // here must not fail the check-in itself — the gate already made sure the
+      // permissions exist, and tracking retries on the next app foreground.
+      try {
+        const { startLocationTracking, pushCurrentLocation } = await import('../lib/locationTracking');
+        const session = { userId: user.id, workLogId: (data as WorkLog).id, date: today };
+        const started = await startLocationTracking(session);
+        if (started) void pushCurrentLocation(session);
+      } catch (locErr) {
+        if (__DEV__) console.warn('Failed to start location tracking:', locErr);
+      }
+
       const { data: profile } = await supabase
         .from('profiles')
         .select('full_name, manager_id')
@@ -480,6 +500,15 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
       set({ todayLog: data as WorkLog });
 
+      // The day is over: stop the background task, flush anything the device
+      // could not upload, and drop the live marker to "last seen".
+      try {
+        const { stopLocationTracking } = await import('../lib/locationTracking');
+        await stopLocationTracking();
+      } catch (locErr) {
+        if (__DEV__) console.warn('Failed to stop location tracking:', locErr);
+      }
+
       // Always notify manager and owners on checkout — message differs based on whether approval is needed
       try {
         const { data: profile } = await supabase
@@ -543,7 +572,26 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         return { success: false, error: error.message };
       }
 
-      set({ todayLog: data ? (data as unknown as WorkLog) : null, isLoadingToday: false });
+      const log = data ? (data as unknown as WorkLog) : null;
+      set({ todayLog: log, isLoadingToday: false });
+
+      // The OS drops the background task when the app is force-stopped, so an
+      // open day has to re-arm it; a closed day makes sure nothing is still
+      // running (e.g. the member checked out on another device).
+      try {
+        const openDay = !!log && !log.check_out_time && log.status !== 'done';
+        const { resumeTrackingIfCheckedIn, stopLocationTracking, isTrackingRunning } =
+          await import('../lib/locationTracking');
+
+        if (openDay && log) {
+          await resumeTrackingIfCheckedIn({ userId, workLogId: log.id, date: today });
+        } else if (await isTrackingRunning()) {
+          await stopLocationTracking();
+        }
+      } catch (locErr) {
+        if (__DEV__) console.warn('Failed to reconcile location tracking:', locErr);
+      }
+
       return { success: true };
     } catch (err: any) {
       set({ errorToday: err.message, todayError: err.message, isLoadingToday: false });
@@ -1224,6 +1272,41 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
       if (error) return { data: [], success: false, error: error.message };
       return { data: (data || []) as LeaveRequest[], success: true };
+    } catch (err: any) {
+      return { data: [], success: false, error: err.message };
+    }
+  },
+
+  fetchDayLocations: async (userId: string, date: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('location_pings')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .order('recorded_at', { ascending: true });
+
+      if (error) return { data: [], success: false, error: error.message };
+      return { data: (data || []) as LocationPing[], success: true };
+    } catch (err: any) {
+      return { data: [], success: false, error: err.message };
+    }
+  },
+
+  fetchLiveLocations: async () => {
+    try {
+      // RLS already narrows this to the caller's team, so no filter is needed
+      // here — a manager asking for "everyone" gets their own reports.
+      const { data, error } = await supabase
+        .from('member_locations')
+        .select(`
+          *,
+          profiles!member_locations_user_id_fkey(full_name, employee_id, role, department)
+        `)
+        .order('recorded_at', { ascending: false });
+
+      if (error) return { data: [], success: false, error: error.message };
+      return { data: (data || []) as MemberLocationWithProfile[], success: true };
     } catch (err: any) {
       return { data: [], success: false, error: err.message };
     }

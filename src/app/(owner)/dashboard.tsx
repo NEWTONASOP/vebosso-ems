@@ -234,7 +234,7 @@ export default function OwnerDashboard() {
               <View style={styles.heroGlow} />
 
               {stillLoading ? (
-                <ActivityIndicator color="#fff" style={{ marginVertical: 26 }} />
+                <ActivityIndicator color="#fff" style={{ marginVertical: 18 }} />
               ) : hasPending ? (
                 <>
                   <View style={styles.heroEyebrowRow}>
@@ -268,14 +268,6 @@ export default function OwnerDashboard() {
                       ? `${stats.activeNow} ${stats.activeNow === 1 ? 'person is' : 'people are'} working right now.`
                       : 'No one has checked in yet today.'}
                   </Text>
-                  <AnimatedPressable
-                    scaleTo={0.97}
-                    onPress={() => setMemberPickerVisible(true)}
-                    style={styles.heroCtaGhost}
-                  >
-                    <Feather name="plus" size={16} color="#fff" />
-                    <Text style={styles.heroCtaGhostText}>Assign a task</Text>
-                  </AnimatedPressable>
                 </>
               )}
             </View>
@@ -571,26 +563,26 @@ const styles = StyleSheet.create({
 
   hero: {
     backgroundColor: T.charcoal,
-    borderRadius: 28,
-    padding: 22,
+    borderRadius: 22,
+    padding: 14,
     overflow: 'hidden',
-    marginBottom: 14,
+    marginBottom: 12,
     ...shadow,
   },
   heroGlow: {
     position: 'absolute',
-    top: -70,
-    right: -50,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
+    top: -58,
+    right: -42,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
     backgroundColor: 'rgba(255,255,255,0.045)',
   },
   heroEyebrowRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    marginBottom: 12,
+    marginBottom: 6,
   },
   heroDot: {
     width: 7,
@@ -600,57 +592,41 @@ const styles = StyleSheet.create({
   },
   heroEyebrow: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 12.5,
+    fontSize: 12,
     color: 'rgba(255,255,255,0.68)',
     letterSpacing: 0.2,
   },
   heroTitle: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 25,
+    fontSize: 18.5,
     color: '#fff',
     letterSpacing: -0.6,
-    lineHeight: 31,
+    lineHeight: 23,
     maxWidth: 290,
   },
   heroHint: {
     fontFamily: 'Inter_400Regular',
-    fontSize: 14,
+    fontSize: 13,
     color: 'rgba(255,255,255,0.66)',
-    marginTop: 8,
-    lineHeight: 20,
+    marginTop: 4,
+    lineHeight: 17,
     maxWidth: 290,
   },
   heroCta: {
-    marginTop: 20,
+    marginTop: 12,
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    height: 46,
+    paddingHorizontal: 18,
+    height: 38,
     borderRadius: 999,
   },
   heroCtaText: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
+    fontSize: 14,
     color: T.ink,
-  },
-  heroCtaGhost: {
-    marginTop: 20,
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    paddingHorizontal: 18,
-    height: 44,
-    borderRadius: 999,
-  },
-  heroCtaGhostText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14.5,
-    color: '#fff',
   },
 
   sectionLabel: {

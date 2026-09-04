@@ -43,7 +43,7 @@ export function LoadingScreen() {
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
       <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
         <Image
-          source={require('../../assets/images/vb_logo.png')}
+          source={require('../../assets/images/vebosso-emblem-black.png')}
           style={styles.logo}
           contentFit="contain"
         />

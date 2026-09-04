@@ -8,8 +8,9 @@ import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { Searchbar, Text } from 'react-native-paper';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
+import { MemberAttendanceModal } from '../../components/MemberAttendanceModal';
 import { MemberCard } from '../../components/MemberCard';
-import { AppSpace, AppTheme, screenChrome } from '../../constants/theme';
+import { AppSpace, AppTheme, RoleAccent, screenChrome } from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Profile } from '../../types/database';
@@ -26,6 +27,7 @@ export default function ManagerMyTeamScreen() {
   } = useWorkStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [attendanceMember, setAttendanceMember] = useState<Profile | null>(null);
 
   useEffect(() => {
     if (profile) fetchTeamMembers(profile.id);
@@ -74,6 +76,7 @@ export default function ManagerMyTeamScreen() {
         inProgressTaskCount={live?.inProgressTaskCount ?? 0}
         doneTaskCount={live?.doneTaskCount ?? 0}
         activeTasks={live?.activeTasks ?? []}
+        onPress={() => setAttendanceMember(item)}
       />
     );
   }, [memberLiveStatus]);
@@ -125,6 +128,13 @@ export default function ManagerMyTeamScreen() {
           }
         />
       )}
+
+      <MemberAttendanceModal
+        visible={!!attendanceMember}
+        member={attendanceMember}
+        onDismiss={() => setAttendanceMember(null)}
+        accentColor={RoleAccent.manager.color}
+      />
     </View>
   );
 }

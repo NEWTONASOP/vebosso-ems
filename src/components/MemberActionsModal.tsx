@@ -6,10 +6,11 @@ import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Modal, Portal, Text } from 'react-native-paper';
-import { AppTheme, appSoftShadow } from '../constants/theme';
+import { AppTheme, RoleAccent, appSoftShadow } from '../constants/theme';
 import { ROLE_LABELS, WORK_LOG_STATUS_CONFIG } from '../constants/roles';
 import { Profile, WorkLogStatus } from '../types/database';
 import { MemberActiveTask } from './MemberCard';
+import { MemberAttendancePanel } from './MemberAttendancePanel';
 
 interface MemberActionsModalProps {
   visible: boolean;
@@ -251,6 +252,17 @@ export function MemberActionsModal({
             </View>
           )}
 
+          {/* 3. Attendance history — same day rail as the Attendance screen */}
+          <Text style={styles.sectionTitle}>Attendance history</Text>
+          <View style={styles.attendanceBlock}>
+            <MemberAttendancePanel
+              memberId={member.id}
+              accentColor={RoleAccent.owner.color}
+              enableDetailSheet={false}
+              showLocation
+            />
+          </View>
+
           <Text style={styles.sectionTitle}>Actions</Text>
           <View style={styles.actionsCard}>
             <ActionRow
@@ -443,6 +455,9 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 10,
+  },
+  attendanceBlock: {
+    marginBottom: 16,
   },
   taskListContainer: {
     marginTop: 10,
