@@ -261,15 +261,34 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
           )}
         </AnimatedPressable>
 
-        <AnimatedPressable
-          scaleTo={0.98}
-          style={styles.secondaryBtn}
-          onPress={() => void refresh()}
-          accessibilityRole="button"
-          accessibilityLabel="Check again"
-        >
-          <Text style={styles.secondaryBtnText}>Check again</Text>
-        </AnimatedPressable>
+        <View style={styles.secondaryRow}>
+          <AnimatedPressable
+            scaleTo={0.98}
+            style={styles.secondaryBtn}
+            onPress={() => void refresh()}
+            accessibilityRole="button"
+            accessibilityLabel="Check again"
+          >
+            <Text style={styles.secondaryBtnText}>Check again</Text>
+          </AnimatedPressable>
+
+          {!needsSettings ? (
+            // The in-app prompt can silently fail to appear on some devices —
+            // a known Android issue in the underlying location library, not
+            // something this screen can detect or retry its way out of. This
+            // stays visible even when Android still says it *could* prompt,
+            // so nobody is stuck with only a button that does nothing.
+            <AnimatedPressable
+              scaleTo={0.98}
+              style={styles.secondaryBtn}
+              onPress={openSettings}
+              accessibilityRole="button"
+              accessibilityLabel="Open settings manually"
+            >
+              <Text style={styles.secondaryBtnText}>Open settings manually</Text>
+            </AnimatedPressable>
+          ) : null}
+        </View>
       </ScrollView>
     </View>
   );
@@ -382,9 +401,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: T.white,
   },
+  secondaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
   secondaryBtn: {
     marginTop: 10,
     height: 44,
+    paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
