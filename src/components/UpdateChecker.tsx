@@ -23,6 +23,7 @@ export function UpdateChecker() {
   const [phase, setPhase] = useState<UpdatePhase>('idle');
   const [progress, setProgress] = useState(0);
   const [targetVersion, setTargetVersion] = useState('');
+  const [installedVersion, setInstalledVersion] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isOpeningInstaller, setIsOpeningInstaller] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
@@ -44,6 +45,7 @@ export function UpdateChecker() {
   const checkForRequiredUpdate = async () => {
     try {
       const result = await checkAppVersion();
+      setInstalledVersion(result.currentVersion);
 
       if (result.needsUpdate) {
         await startInAppUpdate(result.latestVersion);
@@ -177,6 +179,15 @@ export function UpdateChecker() {
               ? 'Tap Install Now to open the system installer. If nothing happens, use Redownload or check install permissions.'
               : `Version ${targetVersion} is required before you can continue.`}
         </Text>
+
+        {phase !== 'error' && installedVersion ? (
+          // If this prompt reappears right after installing, the two numbers
+          // below say why: either the install didn't actually replace the
+          // running app, or the app is reporting the wrong installed version.
+          <Text style={styles.versionLine}>
+            Installed: v{installedVersion} → Required: v{targetVersion}
+          </Text>
+        ) : null}
 
         {phase !== 'error' && (
           <View style={styles.keepOpenNotice}>
@@ -313,6 +324,13 @@ const styles = StyleSheet.create({
     color: AppTheme.inkSoft,
     marginBottom: 16,
     lineHeight: 22,
+  },
+  versionLine: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    color: AppTheme.mute,
+    marginBottom: 16,
+    marginTop: -8,
   },
   keepOpenNotice: {
     backgroundColor: AppTheme.amberSoft,

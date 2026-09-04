@@ -87,6 +87,27 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building UAT for version: $VERSION"
 
+      - name: Set Android versionCode
+        # See build-production.yml for why this is required: without an explicit
+        # android.versionCode, expo prebuild hardcodes it to 1 on every build,
+        # which makes Android refuse to install any release over an existing one.
+        run: |
+          node -e '
+            const fs = require("fs");
+            const path = "app.json";
+            const config = JSON.parse(fs.readFileSync(path, "utf8"));
+            const version = config.expo.version;
+            const [major, minor, patch] = version.split(".").map((n) => parseInt(n, 10));
+            if ([major, minor, patch].some((n) => Number.isNaN(n))) {
+              throw new Error(`Cannot derive versionCode from non-semver version "${version}"`);
+            }
+            const versionCode = major * 10000 + minor * 100 + patch;
+            config.expo.android = config.expo.android || {};
+            config.expo.android.versionCode = versionCode;
+            fs.writeFileSync(path, JSON.stringify(config, null, 2) + "\n");
+            console.log(`versionCode ${versionCode} for version ${version}`);
+          '
+
       - name: Generate Android project
         run: npx expo prebuild --platform android
 

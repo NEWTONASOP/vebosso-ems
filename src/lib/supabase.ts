@@ -76,9 +76,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const storage = Platform.OS === 'web' ? new WebStorage() : new ExpoSecureStoreAdapter();
 
+// createClient() throws synchronously on an empty URL ("supabaseUrl is
+// required"). This module is imported eagerly from the root layout, so that
+// throw happens before React ever renders — on web that's a blank white page
+// with no visible error, not the graceful degradation the comment above
+// promises. A syntactically valid placeholder keeps the client constructible;
+// every real request against it still fails (network error), which existing
+// try/catch + snackbar error handling throughout the app already surfaces.
+const safeSupabaseUrl = supabaseUrl || 'https://missing-config.invalid';
+const safeSupabaseAnonKey = supabaseAnonKey || 'missing-anon-key';
+
 // Use 'any' generic to prevent 'never' errors from manual schema types.
 // Our Database interface still provides IDE intellisense via explicit casts.
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(safeSupabaseUrl, safeSupabaseAnonKey, {
   auth: {
     storage: {
       getItem: (key: string) => storage.getItem(key),

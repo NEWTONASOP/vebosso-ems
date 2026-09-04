@@ -130,6 +130,32 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
+      - name: Set Android versionCode
+        # app.json has no android.versionCode, so `expo prebuild` hardcodes it to 1
+        # on every build. Android's installer keys "is this an update" on
+        # versionCode, not the human-readable version string — with every APK
+        # carrying the same versionCode 1, installing a new release over an
+        # existing install is silently refused by the OS every time, regardless
+        # of how different the version numbers look. Deriving it from the
+        # semver version keeps it monotonic automatically, so nobody has to
+        # remember to bump a second number alongside `version`.
+        run: |
+          node -e '
+            const fs = require("fs");
+            const path = "app.json";
+            const config = JSON.parse(fs.readFileSync(path, "utf8"));
+            const version = config.expo.version;
+            const [major, minor, patch] = version.split(".").map((n) => parseInt(n, 10));
+            if ([major, minor, patch].some((n) => Number.isNaN(n))) {
+              throw new Error(`Cannot derive versionCode from non-semver version "${version}"`);
+            }
+            const versionCode = major * 10000 + minor * 100 + patch;
+            config.expo.android = config.expo.android || {};
+            config.expo.android.versionCode = versionCode;
+            fs.writeFileSync(path, JSON.stringify(config, null, 2) + "\n");
+            console.log(`versionCode ${versionCode} for version ${version}`);
+          '
+
       - name: Create google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}

@@ -74,10 +74,18 @@ export function assertSafeDownloadUrl(rawUrl: string): string {
 }
 
 /**
- * Get the current app version from app.json
+ * Get the current app version.
+ *
+ * `Application.nativeApplicationVersion` reads the installed APK's own
+ * versionName from Android's PackageManager — it can't lag behind what's
+ * actually on the device. `Constants.expoConfig?.version` reads the active
+ * JS manifest instead, which for a non-EAS (`expo prebuild` + Gradle) build
+ * is not guaranteed to be freshly embedded, and after an OTA update it
+ * reflects the *manifest*, not the native binary. Checked in that order so a
+ * "current version" mismatch can never make the update prompt loop forever.
  */
 export function getCurrentVersion(): string {
-  return Constants.expoConfig?.version || Application.nativeApplicationVersion || '1.0.0';
+  return Application.nativeApplicationVersion || Constants.expoConfig?.version || '1.0.0';
 }
 
 /**
@@ -193,12 +201,40 @@ export function getApkFileUri(version: string): string {
 }
 
 /**
- * Whether a completed APK for this version is already in cache
+ * Byte size the server reports for the current download URL, or null if it
+ * can't be determined. Used to tell a genuinely complete cached APK apart
+ * from a partial one left by an interrupted download — both satisfy
+ * "exists and size > 0", but only one of them installs the real update.
+ */
+async function getRemoteApkSize(): Promise<number | null> {
+  try {
+    const downloadUrl = await getDownloadUrl();
+    const response = await fetch(downloadUrl, { method: 'HEAD' });
+    const length = response.headers.get('content-length');
+    return length ? parseInt(length, 10) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether a *complete* APK for this version is already in cache.
+ *
+ * A file existing with size > 0 is not proof it finished downloading — an
+ * interrupted transfer (backgrounded app, dropped connection) leaves exactly
+ * that. Trusting it meant a bad first attempt would reinstall itself forever,
+ * since every later check saw the same broken file as "already downloaded"
+ * and never re-fetched a good one. When the remote size can't be confirmed,
+ * the cache is treated as invalid rather than trusted — a redundant download
+ * is a much smaller cost than an update that silently never lands.
  */
 export async function hasCachedApk(version: string): Promise<boolean> {
   const fileUri = getApkFileUri(version);
   const info = await FileSystem.getInfoAsync(fileUri);
-  return info.exists && (info.size ?? 0) > 0;
+  if (!info.exists || !(info.size ?? 0)) return false;
+
+  const remoteSize = await getRemoteApkSize();
+  return remoteSize != null && info.size === remoteSize;
 }
 
 /**
