@@ -181,7 +181,7 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
       key: 'location',
       icon: 'map-pin' as const,
       title: 'Location — Precise, allow all the time',
-      body: 'Only used while you’re checked in — it stops the moment you check out. Choose “Allow all the time” and “Precise” (not “Approximate”) so attendance can tell where you actually were.',
+      body: 'Only used while you’re checked in, it stops the moment you check out. Choose “Allow all the time” and “Precise” (not “Approximate”) so attendance can tell where you actually were.',
       done:
         state.locationForeground &&
         state.locationBackground &&
