@@ -193,6 +193,16 @@ if (Platform.OS !== 'web') {
 export interface LocationPermissionState {
   foreground: boolean;
   background: boolean;
+  /**
+   * False if the member picked "Approximate" on Android's precise/approximate
+   * choice (or the equivalent iOS 14+ "reduced accuracy" toggle). Attendance
+   * needs real GPS-grade fixes — approximate location resolves to roughly
+   * neighbourhood-sized circles, which the stop-detection radius in
+   * locationTrail.ts (80 m) can't work with, and most such fixes get dropped
+   * outright by its 150 m accuracy filter. Always true on platforms/versions
+   * that don't offer the choice, since there's nothing coarser to detect.
+   */
+  isPrecise: boolean;
   /** The OS will not prompt again; the user has to go to Settings. */
   blocked: boolean;
   /**
@@ -202,6 +212,13 @@ export interface LocationPermissionState {
    * way the three booleans above collapse away.
    */
   raw?: { foreground: unknown; background?: unknown };
+}
+
+/** True unless the response reports coarse-only (Android) or reduced (iOS) accuracy. */
+function isPreciseResponse(response: Location.LocationPermissionResponse): boolean {
+  if (response.android && response.android.accuracy === 'coarse') return false;
+  if (response.ios && response.ios.accuracy === 'reduced') return false;
+  return true;
 }
 
 export async function getLocationPermissionState(): Promise<LocationPermissionState> {
@@ -215,6 +232,7 @@ export async function getLocationPermissionState(): Promise<LocationPermissionSt
   return {
     foreground: foreground.granted,
     background: background.granted,
+    isPrecise: isPreciseResponse(foreground),
     blocked:
       (!foreground.granted && !foreground.canAskAgain) ||
       (foreground.granted && !background.granted && !background.canAskAgain),
@@ -254,6 +272,7 @@ export async function requestLocationPermissions(): Promise<LocationPermissionSt
     return {
       foreground: false,
       background: false,
+      isPrecise: isPreciseResponse(foreground),
       blocked: !foreground.canAskAgain,
       raw: { foreground },
     };
@@ -272,6 +291,7 @@ export async function requestLocationPermissions(): Promise<LocationPermissionSt
   return {
     foreground: true,
     background: background.granted,
+    isPrecise: isPreciseResponse(foreground),
     blocked: !background.granted && !background.canAskAgain,
     raw: { foreground, background },
   };

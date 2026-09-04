@@ -10,9 +10,6 @@
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
-import * as Application from 'expo-application';
-import * as Clipboard from 'expo-clipboard';
-import Constants from 'expo-constants';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Linking from 'expo-linking';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -36,13 +33,14 @@ interface GateState {
   locationForeground: boolean;
   locationBackground: boolean;
   servicesEnabled: boolean;
+  /**
+   * False if the member chose "Approximate" on Android's precise/approximate
+   * picker (or iOS 14+'s reduced-accuracy toggle). Attendance needs real
+   * GPS-grade fixes, so this counts as not satisfying the gate.
+   */
+  isPrecise: boolean;
   /** The OS will not prompt again — only Settings can fix it now. */
   blocked: boolean;
-  // Kept only so `blocked` can be explained on screen: which of the two
-  // permissions is actually the blocked one, rather than one combined flag
-  // that reads the same regardless of which check produced it.
-  notificationsCanAskAgain: boolean;
-  locationBlockedRaw: boolean;
 }
 
 const INITIAL: GateState = {
@@ -50,9 +48,8 @@ const INITIAL: GateState = {
   locationForeground: false,
   locationBackground: false,
   servicesEnabled: true,
+  isPrecise: true,
   blocked: false,
-  notificationsCanAskAgain: true,
-  locationBlockedRaw: false,
 };
 
 async function readState(): Promise<GateState> {
@@ -67,21 +64,24 @@ async function readState(): Promise<GateState> {
     locationForeground: location.foreground,
     locationBackground: location.background,
     servicesEnabled,
+    isPrecise: location.isPrecise,
     blocked: location.blocked || (!notifications.granted && !notifications.canAskAgain),
-    notificationsCanAskAgain: notifications.canAskAgain,
-    locationBlockedRaw: location.blocked,
   };
 }
 
 export function isGateSatisfied(state: GateState): boolean {
   // Device-wide location being switched off is checked alongside the grants:
   // it silences the trail just as effectively, and the app is not usable in
-  // that state either.
+  // that state either. Approximate-only location is checked the same way —
+  // it technically "counts" as granted to Android, but resolves to
+  // neighbourhood-sized circles that the trail's 80 m stop radius and 150 m
+  // accuracy filter can't work with, so it isn't usable either.
   return (
     state.notifications &&
     state.locationForeground &&
     state.locationBackground &&
-    state.servicesEnabled
+    state.servicesEnabled &&
+    state.isPrecise
   );
 }
 
@@ -101,15 +101,6 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<GateState>(INITIAL);
   const [isChecking, setIsChecking] = useState(true);
   const [isRequesting, setIsRequesting] = useState(false);
-  // Surfaced instead of left as a silent unhandled rejection — without this,
-  // any native-side failure in the request calls below looked identical to
-  // "nothing happened" when the button was pressed, with no way to tell why.
-  const [requestError, setRequestError] = useState<string | null>(null);
-  // The full raw diagnostic (device info + untouched permission-API
-  // response), kept separately from `requestError` so it can be copied
-  // verbatim instead of retyped or paraphrased from what's on screen.
-  const [diagnosticText, setDiagnosticText] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const refresh = useCallback(async () => {
     const next = await readState();
@@ -130,22 +121,8 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
     return () => sub.remove();
   }, [refresh]);
 
-  const buildDiagnosticText = (extra: Record<string, unknown>): string => {
-    const lines = [
-      `App: ${Constants.expoConfig?.version ?? '?'} (native ${Application.nativeApplicationVersion ?? '?'})`,
-      `OS: ${Platform.OS} ${Platform.Version}`,
-      `Device: ${Application.applicationName ?? '?'} / ${Application.applicationId ?? '?'}`,
-      `Gate state: ${JSON.stringify(state)}`,
-      ...Object.entries(extra).map(([key, value]) => `${key}: ${JSON.stringify(value, null, 2)}`),
-    ];
-    return lines.join('\n');
-  };
-
   const handleGrant = async () => {
     setIsRequesting(true);
-    setRequestError(null);
-    setDiagnosticText(null);
-    setCopied(false);
     try {
       if (!state.notifications) {
         await requestNotificationPermission();
@@ -160,25 +137,15 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
         ...prev,
         locationForeground: location.foreground,
         locationBackground: location.background,
+        isPrecise: location.isPrecise,
         blocked: location.blocked,
       }));
-      // The call can resolve cleanly without granting anything — that path
-      // threw nothing, so it never hit the catch below, and previously showed
-      // no explanation at all. Report exactly what came back.
-      if (!location.foreground || !location.background) {
-        setRequestError(
-          `Location responded without granting access (foreground: ${location.foreground}, background: ${location.background}, blocked: ${location.blocked}).`
-        );
-        setDiagnosticText(buildDiagnosticText({ location }));
-      }
       await refresh();
     } catch (error) {
-      // A thrown error here previously vanished as an unhandled rejection —
-      // the spinner stopped and nothing else happened, indistinguishable from
-      // the button doing nothing at all.
-      const message = error instanceof Error ? error.message : String(error);
-      setDiagnosticText(buildDiagnosticText({ error: message }));
-      setRequestError(message);
+      // The in-app prompt can fail to appear at all on some devices — a known
+      // Android issue in the underlying location library. There's nothing
+      // useful to do with the error here beyond not crashing: the "Open
+      // settings manually" link below is the actual way through it.
       if (__DEV__) console.error('Permission request failed:', error);
     } finally {
       setIsRequesting(false);
@@ -195,7 +162,13 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
 
   if (isGateSatisfied(state)) return <>{children}</>;
 
-  const needsSettings = state.blocked;
+  // Android only offers the Precise/Approximate choice once per grant — a
+  // repeat in-app request won't show it again, so re-requesting can't fix
+  // this the way it fixes an outright denial. Settings is the only way out,
+  // same as the fully-blocked case below.
+  const needsPreciseLocation =
+    state.locationForeground && state.locationBackground && !state.isPrecise;
+  const needsSettings = state.blocked || needsPreciseLocation;
   const items = [
     {
       key: 'notifications',
@@ -207,9 +180,13 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
     {
       key: 'location',
       icon: 'map-pin' as const,
-      title: 'Location — Allow all the time',
-      body: 'Only used while you’re checked in — it stops the moment you check out. Choose “Allow all the time” so it keeps working in the background during that window.',
-      done: state.locationForeground && state.locationBackground && state.servicesEnabled,
+      title: 'Location — Precise, allow all the time',
+      body: 'Only used while you’re checked in — it stops the moment you check out. Choose “Allow all the time” and “Precise” (not “Approximate”) so attendance can tell where you actually were.',
+      done:
+        state.locationForeground &&
+        state.locationBackground &&
+        state.servicesEnabled &&
+        state.isPrecise,
     },
   ];
 
@@ -255,7 +232,17 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
           </View>
         ) : null}
 
-        {needsSettings ? (
+        {needsPreciseLocation ? (
+          <View style={styles.notice}>
+            <Feather name="alert-triangle" size={14} color={T.amber} />
+            <Text style={styles.noticeText}>
+              Location is set to “Approximate”, which isn’t accurate enough for attendance.
+              {Platform.OS === 'android'
+                ? ' Open Settings → Permissions → Location and switch to “Use precise location”.'
+                : ' Open Settings → Location and turn on “Precise Location”.'}
+            </Text>
+          </View>
+        ) : needsSettings ? (
           <View style={styles.notice}>
             <Feather name="alert-triangle" size={14} color={T.amber} />
             <Text style={styles.noticeText}>
@@ -263,75 +250,6 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
                 ? 'Android no longer shows the prompt. Open Settings → Permissions → Location and choose “Allow all the time”.'
                 : 'Open Settings and set Location to “Always”.'}
             </Text>
-          </View>
-        ) : null}
-
-        {needsSettings ? (
-          // This state skips the request entirely (see the button below), so
-          // it never runs the code that produces the error banner further
-          // down — without this, a device landing here straight from its very
-          // first check had no way to show what triggered it at all.
-          <View style={styles.errorNotice}>
-            <View style={styles.noticeHead}>
-              <Feather name="info" size={14} color={T.coral} />
-              <Text style={styles.errorNoticeText}>
-                Blocked by:{' '}
-                {state.locationBlockedRaw && !state.notificationsCanAskAgain
-                  ? 'both location and notifications'
-                  : state.locationBlockedRaw
-                    ? 'location'
-                    : 'notifications'}
-              </Text>
-            </View>
-            <Text selectable style={styles.diagnosticText}>
-              {buildDiagnosticText({ reason: 'blocked on initial check, before any request' })}
-            </Text>
-            <AnimatedPressable
-              scaleTo={0.98}
-              style={styles.copyBtn}
-              onPress={async () => {
-                await Clipboard.setStringAsync(
-                  buildDiagnosticText({ reason: 'blocked on initial check, before any request' })
-                );
-                setCopied(true);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Copy diagnostic details"
-            >
-              <Feather name={copied ? 'check' : 'copy'} size={13} color={T.coral} />
-              <Text style={styles.copyBtnText}>{copied ? 'Copied' : 'Copy details'}</Text>
-            </AnimatedPressable>
-          </View>
-        ) : null}
-
-        {requestError ? (
-          <View style={styles.errorNotice}>
-            <View style={styles.noticeHead}>
-              <Feather name="alert-circle" size={14} color={T.coral} />
-              <Text style={styles.errorNoticeText}>Couldn’t request permissions: {requestError}</Text>
-            </View>
-            {diagnosticText ? (
-              <>
-                <Text selectable style={styles.diagnosticText}>
-                  {diagnosticText}
-                </Text>
-                <AnimatedPressable
-                  scaleTo={0.98}
-                  style={styles.copyBtn}
-                  onPress={async () => {
-                    await Clipboard.setStringAsync(diagnosticText);
-                    setCopied(true);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel="Copy diagnostic details"
-                >
-                  <Feather name={copied ? 'check' : 'copy'} size={13} color={T.coral} />
-                  <Text style={styles.copyBtnText}>
-                    {copied ? 'Copied' : 'Copy details'}
-                  </Text>
-                </AnimatedPressable>
-              </>
-            ) : null}
           </View>
         ) : null}
 
@@ -469,49 +387,6 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     lineHeight: 18,
     color: T.ink,
-  },
-  errorNotice: {
-    backgroundColor: T.coralSoft,
-    borderRadius: 14,
-    padding: 12,
-    marginTop: 16,
-  },
-  noticeHead: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'flex-start',
-  },
-  errorNoticeText: {
-    flex: 1,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12.5,
-    lineHeight: 18,
-    color: T.ink,
-  },
-  diagnosticText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 11,
-    lineHeight: 15,
-    color: T.inkSoft,
-    marginTop: 10,
-    backgroundColor: T.card,
-    borderRadius: 10,
-    padding: 10,
-  },
-  copyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 10,
-    height: 36,
-    borderRadius: 999,
-    backgroundColor: T.card,
-  },
-  copyBtnText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12.5,
-    color: T.coral,
   },
   primaryBtn: {
     marginTop: 24,
