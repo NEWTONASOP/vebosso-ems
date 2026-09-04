@@ -89,6 +89,10 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<GateState>(INITIAL);
   const [isChecking, setIsChecking] = useState(true);
   const [isRequesting, setIsRequesting] = useState(false);
+  // Surfaced instead of left as a silent unhandled rejection — without this,
+  // any native-side failure in the request calls below looked identical to
+  // "nothing happened" when the button was pressed, with no way to tell why.
+  const [requestError, setRequestError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const next = await readState();
@@ -111,6 +115,7 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
 
   const handleGrant = async () => {
     setIsRequesting(true);
+    setRequestError(null);
     try {
       if (!state.notifications) {
         await requestNotificationPermission();
@@ -123,6 +128,13 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
         blocked: location.blocked,
       }));
       await refresh();
+    } catch (error) {
+      // A thrown error here previously vanished as an unhandled rejection —
+      // the spinner stopped and nothing else happened, indistinguishable from
+      // the button doing nothing at all.
+      const message = error instanceof Error ? error.message : String(error);
+      setRequestError(message);
+      if (__DEV__) console.error('Permission request failed:', error);
     } finally {
       setIsRequesting(false);
     }
@@ -206,6 +218,13 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
                 ? 'Android no longer shows the prompt. Open Settings → Permissions → Location and choose “Allow all the time”.'
                 : 'Open Settings and set Location to “Always”.'}
             </Text>
+          </View>
+        ) : null}
+
+        {requestError ? (
+          <View style={styles.notice}>
+            <Feather name="alert-triangle" size={14} color={T.amber} />
+            <Text style={styles.noticeText}>Couldn’t request permissions: {requestError}</Text>
           </View>
         ) : null}
 
