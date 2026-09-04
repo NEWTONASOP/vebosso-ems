@@ -19,7 +19,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, AppState, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AnimatedPressable } from './AnimatedPressable';
 import { AppTheme as T, appShadow } from '../constants/theme';
 import {
   getLocationPermissionState,
@@ -30,6 +29,7 @@ import {
   getNotificationPermissionState,
   requestNotificationPermission,
 } from '../lib/notifications';
+import { AnimatedPressable } from './AnimatedPressable';
 
 interface GateState {
   notifications: boolean;
@@ -38,6 +38,11 @@ interface GateState {
   servicesEnabled: boolean;
   /** The OS will not prompt again — only Settings can fix it now. */
   blocked: boolean;
+  // Kept only so `blocked` can be explained on screen: which of the two
+  // permissions is actually the blocked one, rather than one combined flag
+  // that reads the same regardless of which check produced it.
+  notificationsCanAskAgain: boolean;
+  locationBlockedRaw: boolean;
 }
 
 const INITIAL: GateState = {
@@ -46,6 +51,8 @@ const INITIAL: GateState = {
   locationBackground: false,
   servicesEnabled: true,
   blocked: false,
+  notificationsCanAskAgain: true,
+  locationBlockedRaw: false,
 };
 
 async function readState(): Promise<GateState> {
@@ -61,6 +68,8 @@ async function readState(): Promise<GateState> {
     locationBackground: location.background,
     servicesEnabled,
     blocked: location.blocked || (!notifications.granted && !notifications.canAskAgain),
+    notificationsCanAskAgain: notifications.canAskAgain,
+    locationBlockedRaw: location.blocked,
   };
 }
 
@@ -198,8 +207,8 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
     {
       key: 'location',
       icon: 'map-pin' as const,
-      title: 'Location — allow all the time',
-      body: 'Required for attendance. Choose “Allow all the time” so it keeps working while you are checked in.',
+      title: 'Location — Allow all the time',
+      body: 'Only used while you’re checked in — it stops the moment you check out. Choose “Allow all the time” so it keeps working in the background during that window.',
       done: state.locationForeground && state.locationBackground && state.servicesEnabled,
     },
   ];
@@ -254,6 +263,44 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
                 ? 'Android no longer shows the prompt. Open Settings → Permissions → Location and choose “Allow all the time”.'
                 : 'Open Settings and set Location to “Always”.'}
             </Text>
+          </View>
+        ) : null}
+
+        {needsSettings ? (
+          // This state skips the request entirely (see the button below), so
+          // it never runs the code that produces the error banner further
+          // down — without this, a device landing here straight from its very
+          // first check had no way to show what triggered it at all.
+          <View style={styles.errorNotice}>
+            <View style={styles.noticeHead}>
+              <Feather name="info" size={14} color={T.coral} />
+              <Text style={styles.errorNoticeText}>
+                Blocked by:{' '}
+                {state.locationBlockedRaw && !state.notificationsCanAskAgain
+                  ? 'both location and notifications'
+                  : state.locationBlockedRaw
+                    ? 'location'
+                    : 'notifications'}
+              </Text>
+            </View>
+            <Text selectable style={styles.diagnosticText}>
+              {buildDiagnosticText({ reason: 'blocked on initial check, before any request' })}
+            </Text>
+            <AnimatedPressable
+              scaleTo={0.98}
+              style={styles.copyBtn}
+              onPress={async () => {
+                await Clipboard.setStringAsync(
+                  buildDiagnosticText({ reason: 'blocked on initial check, before any request' })
+                );
+                setCopied(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Copy diagnostic details"
+            >
+              <Feather name={copied ? 'check' : 'copy'} size={13} color={T.coral} />
+              <Text style={styles.copyBtnText}>{copied ? 'Copied' : 'Copy details'}</Text>
+            </AnimatedPressable>
           </View>
         ) : null}
 
