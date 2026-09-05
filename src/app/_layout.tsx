@@ -6,7 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AppState, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { configureFonts, MD3LightTheme, PaperProvider } from 'react-native-paper';
@@ -204,6 +204,11 @@ export default function RootLayout() {
     Inter_700Bold,
     Inter_800ExtraBold,
   });
+  // True only for the brief window between "an OTA update was found" and the
+  // reload it triggers — the native splash gets hidden right when this flips
+  // on, since fetchUpdateAsync() is the step that can take a few seconds and a
+  // frozen splash with no explanation looks like the app has hung.
+  const [isApplyingOtaUpdate, setIsApplyingOtaUpdate] = useState(false);
 
   useEffect(() => {
     initialize();
@@ -222,7 +227,11 @@ export default function RootLayout() {
     const prepareApp = async () => {
       try {
         const { applyOtaUpdateIfAvailable } = await import('../lib/otaUpdates');
-        const reloaded = await applyOtaUpdateIfAvailable();
+        const reloaded = await applyOtaUpdateIfAvailable(() => {
+          if (cancelled) return;
+          setIsApplyingOtaUpdate(true);
+          SplashScreen.hideAsync();
+        });
         if (reloaded || cancelled) return;
       } catch (error) {
         if (__DEV__) console.warn('OTA bootstrap failed:', error);
@@ -248,26 +257,36 @@ export default function RootLayout() {
     <ErrorBoundary>
       <SafeAreaProvider>
         <GestureHandlerRootView style={styles.container}>
-          <PaperProvider 
+          <PaperProvider
             theme={theme}
             settings={{
               icon: props => <MaterialCommunityIcons {...props} />,
             }}
           >
-            <StatusBar style="dark" />
-            <OfflineBanner />
-            <UpdateChecker />
-            <AuthGuard />
-            {!isInitialized ? (
-              <LoadingScreen />
+            {isApplyingOtaUpdate ? (
+              // The app reloads out from under this the moment the update
+              // finishes downloading — nothing here needs its own way to
+              // dismiss it. Skips AuthGuard/UpdateChecker/the route stack
+              // entirely so nothing else tries to run mid-update.
+              <LoadingScreen label="Updating…" />
             ) : (
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: AppTheme.bg },
-                  animation: 'slide_from_right',
-                }}
-              />
+              <>
+                <StatusBar style="dark" />
+                <OfflineBanner />
+                <UpdateChecker />
+                <AuthGuard />
+                {!isInitialized ? (
+                  <LoadingScreen />
+                ) : (
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: AppTheme.bg },
+                      animation: 'slide_from_right',
+                    }}
+                  />
+                )}
+              </>
             )}
           </PaperProvider>
         </GestureHandlerRootView>

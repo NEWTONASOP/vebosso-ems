@@ -1,9 +1,13 @@
 // ============================================================================
 // VEBOSSO EMS — Member location for one day
 // ============================================================================
-// The day's route drawn from the recorded trail, with the stops named in order
-// underneath. On today's date it also carries the live marker, refreshed while
-// the sheet is open.
+// The day's route drawn from the recorded trail, with stops and tracking gaps
+// laid out as one chronological timeline underneath — by place name where one
+// can be resolved, coordinates always shown alongside it. On today's date it
+// also carries the live marker, refreshed while the sheet is open. A gap is
+// shown rather than papered over: a dashed line on the map and an entry in the
+// timeline saying roughly why (battery, or the app/permission being turned
+// off), instead of a solid line implying a journey nobody can vouch for.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -15,9 +19,13 @@ import { LocationMap, MapMarker } from './LocationMap';
 import { AppTheme as T, appShadow } from '../constants/theme';
 import {
   buildDayTrail,
+  describeGapReason,
   formatDistance,
   formatDuration,
+  TrailGap,
+  TrailStop,
 } from '../lib/locationTrail';
+import { reverseGeocodeStop } from '../lib/reverseGeocode';
 import { useWorkStore } from '../store/workStore';
 import { LocationPing, MemberLocation } from '../types/database';
 
@@ -32,6 +40,10 @@ interface MemberLocationSectionProps {
   date: Date;
   accentColor?: string;
 }
+
+type TimelineEntry =
+  | { kind: 'stop'; at: string; stop: TrailStop }
+  | { kind: 'gap'; at: string; gap: TrailGap };
 
 export function MemberLocationSection({
   memberId,
@@ -48,6 +60,9 @@ export function MemberLocationSection({
   // React happened to re-render.
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
+  // Keyed by stop id; a stop renders its coordinates until (if ever) a name
+  // resolves, so a slow or failed lookup never blocks the rest of the screen.
+  const [stopNames, setStopNames] = useState<Record<string, string>>({});
 
   const dayKey = format(date, 'yyyy-MM-dd');
   const showLive = isToday(date);
@@ -92,8 +107,38 @@ export function MemberLocationSection({
 
   const trail = useMemo(() => buildDayTrail(pings), [pings]);
 
+  // Resolved lazily and one at a time (see reverseGeocodeStop's own queue) —
+  // a day rarely has more than a handful of stops, so this never becomes a
+  // visible delay, and the module-level cache means switching back to a day
+  // already viewed costs nothing.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      for (const stop of trail.stops) {
+        if (cancelled) return;
+        const name = await reverseGeocodeStop(stop.lat, stop.lng);
+        if (!cancelled && name) {
+          setStopNames((prev) => (prev[stop.id] === name ? prev : { ...prev, [stop.id]: name }));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [trail.stops]);
+
   const liveAge = live ? nowTs - new Date(live.recorded_at).getTime() : null;
   const isLiveNow = !!live && live.is_tracking && liveAge != null && liveAge < LIVE_STALE_MS;
+
+  // The live row is fresher than the trail on a day still in progress; a past
+  // day has no live row at all, so the trail's own last fix is all there is.
+  const lastBatteryLevel =
+    showLive && live?.battery_level != null
+      ? live.battery_level
+      : (trail.points[trail.points.length - 1]?.batteryLevel ?? null);
+  const lastBatteryPct = lastBatteryLevel != null ? Math.round(lastBatteryLevel * 100) : null;
+  const batteryColor =
+    lastBatteryPct == null ? T.mute : lastBatteryPct <= 15 ? T.coral : lastBatteryPct <= 40 ? T.amber : T.green;
 
   const markers = useMemo(() => {
     const list: MapMarker[] = trail.stops.map((stop) => ({
@@ -103,7 +148,7 @@ export function MemberLocationSection({
       title: `Stop ${stop.index} · ${format(new Date(stop.from), 'h:mm a')}–${format(
         new Date(stop.to),
         'h:mm a'
-      )} · ${formatDuration(stop.minutes)}`,
+      )} · ${formatDuration(stop.minutes)}${stopNames[stop.id] ? ` · ${stopNames[stop.id]}` : ''}`,
       color: accentColor,
       kind: 'stop',
     }));
@@ -120,33 +165,52 @@ export function MemberLocationSection({
       });
     }
     return list;
-  }, [trail.stops, showLive, live, isLiveNow, accentColor]);
+  }, [trail.stops, stopNames, showLive, live, isLiveNow, accentColor]);
 
-  const path = useMemo(
-    () => trail.points.map((p) => ({ lat: p.lat, lng: p.lng })),
-    [trail.points]
+  const mapSegments = useMemo(
+    () => trail.segments.map((segment) => segment.map((p) => ({ lat: p.lat, lng: p.lng }))),
+    [trail.segments]
   );
 
-  const hasAnything = path.length > 0 || markers.length > 0;
+  // Stops and gaps read as one story in the order they happened, not as two
+  // differently-styled lists stacked on top of each other.
+  const timeline = useMemo<TimelineEntry[]>(() => {
+    const entries: TimelineEntry[] = [
+      ...trail.stops.map((stop): TimelineEntry => ({ kind: 'stop', at: stop.from, stop })),
+      ...trail.gaps.map((gap): TimelineEntry => ({ kind: 'gap', at: gap.from, gap })),
+    ];
+    return entries.sort((a, b) => a.at.localeCompare(b.at));
+  }, [trail.stops, trail.gaps]);
+
+  const hasAnything = trail.points.length > 0 || markers.length > 0;
+  const hasActivitySplit = trail.movingMinutes > 0 || trail.stoppedMinutes > 0;
 
   return (
     <View style={styles.card}>
       <View style={styles.head}>
         <Text style={styles.title}>Location</Text>
-        {showLive ? (
-          <View style={[styles.liveChip, isLiveNow ? styles.liveOn : styles.liveOff]}>
-            <View
-              style={[styles.liveDot, { backgroundColor: isLiveNow ? T.green : T.mute }]}
-            />
-            <Text style={[styles.liveText, { color: isLiveNow ? T.green : T.mute }]}>
-              {isLiveNow
-                ? 'Live'
-                : live
-                  ? `Last seen ${formatDistanceToNow(new Date(live.recorded_at), { addSuffix: true })}`
-                  : 'Not tracking'}
-            </Text>
-          </View>
-        ) : null}
+        <View style={styles.headBadges}>
+          {lastBatteryPct != null ? (
+            <View style={styles.batteryChip}>
+              <Feather name="battery" size={11} color={batteryColor} />
+              <Text style={[styles.batteryText, { color: batteryColor }]}>{lastBatteryPct}%</Text>
+            </View>
+          ) : null}
+          {showLive ? (
+            <View style={[styles.liveChip, isLiveNow ? styles.liveOn : styles.liveOff]}>
+              <View
+                style={[styles.liveDot, { backgroundColor: isLiveNow ? T.green : T.mute }]}
+              />
+              <Text style={[styles.liveText, { color: isLiveNow ? T.green : T.mute }]}>
+                {isLiveNow
+                  ? 'Live'
+                  : live
+                    ? `Last seen ${formatDistanceToNow(new Date(live.recorded_at), { addSuffix: true })}`
+                    : 'Not tracking'}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
       {isLoading && pings.length === 0 ? (
@@ -158,10 +222,10 @@ export function MemberLocationSection({
       ) : (
         <>
           <LocationMap
-            path={path}
+            segments={mapSegments}
             markers={markers}
             pathColor={accentColor}
-            height={220}
+            height={200}
             emptyLabel={
               showLive
                 ? 'Nothing recorded yet today. Tracking starts at check-in.'
@@ -199,25 +263,35 @@ export function MemberLocationSection({
             </View>
           ) : null}
 
-          {trail.stops.length > 0 ? (
-            <View style={styles.stopList}>
-              {trail.stops.map((stop) => (
-                <View key={stop.id} style={styles.stopRow}>
-                  <View style={[styles.stopBadge, { backgroundColor: accentColor }]}>
-                    <Text style={styles.stopBadgeText}>{stop.index}</Text>
-                  </View>
-                  <View style={styles.stopText}>
-                    <Text style={styles.stopTime}>
-                      {format(new Date(stop.from), 'h:mm a')} –{' '}
-                      {format(new Date(stop.to), 'h:mm a')}
-                    </Text>
-                    <Text style={styles.stopMeta}>
-                      Stayed {formatDuration(stop.minutes)} · {stop.lat.toFixed(5)},{' '}
-                      {stop.lng.toFixed(5)}
-                    </Text>
-                  </View>
-                </View>
-              ))}
+          {hasActivitySplit ? (
+            <Text style={styles.splitLine}>
+              {formatDuration(trail.stoppedMinutes)} at stops · {formatDuration(trail.movingMinutes)} travelling
+            </Text>
+          ) : null}
+
+          {timeline.length > 0 ? (
+            <View style={styles.timelineSection}>
+              <Text style={styles.sectionLabel}>Where they stayed</Text>
+              <View style={styles.timeline}>
+                {timeline.map((entry, index) => {
+                  const isLast = index === timeline.length - 1;
+                  return entry.kind === 'stop' ? (
+                    <StopRow
+                      key={entry.stop.id}
+                      stop={entry.stop}
+                      name={stopNames[entry.stop.id]}
+                      accentColor={accentColor}
+                      isLast={isLast}
+                    />
+                  ) : (
+                    <GapRow
+                      key={`${entry.gap.from}-${entry.gap.to}`}
+                      gap={entry.gap}
+                      isLast={isLast}
+                    />
+                  );
+                })}
+              </View>
             </View>
           ) : null}
 
@@ -229,6 +303,61 @@ export function MemberLocationSection({
           ) : null}
         </>
       )}
+    </View>
+  );
+}
+
+function StopRow({
+  stop,
+  name,
+  accentColor,
+  isLast,
+}: {
+  stop: TrailStop;
+  name?: string;
+  accentColor: string;
+  isLast: boolean;
+}) {
+  return (
+    <View style={styles.timelineRow}>
+      <View style={[styles.stopBadge, { backgroundColor: accentColor }]}>
+        <Text style={styles.stopBadgeText}>{stop.index}</Text>
+      </View>
+      <View style={[styles.timelineText, isLast && styles.timelineTextLast]}>
+        <View style={styles.timelineHeadRow}>
+          <Text style={styles.timelineTime}>
+            {format(new Date(stop.from), 'h:mm a')} – {format(new Date(stop.to), 'h:mm a')}
+          </Text>
+          <Text style={styles.timelineDuration}>Stayed {formatDuration(stop.minutes)}</Text>
+        </View>
+        <Text style={styles.timelinePlace} numberOfLines={1}>
+          {name ?? 'Locating…'}
+        </Text>
+        <Text style={styles.timelineCoords}>
+          {stop.lat.toFixed(5)}, {stop.lng.toFixed(5)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function GapRow({ gap, isLast }: { gap: TrailGap; isLast: boolean }) {
+  return (
+    <View style={[styles.timelineRow, styles.gapRow]}>
+      <View style={styles.gapBadge}>
+        <Feather name="alert-triangle" size={12} color={T.amber} />
+      </View>
+      <View style={[styles.timelineText, isLast && styles.timelineTextLast]}>
+        <View style={styles.timelineHeadRow}>
+          <Text style={[styles.timelineTime, styles.gapTime]}>
+            {format(new Date(gap.from), 'h:mm a')} – {format(new Date(gap.to), 'h:mm a')}
+          </Text>
+          <Text style={[styles.timelineDuration, styles.gapTime]}>
+            {formatDuration(gap.minutes)}
+          </Text>
+        </View>
+        <Text style={styles.timelinePlace}>Tracking gap — {describeGapReason(gap)}</Text>
+      </View>
     </View>
   );
 }
@@ -261,19 +390,34 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 14,
     marginTop: 12,
+    marginBottom: 14,
     ...appShadow,
   },
   head: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   title: {
     fontFamily: 'Inter_700Bold',
     fontSize: 14.5,
     color: T.ink,
     letterSpacing: -0.2,
+  },
+  headBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  batteryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  batteryText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11.5,
   },
   liveChip: {
     flexDirection: 'row',
@@ -312,7 +456,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 14,
   },
   stat: {
     flex: 1,
@@ -337,48 +481,105 @@ const styles = StyleSheet.create({
     height: 26,
     backgroundColor: T.soft,
   },
-  stopList: {
-    marginTop: 12,
-    gap: 8,
-  },
-  stopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: T.soft,
-    borderRadius: 14,
-    padding: 10,
-  },
-  stopBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stopBadgeText: {
-    fontFamily: 'Inter_700Bold',
+  splitLine: {
+    fontFamily: 'Inter_400Regular',
     fontSize: 11.5,
-    color: T.white,
+    color: T.mute,
+    textAlign: 'center',
+    marginTop: 8,
   },
-  stopText: {
+  timelineSection: {
+    marginTop: 16,
+  },
+  sectionLabel: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+    color: T.mute,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 10,
+  },
+  timeline: {
+    gap: 10,
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  timelineText: {
     flex: 1,
+    // A hairline bottom border per row (instead of a filled card each) is
+    // what actually removes the "boxes stacked on boxes" feeling — the list
+    // reads as one continuous timeline rather than a pile of separate cards.
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: T.soft,
   },
-  stopTime: {
+  timelineTextLast: {
+    borderBottomWidth: 0,
+    paddingBottom: 0,
+  },
+  timelineHeadRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+  },
+  timelineTime: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
     color: T.ink,
   },
-  stopMeta: {
-    fontFamily: 'Inter_400Regular',
+  timelineDuration: {
+    fontFamily: 'Inter_500Medium',
     fontSize: 11.5,
+    color: T.mute,
+  },
+  timelinePlace: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12.5,
+    color: T.inkSoft,
+    marginTop: 2,
+  },
+  timelineCoords: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 10.5,
     color: T.mute,
     marginTop: 1,
   },
+  stopBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  stopBadgeText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+    color: T.white,
+  },
+  gapRow: {
+    // Sits between two rows drawing their own top-adjacent border, so a
+    // little extra breathing room keeps the warning from feeling squeezed.
+    paddingTop: 2,
+  },
+  gapBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+    backgroundColor: T.amberSoft,
+  },
+  gapTime: {
+    color: T.amber,
+  },
   footnote: {
     fontFamily: 'Inter_400Regular',
-    fontSize: 11.5,
+    fontSize: 11,
     color: T.mute,
-    marginTop: 10,
+    marginTop: 12,
   },
 });

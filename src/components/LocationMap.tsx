@@ -24,7 +24,13 @@ export interface MapMarker {
 }
 
 interface LocationMapProps {
-  path?: { lat: number; lng: number }[];
+  /**
+   * Contiguous tracked stretches. Each inner array draws as one solid line;
+   * a gap between two segments is drawn as a thin dashed connector instead of
+   * a solid one, so a tracking interruption never reads as a journey that
+   * was never actually recorded.
+   */
+  segments?: { lat: number; lng: number }[][];
   markers?: MapMarker[];
   height?: number;
   /** Path colour; defaults to the app blue. */
@@ -86,11 +92,28 @@ function buildHtml(pathColor: string): string {
   function render(data) {
     layer.clearLayers();
     var bounds = [];
+    var segments = data.segments || [];
 
-    if (data.path && data.path.length > 1) {
-      var latlngs = data.path.map(function (p) { return [p.lat, p.lng]; });
+    segments.forEach(function (seg) {
+      if (seg.length < 2) {
+        if (seg.length === 1) bounds.push([seg[0].lat, seg[0].lng]);
+        return;
+      }
+      var latlngs = seg.map(function (p) { return [p.lat, p.lng]; });
       L.polyline(latlngs, { color: '${pathColor}', weight: 4, opacity: 0.75, lineJoin: 'round' }).addTo(layer);
       bounds = bounds.concat(latlngs);
+    });
+
+    // A dashed, muted line across each gap — visible enough to show something
+    // happened there, deliberately unlike the solid tracked line so it never
+    // reads as a real, recorded journey.
+    for (var i = 1; i < segments.length; i++) {
+      var prevSeg = segments[i - 1], currSeg = segments[i];
+      if (!prevSeg.length || !currSeg.length) continue;
+      var a = prevSeg[prevSeg.length - 1], b = currSeg[0];
+      L.polyline([[a.lat, a.lng], [b.lat, b.lng]], {
+        color: '#9CA3AF', weight: 3, opacity: 0.7, dashArray: '2, 8'
+      }).addTo(layer);
     }
 
     (data.markers || []).forEach(function (m) {
@@ -126,7 +149,7 @@ function buildHtml(pathColor: string): string {
 }
 
 export function LocationMap({
-  path = [],
+  segments = [],
   markers = [],
   height = 240,
   pathColor = T.blue,
@@ -134,15 +157,16 @@ export function LocationMap({
 }: LocationMapProps) {
   const webRef = useRef<WebView>(null);
   const html = useMemo(() => buildHtml(pathColor), [pathColor]);
-  const payload = useMemo(() => JSON.stringify({ path, markers }), [path, markers]);
+  const payload = useMemo(() => JSON.stringify({ segments, markers }), [segments, markers]);
 
-  const isEmpty = path.length === 0 && markers.length === 0;
+  const isEmpty = segments.every((s) => s.length === 0) && markers.length === 0;
 
   // A change of day should re-frame the map; a live fix on the same day should
   // not. Keying the reset on the payload's first point tells them apart without
   // threading a "day" prop through every caller.
-  const firstKey = path[0]
-    ? `${path[0].lat},${path[0].lng}`
+  const firstPoint = segments.find((s) => s.length > 0)?.[0];
+  const firstKey = firstPoint
+    ? `${firstPoint.lat},${firstPoint.lng}`
     : markers[0]
       ? `${markers[0].lat},${markers[0].lng}`
       : 'empty';

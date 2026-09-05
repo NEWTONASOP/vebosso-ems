@@ -11,8 +11,15 @@ import { Platform } from 'react-native';
 /**
  * Checks Expo's update server for a newer JS bundle, downloads it, and reloads.
  * Returns true if a reload was triggered (callers usually won't run after reload).
+ *
+ * `onUpdateAvailable` fires once an update is confirmed to exist, before the
+ * download starts — `fetchUpdateAsync()` is the step that can take a few
+ * seconds, and a caller can use this moment to swap a frozen splash screen
+ * for something that says "Updating…" instead of just looking hung.
  */
-export async function applyOtaUpdateIfAvailable(): Promise<boolean> {
+export async function applyOtaUpdateIfAvailable(
+  onUpdateAvailable?: () => void
+): Promise<boolean> {
   if (__DEV__ || isRunningInExpoGo() || Platform.OS === 'web') {
     return false;
   }
@@ -28,6 +35,8 @@ export async function applyOtaUpdateIfAvailable(): Promise<boolean> {
     if (!result.isAvailable) {
       return false;
     }
+
+    onUpdateAvailable?.();
 
     await Updates.fetchUpdateAsync();
     await Updates.reloadAsync();

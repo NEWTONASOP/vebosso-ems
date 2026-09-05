@@ -6,9 +6,17 @@
 import { Image } from 'expo-image';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Text } from 'react-native-paper';
 import { AppTheme } from '../constants/theme';
 
-export function LoadingScreen() {
+interface LoadingScreenProps {
+  /** Shown under the dots — e.g. "Updating…" while an OTA bundle downloads,
+   *  so a launch that takes a few seconds longer than usual doesn't look like
+   *  the app has simply hung. */
+  label?: string;
+}
+
+export function LoadingScreen({ label }: LoadingScreenProps = {}) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -48,10 +56,13 @@ export function LoadingScreen() {
           contentFit="contain"
         />
       </Animated.View>
-      <View style={styles.dotsRow}>
-        <Dot delay={0} />
-        <Dot delay={180} />
-        <Dot delay={360} />
+      <View style={styles.dotsGroup}>
+        <View style={styles.dotsRow}>
+          <Dot delay={0} />
+          <Dot delay={180} />
+          <Dot delay={360} />
+        </View>
+        {label ? <Text style={styles.label}>{label}</Text> : null}
       </View>
     </Animated.View>
   );
@@ -95,9 +106,18 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
   },
+  dotsGroup: {
+    alignItems: 'center',
+    gap: 14,
+  },
   dotsRow: {
     flexDirection: 'row',
     gap: 8,
+  },
+  label: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    color: AppTheme.mute,
   },
   dot: {
     width: 7,
