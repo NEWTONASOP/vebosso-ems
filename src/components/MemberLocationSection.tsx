@@ -15,7 +15,7 @@ import { format, formatDistanceToNow, isToday } from 'date-fns';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { LocationMap, MapMarker } from './LocationMap';
+import { LocationMap, MapGap, MapMarker } from './LocationMap';
 import { AppTheme as T, appShadow } from '../constants/theme';
 import {
   buildDayTrail,
@@ -43,7 +43,7 @@ interface MemberLocationSectionProps {
 
 type TimelineEntry =
   | { kind: 'stop'; at: string; stop: TrailStop }
-  | { kind: 'gap'; at: string; gap: TrailGap };
+  | { kind: 'gap'; at: string; gap: TrailGap; displacementKm: number | null };
 
 export function MemberLocationSection({
   memberId,
@@ -153,6 +153,28 @@ export function MemberLocationSection({
       kind: 'stop',
     }));
 
+    // Start marker at the very first tracked fix
+    if (trail.points.length > 0) {
+      const first = trail.points[0];
+      list.push({
+        lat: first.lat,
+        lng: first.lng,
+        kind: 'start',
+        title: `Started tracking · ${format(new Date(first.at), 'h:mm a')}`,
+      });
+    }
+
+    // End marker at the very last tracked fix (only when not live / checked out)
+    if (!showLive && trail.points.length > 1) {
+      const last = trail.points[trail.points.length - 1];
+      list.push({
+        lat: last.lat,
+        lng: last.lng,
+        kind: 'end',
+        title: `Last tracked · ${format(new Date(last.at), 'h:mm a')}`,
+      });
+    }
+
     if (showLive && live) {
       list.push({
         lat: live.latitude,
@@ -162,14 +184,37 @@ export function MemberLocationSection({
           : `Last seen ${formatDistanceToNow(new Date(live.recorded_at), { addSuffix: true })}`,
         color: isLiveNow ? T.green : T.mute,
         kind: 'live',
+        accuracyM: live.accuracy ?? undefined,
       });
     }
     return list;
-  }, [trail.stops, stopNames, showLive, live, isLiveNow, accentColor]);
+  }, [trail.stops, trail.points, stopNames, showLive, live, isLiveNow, accentColor]);
 
   const mapSegments = useMemo(
     () => trail.segments.map((segment) => segment.map((p) => ({ lat: p.lat, lng: p.lng }))),
     [trail.segments]
+  );
+
+  // Build annotated gap connectors for the map — each gap gets a popup label
+  // with its duration and the minimum displacement measured across it.
+  const mapGaps = useMemo<MapGap[]>(
+    () =>
+      trail.gaps
+        .filter((g) => g.fromPoint && g.toPoint)
+        .map((g) => ({
+          from: g.fromPoint!,
+          to: g.toPoint!,
+          label: [
+            `Duration: ${formatDuration(g.minutes)}`,
+            g.gapDisplacementKm != null && g.gapDisplacementKm > 0.05
+              ? `Moved at least ${formatDistance(g.gapDisplacementKm)} (straight line)`
+              : null,
+            describeGapReason(g),
+          ]
+            .filter(Boolean)
+            .join('<br/>'),
+        })),
+    [trail.gaps]
   );
 
   // Stops and gaps read as one story in the order they happened, not as two
@@ -177,7 +222,12 @@ export function MemberLocationSection({
   const timeline = useMemo<TimelineEntry[]>(() => {
     const entries: TimelineEntry[] = [
       ...trail.stops.map((stop): TimelineEntry => ({ kind: 'stop', at: stop.from, stop })),
-      ...trail.gaps.map((gap): TimelineEntry => ({ kind: 'gap', at: gap.from, gap })),
+      ...trail.gaps.map((gap): TimelineEntry => ({
+        kind: 'gap',
+        at: gap.from,
+        gap,
+        displacementKm: gap.gapDisplacementKm,
+      })),
     ];
     return entries.sort((a, b) => a.at.localeCompare(b.at));
   }, [trail.stops, trail.gaps]);
@@ -223,9 +273,10 @@ export function MemberLocationSection({
         <>
           <LocationMap
             segments={mapSegments}
+            gaps={mapGaps}
             markers={markers}
             pathColor={accentColor}
-            height={200}
+            height={280}
             emptyLabel={
               showLive
                 ? 'Nothing recorded yet today. Tracking starts at check-in.'
@@ -237,7 +288,7 @@ export function MemberLocationSection({
             <View style={styles.statsRow}>
               <Stat
                 icon="map"
-                value={formatDistance(trail.distanceKm)}
+                value={formatDistance(trail.totalDistanceKm)}
                 label="travelled"
               />
               <View style={styles.statDivider} />
@@ -266,6 +317,9 @@ export function MemberLocationSection({
           {hasActivitySplit ? (
             <Text style={styles.splitLine}>
               {formatDuration(trail.stoppedMinutes)} at stops · {formatDuration(trail.movingMinutes)} travelling
+              {trail.gapDisplacementKm > 0.5
+                ? ` · ≥${formatDistance(trail.gapDisplacementKm)} estimated across gaps`
+                : ''}
             </Text>
           ) : null}
 
@@ -287,6 +341,7 @@ export function MemberLocationSection({
                     <GapRow
                       key={`${entry.gap.from}-${entry.gap.to}`}
                       gap={entry.gap}
+                      displacementKm={entry.displacementKm}
                       isLast={isLast}
                     />
                   );
@@ -341,7 +396,19 @@ function StopRow({
   );
 }
 
-function GapRow({ gap, isLast }: { gap: TrailGap; isLast: boolean }) {
+function GapRow({
+  gap,
+  displacementKm,
+  isLast,
+}: {
+  gap: TrailGap;
+  displacementKm: number | null;
+  isLast: boolean;
+}) {
+  const displaceLabel =
+    displacementKm != null && displacementKm > 0.05
+      ? ` · moved ≥${formatDistance(displacementKm)}`
+      : '';
   return (
     <View style={[styles.timelineRow, styles.gapRow]}>
       <View style={styles.gapBadge}>
@@ -356,7 +423,9 @@ function GapRow({ gap, isLast }: { gap: TrailGap; isLast: boolean }) {
             {formatDuration(gap.minutes)}
           </Text>
         </View>
-        <Text style={styles.timelinePlace}>Tracking gap — {describeGapReason(gap)}</Text>
+        <Text style={styles.timelinePlace}>
+          Tracking gap{displaceLabel} — {describeGapReason(gap)}
+        </Text>
       </View>
     </View>
   );

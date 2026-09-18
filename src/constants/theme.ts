@@ -57,6 +57,17 @@ export const RoleAccent = {
 
 export type Role = keyof typeof RoleAccent;
 
+/** Pixel breakpoints — keep in sync with useResponsive(). */
+export const BREAKPOINTS = {
+  sm:  640,  // wide phone
+  md:  768,  // tablet portrait
+  lg: 1024,  // desktop / laptop
+  xl: 1280,  // wide desktop
+} as const;
+
+/** Width of the desktop sidebar — screens add paddingLeft of this on desktop. */
+export const SIDEBAR_WIDTH = 240;
+
 /** 4pt spacing scale */
 export const AppSpace = {
   xs: 4,
@@ -258,6 +269,12 @@ export const screenChrome = StyleSheet.create({
   listPad: {
     paddingHorizontal: AppSpace.screen,
     paddingBottom: 120,
+  } as ViewStyle,
+
+  // Desktop: no floating tab bar, so remove its reserved bottom space.
+  listPadDesktop: {
+    paddingHorizontal: AppSpace.screen,
+    paddingBottom: 40,
   } as ViewStyle,
 
   // Section headings

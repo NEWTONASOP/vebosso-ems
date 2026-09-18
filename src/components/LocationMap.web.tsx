@@ -1,23 +1,25 @@
 // ============================================================================
-// VEBOSSO EMS — Location map
+// VEBOSSO EMS — Location map (WEB)
 // ============================================================================
-// Leaflet on OpenStreetMap tiles inside a WebView: no Google Cloud project, no
-// API key, no native map dependency. The HTML is built once and later updates
-// are injected as JS, so panning is not lost every time a live fix arrives.
+// Metro picks this file over LocationMap.tsx on web builds. Uses a plain
+// <iframe srcdoc> to host the same Leaflet HTML that the native version runs
+// inside a WebView. postMessage() is the update channel on both platforms,
+// so the Leaflet JS side is byte-for-byte identical.
 // ============================================================================
 
-import { useEffect, useMemo, useRef } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { WebView } from 'react-native-webview';
 import { AppTheme as T } from '../constants/theme';
+
+// ─── Public types (identical to LocationMap.tsx — kept in sync manually) ─────
+// Defining them here rather than importing avoids a circular dependency when
+// Metro resolves ./LocationMap on web to this very file.
 
 export interface MapMarker {
   lat: number;
   lng: number;
-  /** Short text inside the pin — a stop number, or empty for a plain dot. */
   label?: string;
-  /** Shown on tap. */
   title?: string;
   color?: string;
   kind?: 'stop' | 'live' | 'start' | 'end';
@@ -28,39 +30,19 @@ export interface MapMarker {
 export interface MapGap {
   from: { lat: number; lng: number };
   to: { lat: number; lng: number };
-  /** Popup text shown when the gap connector is tapped. */
+  /** Popup text shown when the gap connector is tapped / clicked. */
   label: string;
 }
 
-interface LocationMapProps {
-  /**
-   * Contiguous tracked stretches. Each inner array draws as one solid line;
-   * a gap between two segments is drawn as a thin dashed connector instead of
-   * a solid one, so a tracking interruption never reads as a journey that
-   * was never actually recorded.
-   */
-  segments?: { lat: number; lng: number }[][];
-  /**
-   * Gap metadata — used to annotate the dashed gap connectors with popups
-   * showing how long tracking was off and the estimated minimum displacement.
-   */
-  gaps?: MapGap[];
-  markers?: MapMarker[];
-  height?: number;
-  /** Path colour; defaults to the app blue. */
-  pathColor?: string;
-  /** Shown instead of the map when there is nothing to draw. */
-  emptyLabel?: string;
-}
+// ─── Leaflet HTML (identical to the native build) ─────────────────────────────
+// CartoDB Positron tiles, annotated gap connectors, GO/END endpoint markers,
+// accuracy ring on the live marker. Paste-duplicated so the web file has zero
+// build-time dependency on WebView.
 
-// CartoDB Positron: much cleaner than OSM for route viewing — muted background
-// lets the coloured route stand out without visual noise.
 const TILE_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>';
 
 function buildHtml(pathColor: string): string {
-  // Leaflet is pulled from a CDN: bundling it would mean shipping a copy of the
-  // library in the JS bundle for a screen most users open rarely.
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -90,7 +72,6 @@ function buildHtml(pathColor: string): string {
     color: #fff; font: 700 10px/1 -apple-system, Roboto, sans-serif;
     border: 2.5px solid rgba(255,255,255,0.9);
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    letter-spacing: 0;
   }
   .leaflet-control-attribution { font-size: 9px; }
   .leaflet-popup-content-wrapper { border-radius: 10px; font: 13px/1.4 -apple-system, Roboto, sans-serif; }
@@ -119,8 +100,7 @@ function buildHtml(pathColor: string): string {
     return L.divIcon({
       className: '',
       html: '<div class="' + cls + '" style="background:' + color + '">' + (marker.label || '') + '</div>',
-      iconSize: [28, 28],
-      iconAnchor: [14, 14]
+      iconSize: [28, 28], iconAnchor: [14, 14]
     });
   }
 
@@ -128,8 +108,7 @@ function buildHtml(pathColor: string): string {
     return L.divIcon({
       className: '',
       html: '<div class="pin-endpoint" style="background:' + color + '">' + label + '</div>',
-      iconSize: [32, 32],
-      iconAnchor: [16, 16]
+      iconSize: [32, 32], iconAnchor: [16, 16]
     });
   }
 
@@ -139,25 +118,13 @@ function buildHtml(pathColor: string): string {
     var segments = data.segments || [];
     var gaps = data.gaps || [];
 
-    // Draw solid tracked segments
     segments.forEach(function (seg) {
-      if (seg.length < 2) {
-        if (seg.length === 1) bounds.push([seg[0].lat, seg[0].lng]);
-        return;
-      }
+      if (seg.length < 2) { if (seg.length === 1) bounds.push([seg[0].lat, seg[0].lng]); return; }
       var latlngs = seg.map(function (p) { return [p.lat, p.lng]; });
-      L.polyline(latlngs, {
-        color: '${pathColor}',
-        weight: 5,
-        opacity: 0.85,
-        lineJoin: 'round',
-        lineCap: 'round'
-      }).arrowheads({ size: '12px', frequency: '80px', fill: true }).addTo(layer);
+      L.polyline(latlngs, { color: '${pathColor}', weight: 5, opacity: 0.85, lineJoin: 'round', lineCap: 'round' }).arrowheads({ size: '12px', frequency: '80px', fill: true }).addTo(layer);
       bounds = bounds.concat(latlngs);
     });
 
-    // Draw annotated dashed gap connectors using the gaps array if provided,
-    // otherwise fall back to drawing between adjacent segment endpoints.
     if (gaps.length > 0) {
       gaps.forEach(function (gap) {
         var line = L.polyline(
@@ -174,37 +141,24 @@ function buildHtml(pathColor: string): string {
         bounds.push([gap.to.lat, gap.to.lng]);
       });
     } else {
-      // Fallback: draw plain dashed connectors between segment endpoints
       for (var i = 1; i < segments.length; i++) {
         var prevSeg = segments[i - 1], currSeg = segments[i];
         if (!prevSeg.length || !currSeg.length) continue;
         var a = prevSeg[prevSeg.length - 1], b = currSeg[0];
-        L.polyline([[a.lat, a.lng], [b.lat, b.lng]], {
-          color: '#D97706', weight: 2.5, opacity: 0.7, dashArray: '4, 9'
-        }).addTo(layer);
+        L.polyline([[a.lat, a.lng], [b.lat, b.lng]], { color: '#D97706', weight: 2.5, opacity: 0.7, dashArray: '4, 9' }).addTo(layer);
       }
     }
 
-    // Draw stop markers and live marker
     (data.markers || []).forEach(function (m) {
-      if (m.kind === 'start' || m.kind === 'end') return; // handled below
+      if (m.kind === 'start' || m.kind === 'end') return;
       var marker = L.marker([m.lat, m.lng], { icon: stopPin(m), zIndexOffset: 200 }).addTo(layer);
       if (m.title) marker.bindPopup(m.title);
-      // Accuracy ring around the live marker
       if (m.kind === 'live' && m.accuracyM && m.accuracyM > 0 && m.accuracyM < 300) {
-        L.circle([m.lat, m.lng], {
-          radius: m.accuracyM,
-          color: '#22C55E',
-          fillColor: '#22C55E',
-          fillOpacity: 0.08,
-          weight: 1,
-          opacity: 0.35
-        }).addTo(layer);
+        L.circle([m.lat, m.lng], { radius: m.accuracyM, color: '#22C55E', fillColor: '#22C55E', fillOpacity: 0.08, weight: 1, opacity: 0.35 }).addTo(layer);
       }
       bounds.push([m.lat, m.lng]);
     });
 
-    // Draw start/end endpoint markers on top of everything
     (data.markers || []).forEach(function (m) {
       if (m.kind === 'start') {
         var sm = L.marker([m.lat, m.lng], { icon: endpointPin('GO', '#16A34A'), zIndexOffset: 500 }).addTo(layer);
@@ -218,30 +172,39 @@ function buildHtml(pathColor: string): string {
     });
 
     if (bounds.length > 0 && !hasFitted) {
-      // Only the first render moves the camera; re-fitting on every live update
-      // would yank the map away from whatever the viewer is looking at.
-      if (bounds.length === 1) {
-        map.setView(bounds[0], 16);
-      } else {
-        map.fitBounds(bounds, { padding: [32, 32], maxZoom: 17 });
-      }
+      if (bounds.length === 1) { map.setView(bounds[0], 16); }
+      else { map.fitBounds(bounds, { padding: [32, 32], maxZoom: 17 }); }
       hasFitted = true;
     }
   }
 
-  window.renderTrail = function (json) {
-    try { render(JSON.parse(json)); } catch (e) {}
-  };
+  window.renderTrail = function (json) { try { render(JSON.parse(json)); } catch (e) {} };
+  window.resetView   = function ()     { hasFitted = false; };
 
-  // Re-fit on demand, e.g. after the viewer switches to another day.
-  window.resetView = function () { hasFitted = false; };
-
-  document.addEventListener('message', function (e) { window.renderTrail(e.data); });
-  window.addEventListener('message', function (e) { window.renderTrail(e.data); });
+  // Receive postMessage from the React host.
+  // '__resetView__' is a sentinel sent before a new-day payload to re-frame.
+  window.addEventListener('message', function (e) {
+    if (typeof e.data !== 'string') return;
+    if (e.data === '__resetView__') { window.resetView(); }
+    else { window.renderTrail(e.data); }
+  });
 </script>
 </body>
 </html>`;
 }
+
+// ─── Props (identical interface to LocationMap.tsx) ────────────────────────────
+
+interface LocationMapProps {
+  segments?: { lat: number; lng: number }[][];
+  gaps?: MapGap[];
+  markers?: MapMarker[];
+  height?: number;
+  pathColor?: string;
+  emptyLabel?: string;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function LocationMap({
   segments = [],
@@ -251,8 +214,11 @@ export function LocationMap({
   pathColor = T.blue,
   emptyLabel = 'No location recorded',
 }: LocationMapProps) {
-  const webRef = useRef<WebView>(null);
-  const html = useMemo(() => buildHtml(pathColor), [pathColor]);
+  // @ts-ignore — HTMLIFrameElement is only available in web context; native
+  // Metro never loads this file so there is no type mismatch at runtime.
+  const iframeRef = useRef<any>(null);
+
+  const html    = useMemo(() => buildHtml(pathColor), [pathColor]);
   const payload = useMemo(
     () => JSON.stringify({ segments, gaps, markers }),
     [segments, gaps, markers]
@@ -260,29 +226,36 @@ export function LocationMap({
 
   const isEmpty = segments.every((s) => s.length === 0) && markers.length === 0;
 
-  // A change of day should re-frame the map; a live fix on the same day should
-  // not. Keying the reset on the payload's first point tells them apart without
-  // threading a "day" prop through every caller.
+  // Track first point to detect day changes (same logic as native).
   const firstPoint = segments.find((s) => s.length > 0)?.[0];
-  const firstKey = firstPoint
-    ? `${firstPoint.lat},${firstPoint.lng}`
-    : markers[0]
-      ? `${markers[0].lat},${markers[0].lng}`
-      : 'empty';
+  const firstKey   = firstPoint ? `${firstPoint.lat},${firstPoint.lng}` : 'empty';
   const lastFirstKey = useRef(firstKey);
 
-  const render = useMemo(
-    () => `window.renderTrail && window.renderTrail(${JSON.stringify(payload)}); true;`,
-    [payload]
-  );
-
+  // Push data into the iframe via postMessage whenever the payload changes.
   useEffect(() => {
-    const reset = firstKey !== lastFirstKey.current;
+    const iframe = iframeRef.current as HTMLIFrameElement | null;
+    if (!iframe) return;
+
+    const isNewDay = firstKey !== lastFirstKey.current;
     lastFirstKey.current = firstKey;
-    webRef.current?.injectJavaScript(
-      `${reset ? 'window.resetView && window.resetView();' : ''}${render}`
-    );
-  }, [render, firstKey]);
+
+    const send = () => {
+      try {
+        if (isNewDay) {
+          iframe.contentWindow?.postMessage('__resetView__', '*');
+        }
+        iframe.contentWindow?.postMessage(payload, '*');
+      } catch (_) {}
+    };
+
+    // If the document is already loaded, send immediately; otherwise wait.
+    const doc = iframe.contentDocument;
+    if (doc && doc.readyState === 'complete') {
+      send();
+    } else {
+      iframe.addEventListener('load', send, { once: true });
+    }
+  }, [payload, firstKey]);
 
   if (isEmpty) {
     return (
@@ -292,47 +265,31 @@ export function LocationMap({
     );
   }
 
-  // react-native-webview has no web implementation; the owner console on the
-  // web build gets the stop list instead of a map.
-  if (Platform.OS === 'web') {
-    return (
-      <View style={[styles.empty, { height }]}>
-        <Text style={styles.emptyText}>Maps are available in the mobile app.</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.wrap, { height }]}>
-      <WebView
-        ref={webRef}
-        originWhitelist={['*']}
-        source={{ html }}
-        style={styles.web}
-        injectedJavaScript={render}
-        onLoadEnd={() => webRef.current?.injectJavaScript(render)}
-        javaScriptEnabled
-        domStorageEnabled
-        scrollEnabled={false}
-        // The map handles its own gestures; letting the parent ScrollView steal
-        // the drag makes panning impossible.
-        nestedScrollEnabled
-        androidLayerType="hardware"
-        setSupportMultipleWindows={false}
+      {/* @ts-ignore — standard iframe; valid in React DOM / RN Web context */}
+      <iframe
+        ref={iframeRef}
+        srcDoc={html}
+        title="Location Map"
+        style={{
+          width: '100%',
+          height: '100%',
+          border: 'none',
+          display: 'block',
+        }}
       />
     </View>
   );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   wrap: {
     borderRadius: 18,
     overflow: 'hidden',
     backgroundColor: T.soft,
-  },
-  web: {
-    flex: 1,
-    backgroundColor: 'transparent',
   },
   empty: {
     borderRadius: 18,

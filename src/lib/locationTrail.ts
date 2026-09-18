@@ -55,6 +55,17 @@ export interface TrailGap {
   minutes: number;
   /** Battery percentage (0–100) from the last fix before the gap, if known. */
   batteryBeforePct: number | null;
+  /**
+   * Straight-line distance between the last fix before the gap and the first
+   * fix after it, in kilometres. This is a minimum bound — they must have
+   * travelled at least this far, but we don't know the actual route.
+   * Null if either endpoint is missing (e.g. the gap is at the day boundary).
+   */
+  gapDisplacementKm: number | null;
+  /** Last known position before the gap — used to draw the gap connector. */
+  fromPoint: { lat: number; lng: number } | null;
+  /** First known position after the gap — used to draw the gap connector. */
+  toPoint: { lat: number; lng: number } | null;
 }
 
 export interface DayTrail {
@@ -65,9 +76,20 @@ export interface DayTrail {
   segments: TrailPoint[][];
   gaps: TrailGap[];
   stops: TrailStop[];
-  /** Straight-line distance within each tracked segment, in kilometres —
-   *  gaps are excluded rather than guessed at. */
+  /** Straight-line distance within each tracked segment, in kilometres. */
   distanceKm: number;
+  /**
+   * Sum of straight-line displacements across all tracking gaps, in kilometres.
+   * Each gap contributes the distance between its last-known and first-post-gap
+   * fix. This is a minimum bound — actual road distance will be higher.
+   */
+  gapDisplacementKm: number;
+  /**
+   * Total distance: distanceKm + gapDisplacementKm. This is the primary
+   * figure to surface — it stops silently dropping movement that happened
+   * during tracking interruptions.
+   */
+  totalDistanceKm: number;
   firstAt: string | null;
   lastAt: string | null;
   /** Fixes dropped for poor accuracy — surfaced so a sparse day is explained. */
@@ -124,6 +146,14 @@ export function buildDayTrail(pings: LocationPing[]): DayTrail {
     }
   }
 
+  // Sum displacement across all gaps — every gap where we can measure both
+  // endpoints contributes an honest minimum to the total travel distance.
+  const gapDisplacementKm = gaps.reduce(
+    (sum, g) => sum + (g.gapDisplacementKm ?? 0),
+    0
+  );
+  const totalDistanceKm = distanceKm + gapDisplacementKm;
+
   const stops = buildStops(points);
 
   const firstAt = points[0]?.at ?? null;
@@ -140,6 +170,8 @@ export function buildDayTrail(pings: LocationPing[]): DayTrail {
     gaps,
     stops,
     distanceKm,
+    gapDisplacementKm,
+    totalDistanceKm,
     firstAt,
     lastAt,
     droppedCount,
@@ -169,12 +201,22 @@ function buildSegmentsAndGaps(points: TrailPoint[]): {
     const gapMs = new Date(curr.at).getTime() - new Date(prev.at).getTime();
 
     if (gapMs > GAP_THRESHOLD_MS) {
+      // Measure how far the person moved during the gap. This is a straight-
+      // line minimum — actual road distance will be higher, but it is honest
+      // in a way that fabricating a route would not be.
+      const displacementM = metresBetween(
+        { lat: prev.lat, lng: prev.lng },
+        { lat: curr.lat, lng: curr.lng }
+      );
       gaps.push({
         from: prev.at,
         to: curr.at,
         minutes: Math.round(gapMs / 60000),
         batteryBeforePct:
           prev.batteryLevel != null ? Math.round(prev.batteryLevel * 100) : null,
+        gapDisplacementKm: displacementM / 1000,
+        fromPoint: { lat: prev.lat, lng: prev.lng },
+        toPoint: { lat: curr.lat, lng: curr.lng },
       });
       segments.push([curr]);
     } else {

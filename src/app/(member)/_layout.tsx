@@ -4,11 +4,15 @@
 
 import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { Platform } from 'react-native';
 import { CustomTabBar } from '../../components/CustomTabBar';
 import { PermissionGate } from '../../components/PermissionGate';
-import { AppTheme, RoleAccent } from '../../constants/theme';
+import { AppTheme, RoleAccent, SIDEBAR_WIDTH } from '../../constants/theme';
+import { useResponsive } from '../../lib/responsive';
 
 export default function MemberLayout() {
+  const { isDesktop } = useResponsive();
+
   return (
     <PermissionGate>
       <Tabs

@@ -102,6 +102,12 @@ export function PermissionGate({ children }: { children: React.ReactNode }) {
   const [isChecking, setIsChecking] = useState(true);
   const [isRequesting, setIsRequesting] = useState(false);
 
+  // Web browsers don't support "background/always" location or force strict
+  // native permissions up front, so we bypass the gate entirely on web.
+  if (Platform.OS === 'web') {
+    return <>{children}</>;
+  }
+
   const refresh = useCallback(async () => {
     const next = await readState();
     setState(next);

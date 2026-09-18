@@ -4,11 +4,11 @@
 
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useWorkStore } from '../../store/workStore';
-
 import { CustomTabBar } from '../../components/CustomTabBar';
-import { AppTheme } from '../../constants/theme';
+import { AppTheme, SIDEBAR_WIDTH } from '../../constants/theme';
+import { useResponsive } from '../../lib/responsive';
 
 function TabBarBadge({ count }: { count: number }) {
   if (count === 0) return null;
@@ -44,6 +44,7 @@ export default function OwnerLayout() {
   const pendingApprovalsCount = useWorkStore((s) => s.pendingApprovalsCount);
   const pendingLeavesCount = useWorkStore((s) => s.pendingLeavesCount);
   const pendingCount = pendingApprovalsCount + pendingLeavesCount;
+  const { isDesktop } = useResponsive();
 
   return (
     <Tabs
