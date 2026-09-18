@@ -39,6 +39,12 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Google removed the legacy 'tools' package from the SDK repo index,
+          # but the action still requests it by default, breaking sdkmanager.
+          # We only need platform-tools here; build-tools/NDK/CMake are
+          # installed explicitly below.
+          packages: 'platform-tools'
 
       - name: Cache Android NDK & CMake
         id: cache-ndk-cmake
