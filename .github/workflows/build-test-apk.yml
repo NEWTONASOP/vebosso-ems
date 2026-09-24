@@ -1,0 +1,275 @@
+name: Build Test APK (production build, not released)
+
+# ============================================================================
+# A production APK for testing on your own phone — built EXACTLY like
+# build-production.yml (same steps, production secrets, same release signing
+# key, same app ID and version), but it publishes NOTHING:
+#   * no GitHub Release (the APK is a private workflow artifact, 7 days)
+#   * no Supabase update (latest_version / download_url untouched), so
+#     nobody else is offered an update
+#   * manual only — never runs on push. Pick the branch in "Run workflow".
+#
+# The build steps below are copied from build-production.yml; keep them in
+# step if that file changes.
+# ============================================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: 'Short note for this test build (e.g. "permissions-test")'
+        required: false
+        default: 'test'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # Google removed the legacy 'tools' package from the SDK repo index,
+          # but the action still requests it by default, breaking sdkmanager.
+          # We only need platform-tools here; build-tools/NDK/CMake are
+          # installed explicitly below.
+          packages: 'platform-tools'
+
+      - name: Cache Android NDK & CMake
+        id: cache-ndk-cmake
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/android/sdk/ndk
+            /usr/local/lib/android/sdk/cmake
+          key: ${{ runner.os }}-android-ndk-27.1.12297006-cmake-3.22.1
+
+      - name: Install NDK & CMake (if not cached)
+        if: steps.cache-ndk-cmake.outputs.cache-hit != 'true'
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager --install "ndk;27.1.12297006" "cmake;3.22.1"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          # Keyed on package-lock.json instead of the generated android/*.gradle files,
+          # since those get rewritten by prebuild every run and would bust the cache
+          # even when nothing actually changed.
+          key: ${{ runner.os }}-gradle-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Create .env file
+        run: |
+          echo "EXPO_PUBLIC_SUPABASE_URL=${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}" >> .env
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}" >> .env
+          echo "EXPO_PUBLIC_PROJECT_ID=${{ secrets.EXPO_PUBLIC_PROJECT_ID }}" >> .env
+
+      - name: Get version from app.json
+        id: version
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Set Android versionCode
+        # app.json has no android.versionCode, so `expo prebuild` hardcodes it to 1
+        # on every build. Android's installer keys "is this an update" on
+        # versionCode, not the human-readable version string — with every APK
+        # carrying the same versionCode 1, installing a new release over an
+        # existing install is silently refused by the OS every time, regardless
+        # of how different the version numbers look. Deriving it from the
+        # semver version keeps it monotonic automatically, so nobody has to
+        # remember to bump a second number alongside `version`.
+        run: |
+          node -e '
+            const fs = require("fs");
+            const path = "app.json";
+            const config = JSON.parse(fs.readFileSync(path, "utf8"));
+            const version = config.expo.version;
+            const [major, minor, patch] = version.split(".").map((n) => parseInt(n, 10));
+            if ([major, minor, patch].some((n) => Number.isNaN(n))) {
+              throw new Error(`Cannot derive versionCode from non-semver version "${version}"`);
+            }
+            const versionCode = major * 10000 + minor * 100 + patch;
+            config.expo.android = config.expo.android || {};
+            config.expo.android.versionCode = versionCode;
+            fs.writeFileSync(path, JSON.stringify(config, null, 2) + "\n");
+            console.log(`versionCode ${versionCode} for version ${version}`);
+          '
+
+      - name: Create google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          echo "$GOOGLE_SERVICES_JSON" > google-services.json
+
+      - name: Generate Android project
+        # No --clean: a plain prebuild only rewrites files that actually differ from
+        # the current Expo config, so Gradle's up-to-date checks and our caches below
+        # (Gradle cache + .cxx native build cache) can actually take effect.
+        run: npx expo prebuild --platform android
+
+      - name: Set minSdkVersion
+        run: echo "android.minSdkVersion=29" >> android/gradle.properties
+
+      - name: Decode release keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+
+      - name: Configure release signing
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("android/app/build.gradle")
+          text = path.read_text()
+
+          release_block = (
+              '        release {\n'
+              '            storeFile file("release.keystore")\n'
+              '            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")\n'
+              '            keyAlias System.getenv("ANDROID_KEY_ALIAS")\n'
+              '            keyPassword System.getenv("ANDROID_KEY_PASSWORD")\n'
+              '        }\n'
+          )
+
+          if "release {" in text.split("signingConfigs {", 1)[-1].split("}", 1)[0] if "signingConfigs {" in text else False:
+              # A release config already exists inside signingConfigs - do nothing.
+              pass
+          elif "signingConfigs {" in text:
+              # signingConfigs block exists (e.g. just "debug") - insert release alongside it.
+              text = text.replace("signingConfigs {", "signingConfigs {\n" + release_block, 1)
+          else:
+              # No signingConfigs block at all - create one with just release.
+              text = text.replace(
+                  "android {",
+                  "android {\n    signingConfigs {\n" + release_block + "    }",
+                  1,
+              )
+
+          # Point the release build type at the release signing config,
+          # regardless of whether it previously referenced debug or nothing.
+          if "signingConfig signingConfigs.debug" in text:
+              text = text.replace(
+                  "signingConfig signingConfigs.debug",
+                  "signingConfig signingConfigs.release"
+              )
+          elif "signingConfig signingConfigs.release" not in text:
+              # buildTypes.release exists but has no signingConfig line - add one.
+              text = text.replace(
+                  "buildTypes {",
+                  "buildTypes {\n        release {\n            signingConfig signingConfigs.release\n        }",
+                  1,
+              )
+
+          path.write_text(text)
+          PY
+
+      - name: Verify signing config was added
+        run: |
+          echo "---- signingConfigs block ----"
+          sed -n '/signingConfigs {/,/^    }/p' android/app/build.gradle
+          echo "---- signingConfig references ----"
+          grep -n "signingConfig signingConfigs" android/app/build.gradle
+
+      - name: Cache CMake/NDK native build
+        uses: actions/cache@v4
+        with:
+          path: android/app/.cxx
+          key: ${{ runner.os }}-cxx-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.cpp', '**/*.h', '**/CMakeLists.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-cxx-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-cxx-
+
+      - name: Configure architecture for arm64-v8a only
+        run: |
+          echo "" >> android/gradle.properties
+          echo "# Build only for arm64-v8a (modern devices)" >> android/gradle.properties
+          echo "reactNativeArchitectures=arm64-v8a" >> android/gradle.properties
+          echo "" >> android/gradle.properties
+          echo "# Memory/parallelism tuning for GitHub-hosted runners (ubuntu-latest: 16GB RAM, 4 cores)" >> android/gradle.properties
+          echo "org.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError" >> android/gradle.properties
+          echo "org.gradle.parallel=true" >> android/gradle.properties
+          echo "org.gradle.workers.max=4" >> android/gradle.properties
+          echo "kotlin.incremental=true" >> android/gradle.properties
+          echo "org.gradle.caching=true" >> android/gradle.properties
+          cat android/gradle.properties
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x android/gradlew
+
+      - name: Build Release APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Name the APK
+        id: apk
+        env:
+          LABEL: ${{ github.event.inputs.label }}
+        run: |
+          SAFE_LABEL=$(printf '%s' "$LABEL" | tr -cs 'A-Za-z0-9._-' '-' | sed 's/^-*//;s/-*$//')
+          NAME="vebosso-ems-v${{ steps.version.outputs.version }}-TEST-${SAFE_LABEL:-test}-${GITHUB_SHA::7}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$NAME"
+          echo "name=$NAME" >> $GITHUB_OUTPUT
+
+      - name: Report permissions and signing certificate
+        env:
+          LABEL: ${{ github.event.inputs.label }}
+        run: |
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          APK="${{ steps.apk.outputs.name }}"
+          {
+            echo "## Test APK: \`$APK\`"
+            echo ""
+            echo "Branch \`${GITHUB_REF_NAME}\` · commit \`${GITHUB_SHA::7}\` · label \`${LABEL}\`"
+            echo ""
+            echo "### Permissions in this APK"
+            echo '```'
+            "$BT/aapt2" dump permissions "$APK" | grep -E "uses-permission|permission:" || true
+            echo '```'
+            echo ""
+            echo "### Signing certificate (must match the production APK)"
+            echo '```'
+            "$BT/apksigner" verify --print-certs "$APK" | grep -E "SHA-256|DN" || true
+            echo '```'
+            echo ""
+            echo "Download it from **Artifacts** at the bottom of this run. Nothing was published."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK (private artifact, not a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: ${{ steps.apk.outputs.name }}
+          retention-days: 7
+          if-no-files-found: error
