@@ -6,7 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Snackbar, Text, TextInput } from 'react-native-paper';
 import {
   AppRadius,
@@ -19,10 +19,12 @@ import {
 import { EMPLOYEE_ID_PREFIX } from '../../../constants/roles';
 import { parseFunctionError } from '../../../lib/errors';
 import { supabase } from '../../../lib/supabase';
+import { useKeyboardOverlap } from '../../../lib/useKeyboardHeight';
 import { useWorkStore } from '../../../store/workStore';
 
 export default function AddMemberScreen() {
   const router = useRouter();
+  const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
   const { teamMembers, fetchTeamMembers } = useWorkStore();
 
   const [fullName, setFullName] = useState('');
@@ -196,7 +198,7 @@ export default function AddMemberScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View ref={keyboardRef} style={[styles.container, { paddingBottom: keyboardInset }]}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Pressable
@@ -350,7 +352,7 @@ export default function AddMemberScreen() {
       </ScrollView>
 
       <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>{snackMessage}</Snackbar>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

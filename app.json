@@ -2,7 +2,7 @@
   "expo": {
     "name": "VEBOSSO EMS",
     "slug": "vebosso-ems",
-    "version": "1.8.1",
+    "version": "1.8.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "vebossoems",
@@ -84,6 +84,7 @@
         }
       ],
       "./plugins/withApkInstaller.js",
+      "./plugins/withWhatsAppQueries.js",
       [
         "expo-splash-screen",
         {

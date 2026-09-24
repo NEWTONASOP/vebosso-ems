@@ -13,8 +13,6 @@ import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,6 +26,7 @@ import { AppTheme as T, appSoftShadow, screenChrome } from '../../../constants/t
 import { money, num } from '../../../lib/accounts';
 import { Alert } from '../../../lib/alert';
 import { useFieldChain } from '../../../lib/useFieldChain';
+import { useKeyboardOverlap } from '../../../lib/useKeyboardHeight';
 import { sendBillOnWhatsApp, shareBillPdf, waNumber } from '../../../lib/billPdf';
 import {
   BILL_STATUS_TONE,
@@ -129,6 +128,7 @@ export default function BillEditorScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
   const params = useLocalSearchParams<{ id: string; kind?: string }>();
   const isNew = params.id === 'new';
   const profileName = useAuthStore((s) => s.profile?.full_name ?? '');
@@ -536,7 +536,7 @@ export default function BillEditorScreen() {
         </View>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View ref={keyboardRef} style={{ flex: 1, paddingBottom: keyboardInset }}>
         <ScrollView
           contentContainerStyle={[styles.body, { paddingBottom: 190 + insets.bottom }]}
           keyboardShouldPersistTaps="handled"
@@ -720,7 +720,7 @@ export default function BillEditorScreen() {
             </View>
           </Section>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
 
       {preview && settings ? (
         <BillPreviewSheet

@@ -8,7 +8,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    KeyboardAvoidingView,
     Platform,
     Pressable,
     Alert as RNAlert,
@@ -29,6 +28,7 @@ import {
 import { ROLE_LABELS } from '../../../constants/roles';
 import { parseFunctionError, parseSupabaseError } from '../../../lib/errors';
 import { supabase } from '../../../lib/supabase';
+import { useKeyboardOverlap } from '../../../lib/useKeyboardHeight';
 import { useAuthStore } from '../../../store/authStore';
 import { useWorkStore } from '../../../store/workStore';
 import { Profile } from '../../../types/database';
@@ -43,6 +43,7 @@ interface SessionInfo {
 export default function MemberProfileManagementScreen() {
   const router = useRouter();
   const { id: memberId } = useLocalSearchParams<{ id: string }>();
+  const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
   const { profile: currentOwner } = useAuthStore();
   const { teamMembers, fetchTeamMembers } = useWorkStore();
 
@@ -356,7 +357,7 @@ export default function MemberProfileManagementScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View ref={keyboardRef} style={[styles.container, { paddingBottom: keyboardInset }]}>
       <View style={styles.header}>
         <Pressable
           style={screenChrome.iconButton}
@@ -667,7 +668,7 @@ export default function MemberProfileManagementScreen() {
       <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>
         {snackMessage}
       </Snackbar>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

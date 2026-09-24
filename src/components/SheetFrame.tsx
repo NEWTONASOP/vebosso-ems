@@ -6,9 +6,11 @@
 
 import { Feather } from '@expo/vector-icons';
 import { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Modal, Portal, Text } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTheme, appSoftShadow } from '../constants/theme';
+import { useKeyboardHeight } from '../lib/useKeyboardHeight';
 
 interface SheetFrameProps {
   visible: boolean;
@@ -34,12 +36,22 @@ export function SheetFrame({
   children,
   footer,
 }: SheetFrameProps) {
+  const keyboard = useKeyboardHeight();
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   if (!visible) return null;
+
+  // With the keyboard open, sit on top of it and fit in the space above. The
+  // modal already keeps clear of the system bars (insets); Android reports the
+  // keyboard without the nav bar, iOS with the home-indicator strip.
+  const lift = Platform.OS === 'ios' ? Math.max(0, keyboard - insets.bottom) : keyboard;
+  const lifted =
+    keyboard > 0 ? { marginBottom: lift, maxHeight: height - insets.top - insets.bottom - lift - 8 } : null;
 
   return (
     <Portal>
-      <Modal visible onDismiss={onDismiss} contentContainerStyle={styles.container}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Modal visible onDismiss={onDismiss} contentContainerStyle={[styles.container, lifted]}>
+        <View style={styles.inner}>
           <View style={styles.header}>
             {icon ? (
               <View style={[styles.icon, { backgroundColor: iconBg }]}>
@@ -72,7 +84,7 @@ export function SheetFrame({
           </ScrollView>
 
           {footer ? <View style={styles.footer}>{footer}</View> : null}
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
     </Portal>
   );
@@ -133,6 +145,9 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     maxHeight: '90%',
     ...appSoftShadow,
+  },
+  inner: {
+    flexShrink: 1,
   },
   header: {
     flexDirection: 'row',

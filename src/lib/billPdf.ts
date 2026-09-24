@@ -1,7 +1,7 @@
 // ============================================================================
 // VEBOSSO EMS — Bill PDF
 // Builds the printable bill, shares it, or sends it straight to the number on
-// the bill over WhatsApp as a link. Nothing the client sees says whether it's
+// the bill over WhatsApp as the PDF itself. Nothing the client sees says whether it's
 // an estimate or a client bill.
 // ============================================================================
 
@@ -10,11 +10,12 @@ import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { Linking, Platform } from 'react-native';
+import { Platform } from 'react-native';
+import Share, { Social } from 'react-native-share';
 import { Bill, BillSettings } from '../types/database';
 import { money } from './accounts';
-import { billTotals, BUCKET, signBillImages } from './bills';
-import { supabase } from './supabase';
+import { Alert } from './alert';
+import { billTotals, signBillImages } from './bills';
 import { printHtmlOnWeb } from './webPrint';
 
 const esc = (s: string | null | undefined) =>
@@ -217,40 +218,63 @@ export function waNumber(phone: string | null | undefined): string | null {
   return null;
 }
 
+/** WhatsApp apps on this phone, normal first. */
+async function installedWhatsApps(): Promise<('whatsapp' | 'whatsappbusiness')[]> {
+  const check = async (pkg: string) => {
+    try {
+      return (await Share.isPackageInstalled(pkg)).isInstalled;
+    } catch {
+      return false;
+    }
+  };
+  const [normal, business] = await Promise.all([check('com.whatsapp'), check('com.whatsapp.w4b')]);
+  return [...(normal ? ['whatsapp' as const] : []), ...(business ? ['whatsappbusiness' as const] : [])];
+}
+
+const askWhich = () =>
+  new Promise<'whatsapp' | 'whatsappbusiness' | null>((resolve) =>
+    Alert.alert('Send with', undefined, [
+      { text: 'WhatsApp', onPress: () => resolve('whatsapp') },
+      { text: 'WhatsApp Business', onPress: () => resolve('whatsappbusiness') },
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
+    ])
+  );
+
 /**
- * Open WhatsApp on the bill's number with a message and a link to the PDF.
- * The PDF is uploaded to private storage and linked for 30 days.
+ * Open the client's WhatsApp chat with the bill PDF attached, ready to send.
+ * Asks which app when both WhatsApp and WhatsApp Business are installed.
  */
 export async function sendBillOnWhatsApp(b: Bill, s: BillSettings, phone: string) {
   const to = waNumber(phone);
   if (!to) throw new Error('That phone number doesn’t look right');
+  if (Platform.OS !== 'android') throw new Error('Sending to WhatsApp works from the Android app');
 
-  const path = `pdf/${b.id}.pdf`;
-  if (Platform.OS === 'web') {
-    throw new Error('Sending to WhatsApp works from the phone app');
-  }
+  const apps = await installedWhatsApps();
+  if (apps.length === 0) throw new Error('WhatsApp isn’t installed on this phone');
+  const app = apps.length === 1 ? apps[0] : await askWhich();
+  if (!app) return;
+
   const uri = await renderPdf(b, s);
-  const b64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  const { error: upErr } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, bytes.buffer, { contentType: 'application/pdf', upsert: true });
-  if (upErr) throw upErr;
-
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrl(path, 60 * 60 * 24 * 30, { download: billFileName(b) });
-  if (error || !data?.signedUrl) throw error ?? new Error('Could not create the link');
-
   const t = billTotals(b);
-  const lines = [
+  const message = [
     `Hello${b.client_name ? ` ${b.client_name}` : ''},`,
     `Here are the details from ${s.business_name}${b.venue ? ` for ${b.venue}` : ''}${
       b.function_date ? ` on ${format(parseISO(b.function_date), 'd MMM yyyy')}` : ''
     }${b.number ? ` (${b.number})` : ''}.`,
     `Total ₹${money(t.total)} · Advance ₹${money(t.advance)} · Balance ₹${money(t.balance)}`,
-    '',
-    `View / download: ${data.signedUrl}`,
-  ];
-  await Linking.openURL(`https://wa.me/${to}?text=${encodeURIComponent(lines.join('\n'))}`);
+  ].join('\n');
+
+  // whatsAppNumber opens that chat directly; the library supports it on
+  // Android but leaves it out of its types.
+  const social: Social.Whatsapp | Social.Whatsappbusiness =
+    app === 'whatsapp' ? Social.Whatsapp : Social.Whatsappbusiness;
+  const options = {
+    social,
+    whatsAppNumber: to,
+    url: uri,
+    type: 'application/pdf',
+    filename: billFileName(b),
+    message,
+  };
+  await Share.shareSingle(options);
 }

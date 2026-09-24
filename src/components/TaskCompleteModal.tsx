@@ -4,9 +4,10 @@
 
 import { Feather } from '@expo/vector-icons';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { Button, Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/theme';
+import { useKeyboardHeight } from '../lib/useKeyboardHeight';
 
 interface TaskCompleteModalProps {
   visible: boolean;
@@ -22,6 +23,9 @@ export function TaskCompleteModal({
   onComplete,
 }: TaskCompleteModalProps) {
   const [note, setNote] = useState('');
+
+  // Centre the dialog in the space above the keyboard.
+  const keyboard = useKeyboardHeight();
 
   const handleCancel = () => {
     setNote('');
@@ -39,12 +43,9 @@ export function TaskCompleteModal({
       <Modal
         visible={visible}
         onDismiss={onDismiss}
-        contentContainerStyle={styles.modalContainer}
+        contentContainerStyle={[styles.modalContainer, keyboard > 0 && { marginBottom: keyboard }]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.keyboardView}
-        >
+        <View style={styles.keyboardView}>
           <View style={styles.container}>
             <View style={styles.header}>
               <View style={styles.iconContainer}>
@@ -101,7 +102,7 @@ export function TaskCompleteModal({
               </Button>
             </View>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
     </Portal>
   );
