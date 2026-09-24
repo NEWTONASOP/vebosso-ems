@@ -38,13 +38,28 @@ interface MemberAttendancePanelProps {
   /** Owner/manager views also get the day's map; a member reviewing their own
    *  history does not need to be shown their own trail back. */
   showLocation?: boolean;
+  /** The selected day's summary card (date, times, status). */
+  showDayHeader?: boolean;
+  /** "N days worked" beside the month on the rail. */
+  showWorkedCount?: boolean;
+  /** Rendered under the day's log, for the selected day. */
+  footer?: (selectedDate: Date) => React.ReactNode;
+  /** Rendered between the calendar and the day's log, e.g. "Allow edit". */
+  dayAction?: (selectedDate: Date) => React.ReactNode;
 }
+
+/** A day counts as worked once the person checked in and it wasn't rejected. */
+const WORKED_STATUSES = new Set(['pending_approval', 'working', 'pending_checkout', 'done']);
 
 export function MemberAttendancePanel({
   memberId,
   accentColor,
   enableDetailSheet = true,
   showLocation = false,
+  showDayHeader = true,
+  showWorkedCount = false,
+  footer,
+  dayAction,
 }: MemberAttendancePanelProps) {
   const { fetchWorkHistory, fetchCompletedTasksInRange, fetchLeaveInRange } =
     useWorkStore();
@@ -122,6 +137,11 @@ export function MemberAttendancePanel({
     [selectedKey, selectedLog, tasks, selectedLeave]
   );
 
+  const workedDays = useMemo(
+    () => new Set(workLogs.filter((l) => WORKED_STATUSES.has(l.status)).map((l) => l.date)).size,
+    [workLogs]
+  );
+
   const dayActions: DayAction[] = enableDetailSheet
     ? [
         {
@@ -144,6 +164,11 @@ export function MemberAttendancePanel({
         onChangeMonth={setVisibleMonth}
         getDayStatus={(d) => getDayStatus({ workLog: logFor(d), leave: leaveFor(d) })}
         accentColor={accentColor}
+        headerBadge={
+          showWorkedCount && !isLoading
+            ? `${workedDays} day${workedDays === 1 ? '' : 's'} worked`
+            : undefined
+        }
       />
 
       {error ? (
@@ -152,6 +177,11 @@ export function MemberAttendancePanel({
         </View>
       ) : null}
 
+      {/* The day card normally spaces the rail from the log; without it, keep the gap. */}
+      {!showDayHeader ? <View style={styles.railGap} /> : null}
+
+      {dayAction ? dayAction(selectedDate) : null}
+
       {isLoading && workLogs.length === 0 ? (
         <View style={styles.loading}>
           <ActivityIndicator color={T.charcoal} />
@@ -159,14 +189,16 @@ export function MemberAttendancePanel({
         </View>
       ) : (
         <>
-          <DayHeaderCard
-            date={selectedDate}
-            status={selectedStatus}
-            checkInTime={selectedLog?.check_in_time}
-            checkOutTime={selectedLog?.check_out_time}
-            totalHours={selectedLog?.total_hours}
-            actions={dayActions}
-          />
+          {showDayHeader ? (
+            <DayHeaderCard
+              date={selectedDate}
+              status={selectedStatus}
+              checkInTime={selectedLog?.check_in_time}
+              checkOutTime={selectedLog?.check_out_time}
+              totalHours={selectedLog?.total_hours}
+              actions={dayActions}
+            />
+          ) : null}
 
           {showLocation ? (
             <MemberLocationSection
@@ -190,6 +222,8 @@ export function MemberAttendancePanel({
         </>
       )}
 
+      {footer ? footer(selectedDate) : null}
+
       {enableDetailSheet && detailVisible && selectedLog ? (
         <WorkLogDetail
           visible
@@ -203,6 +237,9 @@ export function MemberAttendancePanel({
 }
 
 const styles = StyleSheet.create({
+  railGap: {
+    height: 14,
+  },
   errorPad: {
     paddingHorizontal: 4,
     paddingBottom: 8,

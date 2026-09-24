@@ -21,6 +21,10 @@ interface AnnouncementCardProps {
 
 export function AnnouncementCard({ announcement, index = 0, canDelete = false, onDelete }: AnnouncementCardProps) {
   const timeAgo = formatDistanceToNow(new Date(announcement.created_at), { addSuffix: true });
+  const authorName = announcement.author_name || announcement.creator?.full_name || 'Admin';
+  const authorRole = announcement.author_role || announcement.creator?.role;
+  // Posts from members/managers read as a message from that person.
+  const isTeamPost = authorRole === 'member' || authorRole === 'manager';
 
   return (
     <Animated.View
@@ -30,12 +34,12 @@ export function AnnouncementCard({ announcement, index = 0, canDelete = false, o
     >
       <View style={styles.header}>
         <View style={styles.iconContainer}>
-          <Feather name="bell" color={AppTheme.blue} size={16} />
+          <Feather name={isTeamPost ? 'message-circle' : 'bell'} color={AppTheme.blue} size={16} />
         </View>
         <View style={styles.headerInfo}>
-          <Text style={styles.title}>{announcement.title}</Text>
+          <Text style={styles.title}>{isTeamPost ? authorName : announcement.title}</Text>
           <Text style={styles.meta}>
-            By {announcement.creator?.full_name || 'Admin'} • {timeAgo}
+            {isTeamPost ? `Team message • ${timeAgo}` : `By ${authorName} • ${timeAgo}`}
           </Text>
         </View>
 

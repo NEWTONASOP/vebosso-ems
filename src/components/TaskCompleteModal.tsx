@@ -23,9 +23,8 @@ export function TaskCompleteModal({
 }: TaskCompleteModalProps) {
   const [note, setNote] = useState('');
 
-  const handleSkip = () => {
+  const handleCancel = () => {
     setNote('');
-    onComplete('');
     onDismiss();
   };
 
@@ -61,7 +60,7 @@ export function TaskCompleteModal({
             </View>
 
             <View style={styles.inputSection}>
-              <Text style={styles.inputLabel}>What did you accomplish? (optional)</Text>
+              <Text style={styles.inputLabel}>Add a note (optional)</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Brief summary of your work..."
@@ -79,14 +78,14 @@ export function TaskCompleteModal({
             <View style={styles.buttonRow}>
               <Button
                 mode="contained"
-                onPress={handleSkip}
+                onPress={handleCancel}
                 style={styles.skipButton}
                 contentStyle={styles.buttonContent}
                 buttonColor={AppTheme.soft2}
                 textColor={AppTheme.inkSoft}
                 labelStyle={styles.skipButtonText}
               >
-                Skip
+                Cancel
               </Button>
 
               <Button

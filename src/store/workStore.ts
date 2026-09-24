@@ -158,7 +158,19 @@ interface WorkState {
   reset: () => void;
 }
 
-const uploadCheckoutPhoto = async (path: string, uri: string, ext: string) => {
+/**
+ * Upload a local/web file URI to a storage bucket. `upsert` must stay false
+ * for buckets where the uploader has no UPDATE permission (e.g. documents).
+ * Pass `mimeType` for anything that isn't an image (PDF, Word…).
+ */
+export const uploadCheckoutPhoto = async (
+  path: string,
+  uri: string,
+  ext: string,
+  bucket: string = 'checkouts',
+  upsert: boolean = true,
+  mimeType?: string,
+) => {
   if (Platform.OS === 'web' && typeof document !== 'undefined') {
     let iframe: HTMLIFrameElement | null = null;
     try {
@@ -180,7 +192,7 @@ const uploadCheckoutPhoto = async (path: string, uri: string, ext: string) => {
         const response = await fetch(uri);
         const blob = await response.blob();
         arrayBuffer = await blob.arrayBuffer();
-        contentType = blob.type || 'image/jpeg';
+        contentType = mimeType || blob.type || 'image/jpeg';
       }
 
       // 2. Retrieve native window objects from clean iframe to bypass RN Web polyfills
@@ -198,7 +210,7 @@ const uploadCheckoutPhoto = async (path: string, uri: string, ext: string) => {
 
         // 4. Upload the FormData directly
         const { data, error } = await supabase.storage
-          .from('checkouts')
+          .from(bucket)
           .upload(path, formData);
 
         if (error) throw error;
@@ -216,7 +228,9 @@ const uploadCheckoutPhoto = async (path: string, uri: string, ext: string) => {
   // Fallback / Native Mobile Path
   let body: ArrayBuffer;
   const extLower = ext.toLowerCase();
-  let contentType = extLower === 'png' ? 'image/png' : extLower === 'webp' ? 'image/webp' : extLower === 'gif' ? 'image/gif' : 'image/jpeg';
+  let contentType =
+    mimeType ||
+    (extLower === 'png' ? 'image/png' : extLower === 'webp' ? 'image/webp' : extLower === 'gif' ? 'image/gif' : 'image/jpeg');
 
   if (uri.startsWith('data:image')) {
     const base64Data = uri.split(',')[1];
@@ -243,10 +257,10 @@ const uploadCheckoutPhoto = async (path: string, uri: string, ext: string) => {
   }
 
   const { data, error } = await supabase.storage
-    .from('checkouts')
+    .from(bucket)
     .upload(path, body, {
       contentType,
-      upsert: true,
+      upsert,
     });
 
   if (error) throw error;
@@ -343,7 +357,12 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       // permissions exist, and tracking retries on the next app foreground.
       try {
         const { startLocationTracking, pushCurrentLocation } = await import('../lib/locationTracking');
-        const session = { userId: user.id, workLogId: (data as WorkLog).id, date: today };
+        const session = {
+          userId: user.id,
+          workLogId: (data as WorkLog).id,
+          date: today,
+          startedAt: (data as WorkLog).check_in_time,
+        };
         const started = await startLocationTracking(session);
         if (started) void pushCurrentLocation(session);
       } catch (locErr) {
@@ -584,7 +603,12 @@ export const useWorkStore = create<WorkState>((set, get) => ({
           await import('../lib/locationTracking');
 
         if (openDay && log) {
-          await resumeTrackingIfCheckedIn({ userId, workLogId: log.id, date: today });
+          await resumeTrackingIfCheckedIn({
+            userId,
+            workLogId: log.id,
+            date: today,
+            startedAt: log.check_in_time,
+          });
         } else if (await isTrackingRunning()) {
           await stopLocationTracking();
         }
@@ -601,7 +625,10 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
   fetchTodayTasks: async (userId: string) => {
     try {
-      const today = format(new Date(), 'yyyy-MM-dd');
+      // Tasks have no due date any more: show everything still open, plus
+      // what was finished today (local midnight, sent as an absolute time).
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
 
       const { data, error } = await supabase
         .from('tasks')
@@ -611,7 +638,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
           assigned_by_profile:profiles!tasks_assigned_by_fkey(id, full_name, employee_id, avatar_url, role)
         `)
         .eq('assigned_to', userId)
-        .or(`due_date.eq.${today},due_date.is.null`)
+        .or(`status.neq.done,completed_at.gte.${startOfToday.toISOString()}`)
         .order('created_at', { ascending: false });
 
       if (error) return { success: false, error: error.message };

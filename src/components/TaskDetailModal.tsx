@@ -5,10 +5,11 @@
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Avatar, Divider, Modal, Portal, Text } from 'react-native-paper';
+import { Divider, Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { TaskStatus } from '../types/database';
 import { AnimatedPressable } from './AnimatedPressable';
+import { UserAvatar } from './UserAvatar';
 
 interface TaskDetailModalProps {
   visible: boolean;
@@ -32,6 +33,7 @@ interface TaskDetailModalProps {
     assigned_by_profile?: {
       full_name: string;
       employee_id: string;
+      avatar_url?: string | null;
     };
   } | null;
   onReassign?: () => void;
@@ -144,7 +146,8 @@ export function TaskDetailModal({
                 <Text style={styles.sectionLabel}>Assigned To</Text>
               </View>
               <View style={styles.assigneeRow}>
-                <Avatar.Text
+                <UserAvatar
+                  uri={task.assignee.avatar_url}
                   size={36}
                   label={task.assignee.full_name?.substring(0, 2).toUpperCase() || '??'}
                   style={styles.avatar}
@@ -166,7 +169,8 @@ export function TaskDetailModal({
                 <Text style={styles.sectionLabel}>Assigned By</Text>
               </View>
               <View style={styles.assigneeRow}>
-                <Avatar.Text
+                <UserAvatar
+                  uri={task.assigned_by_profile.avatar_url}
                   size={36}
                   label={task.assigned_by_profile.full_name?.substring(0, 2).toUpperCase() || '??'}
                   style={styles.avatar}

@@ -19,9 +19,20 @@ import { supabase } from './supabase';
 
 export const LOCATION_TASK = 'vebosso-location-tracking';
 
-/** Chosen with battery in mind: a fix every 3 minutes, or every 100 m moved. */
+/**
+ * A fix every 3 minutes. No distance filter on Android: with one set, a phone
+ * that isn't moving reports nothing at all, and a member sitting at a venue
+ * showed up as hours of "tracking gap". iOS needs a small filter or it streams
+ * continuously.
+ */
 const TIME_INTERVAL_MS = 3 * 60 * 1000;
-const DISTANCE_INTERVAL_M = 100;
+const DISTANCE_INTERVAL_M = Platform.OS === 'android' ? 0 : 50;
+
+/**
+ * A work day never runs longer than this after check-in. If someone forgets to
+ * check out, tracking ends itself here instead of following them for days.
+ */
+const MAX_SESSION_MS = 18 * 60 * 60 * 1000;
 
 /** Where the task finds the work log a fix belongs to. */
 const SESSION_KEY = 'vebosso.location.session';
@@ -33,8 +44,24 @@ const QUEUE_LIMIT = 200;
 export interface TrackingSession {
   userId: string;
   workLogId: string | null;
+  /** The work day ("yyyy-MM-dd") fixes are filed under. */
   date: string;
+  /** Check-in time (ISO). Older stored sessions don't have it. */
+  startedAt?: string | null;
 }
+
+/** When this session stops recording: 18 h after check-in (or 06:00 next day). */
+export function sessionEndsAt(session: TrackingSession): number {
+  if (session.startedAt) {
+    const start = new Date(session.startedAt).getTime();
+    if (Number.isFinite(start)) return start + MAX_SESSION_MS;
+  }
+  const [y, m, d] = session.date.split('-').map(Number);
+  // Local midnight of the work day + 30 h = 06:00 the next morning.
+  return new Date(y, (m ?? 1) - 1, d ?? 1).getTime() + 30 * 60 * 60 * 1000;
+}
+
+const isExpired = (session: TrackingSession, at = Date.now()) => at > sessionEndsAt(session);
 
 interface PingRow {
   user_id: string;
@@ -178,8 +205,19 @@ if (Platform.OS !== 'web') {
       return;
     }
 
+    // Nobody checked out: record up to the session's end, then stop for good
+    // rather than filing tomorrow's movements under today.
+    const endsAt = sessionEndsAt(session);
+    const inWindow = locations.filter((loc) => loc.timestamp <= endsAt);
     const battery = await batteryLevel();
-    const fresh = locations.map((loc) => toRow(loc, session, battery));
+    const fresh = inWindow.map((loc) => toRow(loc, session, battery));
+    if (isExpired(session)) {
+      const pending = dropExpired([...(await readQueue()), ...fresh]);
+      if (pending.length) await upload(pending);
+      await writeQueue([]);
+      await endSession();
+      return;
+    }
     const queued = await readQueue();
     const pending = dropExpired([...queued, ...fresh]);
 
@@ -320,6 +358,8 @@ export async function isTrackingRunning(): Promise<boolean> {
  * it refreshes the work log the fixes are attributed to.
  */
 export async function startLocationTracking(session: TrackingSession): Promise<boolean> {
+  if (isExpired(session)) return false;
+
   const state = await getLocationPermissionState();
   if (!state.foreground || !state.background) return false;
 
@@ -355,6 +395,17 @@ export async function startLocationTracking(session: TrackingSession): Promise<b
   }
 }
 
+/** Stop the background task and forget the session (no queue flush). */
+async function endSession(): Promise<void> {
+  await Location.stopLocationUpdatesAsync(LOCATION_TASK).catch(() => {});
+  await writeSession(null);
+  try {
+    await supabase.rpc('end_location_tracking');
+  } catch {
+    // The live marker goes stale on its own after a few minutes.
+  }
+}
+
 /** Stop tracking and drop the live marker back to "last seen". */
 export async function stopLocationTracking(): Promise<void> {
   try {
@@ -384,6 +435,7 @@ export async function stopLocationTracking(): Promise<void> {
  * without waiting for the first background interval.
  */
 export async function pushCurrentLocation(session: TrackingSession): Promise<void> {
+  if (isExpired(session)) return;
   try {
     const location = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.High,
@@ -402,6 +454,10 @@ export async function pushCurrentLocation(session: TrackingSession): Promise<voi
  * the OS drops the task when the app is force-stopped.
  */
 export async function resumeTrackingIfCheckedIn(session: TrackingSession): Promise<void> {
+  if (isExpired(session)) {
+    if (await isTrackingRunning()) await stopLocationTracking();
+    return;
+  }
   if (await isTrackingRunning()) {
     await writeSession(session);
     return;

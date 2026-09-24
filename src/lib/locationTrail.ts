@@ -27,6 +27,11 @@ const MAX_ACCURACY_M = 150;
 const GAP_THRESHOLD_MS = 10 * 60 * 1000;
 /** Below this, a gap's most likely explanation is the battery running out. */
 const LOW_BATTERY_PCT = 15;
+/**
+ * A day's trail covers 00:00 that day to 08:00 the next morning (late events
+ * run past midnight). Matches the database's own window (migration 028).
+ */
+const DAY_WINDOW_MS = 32 * 60 * 60 * 1000;
 
 export interface TrailPoint {
   lat: number;
@@ -47,6 +52,12 @@ export interface TrailStop {
   minutes: number;
   /** 1-based position in the day, for map labels. */
   index: number;
+  /**
+   * Of the stay, how long the phone sent nothing while sitting at this place.
+   * Folded into the stop rather than listed on its own — it's the phone
+   * idling, not something that happened.
+   */
+  quietMinutes: number;
 }
 
 export interface TrailGap {
@@ -66,6 +77,11 @@ export interface TrailGap {
   fromPoint: { lat: number; lng: number } | null;
   /** First known position after the gap — used to draw the gap connector. */
   toPoint: { lat: number; lng: number } | null;
+  /**
+   * Same place before and after — the phone most likely just sat idle. Never
+   * listed on its own (it's folded into the stop) and not a break in the route.
+   */
+  still: boolean;
 }
 
 export interface DayTrail {
@@ -74,6 +90,7 @@ export interface DayTrail {
   /** Contiguous stretches, split wherever a gap was detected — what the map
    *  actually draws as solid line, so it never implies travel across a gap. */
   segments: TrailPoint[][];
+  /** Real interruptions only: the person moved while nothing was recorded. */
   gaps: TrailGap[];
   stops: TrailStop[];
   /** Straight-line distance within each tracked segment, in kilometres. */
@@ -94,6 +111,8 @@ export interface DayTrail {
   lastAt: string | null;
   /** Fixes dropped for poor accuracy — surfaced so a sparse day is explained. */
   droppedCount: number;
+  /** Fixes outside the day's window (from before the fix to filing by day). */
+  outsideDayCount: number;
   /** Minutes stationary at a detected stop. */
   stoppedMinutes: number;
   /** Tracked span minus time at stops minus gap time — what's left is transit. */
@@ -117,13 +136,31 @@ export function metresBetween(
   return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-export function buildDayTrail(pings: LocationPing[]): DayTrail {
+/**
+ * @param day "yyyy-MM-dd" — when given, fixes outside that day's window are
+ * left out, so a day never shows movements from another day.
+ */
+export function buildDayTrail(pings: LocationPing[], day?: string): DayTrail {
   const sorted = [...pings].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
+
+  let windowStart = -Infinity;
+  let windowEnd = Infinity;
+  if (day) {
+    const [y, m, d] = day.split('-').map(Number);
+    windowStart = new Date(y, m - 1, d).getTime();
+    windowEnd = windowStart + DAY_WINDOW_MS;
+  }
 
   const points: TrailPoint[] = [];
   let droppedCount = 0;
+  let outsideDayCount = 0;
 
   for (const ping of sorted) {
+    const t = new Date(ping.recorded_at).getTime();
+    if (t < windowStart || t >= windowEnd) {
+      outsideDayCount += 1;
+      continue;
+    }
     if (ping.accuracy != null && ping.accuracy > MAX_ACCURACY_M) {
       droppedCount += 1;
       continue;
@@ -149,25 +186,40 @@ export function buildDayTrail(pings: LocationPing[]): DayTrail {
   // Sum displacement across all gaps — every gap where we can measure both
   // endpoints contributes an honest minimum to the total travel distance.
   const gapDisplacementKm = gaps.reduce(
-    (sum, g) => sum + (g.gapDisplacementKm ?? 0),
+    (sum, g) => sum + (g.still ? 0 : g.gapDisplacementKm ?? 0),
     0
   );
   const totalDistanceKm = distanceKm + gapDisplacementKm;
 
   const stops = buildStops(points);
 
+  // Fold each idle spell into the stop it happened at.
+  for (const gap of gaps) {
+    if (!gap.still) continue;
+    const g0 = new Date(gap.from).getTime();
+    const g1 = new Date(gap.to).getTime();
+    for (const stop of stops) {
+      const s0 = new Date(stop.from).getTime();
+      const s1 = new Date(stop.to).getTime();
+      const overlap = Math.min(g1, s1) - Math.max(g0, s0);
+      if (overlap > 0) stop.quietMinutes += Math.round(overlap / 60000);
+    }
+  }
+
   const firstAt = points[0]?.at ?? null;
   const lastAt = points[points.length - 1]?.at ?? null;
   const trackedMs =
     firstAt && lastAt ? new Date(lastAt).getTime() - new Date(firstAt).getTime() : 0;
   const stoppedMs = stops.reduce((sum, s) => sum + s.minutes * 60000, 0);
-  const gapMs = gaps.reduce((sum, g) => sum + g.minutes * 60000, 0);
+  // Still gaps sit inside a stop and are already counted there; only real
+  // interruptions come off the travelling time.
+  const gapMs = gaps.reduce((sum, g) => sum + (g.still ? 0 : g.minutes * 60000), 0);
   const movingMs = Math.max(0, trackedMs - stoppedMs - gapMs);
 
   return {
     points,
     segments,
-    gaps,
+    gaps: gaps.filter((g) => !g.still),
     stops,
     distanceKm,
     gapDisplacementKm,
@@ -175,6 +227,7 @@ export function buildDayTrail(pings: LocationPing[]): DayTrail {
     firstAt,
     lastAt,
     droppedCount,
+    outsideDayCount,
     stoppedMinutes: Math.round(stoppedMs / 60000),
     movingMinutes: Math.round(movingMs / 60000),
   };
@@ -208,6 +261,9 @@ function buildSegmentsAndGaps(points: TrailPoint[]): {
         { lat: prev.lat, lng: prev.lng },
         { lat: curr.lat, lng: curr.lng }
       );
+      // Within the stop radius (plus how unsure each fix was) = didn't move.
+      const tolerance = STOP_RADIUS_M + (prev.accuracy ?? 0) + (curr.accuracy ?? 0);
+      const still = displacementM <= tolerance;
       gaps.push({
         from: prev.at,
         to: curr.at,
@@ -217,8 +273,11 @@ function buildSegmentsAndGaps(points: TrailPoint[]): {
         gapDisplacementKm: displacementM / 1000,
         fromPoint: { lat: prev.lat, lng: prev.lng },
         toPoint: { lat: curr.lat, lng: curr.lng },
+        still,
       });
-      segments.push([curr]);
+      // Idling in one place isn't a break in the route.
+      if (still) segments[segments.length - 1].push(curr);
+      else segments.push([curr]);
     } else {
       segments[segments.length - 1].push(curr);
     }
@@ -240,10 +299,12 @@ function buildSegmentsAndGaps(points: TrailPoint[]): {
  * this reports uncertainty rather than guessing a specific cause.
  */
 export function describeGapReason(gap: TrailGap): string {
+  if (gap.still) return 'The phone was idle at the same place.';
   if (gap.batteryBeforePct != null && gap.batteryBeforePct <= LOW_BATTERY_PCT) {
-    return `battery was at ${gap.batteryBeforePct}%, likely died`;
+    return `Battery was at ${gap.batteryBeforePct}% — the phone likely died.`;
   }
-  return "cause unknown — could be a permission change or the device's battery saver pausing it";
+  // No guess when there's nothing to go on.
+  return '';
 }
 
 /**
@@ -280,6 +341,7 @@ function buildStops(points: TrailPoint[]): TrailStop[] {
       to,
       minutes: Math.round(ms / 60000),
       index: stops.length + 1,
+      quietMinutes: 0,
     });
     cluster = [];
   };

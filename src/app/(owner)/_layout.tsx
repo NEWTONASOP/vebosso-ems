@@ -4,46 +4,12 @@
 
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { Platform, StyleSheet, Text, View } from 'react-native';
-import { useWorkStore } from '../../store/workStore';
+import { Platform } from 'react-native';
 import { CustomTabBar } from '../../components/CustomTabBar';
-import { AppTheme, SIDEBAR_WIDTH } from '../../constants/theme';
+import { SIDEBAR_WIDTH } from '../../constants/theme';
 import { useResponsive } from '../../lib/responsive';
 
-function TabBarBadge({ count }: { count: number }) {
-  if (count === 0) return null;
-  return (
-    <View style={badgeStyles.container}>
-      <Text style={badgeStyles.text}>{count > 99 ? '99+' : count}</Text>
-    </View>
-  );
-}
-
-const badgeStyles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    top: -4,
-    right: -10,
-    backgroundColor: AppTheme.coral,
-    borderRadius: 9,
-    minWidth: 16,
-    height: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-    zIndex: 10,
-  },
-  text: {
-    color: AppTheme.white,
-    fontSize: 9,
-    fontFamily: 'Inter_700Bold',
-  },
-});
-
 export default function OwnerLayout() {
-  const pendingApprovalsCount = useWorkStore((s) => s.pendingApprovalsCount);
-  const pendingLeavesCount = useWorkStore((s) => s.pendingLeavesCount);
-  const pendingCount = pendingApprovalsCount + pendingLeavesCount;
   const { isDesktop } = useResponsive();
 
   return (
@@ -63,32 +29,29 @@ export default function OwnerLayout() {
         }}
       />
       <Tabs.Screen
-        name="team"
+        name="venues"
         options={{
-          title: 'Team',
+          title: 'Venues',
           tabBarIcon: ({ color, size }) => (
-            <Feather name="users" color={color} size={size} />
+            <Feather name="map-pin" color={color} size={size} />
           ),
         }}
       />
       <Tabs.Screen
-        name="approvals"
+        name="bills"
         options={{
-          title: 'Approvals',
+          title: 'Bills',
           tabBarIcon: ({ color, size }) => (
-            <View style={styles.iconWrapper}>
-              <Feather name="check-circle" color={color} size={size} />
-              <TabBarBadge count={pendingCount} />
-            </View>
+            <Feather name="file-text" color={color} size={size} />
           ),
         }}
       />
       <Tabs.Screen
-        name="history"
+        name="accounts"
         options={{
-          title: 'History',
+          title: 'Accounts',
           tabBarIcon: ({ color, size }) => (
-            <Feather name="calendar" color={color} size={size} />
+            <Feather name="book-open" color={color} size={size} />
           ),
         }}
       />
@@ -99,6 +62,27 @@ export default function OwnerLayout() {
           tabBarIcon: ({ color, size }) => (
             <Feather name="settings" color={color} size={size} />
           ),
+        }}
+      />
+      {/* Approvals moved to the Dashboard's "Needs you now"; kept for links. */}
+      <Tabs.Screen
+        name="approvals"
+        options={{
+          href: null,
+        }}
+      />
+      {/* Attendance history now lives in each member's sheet; kept for links. */}
+      <Tabs.Screen
+        name="history"
+        options={{
+          href: null,
+        }}
+      />
+      {/* Team moved to the Dashboard; kept for Add Member and deep links. */}
+      <Tabs.Screen
+        name="team"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -123,8 +107,3 @@ export default function OwnerLayout() {
   );
 }
 
-const styles = StyleSheet.create({
-  iconWrapper: {
-    position: 'relative',
-  },
-});

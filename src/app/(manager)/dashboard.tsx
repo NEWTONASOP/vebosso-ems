@@ -18,6 +18,8 @@ import { EmptyState } from '../../components/EmptyState';
 import { InlineError } from '../../components/InlineError';
 import { ListSkeleton, StatusCardSkeleton } from '../../components/LoadingSkeleton';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
+import { MessageButtons } from '../../components/MessageButtons';
+import { VenuesShortcut } from '../../components/VenuesShortcut';
 import { NotificationBell } from '../../components/NotificationBell';
 import { QuickActionCard } from '../../components/QuickActionCard';
 import { TaskCard } from '../../components/TaskCard';
@@ -492,9 +494,15 @@ export default function ManagerDashboard() {
         {renderWorkStatus()}
       </View>
 
+      <View style={styles.messageRow}>
+        <MessageButtons onMessage={setSnackMessage} />
+        <View style={{ height: 10 }} />
+        <VenuesShortcut role="manager" />
+      </View>
+
       {todayTasks.length > 0 && (
         <View style={styles.tasksSection}>
-          <Text style={styles.sectionLabel}>Today&apos;s tasks</Text>
+          <Text style={styles.sectionLabel}>Tasks by Boss</Text>
           <View style={styles.tasksContainer}>
             {todayTasks.map((task, index) => (
               <TaskCard 
@@ -671,6 +679,10 @@ const rowStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  messageRow: {
+    paddingHorizontal: AppSpace.screen,
+    marginTop: 14,
+  },
   scrollContent: {
     paddingBottom: 110,
     width: '100%',

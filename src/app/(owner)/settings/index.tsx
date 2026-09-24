@@ -19,6 +19,7 @@ import {
 } from '../../../constants/theme';
 import { Alert } from '../../../lib/alert';
 import { useAuthStore } from '../../../store/authStore';
+import { ProfilePhotoEditor } from '../../../components/ProfilePhotoEditor';
 import { useWorkStore } from '../../../store/workStore';
 
 export default function OwnerSettingsScreen() {
@@ -67,11 +68,7 @@ export default function OwnerSettingsScreen() {
 
         {/* Profile card — visual anchor */}
         <View style={styles.profileCard}>
-          <View style={styles.profileAvatar}>
-            <Text style={styles.avatarText}>
-              {profile?.full_name?.substring(0, 2).toUpperCase()}
-            </Text>
-          </View>
+          <ProfilePhotoEditor size={60} color={AppTheme.violet} bg={AppTheme.violetSoft} />
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{profile?.full_name}</Text>
             <View style={styles.roleBadge}>
@@ -238,20 +235,6 @@ const styles = StyleSheet.create({
     padding: 20,
     ...appShadow,
     gap: 16,
-  },
-  profileAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: AppTheme.violetSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontFamily: 'Inter_700Bold',
-    color: AppTheme.violet,
-    fontSize: 20,
-    letterSpacing: -0.4,
   },
   profileInfo: {
     flex: 1,

@@ -8,7 +8,7 @@
 import { Feather } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import React, { useState } from 'react';
-import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { Platform, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { Text } from 'react-native-paper';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { AnimatedPressable } from './AnimatedPressable';
@@ -37,12 +37,25 @@ const KIND_LABEL: Partial<Record<TimelineEventKind, string>> = {
 };
 
 /**
- * Long notes are collapsed to keep the day scannable. Measuring the rendered
- * text would be exact but `onTextLayout` is unreliable on web, so the
- * affordance appears past a length that reliably wraps beyond the clamp.
+ * Long text is collapsed to keep the day scannable, and anything cut off gets a
+ * "Show more". On native the real line count comes from a hidden, unclamped
+ * copy of the text (`onTextLayout`). Web doesn't fire `onTextLayout`, so there
+ * we estimate — counting line breaks as well as length, since a short
+ * multi-line plan ("1. …\n2. …\n3. …") overflows just as surely as a long one.
  */
 const CLAMPED_LINES = 3;
-const LIKELY_CLAMPED = 130;
+const TITLE_LINES = 2;
+/** Rough characters per line in a timeline card on a phone. */
+const CHARS_PER_LINE = 34;
+
+function estimateLines(text: string | null | undefined): number {
+  if (!text) return 0;
+  return text
+    .split('\n')
+    .reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / CHARS_PER_LINE)), 0);
+}
+
+const MEASURES_TEXT = Platform.OS !== 'web';
 
 const EMPTY_COPY: Record<EmptyDayReason, { title: string; body: string }> = {
   future: {
@@ -102,10 +115,15 @@ function TimelineRow({
   onPress?: (event: TimelineEvent) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  // Full (unclamped) line counts, reported by the hidden measuring copies.
+  const [titleLines, setTitleLines] = useState<number | null>(null);
+  const [subtitleLines, setSubtitleLines] = useState<number | null>(null);
 
   const time = event.at ? format(parseISO(event.at), 'h:mm a') : 'All day';
   const kindLabel = KIND_LABEL[event.kind];
-  const canExpand = (event.subtitle?.length ?? 0) > LIKELY_CLAMPED;
+  const fullTitleLines = titleLines ?? estimateLines(event.title);
+  const fullSubtitleLines = subtitleLines ?? estimateLines(event.subtitle);
+  const canExpand = fullTitleLines > TITLE_LINES || fullSubtitleLines > CLAMPED_LINES;
 
   // Expanding a long note happens in place; only entries backed by a work log
   // have somewhere else to go.
@@ -145,18 +163,40 @@ function TimelineRow({
               {kindLabel ? (
                 <Text style={[styles.kindLabel, { color: event.color }]}>{kindLabel}</Text>
               ) : null}
-              <Text style={styles.title} numberOfLines={expanded ? undefined : 2}>
+              <Text style={styles.title} numberOfLines={expanded ? undefined : TITLE_LINES}>
                 {event.title}
               </Text>
+              {MEASURES_TEXT ? (
+                <Text
+                  style={[styles.title, styles.measure]}
+                  onTextLayout={(e) => setTitleLines(e.nativeEvent.lines.length)}
+                  aria-hidden
+                  importantForAccessibility="no-hide-descendants"
+                >
+                  {event.title}
+                </Text>
+              ) : null}
             </View>
             {event.trailing ? (
               <Text style={styles.trailing}>{event.trailing}</Text>
             ) : null}
           </View>
           {event.subtitle ? (
-            <Text style={styles.subtitle} numberOfLines={expanded ? undefined : CLAMPED_LINES}>
-              {event.subtitle}
-            </Text>
+            <View>
+              <Text style={styles.subtitle} numberOfLines={expanded ? undefined : CLAMPED_LINES}>
+                {event.subtitle}
+              </Text>
+              {MEASURES_TEXT ? (
+                <Text
+                  style={[styles.subtitle, styles.measure]}
+                  onTextLayout={(e) => setSubtitleLines(e.nativeEvent.lines.length)}
+                  aria-hidden
+                  importantForAccessibility="no-hide-descendants"
+                >
+                  {event.subtitle}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
           {canExpand ? (
             <View style={styles.moreRow}>
@@ -266,6 +306,14 @@ const styles = StyleSheet.create({
   titleCol: {
     flex: 1,
     minWidth: 0,
+  },
+  /** Invisible full-length copy used only to count lines. */
+  measure: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    opacity: 0,
   },
   kindLabel: {
     fontFamily: 'Inter_700Bold',

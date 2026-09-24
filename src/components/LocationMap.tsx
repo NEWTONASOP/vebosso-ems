@@ -53,10 +53,12 @@ interface LocationMapProps {
   emptyLabel?: string;
 }
 
-// CartoDB Positron: much cleaner than OSM for route viewing — muted background
-// lets the coloured route stand out without visual noise.
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>';
+// Standard OpenStreetMap tiles: free, no API key. (CARTO's basemaps now
+// stamp "API KEY REQUIRED" on every tile, so they can't be used keyless.)
+// OSM's tile policy needs a visible credit and a Referer that identifies the
+// app — the browser sends the site's on web; native sets it via baseUrl.
+const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 function buildHtml(pathColor: string): string {
   // Leaflet is pulled from a CDN: bundling it would mean shipping a copy of the
@@ -86,11 +88,10 @@ function buildHtml(pathColor: string): string {
   }
   .pin-endpoint {
     display: flex; align-items: center; justify-content: center;
-    width: 32px; height: 32px; border-radius: 8px;
+    border-radius: 8px; letter-spacing: 0.4px;
     color: #fff; font: 700 10px/1 -apple-system, Roboto, sans-serif;
     border: 2.5px solid rgba(255,255,255,0.9);
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    letter-spacing: 0;
   }
   .leaflet-control-attribution { font-size: 9px; }
   .leaflet-popup-content-wrapper { border-radius: 10px; font: 13px/1.4 -apple-system, Roboto, sans-serif; }
@@ -105,7 +106,6 @@ function buildHtml(pathColor: string): string {
   var map = L.map('map', { zoomControl: true, attributionControl: true });
   L.tileLayer('${TILE_URL}', {
     maxZoom: 19,
-    subdomains: 'abcd',
     attribution: '${ATTRIBUTION}'
   }).addTo(map);
   map.setView([20.5937, 78.9629], 4);
@@ -124,17 +124,40 @@ function buildHtml(pathColor: string): string {
     });
   }
 
-  function endpointPin(label, color) {
+  // START / END badges. When the two land within a badge-width of each other
+  // on screen they sit side by side (START on the left) instead of stacking,
+  // re-checked on every zoom — so neither hides the other at any zoom level.
+  function endpointPin(label, color, side) {
+    var w = label === 'START' ? 50 : 38, h = 26;
+    var ax = side === 'left' ? w + 3 : side === 'right' ? -3 : w / 2;
     return L.divIcon({
       className: '',
-      html: '<div class="pin-endpoint" style="background:' + color + '">' + label + '</div>',
-      iconSize: [32, 32],
-      iconAnchor: [16, 16]
+      html: '<div class="pin-endpoint" style="width:' + w + 'px;height:' + h + 'px;background:' + color + '">' + label + '</div>',
+      iconSize: [w, h],
+      iconAnchor: [ax, h / 2]
     });
   }
 
+  var startMarker = null, endMarker = null;
+  function placeEndpoints() {
+    if (!startMarker || !endMarker) {
+      if (startMarker) startMarker.setIcon(endpointPin('START', '#16A34A'));
+      if (endMarker) endMarker.setIcon(endpointPin('END', '#DC2626'));
+      return;
+    }
+    var a = map.latLngToLayerPoint(startMarker.getLatLng());
+    var b = map.latLngToLayerPoint(endMarker.getLatLng());
+    var close = a.distanceTo(b) < 60;
+    var startOnLeft = a.x <= b.x;
+    startMarker.setIcon(endpointPin('START', '#16A34A', close ? (startOnLeft ? 'left' : 'right') : null));
+    endMarker.setIcon(endpointPin('END', '#DC2626', close ? (startOnLeft ? 'right' : 'left') : null));
+  }
+  map.on('zoomend', placeEndpoints);
+
   function render(data) {
     layer.clearLayers();
+    startMarker = null;
+    endMarker = null;
     var bounds = [];
     var segments = data.segments || [];
     var gaps = data.gaps || [];
@@ -207,12 +230,14 @@ function buildHtml(pathColor: string): string {
     // Draw start/end endpoint markers on top of everything
     (data.markers || []).forEach(function (m) {
       if (m.kind === 'start') {
-        var sm = L.marker([m.lat, m.lng], { icon: endpointPin('GO', '#16A34A'), zIndexOffset: 500 }).addTo(layer);
+        var sm = L.marker([m.lat, m.lng], { icon: endpointPin('START', '#16A34A'), zIndexOffset: 500 }).addTo(layer);
         if (m.title) sm.bindPopup(m.title);
+        startMarker = sm;
         bounds.push([m.lat, m.lng]);
       } else if (m.kind === 'end') {
-        var em = L.marker([m.lat, m.lng], { icon: endpointPin('END', '#DC2626'), zIndexOffset: 500 }).addTo(layer);
+        var em = L.marker([m.lat, m.lng], { icon: endpointPin('END', '#DC2626'), zIndexOffset: 510 }).addTo(layer);
         if (m.title) em.bindPopup(m.title);
+        endMarker = em;
         bounds.push([m.lat, m.lng]);
       }
     });
@@ -227,6 +252,7 @@ function buildHtml(pathColor: string): string {
       }
       hasFitted = true;
     }
+    placeEndpoints();
   }
 
   window.renderTrail = function (json) {
@@ -307,7 +333,9 @@ export function LocationMap({
       <WebView
         ref={webRef}
         originWhitelist={['*']}
-        source={{ html }}
+        // A real origin makes tile requests carry a Referer, which OSM's
+        // servers require (without it they answer "Access blocked").
+        source={{ html, baseUrl: 'https://vebosso-ems.vercel.app/' }}
         style={styles.web}
         injectedJavaScript={render}
         onLoadEnd={() => webRef.current?.injectJavaScript(render)}

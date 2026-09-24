@@ -118,6 +118,9 @@ export interface Announcement {
   body: string;
   target_role: AnnouncementTarget | null;
   target_user_id: string | null;
+  /** Filled in by the database on insert (members can't read others' profiles). */
+  author_name?: string | null;
+  author_role?: UserRole | null;
   created_at: string;
 }
 
@@ -147,6 +150,205 @@ export interface AppSetting {
   value: string;
   updated_at: string;
   updated_by: string | null;
+}
+
+export type DocumentStatus = 'pending' | 'approved' | 'rejected';
+
+export interface EmployeeDocument {
+  id: string;
+  user_id: string;
+  name: string;
+  /** Path inside the private `documents` bucket, "<user_id>/<file>". */
+  file_path: string;
+  mime_type: string | null;
+  uploaded_by: string | null;
+  /** Set by the database: owner uploads start approved, others pending. */
+  status: DocumentStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+export type SalaryStatus = 'requested' | 'paid' | 'received';
+
+export interface SalaryRequest {
+  id: string;
+  user_id: string;
+  /** First day of the month the salary is for, "yyyy-MM-01". */
+  month: string;
+  status: SalaryStatus;
+  requested_at: string | null;
+  paid_at: string | null;
+  paid_by: string | null;
+  received_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BossMessage {
+  id: string;
+  sender_id: string;
+  body: string;
+  status: 'open' | 'done';
+  done_at: string | null;
+  created_at: string;
+}
+
+export interface BossMessageWithSender extends BossMessage {
+  sender: Pick<Profile, 'full_name' | 'employee_id' | 'role'>;
+}
+
+export interface Venue {
+  id: string;
+  /** The day the venue was met, "yyyy-MM-dd". */
+  met_on: string;
+  venue_name: string;
+  location: string | null;
+  /** Who was met at the venue — their role there, name and email. */
+  contact_role: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  added_by: string | null;
+  /** Filled in by the database from added_by. */
+  added_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type VenueInput = Pick<
+  Venue,
+  'met_on' | 'venue_name' | 'location' | 'contact_role' | 'contact_name' | 'contact_email'
+>;
+
+export type ExpenseStatus = 'submitted' | 'paid' | 'received';
+
+export interface ExpenseClaim {
+  id: string;
+  user_id: string;
+  /** "yyyy-MM-dd" */
+  spent_on: string;
+  /** Optional when there are receipt photos. */
+  description: string | null;
+  /** Rupees; required. Comes back from Postgres NUMERIC as a string or number. */
+  amount: number | string;
+  /** Paths in the private `expenses` bucket. */
+  photos: string[];
+  status: ExpenseStatus;
+  paid_at: string | null;
+  paid_by: string | null;
+  received_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Account {
+  id: string;
+  name: string;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type TxnKind = 'credit' | 'debit';
+
+export interface AccountTransaction {
+  id: string;
+  account_id: string;
+  /** "yyyy-MM-dd" */
+  txn_date: string;
+  kind: TxnKind;
+  /** Postgres NUMERIC — may arrive as a string. */
+  amount: number | string;
+  particular: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** From the account_summaries() RPC. Balance = credit − debit. */
+export interface AccountSummary {
+  account_id: string;
+  period_credit: number | string;
+  period_debit: number | string;
+  total_credit: number | string;
+  total_debit: number | string;
+  entry_count: number;
+  last_txn_date: string | null;
+}
+
+export type BillKind = 'estimate' | 'client';
+export type BillStatus = 'draft' | 'pending' | 'done' | 'completed' | 'trash';
+
+/** A service provided — description only; bills carry one total. */
+export interface BillItem {
+  description: string;
+}
+
+export interface Bill {
+  id: string;
+  kind: BillKind;
+  status: BillStatus;
+  prev_status: BillStatus | null;
+  /** E-0001 / B-0001 — assigned by the database on first save. */
+  number: string | null;
+  /** The E- number a client bill was converted from. */
+  estimate_number: string | null;
+  prepared_by: string | null;
+  client_name: string | null;
+  venue: string | null;
+  /** "yyyy-MM-dd" */
+  function_date: string | null;
+  guests: string | null;
+  hall_floor: string | null;
+  event_type: string | null;
+  timing: string | null;
+  phone: string | null;
+  alt_phone: string | null;
+  address: string | null;
+  items: BillItem[];
+  total: number | string | null;
+  advance: number | string | null;
+  balance: number | string | null;
+  terms: string | null;
+  images: string[];
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Everything the bill form edits. */
+export type BillFields = Pick<
+  Bill,
+  | 'kind'
+  | 'prepared_by'
+  | 'client_name'
+  | 'venue'
+  | 'function_date'
+  | 'guests'
+  | 'hall_floor'
+  | 'event_type'
+  | 'timing'
+  | 'phone'
+  | 'alt_phone'
+  | 'address'
+  | 'items'
+  | 'total'
+  | 'advance'
+  | 'balance'
+  | 'terms'
+  | 'images'
+>;
+
+export interface BillSettings {
+  id: number;
+  business_name: string;
+  tagline: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  default_terms: string | null;
+  updated_at: string;
 }
 
 export interface DbNotification {

@@ -8,6 +8,7 @@ import { Button, HelperText, Modal, Portal, Text } from 'react-native-paper';
 import { Feather } from '@expo/vector-icons';
 import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/theme';
 import { format, parse } from 'date-fns';
+import { TimeField } from './DateTimeFields';
 import { PaperOutlinedField } from './PaperOutlinedField';
 
 interface BackfillModalProps {
@@ -45,8 +46,8 @@ export function BackfillModal({
   initialCheckOutTime = '18:00',
   initialDayReport = '',
 }: BackfillModalProps) {
-  const inTimeRef = useRef(formatTimeToHHMM(initialCheckInTime) || '09:00');
-  const outTimeRef = useRef(formatTimeToHHMM(initialCheckOutTime) || '18:00');
+  const [inTime, setInTime] = useState(formatTimeToHHMM(initialCheckInTime) || '09:00');
+  const [outTime, setOutTime] = useState(formatTimeToHHMM(initialCheckOutTime) || '18:00');
   const planRef = useRef(initialCheckInPlan);
   const reportRef = useRef(initialDayReport);
   const [error, setError] = useState('');
@@ -60,17 +61,17 @@ export function BackfillModal({
   const handleSubmit = async () => {
     setError('');
 
-    const trimmedIn = inTimeRef.current.trim();
-    const trimmedOut = outTimeRef.current.trim();
+    const trimmedIn = inTime.trim();
+    const trimmedOut = outTime.trim();
     const plan = planRef.current;
     const report = reportRef.current;
 
     if (!validateTime(trimmedIn)) {
-      setError('Check-in time must be in HH:MM format (24-hour)');
+      setError('Pick the check-in time');
       return;
     }
     if (!validateTime(trimmedOut)) {
-      setError('Check-out time must be in HH:MM format (24-hour)');
+      setError('Pick the check-out time');
       return;
     }
     if (!plan.trim()) {
@@ -101,8 +102,6 @@ export function BackfillModal({
 
   if (!visible) return null;
 
-  const defaultInTime = formatTimeToHHMM(initialCheckInTime) || '09:00';
-  const defaultOutTime = formatTimeToHHMM(initialCheckOutTime) || '18:00';
 
   return (
     <Portal>
@@ -133,33 +132,25 @@ export function BackfillModal({
 
             <View style={styles.timeRow}>
               <View style={styles.timeField}>
-                <PaperOutlinedField
-                  label="Check-in (HH:MM)"
-                  placeholder="09:00"
-                  defaultValue={defaultInTime}
-                  onChangeText={(text) => {
-                    inTimeRef.current = text;
+                <TimeField
+                  label="Check-in"
+                  value={inTime}
+                  onChange={(t) => {
+                    setInTime(t);
                     clearError();
                   }}
-                  maxLength={5}
-                  keyboardType="numbers-and-punctuation"
-                  editable={!isLoading}
-                  dense
+                  disabled={isLoading}
                 />
               </View>
               <View style={styles.timeField}>
-                <PaperOutlinedField
-                  label="Check-out (HH:MM)"
-                  placeholder="18:00"
-                  defaultValue={defaultOutTime}
-                  onChangeText={(text) => {
-                    outTimeRef.current = text;
+                <TimeField
+                  label="Check-out"
+                  value={outTime}
+                  onChange={(t) => {
+                    setOutTime(t);
                     clearError();
                   }}
-                  maxLength={5}
-                  keyboardType="numbers-and-punctuation"
-                  editable={!isLoading}
-                  dense
+                  disabled={isLoading}
                 />
               </View>
             </View>

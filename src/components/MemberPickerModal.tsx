@@ -4,11 +4,12 @@
 
 import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
-import { Modal, Portal, Text, Searchbar, Avatar, IconButton, Icon } from 'react-native-paper';
+import { Modal, Portal, Text, Searchbar, IconButton, Icon } from 'react-native-paper';
 import { AppTheme, appShadow, appSoftShadow } from '../constants/theme';
 import { Profile } from '../types/database';
 import { ROLE_LABELS } from '../constants/roles';
 import { AnimatedPressable } from './AnimatedPressable';
+import { UserAvatar } from './UserAvatar';
 
 interface MemberPickerModalProps {
   visible: boolean;
@@ -118,7 +119,8 @@ export function MemberPickerModal({
                     handleSelectMember(item);
                   }}
                 >
-                  <Avatar.Text
+                  <UserAvatar
+                    uri={item.avatar_url}
                     size={40}
                     label={item.full_name.substring(0, 2).toUpperCase()}
                     style={[

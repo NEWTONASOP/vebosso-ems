@@ -76,6 +76,12 @@ export default function MemberLayout() {
           }}
         />
         <Tabs.Screen
+          name="venues"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
           name="notifications"
           options={{
             href: null,

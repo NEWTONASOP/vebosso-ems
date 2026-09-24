@@ -70,7 +70,7 @@ export default function MemberTasksScreen() {
     <PageTransition>
       <View style={screenChrome.root}>
         <View style={screenChrome.header}>
-          <Text style={screenChrome.title}>Tasks</Text>
+          <Text style={screenChrome.title}>Tasks by Boss</Text>
           <Text style={screenChrome.subtitle}>
             {stats.total === 0
               ? 'No assignments yet today'

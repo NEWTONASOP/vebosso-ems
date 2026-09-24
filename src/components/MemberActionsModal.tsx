@@ -1,22 +1,33 @@
 // ============================================================================
 // VEBOSSO EMS — Member Actions Modal (Owner Team)
+// Everything about one person, top to bottom: who they are, today, documents,
+// attendance (calendar + the day's log), tasks, salary, location, admin.
+// White cards on the grey canvas, one idea per card.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Avatar, Button, Modal, Portal, Text } from 'react-native-paper';
+import { Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, RoleAccent, appSoftShadow } from '../constants/theme';
 import { ROLE_LABELS, WORK_LOG_STATUS_CONFIG } from '../constants/roles';
 import { Profile, WorkLogStatus } from '../types/database';
 import { MemberActiveTask } from './MemberCard';
+import { BackfillGrantBar } from './BackfillGrantBar';
 import { MemberAttendancePanel } from './MemberAttendancePanel';
+import { MemberLocationSection } from './MemberLocationSection';
+import { UserAvatar } from './UserAvatar';
 
 interface MemberActionsModalProps {
   visible: boolean;
   member: Profile | null;
   onDismiss: () => void;
-  onAssignTask: () => void;
+  onOpenDocuments: () => void;
+  /** Uploads waiting for the owner's approval. */
+  pendingDocsCount?: number;
+  onOpenTasks: () => void;
+  onOpenSalary: () => void;
+  onOpenExpenses: () => void;
   onAssignManager: () => void;
   onManageProfile: () => void;
   currentStatus?: WorkLogStatus | 'offline' | 'on_leave';
@@ -29,12 +40,6 @@ interface MemberActionsModalProps {
   doneTaskCount?: number;
   activeTasks?: MemberActiveTask[];
 }
-
-const TASK_CHIP = {
-  pending: { color: AppTheme.amber, bg: AppTheme.amberSoft },
-  in_progress: { color: AppTheme.blue, bg: AppTheme.blueSoft },
-  done: { color: AppTheme.green, bg: AppTheme.greenSoft },
-} as const;
 
 function getStatusDisplay(status: WorkLogStatus | 'offline' | 'on_leave') {
   if (status === 'offline') {
@@ -85,7 +90,11 @@ export function MemberActionsModal({
   visible,
   member,
   onDismiss,
-  onAssignTask,
+  onOpenDocuments,
+  pendingDocsCount = 0,
+  onOpenTasks,
+  onOpenSalary,
+  onOpenExpenses,
   onAssignManager,
   onManageProfile,
   currentStatus = 'offline',
@@ -96,8 +105,8 @@ export function MemberActionsModal({
   pendingTaskCount = 0,
   inProgressTaskCount = 0,
   doneTaskCount = 0,
-  activeTasks = [],
 }: MemberActionsModalProps) {
+
   if (!visible || !member) return null;
 
   const status = getStatusDisplay(currentStatus);
@@ -109,272 +118,317 @@ export function MemberActionsModal({
     currentStatus === 'pending_checkout';
   const isDone = currentStatus === 'done';
   const workSummary = isDone && dayReport ? dayReport : checkInPlan || null;
-  const workLabel = isDone && dayReport ? 'Worked today' : isWorking ? 'Working on' : checkInPlan ? 'Plan' : null;
-  const workLabelColor = isDone
-    ? AppTheme.green
-    : isWorking
-      ? AppTheme.amber
-      : AppTheme.blue;
-  const workLabelBg = isDone
-    ? AppTheme.greenSoft
-    : isWorking
-      ? AppTheme.amberSoft
-      : AppTheme.blueSoft;
+  const workLabel = isDone && dayReport ? 'Day report' : isWorking ? 'Working on' : 'Plan';
   const openTaskTotal = pendingTaskCount + inProgressTaskCount;
 
-  const formattedCheckIn = checkInTime ? format(new Date(checkInTime), 'hh:mm a') : null;
-  const formattedCheckOut = checkOutTime ? format(new Date(checkOutTime), 'hh:mm a') : null;
+  const formattedCheckIn = checkInTime ? format(new Date(checkInTime), 'h:mm a') : null;
+  const formattedCheckOut = checkOutTime ? format(new Date(checkOutTime), 'h:mm a') : null;
 
-  const runAction = (action: () => void) => {
-    action();
-  };
+  const taskHint =
+    openTaskTotal > 0 || doneTaskCount > 0
+      ? [openTaskTotal > 0 ? `${openTaskTotal} open` : null, doneTaskCount > 0 ? `${doneTaskCount} done today` : null]
+          .filter(Boolean)
+          .join(' · ')
+      : 'Give a task or see past ones';
 
   return (
     <Portal>
       <Modal visible onDismiss={onDismiss} contentContainerStyle={styles.container}>
+        {/* Identity — stays put while the rest scrolls */}
+        <View style={styles.header}>
+          <View style={styles.grabber} />
+          <View style={styles.headerRow}>
+            <UserAvatar
+              uri={member.avatar_url}
+              size={48}
+              label={member.full_name.substring(0, 2).toUpperCase()}
+              style={{ backgroundColor: avatarColors.bg }}
+              labelStyle={{ color: avatarColors.text, fontFamily: 'Inter_700Bold', fontSize: 17 }}
+            />
+            <View style={styles.headerText}>
+              <Text style={styles.name} numberOfLines={1}>{member.full_name}</Text>
+              <Text style={styles.metaLine} numberOfLines={1}>
+                <Text style={styles.employeeId}>{member.employee_id}</Text>
+                <Text style={styles.metaSep}> · </Text>
+                <Text style={[styles.roleText, { color: roleMuted }]}>{ROLE_LABELS[member.role]}</Text>
+                {!!member.department && (
+                  <>
+                    <Text style={styles.metaSep}> · </Text>
+                    <Text style={styles.department}>{member.department}</Text>
+                  </>
+                )}
+              </Text>
+            </View>
+            <Pressable
+              onPress={onDismiss}
+              hitSlop={10}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <Feather name="x" size={18} color={AppTheme.inkSoft} />
+            </Pressable>
+          </View>
+        </View>
+
         <ScrollView
           showsVerticalScrollIndicator={false}
-          bounces={false}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
         >
-          <View style={styles.header}>
-            <Avatar.Text
-              size={64}
-              label={member.full_name.substring(0, 2).toUpperCase()}
-              style={{ backgroundColor: avatarColors.bg }}
-              labelStyle={{ color: avatarColors.text, fontFamily: 'Inter_700Bold', fontSize: 22 }}
-            />
-            <Text style={styles.name}>{member.full_name}</Text>
-            <Text style={styles.metaLine}>
-              <Text style={styles.employeeId}>{member.employee_id}</Text>
-              <Text style={styles.metaSep}> · </Text>
-              <Text style={[styles.roleText, { color: roleMuted }]}>{ROLE_LABELS[member.role]}</Text>
-              {!!member.department && (
-                <>
-                  <Text style={styles.metaSep}> · </Text>
-                  <Text style={styles.department}>{member.department}</Text>
-                </>
-              )}
-            </Text>
-            <View style={styles.statusRow}>
+          {/* 1. Today */}
+          <View style={styles.card}>
+            <View style={styles.todayTop}>
+              <Text style={styles.cardTitle}>Today</Text>
               <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
                 <View style={[styles.statusDot, { backgroundColor: status.color }]} />
                 <Text style={[styles.statusLabel, { color: status.color }]}>{status.label}</Text>
               </View>
-              {formattedCheckIn && (
-                <View style={[styles.timeChip, styles.timeChipIn]}>
-                  <Feather name="log-in" size={11} color={AppTheme.green} />
-                  <Text style={[styles.timeChipText, styles.timeChipTextIn]}>{formattedCheckIn}</Text>
-                </View>
-              )}
-              {formattedCheckOut && (
-                <View style={[styles.timeChip, styles.timeChipOut]}>
-                  <Feather name="log-out" size={11} color={AppTheme.mute} />
-                  <Text style={styles.timeChipText}>{formattedCheckOut}</Text>
-                </View>
-              )}
             </View>
-          </View>
 
-          {/* 1. Today's Work & Attendance Card */}
-          {(formattedCheckIn || formattedCheckOut || workSummary || currentStatus === 'on_leave') && (
-            <View style={styles.summaryCard}>
-              <Text style={styles.cardSectionTitle}>Work & Attendance</Text>
-
-              {currentStatus === 'on_leave' && (
-                <Text style={styles.footerMuted}>On approved leave today</Text>
-              )}
-
-              {workSummary && workLabel && (
-                <View style={[styles.summaryBlock, { backgroundColor: workLabelBg }]}>
-                  <Text style={[styles.summaryLabel, { color: workLabelColor }]}>{workLabel}</Text>
-                  <Text style={styles.summaryBody}>{workSummary}</Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* 2. Today's Tasks Card */}
-          {(openTaskTotal > 0 || doneTaskCount > 0) && (
-            <View style={styles.summaryCard}>
-              <Text style={styles.cardSectionTitle}>Assigned Tasks</Text>
-
-              <View style={styles.taskSummary}>
-                {inProgressTaskCount > 0 && (
-                  <View style={[styles.taskPill, { backgroundColor: TASK_CHIP.in_progress.bg }]}>
-                    <Text style={[styles.taskStat, { color: TASK_CHIP.in_progress.color }]}>
-                      {inProgressTaskCount} active
-                    </Text>
-                  </View>
-                )}
-                {pendingTaskCount > 0 && (
-                  <View style={[styles.taskPill, { backgroundColor: TASK_CHIP.pending.bg }]}>
-                    <Text style={[styles.taskStat, { color: TASK_CHIP.pending.color }]}>
-                      {pendingTaskCount} pending
-                    </Text>
-                  </View>
-                )}
-                {doneTaskCount > 0 && (
-                  <View style={[styles.taskPill, { backgroundColor: TASK_CHIP.done.bg }]}>
-                    <Text style={[styles.taskStat, { color: TASK_CHIP.done.color }]}>
-                      {doneTaskCount} done
-                    </Text>
-                  </View>
-                )}
+            {formattedCheckIn || formattedCheckOut ? (
+              <View style={styles.timesRow}>
+                <TimeCell icon="log-in" label="In" value={formattedCheckIn} color={AppTheme.green} />
+                <View style={styles.timesDivider} />
+                <TimeCell icon="log-out" label="Out" value={formattedCheckOut} color={AppTheme.inkSoft} />
               </View>
+            ) : null}
 
-              {activeTasks.length > 0 && (
-                <View style={styles.taskListContainer}>
-                  {activeTasks.slice(0, 3).map((task, index) => {
-                    const chip = TASK_CHIP[task.status] || { color: AppTheme.mute, bg: AppTheme.soft };
-                    return (
-                      <View
-                        key={`${task.title}-${index}`}
-                        style={[styles.taskItem, { backgroundColor: chip.bg }]}
-                      >
-                        <View style={styles.taskRow}>
-                          <View style={[styles.taskDot, { backgroundColor: chip.color }]} />
-                          <Text style={styles.taskLine} numberOfLines={1}>
-                            {task.title}
-                          </Text>
-                        </View>
-                        {!!task.description && (
-                          <Text style={styles.taskDesc}>
-                            {task.description}
-                          </Text>
-                        )}
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
-          )}
+            {currentStatus === 'on_leave' ? (
+              <Text style={styles.muted}>On approved leave today.</Text>
+            ) : workSummary ? (
+              <View style={styles.summaryBlock}>
+                <Text style={styles.summaryLabel}>{workLabel}</Text>
+                <Text style={styles.summaryBody} numberOfLines={4}>{workSummary}</Text>
+              </View>
+            ) : !formattedCheckIn ? (
+              <Text style={styles.muted}>Hasn’t started the day yet.</Text>
+            ) : null}
+          </View>
 
-          {/* 3. Attendance history — same day rail as the Attendance screen */}
-          <Text style={styles.sectionTitle}>Attendance history</Text>
-          <View style={styles.attendanceBlock}>
-            <MemberAttendancePanel
-              memberId={member.id}
-              accentColor={RoleAccent.owner.color}
-              enableDetailSheet={false}
-              showLocation
+          {/* 2. Documents */}
+          <View style={styles.group}>
+            <NavRow
+              label="Documents"
+              hint={
+                pendingDocsCount > 0
+                  ? `${pendingDocsCount} waiting for your approval`
+                  : 'ID, certificates and other papers'
+              }
+              hintColor={pendingDocsCount > 0 ? AppTheme.amber : undefined}
+              badge={pendingDocsCount > 0 ? String(pendingDocsCount) : undefined}
+              icon="file-text"
+              iconColor={AppTheme.violet}
+              iconBg={AppTheme.violetSoft}
+              onPress={onOpenDocuments}
+              isLast
             />
           </View>
 
-          <Text style={styles.sectionTitle}>Actions</Text>
-          <View style={styles.actionsCard}>
-            <ActionRow
-              label="Assign Task"
-              icon="clipboard"
-              iconColor={AppTheme.blue}
-              iconBg={AppTheme.blueSoft}
-              onPress={() => runAction(onAssignTask)}
-            />
+          {/* 3. Attendance — calendar, the day's log, then per-day extras */}
+          <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Attendance</Text>
+          <MemberAttendancePanel
+            memberId={member.id}
+            accentColor={RoleAccent.owner.color}
+            enableDetailSheet={false}
+            showDayHeader={false}
+            showWorkedCount
+            dayAction={(date) => (
+              <BackfillGrantBar memberId={member.id} memberName={member.full_name} date={date} />
+            )}
+            footer={(date) => (
+              <>
+                <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Work & pay</Text>
+                <View style={styles.group}>
+                  <NavRow
+                    label="Tasks by Boss"
+                    hint={taskHint}
+                    icon="clipboard"
+                    iconColor={AppTheme.blue}
+                    iconBg={AppTheme.blueSoft}
+                    onPress={onOpenTasks}
+                  />
+                  <NavRow
+                    label="Salary"
+                    hint="Requests, payments and receipts"
+                    icon="credit-card"
+                    iconColor={AppTheme.green}
+                    iconBg={AppTheme.greenSoft}
+                    onPress={onOpenSalary}
+                  />
+                  <NavRow
+                    label="Travel expenses"
+                    hint="Claims, payments and receipts"
+                    icon="navigation"
+                    iconColor={AppTheme.violet}
+                    iconBg={AppTheme.violetSoft}
+                    onPress={onOpenExpenses}
+                    isLast
+                  />
+                </View>
+                <View style={styles.locationWrap}>
+                  <MemberLocationSection
+                    memberId={member.id}
+                    date={date}
+                    accentColor={RoleAccent.owner.color}
+                  />
+                </View>
+              </>
+            )}
+          />
+
+          {/* 4. Admin */}
+          <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Manage</Text>
+          <View style={styles.group}>
             {member.role === 'member' && (
-              <ActionRow
+              <NavRow
                 label="Assign Manager"
                 icon="users"
                 iconColor={AppTheme.violet}
                 iconBg={AppTheme.violetSoft}
-                onPress={() => runAction(onAssignManager)}
+                onPress={onAssignManager}
               />
             )}
-            <ActionRow
+            <NavRow
               label="Manage Profile"
               icon="settings"
               iconColor={AppTheme.charcoal}
               iconBg={AppTheme.soft}
-              onPress={() => runAction(onManageProfile)}
+              onPress={onManageProfile}
               isLast
             />
           </View>
         </ScrollView>
-
-        <View style={styles.cancelSection}>
-          <Button
-            mode="contained"
-            onPress={onDismiss}
-            style={styles.cancelButton}
-            contentStyle={styles.cancelButtonContent}
-            buttonColor={AppTheme.soft}
-            textColor={AppTheme.charcoal}
-          >
-            Cancel
-          </Button>
-        </View>
       </Modal>
     </Portal>
   );
 }
 
-function ActionRow({
+function TimeCell({
+  icon,
   label,
+  value,
+  color,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  value: string | null;
+  color: string;
+}) {
+  return (
+    <View style={styles.timeCell}>
+      <Feather name={icon} size={13} color={value ? color : AppTheme.mute} />
+      <Text style={styles.timeLabel}>{label}</Text>
+      <Text style={[styles.timeValue, !value && { color: AppTheme.mute }]}>{value ?? '—'}</Text>
+    </View>
+  );
+}
+
+function NavRow({
+  label,
+  hint,
   icon,
   iconColor,
   iconBg,
   onPress,
   isLast,
+  trailingIcon = 'chevron-right',
+  expanded,
+  hintColor,
+  badge,
 }: {
   label: string;
+  hint?: string;
+  hintColor?: string;
+  badge?: string;
   icon: keyof typeof Feather.glyphMap;
   iconColor: string;
   iconBg: string;
   onPress: () => void;
   isLast?: boolean;
+  trailingIcon?: keyof typeof Feather.glyphMap;
+  expanded?: boolean;
 }) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed, isLast && styles.actionRowLast]}
+      style={({ pressed }) => [styles.navRow, pressed && styles.navRowPressed]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={expanded === undefined ? undefined : { expanded }}
     >
-      <View style={[styles.actionIconChip, { backgroundColor: iconBg }]}>
+      <View style={[styles.navIcon, { backgroundColor: iconBg }]}>
         <Feather name={icon} size={16} color={iconColor} />
       </View>
-      <Text style={styles.actionLabel}>{label}</Text>
-      <Feather name="chevron-right" size={16} color={AppTheme.mute} />
+      <View style={[styles.navText, !isLast && styles.navTextDivider]}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.navLabel}>{label}</Text>
+          {hint ? (
+            <Text style={[styles.navHint, hintColor ? { color: hintColor } : null]} numberOfLines={1}>
+              {hint}
+            </Text>
+          ) : null}
+        </View>
+        {badge ? (
+          <View style={styles.navBadge}>
+            <Text style={styles.navBadgeText}>{badge}</Text>
+          </View>
+        ) : null}
+        <Feather name={trailingIcon} size={16} color={AppTheme.mute} />
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: AppTheme.card,
+    backgroundColor: AppTheme.bg,
     marginHorizontal: 0,
     marginBottom: 0,
     marginTop: 'auto',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    paddingTop: 28,
-    paddingBottom: 24,
-    maxHeight: '88%',
+    maxHeight: '92%',
+    overflow: 'hidden',
     ...appSoftShadow,
   },
-  scroll: {
-    flexGrow: 0,
-  },
-  scrollContent: {
-    paddingBottom: 4,
-  },
+
+  // Header
   header: {
+    backgroundColor: AppTheme.card,
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: AppTheme.hairline,
+  },
+  grabber: {
+    alignSelf: 'center',
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: AppTheme.soft2,
+    marginBottom: 12,
+  },
+  headerRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    gap: 12,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
   },
   name: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 22,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 19,
     color: AppTheme.ink,
-    marginTop: 12,
     letterSpacing: -0.4,
-    textAlign: 'center',
   },
   metaLine: {
     fontSize: 13,
     lineHeight: 18,
-    marginTop: 4,
-    textAlign: 'center',
+    marginTop: 2,
   },
   employeeId: {
     fontFamily: 'Inter_600SemiBold',
@@ -386,27 +440,75 @@ const styles = StyleSheet.create({
   },
   roleText: {
     fontFamily: 'Inter_500Medium',
-    opacity: 0.9,
   },
   department: {
     fontFamily: 'Inter_400Regular',
     color: AppTheme.mute,
   },
-  statusRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: AppTheme.soft,
     alignItems: 'center',
-    gap: 6,
-    marginTop: 12,
+    justifyContent: 'center',
+  },
+
+  // Body
+  scroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 32,
+  },
+  sectionTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+    color: AppTheme.mute,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  sectionTitleSpaced: {
+    marginTop: 22,
+  },
+  card: {
+    backgroundColor: AppTheme.card,
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 12,
+    gap: 12,
+    ...appSoftShadow,
+  },
+  cardTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 16,
+    color: AppTheme.ink,
+    letterSpacing: -0.3,
+  },
+  muted: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: AppTheme.mute,
+  },
+
+  // Today card
+  todayTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 5,
+    paddingHorizontal: 10,
+    height: 26,
+    borderRadius: 13,
+    gap: 6,
   },
   statusDot: {
     width: 7,
@@ -414,171 +516,118 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   statusLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: 'Inter_700Bold',
   },
-  timeChip: {
+  timesRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  timeChipIn: {
-    backgroundColor: AppTheme.greenSoft,
-  },
-  timeChipOut: {
     backgroundColor: AppTheme.soft,
+    borderRadius: 14,
+    paddingVertical: 10,
   },
-  timeChipText: {
-    fontSize: 11,
-    fontFamily: 'Inter_600SemiBold',
+  timesDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: AppTheme.hairline,
+  },
+  timeCell: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  timeLabel: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12.5,
     color: AppTheme.mute,
   },
-  timeChipTextIn: {
-    color: AppTheme.green,
-  },
-  sectionTitle: {
+  timeValue: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-    color: AppTheme.mute,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-  cardSectionTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 11,
-    color: AppTheme.mute,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 10,
-  },
-  attendanceBlock: {
-    marginBottom: 16,
-  },
-  taskListContainer: {
-    marginTop: 10,
-    gap: 8,
-  },
-  summaryCard: {
-    backgroundColor: AppTheme.soft,
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 16,
-    gap: 8,
+    fontSize: 14,
+    color: AppTheme.ink,
   },
   summaryBlock: {
-    padding: 12,
-    borderRadius: 14,
-    gap: 2,
+    gap: 4,
   },
   summaryLabel: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 10,
+    fontSize: 11,
+    color: AppTheme.mute,
     textTransform: 'uppercase',
-    letterSpacing: 0.35,
+    letterSpacing: 0.4,
   },
   summaryBody: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: AppTheme.ink,
-    lineHeight: 18,
-  },
-  footerMuted: {
-    fontSize: 12,
     fontFamily: 'Inter_400Regular',
-    color: AppTheme.mute,
-  },
-  taskSummary: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  taskPill: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  taskStat: {
-    fontSize: 11,
-    fontFamily: 'Inter_600SemiBold',
-  },
-  taskItem: {
-    padding: 12,
-    borderRadius: 14,
-    marginBottom: 4,
-    gap: 4,
-  },
-  taskRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  taskDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  taskLine: {
-    flex: 1,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-    color: AppTheme.ink,
-  },
-  taskDesc: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
+    fontSize: 14,
     color: AppTheme.inkSoft,
-    marginLeft: 12,
-    lineHeight: 18,
+    lineHeight: 20,
   },
-  actionsCard: {
+
+  // Grouped rows
+  group: {
     backgroundColor: AppTheme.card,
     borderRadius: 20,
     overflow: 'hidden',
-    gap: 2,
-    padding: 4,
     ...appSoftShadow,
   },
-  actionRow: {
+  navRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingLeft: 14,
     gap: 12,
-    minHeight: 48,
-    borderRadius: 16,
+    minHeight: 60,
   },
-  actionRowLast: {},
-  actionRowPressed: {
+  navRowPressed: {
     backgroundColor: AppTheme.soft,
   },
-  actionIconChip: {
+  navIcon: {
     width: 36,
     height: 36,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  actionLabel: {
+  navText: {
     flex: 1,
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingRight: 14,
+    paddingVertical: 11,
+  },
+  navTextDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: AppTheme.hairline,
+  },
+  navLabel: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
+    fontSize: 15,
     color: AppTheme.ink,
   },
-  cancelSection: {
+  navHint: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12.5,
+    color: AppTheme.mute,
+    marginTop: 2,
+  },
+  navBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    backgroundColor: AppTheme.coral,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navBadgeText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+    color: AppTheme.white,
+  },
+  locationWrap: {
     marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: AppTheme.hairline,
-  },
-  cancelButton: {
-    borderRadius: 16,
-  },
-  cancelButtonContent: {
-    minHeight: 48,
   },
 });

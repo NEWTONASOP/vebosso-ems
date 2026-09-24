@@ -51,7 +51,7 @@ export function LoadingScreen({ label }: LoadingScreenProps = {}) {
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
       <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
         <Image
-          source={require('../../assets/images/vebosso-emblem-black.png')}
+          source={require('../../assets/images/vebosso-logo-mark.png')}
           style={styles.logo}
           contentFit="contain"
         />
@@ -102,9 +102,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 48,
   },
+  // The full wordmark + wings (2209×798) — wide, so sized by width.
   logo: {
-    width: 120,
-    height: 120,
+    width: 220,
+    height: 80,
   },
   dotsGroup: {
     alignItems: 'center',

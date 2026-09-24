@@ -19,7 +19,7 @@ const ICON_MAP: Record<string, string> = {
   announcements: 'bell', profile: 'user', dashboard: 'grid',
   team: 'users', approvals: 'check-circle', settings: 'settings',
   'my-team': 'users', 'my-work': 'briefcase',
-  leaves: 'umbrella',
+  leaves: 'umbrella', venues: 'map-pin', accounts: 'book-open', bills: 'file-text',
 };
 
 // Map route names to user-friendly labels
@@ -28,6 +28,7 @@ const LABEL_MAP: Record<string, string> = {
   announcements: 'News', profile: 'Profile', dashboard: 'Dashboard',
   team: 'Team', approvals: 'Approvals', settings: 'Settings',
   'my-team': 'My Team', 'my-work': 'My Work', leaves: 'Leaves',
+  venues: 'Venues', accounts: 'Accounts', bills: 'Bills',
 };
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -35,6 +36,15 @@ const ROLE_LABEL: Record<Role, string> = {
 };
 
 // ─── Main component ────────────────────────────────────────────────────────────
+
+/**
+ * Screens declared with `href: null`. Expo Router strips `href` before the tab
+ * bar sees the options and hides the item with `display: 'none'` instead.
+ */
+function isHiddenTab(options: unknown): boolean {
+  const o = options as { href?: unknown; tabBarItemStyle?: { display?: string } } | undefined;
+  return o?.href === null || o?.tabBarItemStyle?.display === 'none';
+}
 
 export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets     = useSafeAreaInsets();
@@ -52,7 +62,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
 
   // Hide the tab bar entirely on detail/modal screens
   const shouldHide =
-    (currentOptions as any)?.href === null ||
+    isHiddenTab(currentOptions) ||
     currentRoute.name.includes('[') ||
     currentRoute.name.includes('/');
 
@@ -108,7 +118,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
             const hasDashboard = state.routes.some((r) => r.name === 'dashboard');
 
             if (
-              (options as any).href === null ||
+              isHiddenTab(options) ||
               !ICON_MAP[route.name] ||
               route.name.includes('[') ||
               route.name.includes('/') ||
@@ -179,7 +189,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
             const hasDashboard = state.routes.some((r) => r.name === 'dashboard');
 
             if (
-              (options as any).href === null ||
+              isHiddenTab(options) ||
               !ICON_MAP[route.name] ||
               route.name.includes('[') ||
               route.name.includes('/') ||

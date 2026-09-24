@@ -37,6 +37,8 @@ interface DateRailProps {
   getDayStatus: (date: Date) => DayStatus;
   /** Role accent, used to mark today when it isn't the selected day. */
   accentColor?: string;
+  /** Short summary under the month, e.g. "12 days worked". */
+  headerBadge?: string;
 }
 
 export function DateRail({
@@ -46,6 +48,7 @@ export function DateRail({
   onChangeMonth,
   getDayStatus,
   accentColor = AppTheme.blue,
+  headerBadge,
 }: DateRailProps) {
   const listRef = useRef<FlatList<Date>>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -191,8 +194,18 @@ export function DateRail({
           accessibilityRole="button"
           accessibilityLabel={`${format(visibleMonth, 'MMMM yyyy')}, change month`}
         >
-          <Text style={styles.month}>{format(visibleMonth, 'MMMM yyyy')}</Text>
-          <Feather name="chevron-down" size={16} color={AppTheme.inkSoft} />
+          <View>
+            <View style={styles.monthRow}>
+              <Text style={styles.month}>{format(visibleMonth, 'MMMM yyyy')}</Text>
+              <Feather name="chevron-down" size={16} color={AppTheme.inkSoft} />
+            </View>
+            {headerBadge ? (
+              <View style={styles.headerBadge}>
+                <Feather name="check-circle" size={11} color={AppTheme.green} />
+                <Text style={styles.headerBadgeText}>{headerBadge}</Text>
+              </View>
+            ) : null}
+          </View>
         </AnimatedPressable>
 
         {!isToday(selectedDate) ? (
@@ -279,6 +292,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: AppTheme.ink,
     letterSpacing: -0.3,
+  },
+  monthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  headerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 3,
+  },
+  headerBadgeText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    color: AppTheme.green,
   },
   todayBtn: {
     flexDirection: 'row',

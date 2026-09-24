@@ -6,6 +6,8 @@
 // Modes:
 //   Single user:     { user_id: string, title, body, data? }
 //   Role broadcast:  { to_role: 'owner'|'manager'|'member', title, body, data?, exclude_user_ids? }
+//   Team post:       { announcement_id } — pushes the caller's own fresh
+//                    company-wide post to everyone, once
 //
 // The role-broadcast mode runs server-side using the service_role key, so it
 // bypasses RLS and can resolve owner/manager profiles even when the caller is
@@ -26,6 +28,10 @@ interface PushNotificationBody {
   // Role-broadcast mode
   to_role?: 'owner' | 'manager' | 'member';
   exclude_user_ids?: string[];
+  // Team-post mode
+  announcement_id?: string;
+  /** Server-side only — set by team-post mode, rejected from clients. */
+  to_all?: boolean;
   // Common fields
   title: string;
   body: string;
@@ -136,13 +142,54 @@ serve(async (req) => {
       return errorResponse('Invalid request body. Expected JSON.', 400, 'INVALID_JSON');
     }
 
-    const { user_id, to_role, exclude_user_ids, title, body: messageBody, data } = payload;
+    if (payload.to_all) {
+      return errorResponse('to_all cannot be set by the client', 400, 'VALIDATION_ERROR');
+    }
+
+    // -------------------------------------------------------------------------
+    // Team-post mode — any employee's post to the whole company
+    // -------------------------------------------------------------------------
+    // Members may not broadcast free text, so the content comes from the
+    // announcement row itself: it must be the caller's own post, fresh, and
+    // not pushed before. pushed_at is claimed atomically to stop replays.
+    if (payload.announcement_id) {
+      const { data: post, error: postError } = await adminClient
+        .from('announcements')
+        .update({ pushed_at: new Date().toISOString() })
+        .eq('id', payload.announcement_id)
+        .eq('created_by', caller.id)
+        .eq('target_role', 'all')
+        .is('pushed_at', null)
+        .gte('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString())
+        .select('id, title, body')
+        .maybeSingle();
+
+      if (postError || !post) {
+        return errorResponse('Post not found or already sent', 403, 'FORBIDDEN');
+      }
+
+      const { data: sender } = await adminClient
+        .from('profiles')
+        .select('full_name')
+        .eq('id', caller.id)
+        .single();
+
+      payload = {
+        to_all: true,
+        exclude_user_ids: [caller.id],
+        title: `${sender?.full_name ?? 'Team'}: ${post.title}`.slice(0, 200),
+        body: post.body.slice(0, 1000),
+        data: { type: 'announcement', announcement_id: post.id },
+      };
+    }
+
+    const { user_id, to_role, to_all, exclude_user_ids, title, body: messageBody, data } = payload;
 
     if (!title || !messageBody) {
       return errorResponse('title and body are required', 400, 'VALIDATION_ERROR');
     }
 
-    if (!user_id && !to_role) {
+    if (!user_id && !to_role && !to_all) {
       return errorResponse('Either user_id or to_role is required', 400, 'VALIDATION_ERROR');
     }
 
@@ -156,7 +203,9 @@ serve(async (req) => {
     // The damaging direction is notifying a *member*, since that is where a
     // forged "approved / rejected" message would land. Notifying leads is how
     // the normal request flows work, so any active employee may do that.
-    if (to_role) {
+    if (to_all) {
+      // Already authorized in team-post mode above.
+    } else if (to_role) {
       if (to_role === 'member' && !callerIsOwner) {
         return errorResponse('Only owners can broadcast to members', 403, 'FORBIDDEN');
       }
@@ -189,7 +238,20 @@ serve(async (req) => {
     // -------------------------------------------------------------------------
     let targetUsers: TargetUser[] = [];
 
-    if (to_role) {
+    if (to_all) {
+      const { data: profiles, error: profilesError } = await adminClient
+        .from('profiles')
+        .select('id, expo_push_token')
+        .eq('is_active', true);
+
+      if (profilesError) {
+        console.error('Failed to fetch profiles for team post:', profilesError);
+        return errorResponse('Failed to resolve target users', 500, 'PROFILES_FETCH_ERROR');
+      }
+
+      const excluded = new Set(exclude_user_ids || []);
+      targetUsers = (profiles || []).filter((p) => !excluded.has(p.id));
+    } else if (to_role) {
       // Role-broadcast mode — service_role key bypasses RLS, so we can read all
       // owner/manager profiles even if the caller is a member.
       const { data: profiles, error: profilesError } = await adminClient

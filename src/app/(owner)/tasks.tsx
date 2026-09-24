@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { Avatar, Snackbar, Text } from 'react-native-paper';
+import { Snackbar, Text } from 'react-native-paper';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
@@ -24,6 +24,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Task, TaskStatus } from '../../types/database';
+import { UserAvatar } from '../../components/UserAvatar';
 
 interface TaskWithAssignee extends Task {
   assignee: {
@@ -304,7 +305,8 @@ export default function OwnerTaskTrackingScreen() {
                       
                       <View style={styles.taskFooter}>
                         <View style={styles.assigneeInfo}>
-                          <Avatar.Text
+                          <UserAvatar
+                            uri={task.assignee?.avatar_url}
                             size={20}
                             label={task.assignee?.full_name?.substring(0, 2).toUpperCase() || '??'}
                             style={styles.avatar}

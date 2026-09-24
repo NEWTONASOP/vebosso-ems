@@ -19,7 +19,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { Avatar, Snackbar, Text } from 'react-native-paper';
+import { Snackbar, Text } from 'react-native-paper';
 import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { DayAction, DayHeaderCard } from '../../components/DayHeaderCard';
 import { DayTimeline } from '../../components/DayTimeline';
@@ -56,6 +56,7 @@ import {
   WorkLog,
   WorkLogWithProfile,
 } from '../../types/database';
+import { UserAvatar } from '../../components/UserAvatar';
 
 const ownerAccent = RoleAccent.owner;
 const KEY = (d: Date) => format(d, 'yyyy-MM-dd');
@@ -397,7 +398,8 @@ export default function OwnerHistoryScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`Selected member ${selectedMember.full_name}. Change member`}
                 >
-                  <Avatar.Text
+                  <UserAvatar
+                    uri={selectedMember.avatar_url}
                     size={40}
                     label={selectedMember.full_name?.substring(0, 2).toUpperCase() || '??'}
                     style={styles.memberAvatar}

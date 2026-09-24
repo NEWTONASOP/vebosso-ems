@@ -6,8 +6,9 @@ import { Feather } from '@expo/vector-icons';
 import { addDays, format, isValid, parseISO } from 'date-fns';
 import { useCallback, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
-import { Button, Chip, HelperText, Modal, Portal, Text } from 'react-native-paper';
+import { Button, HelperText, Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/theme';
+import { DateField } from './DateTimeFields';
 import { PaperOutlinedField } from './PaperOutlinedField';
 
 interface LeaveRequestModalProps {
@@ -48,29 +49,13 @@ export function LeaveRequestModal({
     setError('');
   };
 
-  const handleDateChange = (text: string) => {
-    const filtered = text.replace(/[^0-9-]/g, '');
-    dateRef.current = filtered;
-    setDateStr(filtered);
-    setError('');
-
-    // If text reaches 10 chars, validate YYYY-MM-DD
-    if (filtered.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(filtered)) {
-      const parsed = parseISO(filtered);
-      if (!isValid(parsed)) {
-        setError('Invalid date format');
-      } else if (filtered < today) {
-        setError('Leave date cannot be in the past');
-      }
-    }
-  };
 
   const handleSubmit = async () => {
     const dateValue = dateRef.current;
     const reason = reasonRef.current;
 
     if (!dateValue.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
-      setError('Please enter date as YYYY-MM-DD');
+      setError('Pick the leave date');
       return;
     }
     const parsed = parseISO(dateValue);
@@ -115,67 +100,17 @@ export function LeaveRequestModal({
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.label}>Select Date</Text>
-            <View style={styles.chipsRow}>
-              <Chip
-                selected={dateStr === today}
-                onPress={() => handleQuickDateSelect(today)}
-                style={[
-                  styles.chip,
-                  dateStr === today ? styles.chipActive : styles.chipInactive,
-                ]}
-                textStyle={[
-                  styles.chipText,
-                  dateStr === today && styles.chipTextSelected,
-                ]}
-                selectedColor={AppTheme.white}
-                mode={dateStr === today ? 'flat' : 'outlined'}
-              >
-                Today
-              </Chip>
-              <Chip
-                selected={dateStr === tomorrow}
-                onPress={() => handleQuickDateSelect(tomorrow)}
-                style={[
-                  styles.chip,
-                  dateStr === tomorrow ? styles.chipActive : styles.chipInactive,
-                ]}
-                textStyle={[
-                  styles.chipText,
-                  dateStr === tomorrow && styles.chipTextSelected,
-                ]}
-                selectedColor={AppTheme.white}
-                mode={dateStr === tomorrow ? 'flat' : 'outlined'}
-              >
-                Tomorrow
-              </Chip>
-              <Chip
-                selected={dateStr === monday}
-                onPress={() => handleQuickDateSelect(monday)}
-                style={[
-                  styles.chip,
-                  dateStr === monday ? styles.chipActive : styles.chipInactive,
-                ]}
-                textStyle={[
-                  styles.chipText,
-                  dateStr === monday && styles.chipTextSelected,
-                ]}
-                selectedColor={AppTheme.white}
-                mode={dateStr === monday ? 'flat' : 'outlined'}
-              >
-                Next Mon
-              </Chip>
-            </View>
-
-            <PaperOutlinedField
-              label="Leave Date (YYYY-MM-DD)"
-              placeholder="e.g. 2026-07-15"
-              value={dateStr}
-              onChangeText={handleDateChange}
-              maxLength={10}
-              keyboardType="numbers-and-punctuation"
-              editable={!isLoading}
-              dense
+            <DateField
+              label="Leave date"
+              value={dateStr || null}
+              onChange={handleQuickDateSelect}
+              quick={[
+                { label: 'Today', value: today },
+                { label: 'Tomorrow', value: tomorrow },
+                { label: 'Next Mon', value: monday },
+              ]}
+              allow="future"
+              disabled={isLoading}
             />
           </View>
 
@@ -269,37 +204,6 @@ const styles = StyleSheet.create({
   },
   section: {
     width: '100%',
-  },
-  label: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-    color: AppTheme.ink,
-    marginBottom: 10,
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-    flexWrap: 'wrap',
-  },
-  chip: {
-    borderRadius: 14,
-  },
-  chipActive: {
-    backgroundColor: AppTheme.charcoal,
-    borderColor: AppTheme.charcoal,
-  },
-  chipInactive: {
-    backgroundColor: AppTheme.soft,
-    borderColor: AppTheme.soft2,
-  },
-  chipText: {
-    fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
-    color: AppTheme.inkSoft,
-  },
-  chipTextSelected: {
-    color: AppTheme.white,
   },
   charCountRow: {
     alignItems: 'flex-end',

@@ -9,7 +9,11 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { InfoRow } from '../../components/InfoRow';
+import { DocumentsSheet } from '../../components/DocumentsSheet';
+import { ExpensesSheet } from '../../components/ExpensesSheet';
 import { PageTransition } from '../../components/PageTransition';
+import { SalarySheet } from '../../components/SalarySheet';
+import { useState } from 'react';
 import { APP_NAME, ROLE_LABELS } from '../../constants/roles';
 import {
   AppRadius,
@@ -22,10 +26,12 @@ import {
 } from '../../constants/theme';
 import { Alert } from '../../lib/alert';
 import { useAuthStore } from '../../store/authStore';
+import { ProfilePhotoEditor } from '../../components/ProfilePhotoEditor';
 
 export default function ManagerSettingsScreen() {
   const router = useRouter();
   const { profile, signOut } = useAuthStore();
+  const [openSheet, setOpenSheet] = useState<'documents' | 'salary' | 'expenses' | null>(null);
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -57,11 +63,11 @@ export default function ManagerSettingsScreen() {
 
         {/* Profile card — role accent on avatar only */}
         <View style={styles.profileCard}>
-          <View style={styles.profileAvatar}>
-            <Text style={styles.avatarText}>
-              {profile.full_name.substring(0, 2).toUpperCase()}
-            </Text>
-          </View>
+          <ProfilePhotoEditor
+            size={60}
+            color={RoleAccent.manager.color}
+            bg={RoleAccent.manager.soft}
+          />
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{profile.full_name}</Text>
             <View style={styles.roleBadge}>
@@ -85,6 +91,36 @@ export default function ManagerSettingsScreen() {
           <InfoRow label="Full Name" value={profile.full_name} />
           <InfoRow label="Designation" value={profile.department || 'Not assigned'} />
           <InfoRow label="Joined" value={getJoinedDate()} isLast />
+        </View>
+
+        <Text style={styles.sectionLabel}>Work & pay</Text>
+        <View style={styles.groupedCard}>
+          <ActionRow
+            label="My Documents"
+            subtitle="Upload ID, certificates and other papers"
+            icon="file-text"
+            iconColor={AppTheme.violet}
+            iconBg={AppTheme.violetSoft}
+            onPress={() => setOpenSheet('documents')}
+          />
+          <View style={styles.separator} />
+          <ActionRow
+            label="Salary"
+            subtitle="Ask the boss and confirm when it arrives"
+            icon="credit-card"
+            iconColor={AppTheme.green}
+            iconBg={AppTheme.greenSoft}
+            onPress={() => setOpenSheet('salary')}
+          />
+          <View style={styles.separator} />
+          <ActionRow
+            label="Travel expenses"
+            subtitle="Send what you spent; confirm when it’s paid"
+            icon="navigation"
+            iconColor={AppTheme.violet}
+            iconBg={AppTheme.violetSoft}
+            onPress={() => setOpenSheet('expenses')}
+          />
         </View>
 
         <Text style={styles.sectionLabel}>Security & settings</Text>
@@ -131,6 +167,33 @@ export default function ManagerSettingsScreen() {
           <Text style={styles.appVersion}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
         </View>
       </ScrollView>
+      {openSheet === 'documents' ? (
+        <DocumentsSheet
+          visible
+          onDismiss={() => setOpenSheet(null)}
+          userId={profile.id}
+          userName={profile.full_name}
+          currentUserId={profile.id}
+          canManage={false}
+        />
+      ) : null}
+      {openSheet === 'salary' ? (
+        <SalarySheet
+          visible
+          onDismiss={() => setOpenSheet(null)}
+          userId={profile.id}
+          userName={profile.full_name}
+          mode="self"
+        />
+      ) : null}
+      {openSheet === 'expenses' ? (
+        <ExpensesSheet
+          onDismiss={() => setOpenSheet(null)}
+          userId={profile.id}
+          userName={profile.full_name}
+          mode="self"
+        />
+      ) : null}
     </PageTransition>
   );
 }
@@ -185,20 +248,6 @@ const styles = StyleSheet.create({
     padding: 20,
     ...appShadow,
     gap: 16,
-  },
-  profileAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: RoleAccent.manager.soft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontFamily: 'Inter_700Bold',
-    color: RoleAccent.manager.color,
-    fontSize: 20,
-    letterSpacing: -0.4,
   },
   profileInfo: {
     flex: 1,

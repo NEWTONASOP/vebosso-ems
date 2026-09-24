@@ -5,8 +5,8 @@
 
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
-import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -19,19 +19,20 @@ import Animated, {
   Easing,
   FadeIn,
   FadeInDown,
-  FadeInUp,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnimatedPressable } from '../../components/AnimatedPressable';
-import { ApprovalCard } from '../../components/ApprovalCard';
-import { AssignTaskModal } from '../../components/AssignTaskModal';
+import { InboxKind, NeedsYouCard, OwnerInboxSheet, useOwnerInbox } from '../../components/OwnerInbox';
 import { InlineError } from '../../components/InlineError';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
-import { MemberPickerModal } from '../../components/MemberPickerModal';
+import { MemberCard } from '../../components/MemberCard';
+import { OwnerMemberMenu } from '../../components/OwnerMemberMenu';
+import { sortMembersByLiveStatus } from '../../lib/teamSort';
 import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useWorkStore } from '../../store/workStore';
-import { Profile } from '../../types/database';
+import { Profile, WorkLogWithProfile } from '../../types/database';
+import { formatWorkLogDateForMessage } from '../../lib/workLogDates';
 import { AppTheme as T, appShadow as shadow } from '../../constants/theme';
 
 const ENTER = Easing.bezier(0.22, 1, 0.36, 1);
@@ -46,27 +47,27 @@ export default function OwnerDashboard() {
     isLoadingApprovals,
     approvalsError,
     teamMembers,
+    isLoadingTeam,
+    teamError,
+    memberLiveStatus,
     fetchStats,
     fetchPendingApprovals,
     fetchSettings,
     fetchTeamMembers,
+    refreshMemberLiveStatus,
     approveCheckIn,
     rejectCheckIn,
     subscribeToRealtime,
     unsubscribeFromRealtime,
-    addTask,
   } = useWorkStore();
 
   const [refreshing, setRefreshing] = React.useState(false);
-  const [memberPickerVisible, setMemberPickerVisible] = React.useState(false);
-  const [assignTaskModalVisible, setAssignTaskModalVisible] = React.useState(false);
-  const [selectedMember, setSelectedMember] = React.useState<Profile | null>(null);
-  const [isAssigningTask, setIsAssigningTask] = React.useState(false);
+  const [menuMember, setMenuMember] = React.useState<Profile | null>(null);
   const [approvingId, setApprovingId] = React.useState<string | null>(null);
   const [rejectingId, setRejectingId] = React.useState<string | null>(null);
   const [snackMessage, setSnackMessage] = React.useState('');
-  const [assignTargetWorkLog, setAssignTargetWorkLog] = React.useState<any>(null);
-  const [selectedMemberForApproval, setSelectedMemberForApproval] = React.useState<Profile | null>(null);
+  const inbox = useOwnerInbox();
+  const [inboxFilter, setInboxFilter] = React.useState<InboxKind | 'all' | null>(null);
 
   const loadData = useCallback(async () => {
     await Promise.all([
@@ -86,6 +87,31 @@ export default function OwnerDashboard() {
     subscribeToRealtime(profile.id, 'owner');
     return () => unsubscribeFromRealtime();
   }, [profile?.id, loadData, subscribeToRealtime, unsubscribeFromRealtime]);
+
+  // Keep live status fresh while the dashboard is focused (realtime + poll fallback)
+  useFocusEffect(
+    useCallback(() => {
+      const pollId = setInterval(() => {
+        refreshMemberLiveStatus();
+      }, 15000);
+      return () => clearInterval(pollId);
+    }, [refreshMemberLiveStatus])
+  );
+
+  // Oldest waiting request per person, shown as buttons on their team card.
+  const pendingByUser = useMemo(() => {
+    const map: Record<string, WorkLogWithProfile> = {};
+    for (const log of pendingApprovals) {
+      const prev = map[log.user_id];
+      if (!prev || log.date < prev.date) map[log.user_id] = log;
+    }
+    return map;
+  }, [pendingApprovals]);
+
+  const sortedMembers = useMemo(
+    () => sortMembersByLiveStatus(teamMembers, memberLiveStatus),
+    [teamMembers, memberLiveStatus]
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -113,92 +139,9 @@ export default function OwnerDashboard() {
     }
   };
 
-  const handleAssignAndApprove = (workLog: any) => {
-    const targetMember = {
-      id: workLog.user_id,
-      full_name: workLog.profiles.full_name,
-      employee_id: workLog.profiles.employee_id,
-      role: workLog.profiles.role,
-      department: workLog.profiles.department,
-      avatar_url: workLog.profiles.avatar_url,
-      is_active: true,
-      manager_id: null,
-      expo_push_token: null,
-      must_change_password: false,
-      created_at: '',
-      updated_at: '',
-      created_by: null,
-    };
-    setSelectedMemberForApproval(targetMember);
-    setAssignTargetWorkLog(workLog);
-    setAssignTaskModalVisible(true);
-  };
-
-  const handleAssignTaskFromApproval = async (
-    title: string,
-    description: string | null,
-    dueDate: string | null
-  ) => {
-    if (!profile?.id || !assignTargetWorkLog) return;
-    setIsAssigningTask(true);
-    const result = await approveCheckIn(assignTargetWorkLog.id, profile.id, [
-      {
-        assigned_to: assignTargetWorkLog.user_id,
-        assigned_by: profile.id,
-        work_log_id: assignTargetWorkLog.id,
-        title,
-        description,
-        due_date: dueDate,
-        status: 'pending',
-      },
-    ]);
-    setIsAssigningTask(false);
-    if (result.success) {
-      setSnackMessage('Approved & task assigned');
-      setAssignTaskModalVisible(false);
-      setSelectedMemberForApproval(null);
-      setAssignTargetWorkLog(null);
-    } else {
-      setSnackMessage(result.error || 'Failed to approve. Please try again.');
-    }
-  };
-
-  const handleSelectMember = (member: Profile) => {
-    setSelectedMember(member);
-    setMemberPickerVisible(false);
-    setAssignTaskModalVisible(true);
-  };
-
-  const handleAssignTask = async (
-    title: string,
-    description: string | null,
-    dueDate: string | null
-  ) => {
-    if (!profile?.id || !selectedMember?.id) return;
-    setIsAssigningTask(true);
-    const result = await addTask({
-      assigned_to: selectedMember.id,
-      assigned_by: profile.id,
-      title,
-      description,
-      due_date: dueDate,
-      status: 'pending',
-    });
-    setIsAssigningTask(false);
-    if (result.success) {
-      setSnackMessage(`Task assigned to ${selectedMember.full_name}`);
-      setAssignTaskModalVisible(false);
-      setSelectedMember(null);
-    } else {
-      setSnackMessage(result.error || 'Failed to assign task. Please try again.');
-    }
-  };
-
   const firstName = profile?.full_name?.split(' ')[0] || 'there';
-  const today = format(new Date(), 'EEEE, d MMMM');
+  const today = format(new Date(), 'EEE, d MMM');
   const stillLoading = isLoadingApprovals && stats.totalMembers === 0;
-  const pendingCount = stats.pendingApprovals;
-  const hasPending = pendingCount > 0;
 
   return (
     <>
@@ -221,59 +164,33 @@ export default function OwnerDashboard() {
         >
           {/* 1. Greeting */}
           <Animated.View entering={FadeIn.duration(420).easing(ENTER)} style={styles.header}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={styles.hello}>Hello {firstName}</Text>
-              <Text style={styles.date}>{today}</Text>
-            </View>
+            <Text style={styles.hello} numberOfLines={1}>Hello {firstName}</Text>
+            <Text style={styles.date} numberOfLines={1}>{today}</Text>
             <SoftBell />
           </Animated.View>
 
-          {/* 2. The one thing that needs the owner today */}
+          {/* 2. Everything waiting on the owner — or a quiet all-clear */}
           <Animated.View entering={FadeInDown.delay(50).duration(500).easing(ENTER)}>
-            <View style={styles.hero}>
-              <View style={styles.heroGlow} />
-
-              {stillLoading ? (
-                <ActivityIndicator color="#fff" style={{ marginVertical: 18 }} />
-              ) : hasPending ? (
-                <>
-                  <View style={styles.heroEyebrowRow}>
-                    <View style={styles.heroDot} />
-                    <Text style={styles.heroEyebrow}>Needs you now</Text>
-                  </View>
-                  <Text style={styles.heroTitle}>
-                    {pendingCount} check-in{pendingCount === 1 ? '' : 's'} waiting
-                  </Text>
-                  <Text style={styles.heroHint}>
-                    Your team can’t start until you approve their plan.
-                  </Text>
-                  <AnimatedPressable
-                    scaleTo={0.97}
-                    onPress={() => router.push('/(owner)/approvals')}
-                    style={styles.heroCta}
-                  >
-                    <Text style={styles.heroCtaText}>Review now</Text>
-                    <Feather name="arrow-right" size={17} color={T.ink} />
-                  </AnimatedPressable>
-                </>
-              ) : (
-                <>
-                  <View style={styles.heroEyebrowRow}>
-                    <Feather name="check-circle" size={14} color="rgba(255,255,255,0.55)" />
-                    <Text style={styles.heroEyebrow}>All caught up</Text>
-                  </View>
-                  <Text style={styles.heroTitle}>Nothing needs approval</Text>
-                  <Text style={styles.heroHint}>
+            {stillLoading ? (
+              <ActivityIndicator color={T.mute} style={styles.infoLoading} />
+            ) : inbox.total > 0 ? (
+              <NeedsYouCard inbox={inbox} onOpen={setInboxFilter} />
+            ) : (
+              <View style={styles.infoRow}>
+                <Feather name="check-circle" size={14} color={T.green} />
+                <Text style={styles.infoText} numberOfLines={1}>
+                  Nothing needs approval
+                  <Text style={styles.infoTextMute}>
                     {stats.activeNow > 0
-                      ? `${stats.activeNow} ${stats.activeNow === 1 ? 'person is' : 'people are'} working right now.`
-                      : 'No one has checked in yet today.'}
+                      ? ` · ${stats.activeNow} working now`
+                      : ' · No one checked in yet'}
                   </Text>
-                </>
-              )}
-            </View>
+                </Text>
+              </View>
+            )}
           </Animated.View>
 
-          {/* 3. Today at a glance — one calm strip, not four boxes */}
+          {/* 3. Today at a glance — one compact strip */}
           <Animated.View entering={FadeInDown.delay(120).duration(500).easing(ENTER)}>
             <View style={styles.glanceStrip}>
               <GlanceStat
@@ -302,107 +219,95 @@ export default function OwnerDashboard() {
             </View>
           </Animated.View>
 
-          {/* 4. Two clear actions */}
+          {/* 4. The team, same cards and menu as the Team tab */}
           <Animated.View entering={FadeInDown.delay(180).duration(500).easing(ENTER)}>
-            <Text style={styles.sectionLabel}>Quick actions</Text>
-            <View style={styles.actionsCol}>
-              <ActionCard
-                icon="plus-circle"
-                color={T.violet}
-                soft={T.violetSoft}
-                title="Assign a task"
-                subtitle="Give work to a team member"
-                onPress={() => setMemberPickerVisible(true)}
-              />
-              <ActionCard
-                icon="check-square"
-                color={T.blue}
-                soft={T.blueSoft}
-                title="See team tasks"
-                subtitle="Track what you already assigned"
-                onPress={() => router.push('/(owner)/tasks')}
-              />
-            </View>
-          </Animated.View>
-
-          {/* 5. Actual approvals list */}
-          <Animated.View entering={FadeInUp.delay(240).duration(520).easing(ENTER)}>
             <View style={styles.sectionHead}>
-              <View style={{ flex: 1, paddingRight: 12 }}>
-                <Text style={styles.sectionLabelTight}>Pending check-ins</Text>
-                <Text style={styles.sectionHint}>
-                  Approve so people can start their day
-                </Text>
-              </View>
-              {pendingApprovals.length > 3 ? (
-                <AnimatedPressable
-                  scaleTo={0.96}
-                  onPress={() => router.push('/(owner)/approvals')}
-                  style={styles.viewAll}
-                >
-                  <Text style={styles.viewAllText}>See all</Text>
-                  <Feather name="chevron-right" size={16} color={T.mute} />
-                </AnimatedPressable>
-              ) : null}
+              <Text style={[styles.sectionLabelTight, { flex: 1 }]}>Team</Text>
+              <AnimatedPressable
+                scaleTo={0.96}
+                onPress={() => router.push('/(owner)/tasks')}
+                style={styles.viewAll}
+              >
+                <Text style={styles.viewAllText}>All tasks</Text>
+                <Feather name="chevron-right" size={16} color={T.mute} />
+              </AnimatedPressable>
             </View>
 
-            {isLoadingApprovals ? (
-              <ListSkeleton count={2} variant="approval" />
-            ) : approvalsError ? (
+            {approvalsError ? (
               <InlineError message={approvalsError} onRetry={() => fetchPendingApprovals()} />
-            ) : pendingApprovals.length === 0 ? (
-              <View style={styles.empty}>
-                <View style={styles.emptyCheck}>
-                  <Feather name="inbox" size={20} color={T.mute} />
-                </View>
-                <Text style={styles.emptyTitle}>Nothing to approve</Text>
-                <Text style={styles.emptySub}>
-                  When someone checks in, their request shows up here.
-                </Text>
-              </View>
+            ) : null}
+
+            {isLoadingTeam && teamMembers.length === 0 ? (
+              <ListSkeleton count={3} variant="member" />
+            ) : teamError ? (
+              <InlineError message={teamError} onRetry={() => fetchTeamMembers()} />
+            ) : sortedMembers.length === 0 ? (
+              <Text style={styles.sectionHint}>No team members yet.</Text>
             ) : (
-              pendingApprovals.slice(0, 3).map((workLog, index) => (
-                <ApprovalCard
-                  key={workLog.id}
-                  workLog={workLog}
-                  index={index}
-                  onApprove={handleApprove}
-                  onReject={handleReject}
-                  onAssignAndApprove={handleAssignAndApprove}
-                  isApproving={approvingId === workLog.id}
-                  isRejecting={rejectingId === workLog.id}
-                />
-              ))
+              sortedMembers.map((member) => {
+                const live = memberLiveStatus[member.id];
+                const pending = pendingByUser[member.id];
+                return (
+                  <MemberCard
+                    key={member.id}
+                    member={member}
+                    currentStatus={live?.status ?? 'offline'}
+                    checkInTime={live?.checkInTime}
+                    checkOutTime={live?.checkOutTime}
+                    checkInPlan={live?.checkInPlan}
+                    dayReport={live?.dayReport}
+                    pendingTaskCount={live?.pendingTaskCount ?? 0}
+                    inProgressTaskCount={live?.inProgressTaskCount ?? 0}
+                    doneTaskCount={live?.doneTaskCount ?? 0}
+                    activeTasks={live?.activeTasks ?? []}
+                    onPress={() => setMenuMember(member)}
+                    actions={
+                      pending ? (
+                        <ApprovalActions
+                          workLog={pending}
+                          isApproving={approvingId === pending.id}
+                          isRejecting={rejectingId === pending.id}
+                          onApprove={() => handleApprove(pending.id)}
+                          onReject={() => handleReject(pending.id)}
+                        />
+                      ) : undefined
+                    }
+                  />
+                );
+              })
             )}
+
+            <AnimatedPressable
+              scaleTo={0.98}
+              onPress={() => router.push('/(owner)/team/add-member')}
+              style={styles.addMember}
+              accessibilityRole="button"
+              accessibilityLabel="Add member"
+            >
+              <View style={styles.addMemberIcon}>
+                <Feather name="user-plus" size={17} color={T.ink} />
+              </View>
+              <Text style={styles.addMemberText}>Add member</Text>
+            </AnimatedPressable>
           </Animated.View>
+
         </ScrollView>
       </View>
 
-      <MemberPickerModal
-        visible={memberPickerVisible}
-        onDismiss={() => {
-          setMemberPickerVisible(false);
-          setSelectedMember(null);
-        }}
-        members={teamMembers}
-        selectedMember={selectedMember}
-        onSelectMember={handleSelectMember}
-      />
-
-      {assignTaskModalVisible ? (
-        <AssignTaskModal
-          visible
-          onDismiss={() => {
-            setAssignTaskModalVisible(false);
-            setSelectedMember(null);
-            setSelectedMemberForApproval(null);
-            setAssignTargetWorkLog(null);
-          }}
-          targetMember={selectedMember || selectedMemberForApproval}
-          onSubmit={assignTargetWorkLog ? handleAssignTaskFromApproval : handleAssignTask}
-          isLoading={isAssigningTask}
+      {inboxFilter ? (
+        <OwnerInboxSheet
+          inbox={inbox}
+          initialFilter={inboxFilter}
+          onDismiss={() => setInboxFilter(null)}
+          onMessage={setSnackMessage}
         />
       ) : null}
+
+      <OwnerMemberMenu
+        member={menuMember}
+        onClose={() => setMenuMember(null)}
+        onMessage={setSnackMessage}
+      />
 
       <Snackbar
         visible={!!snackMessage}
@@ -445,6 +350,59 @@ function SoftBell() {
   );
 }
 
+function ApprovalActions({
+  workLog,
+  isApproving,
+  isRejecting,
+  onApprove,
+  onReject,
+}: {
+  workLog: WorkLogWithProfile;
+  isApproving: boolean;
+  isRejecting: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const isCheckout = workLog.status === 'pending_checkout';
+  const when = formatWorkLogDateForMessage(workLog.date);
+  const busy = isApproving || isRejecting;
+
+  return (
+    <View style={styles.approvalBox}>
+      <Text style={styles.approvalLabel} numberOfLines={1}>
+        {isCheckout ? 'Checkout waiting' : 'Check-in waiting'}
+        {when ? <Text style={styles.approvalWhen}> · {when}</Text> : null}
+      </Text>
+      <View style={styles.approvalBtns}>
+        <AnimatedPressable
+          scaleTo={0.95}
+          onPress={onReject}
+          disabled={busy}
+          style={[styles.approvalBtn, styles.rejectBtn]}
+        >
+          {isRejecting ? (
+            <ActivityIndicator size="small" color={T.coral} />
+          ) : (
+            <Text style={styles.rejectText}>Reject</Text>
+          )}
+        </AnimatedPressable>
+        <AnimatedPressable
+          scaleTo={0.95}
+          onPress={onApprove}
+          disabled={busy}
+          style={[styles.approvalBtn, styles.approveBtn]}
+        >
+          {isApproving ? (
+            <ActivityIndicator size="small" color={T.white} />
+          ) : (
+            <Text style={styles.approveText}>Approve</Text>
+          )}
+        </AnimatedPressable>
+      </View>
+    </View>
+  );
+}
+
 function GlanceStat({
   icon,
   color,
@@ -461,40 +419,11 @@ function GlanceStat({
   return (
     <View style={styles.glanceStat}>
       <View style={[styles.glanceIcon, { backgroundColor: soft }]}>
-        <Feather name={icon} size={13} color={color} />
+        <Feather name={icon} size={11} color={color} />
       </View>
       <Text style={styles.glanceValue}>{value}</Text>
-      <Text style={styles.glanceLabel}>{label}</Text>
+      <Text style={styles.glanceLabel} numberOfLines={1}>{label}</Text>
     </View>
-  );
-}
-
-function ActionCard({
-  icon,
-  color,
-  soft,
-  title,
-  subtitle,
-  onPress,
-}: {
-  icon: React.ComponentProps<typeof Feather>['name'];
-  color: string;
-  soft: string;
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-}) {
-  return (
-    <AnimatedPressable scaleTo={0.98} onPress={onPress} style={styles.actionCard}>
-      <View style={[styles.actionIcon, { backgroundColor: soft }]}>
-        <Feather name={icon} size={18} color={color} />
-      </View>
-      <View style={styles.actionCopy}>
-        <Text style={styles.actionTitle}>{title}</Text>
-        <Text style={styles.actionSub}>{subtitle}</Text>
-      </View>
-      <Feather name="chevron-right" size={18} color={T.mute} />
-    </AnimatedPressable>
   );
 }
 
@@ -517,26 +446,26 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 20,
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
   },
   hello: {
+    flex: 1,
     fontFamily: 'Inter_700Bold',
-    fontSize: 30,
+    fontSize: 20,
     color: T.ink,
-    letterSpacing: -0.9,
+    letterSpacing: -0.5,
   },
   date: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
     color: T.mute,
-    marginTop: 4,
   },
   bell: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 14,
     backgroundColor: T.card,
     alignItems: 'center',
     justifyContent: 'center',
@@ -544,8 +473,8 @@ const styles = StyleSheet.create({
   },
   bellDot: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 5,
+    right: 5,
     minWidth: 15,
     height: 15,
     borderRadius: 8,
@@ -561,82 +490,95 @@ const styles = StyleSheet.create({
     lineHeight: 10,
   },
 
-  hero: {
-    backgroundColor: T.charcoal,
-    borderRadius: 22,
-    padding: 14,
-    overflow: 'hidden',
-    marginBottom: 12,
-    ...shadow,
+  infoLoading: {
+    marginVertical: 6,
+    alignSelf: 'flex-start',
   },
-  heroGlow: {
-    position: 'absolute',
-    top: -58,
-    right: -42,
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: 'rgba(255,255,255,0.045)',
-  },
-  heroEyebrowRow: {
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    marginBottom: 6,
+    paddingHorizontal: 2,
+    marginBottom: 10,
   },
-  heroDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: T.onDarkAccent,
-  },
-  heroEyebrow: {
+  infoText: {
+    flex: 1,
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.68)',
-    letterSpacing: 0.2,
-  },
-  heroTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 18.5,
-    color: '#fff',
-    letterSpacing: -0.6,
-    lineHeight: 23,
-    maxWidth: 290,
-  },
-  heroHint: {
-    fontFamily: 'Inter_400Regular',
     fontSize: 13,
-    color: 'rgba(255,255,255,0.66)',
-    marginTop: 4,
-    lineHeight: 17,
-    maxWidth: 290,
+    color: T.ink,
   },
-  heroCta: {
-    marginTop: 12,
-    alignSelf: 'flex-start',
+  addMember: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 56,
+    marginTop: 4,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: T.soft2,
+  },
+  addMemberIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    backgroundColor: T.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addMemberText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: T.ink,
+  },
+  approvalBox: {
+    backgroundColor: T.amberSoft,
+    borderRadius: 14,
+    padding: 10,
     gap: 8,
-    backgroundColor: '#fff',
-    paddingHorizontal: 18,
+  },
+  approvalLabel: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12.5,
+    color: T.amber,
+  },
+  approvalWhen: {
+    fontFamily: 'Inter_500Medium',
+  },
+  approvalBtns: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  approvalBtn: {
+    flex: 1,
     height: 38,
     borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  heroCtaText: {
+  rejectBtn: {
+    backgroundColor: T.card,
+  },
+  rejectText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
-    color: T.ink,
+    color: T.coral,
+  },
+  approveBtn: {
+    backgroundColor: T.charcoal,
+  },
+  approveText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    color: T.white,
+  },
+  infoTextMute: {
+    fontFamily: 'Inter_400Regular',
+    color: T.mute,
   },
 
-  sectionLabel: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 17,
-    color: T.ink,
-    letterSpacing: -0.35,
-    marginTop: 28,
-    marginBottom: 14,
-  },
+
   sectionLabelTight: {
     fontFamily: 'Inter_700Bold',
     fontSize: 17,
@@ -654,7 +596,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     marginBottom: 12,
-    marginTop: 28,
+    marginTop: 22,
   },
   viewAll: {
     flexDirection: 'row',
@@ -671,108 +613,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: T.card,
-    borderRadius: 20,
-    paddingVertical: 18,
+    borderRadius: 14,
+    paddingVertical: 9,
+    paddingHorizontal: 6,
     ...shadow,
   },
   glanceStat: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    justifyContent: 'center',
+    gap: 5,
   },
   glanceDivider: {
     width: 1,
-    height: 34,
+    height: 18,
     backgroundColor: T.hairline,
   },
   glanceIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 9,
+    width: 20,
+    height: 20,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
   glanceValue: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 21,
+    fontSize: 15,
     color: T.ink,
-    letterSpacing: -0.6,
-    lineHeight: 25,
+    letterSpacing: -0.3,
   },
   glanceLabel: {
     fontFamily: 'Inter_500Medium',
-    fontSize: 12.5,
+    fontSize: 12,
     color: T.mute,
   },
 
-  actionsCol: {
-    gap: 12,
-  },
-  actionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 20,
-    paddingVertical: 18,
-    paddingHorizontal: 18,
-    backgroundColor: T.card,
-    ...shadow,
-  },
-  actionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 15,
-  },
-  actionCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  actionTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 16,
-    color: T.ink,
-    letterSpacing: -0.2,
-  },
-  actionSub: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    color: T.mute,
-    marginTop: 4,
-    lineHeight: 18,
-  },
-
-  empty: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 24,
-    backgroundColor: T.card,
-    borderRadius: 20,
-    ...shadow,
-  },
-  emptyCheck: {
-    width: 46,
-    height: 46,
-    borderRadius: 15,
-    backgroundColor: T.soft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  emptyTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 16.5,
-    color: T.ink,
-    letterSpacing: -0.2,
-  },
-  emptySub: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    color: T.mute,
-    marginTop: 6,
-    textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 240,
-  },
 });

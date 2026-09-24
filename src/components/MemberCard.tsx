@@ -4,13 +4,15 @@
 
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Avatar, Text } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { ROLE_LABELS, WORK_LOG_STATUS_CONFIG } from '../constants/roles';
 import { Profile, WorkLogStatus } from '../types/database';
 import { AnimatedPressable } from './AnimatedPressable';
+import { UserAvatar } from './UserAvatar';
 
 export type MemberActiveTask = {
   title: string;
@@ -31,6 +33,8 @@ interface MemberCardProps {
   activeTasks?: MemberActiveTask[];
   onPress?: () => void;
   index?: number;
+  /** Extra controls at the bottom of the card, e.g. approve / reject. */
+  actions?: ReactNode;
 }
 
 const TASK_CHIP = {
@@ -97,6 +101,7 @@ export function MemberCard({
   activeTasks = [],
   onPress,
   index = 0,
+  actions,
 }: MemberCardProps) {
   const status = getStatusDisplay(currentStatus);
   const avatarColors = getAvatarColors(member.role);
@@ -139,7 +144,8 @@ export function MemberCard({
     >
       <CardWrapper {...cardProps}>
         <View style={styles.topRow}>
-          <Avatar.Text
+          <UserAvatar
+            uri={member.avatar_url}
             size={40}
             label={member.full_name.substring(0, 2).toUpperCase()}
             style={{ backgroundColor: avatarColors.bg }}
@@ -245,12 +251,17 @@ export function MemberCard({
             )}
           </View>
         )}
+
+        {actions ? <View style={styles.actions}>{actions}</View> : null}
       </CardWrapper>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  actions: {
+    marginTop: 12,
+  },
   cardContainer: {
     marginBottom: 10,
   },

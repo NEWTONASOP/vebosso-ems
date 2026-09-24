@@ -2,7 +2,7 @@
   "expo": {
     "name": "VEBOSSO EMS",
     "slug": "vebosso-ems",
-    "version": "1.7.2",
+    "version": "1.8.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "vebossoems",
@@ -98,7 +98,8 @@
             "resizeMode": "contain"
           }
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true

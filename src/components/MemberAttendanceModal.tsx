@@ -5,11 +5,12 @@
 // ============================================================================
 
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Avatar, Button, Modal, Portal, Text } from 'react-native-paper';
+import { Button, Modal, Portal, Text } from 'react-native-paper';
 import { MemberAttendancePanel } from './MemberAttendancePanel';
 import { ROLE_LABELS } from '../constants/roles';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { Profile } from '../types/database';
+import { UserAvatar } from './UserAvatar';
 
 interface MemberAttendanceModalProps {
   visible: boolean;
@@ -30,7 +31,8 @@ export function MemberAttendanceModal({
     <Portal>
       <Modal visible onDismiss={onDismiss} contentContainerStyle={styles.container}>
         <View style={styles.header}>
-          <Avatar.Text
+          <UserAvatar
+            uri={member.avatar_url}
             size={44}
             label={member.full_name.substring(0, 2).toUpperCase()}
             style={styles.avatar}

@@ -26,14 +26,9 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  const getNextStatus = (): TaskStatus | null => {
-    if (task.status === 'pending') return 'in_progress';
-    if (task.status === 'in_progress') return 'done';
-    return null;
-  };
-
-  const nextStatus = getNextStatus();
-  const nextLabel = nextStatus === 'in_progress' ? 'Start' : nextStatus === 'done' ? 'Complete' : null;
+  // One tap to finish: anything not done yet goes straight to the note sheet.
+  const nextStatus: TaskStatus | null = task.status === 'done' ? null : 'done';
+  const nextLabel = nextStatus ? 'Done' : null;
 
   const getStatusStyle = () => {
     switch (task.status) {
@@ -61,15 +56,7 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
   const statusStyle = getStatusStyle();
 
   const handleAction = () => {
-    if (onStatusChange && nextStatus) {
-      // If completing the task, show the completion modal
-      if (nextStatus === 'done') {
-        setShowCompleteModal(true);
-      } else {
-        // Otherwise, just change status directly
-        onStatusChange(task.id, nextStatus);
-      }
-    }
+    if (onStatusChange && nextStatus) setShowCompleteModal(true);
   };
 
   const handleComplete = (note: string) => {
@@ -112,7 +99,7 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
             {/* Center Text Column */}
             <View style={styles.textContainer}>
               <View style={styles.titleRow}>
-                <Text style={[styles.title, task.status === 'done' && styles.titleDone]} numberOfLines={1}>
+                <Text style={[styles.title, task.status === 'done' && styles.titleDone]} numberOfLines={2}>
                   {task.title}
                 </Text>
                 <Feather name="chevron-right" size={14} color={AppTheme.soft2} />
@@ -138,7 +125,7 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
               scaleTo={0.92}
               style={({ pressed }) => [
                 styles.actionBtn,
-                nextStatus === 'in_progress' ? styles.startBtn : styles.completeBtn,
+                styles.completeBtn,
                 pressed && styles.btnPressed,
               ]}
               onPress={handleAction}
@@ -146,7 +133,7 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
               <Text
                 style={[
                   styles.actionBtnText,
-                  nextStatus === 'in_progress' ? styles.startBtnText : styles.completeBtnText,
+                  styles.completeBtnText,
                 ]}
               >
                 {nextLabel}
@@ -253,12 +240,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  startBtn: {
-    backgroundColor: AppTheme.charcoal,
-  },
-  startBtnText: {
-    color: AppTheme.white,
   },
   completeBtn: {
     backgroundColor: AppTheme.greenSoft,

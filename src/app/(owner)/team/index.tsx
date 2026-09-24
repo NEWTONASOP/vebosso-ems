@@ -7,16 +7,12 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { Searchbar, Snackbar, Text } from 'react-native-paper';
-import { AssignManagerModal } from '../../../components/AssignManagerModal';
-import { AssignTaskModal } from '../../../components/AssignTaskModal';
 import { EmptyState } from '../../../components/EmptyState';
 import { InlineError } from '../../../components/InlineError';
 import { ListSkeleton } from '../../../components/LoadingSkeleton';
-import { MemberActionsModal } from '../../../components/MemberActionsModal';
 import { MemberCard } from '../../../components/MemberCard';
+import { OwnerMemberMenu } from '../../../components/OwnerMemberMenu';
 import { AppSpace, AppTheme, screenChrome } from '../../../constants/theme';
-import { parseSupabaseError } from '../../../lib/errors';
-import { supabase } from '../../../lib/supabase';
 import { sortMembersByLiveStatus } from '../../../lib/teamSort';
 import { useAuthStore } from '../../../store/authStore';
 import { useWorkStore } from '../../../store/workStore';
@@ -31,20 +27,14 @@ export default function OwnerTeamScreen() {
     teamError,
     fetchTeamMembers,
     refreshMemberLiveStatus,
-    addTask,
     memberLiveStatus,
     subscribeToRealtime,
   } = useWorkStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [assignTaskModalVisible, setAssignTaskModalVisible] = useState(false);
-  const [assignManagerModalVisible, setAssignManagerModalVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
-  const [isAssigningTask, setIsAssigningTask] = useState(false);
-  const [isAssigningManager, setIsAssigningManager] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
-  const [actionsModalVisible, setActionsModalVisible] = useState(false);
 
   useEffect(() => {
     fetchTeamMembers();
@@ -76,77 +66,7 @@ export default function OwnerTeamScreen() {
 
   const handleMemberPress = useCallback((member: Profile) => {
     setSelectedMember(member);
-    setActionsModalVisible(true);
   }, []);
-
-  const handleAssignTask = async (title: string, description: string | null, dueDate: string | null) => {
-    if (!profile?.id || !selectedMember?.id) return;
-
-    setIsAssigningTask(true);
-    const result = await addTask({
-      assigned_to: selectedMember.id,
-      assigned_by: profile.id,
-      title,
-      description,
-      due_date: dueDate,
-      status: 'pending',
-    });
-    setIsAssigningTask(false);
-
-    if (result.success) {
-      setSnackMessage(`Task assigned to ${selectedMember.full_name}`);
-      setAssignTaskModalVisible(false);
-      setSelectedMember(null);
-    } else {
-      setSnackMessage(result.error || 'Failed to assign task. Please try again.');
-    }
-  };
-
-  const handleAssignManager = async (managerId: string | null) => {
-    if (!selectedMember?.id) return;
-
-    setIsAssigningManager(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ manager_id: managerId })
-        .eq('id', selectedMember.id);
-
-      if (error) throw error;
-
-      // Send notification to employee about manager assignment
-      if (managerId) {
-        const { data: managerProfile } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', managerId)
-          .single();
-
-        if (managerProfile) {
-          const { sendPushNotification } = await import('../../../lib/notifications');
-          sendPushNotification(
-            selectedMember.id,
-            'Manager Assigned',
-            `${managerProfile.full_name} is now your manager`,
-            { type: 'manager_assigned', manager_id: managerId }
-          );
-        }
-      }
-
-      setSnackMessage(
-        managerId
-          ? `Manager assigned to ${selectedMember.full_name}`
-          : `Manager removed from ${selectedMember.full_name}`
-      );
-      setAssignManagerModalVisible(false);
-      setSelectedMember(null);
-      await fetchTeamMembers();
-    } catch (error) {
-      setSnackMessage(parseSupabaseError(error));
-    } finally {
-      setIsAssigningManager(false);
-    }
-  };
 
   const roleCounts = useMemo(() => {
     let managers = 0;
@@ -183,8 +103,6 @@ export default function OwnerTeamScreen() {
     });
     return sortMembersByLiveStatus(filtered, memberLiveStatus);
   }, [teamMembers, searchQuery, selectedRole, memberLiveStatus]);
-
-  const managers = teamMembers.filter((m) => m.role === 'manager');
 
   const filterOptions = useMemo(
     () => [
@@ -319,66 +237,11 @@ export default function OwnerTeamScreen() {
         />
       )}
 
-      {selectedMember && (
-        <MemberActionsModal
-          visible={actionsModalVisible}
-          member={selectedMember}
-          onDismiss={() => {
-            setActionsModalVisible(false);
-            setSelectedMember(null);
-          }}
-          onAssignTask={() => {
-            setActionsModalVisible(false);
-            setAssignTaskModalVisible(true);
-          }}
-          onAssignManager={() => {
-            setActionsModalVisible(false);
-            setAssignManagerModalVisible(true);
-          }}
-          onManageProfile={() => {
-            setActionsModalVisible(false);
-            router.push(`/(owner)/member/${selectedMember.id}` as any);
-            setSelectedMember(null);
-          }}
-          currentStatus={memberLiveStatus[selectedMember.id]?.status ?? 'offline'}
-          checkInTime={memberLiveStatus[selectedMember.id]?.checkInTime}
-          checkOutTime={memberLiveStatus[selectedMember.id]?.checkOutTime}
-          checkInPlan={memberLiveStatus[selectedMember.id]?.checkInPlan}
-          dayReport={memberLiveStatus[selectedMember.id]?.dayReport}
-          pendingTaskCount={memberLiveStatus[selectedMember.id]?.pendingTaskCount ?? 0}
-          inProgressTaskCount={memberLiveStatus[selectedMember.id]?.inProgressTaskCount ?? 0}
-          doneTaskCount={memberLiveStatus[selectedMember.id]?.doneTaskCount ?? 0}
-          activeTasks={memberLiveStatus[selectedMember.id]?.activeTasks ?? []}
-        />
-      )}
-
-      {assignTaskModalVisible && selectedMember ? (
-        <AssignTaskModal
-          visible
-          key={selectedMember.id}
-          onDismiss={() => {
-            setAssignTaskModalVisible(false);
-            setSelectedMember(null);
-          }}
-          targetMember={selectedMember}
-          onSubmit={handleAssignTask}
-          isLoading={isAssigningTask}
-        />
-      ) : null}
-
-      {assignManagerModalVisible && selectedMember ? (
-        <AssignManagerModal
-          visible
-          onDismiss={() => {
-            setAssignManagerModalVisible(false);
-            setSelectedMember(null);
-          }}
-          targetMember={selectedMember}
-          managers={managers}
-          onAssign={handleAssignManager}
-          isLoading={isAssigningManager}
-        />
-      ) : null}
+      <OwnerMemberMenu
+        member={selectedMember}
+        onClose={() => setSelectedMember(null)}
+        onMessage={setSnackMessage}
+      />
 
       <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>
         {snackMessage}

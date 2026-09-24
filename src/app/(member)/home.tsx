@@ -11,6 +11,8 @@ import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { CheckInModal } from '../../components/CheckInModal';
 import { CheckOutModal } from '../../components/CheckOutModal';
 import { InlineError } from '../../components/InlineError';
+import { MessageButtons } from '../../components/MessageButtons';
+import { VenuesShortcut } from '../../components/VenuesShortcut';
 import { StatusCardSkeleton } from '../../components/LoadingSkeleton';
 import { NotificationBell } from '../../components/NotificationBell';
 import { PageTransition } from '../../components/PageTransition';
@@ -422,9 +424,15 @@ export default function MemberHomeScreen() {
             )}
           </View>
 
+          <View style={styles.messageRow}>
+            <MessageButtons onMessage={setSnackMessage} />
+            <View style={{ height: 10 }} />
+            <VenuesShortcut role="member" />
+          </View>
+
           {todayTasks.length > 0 && (
             <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Today&apos;s Tasks</Text>
+              <Text style={styles.sectionTitle}>Tasks by Boss</Text>
               <View style={styles.tasksContainer}>
                 {todayTasks.map((task, index) => (
                   <TaskCard
@@ -653,6 +661,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
     overflow: 'hidden',
+  },
+  messageRow: {
+    paddingHorizontal: AppSpace.screen,
+    marginTop: 14,
   },
   sectionContainer: {
     marginTop: AppSpace.xxl,
