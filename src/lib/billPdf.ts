@@ -11,7 +11,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
-import Share, { Social } from 'react-native-share';
+import type { Social as SocialApp } from 'react-native-share';
 import { Bill, BillSettings } from '../types/database';
 import { money } from './accounts';
 import { Alert } from './alert';
@@ -218,11 +218,15 @@ export function waNumber(phone: string | null | undefined): string | null {
   return null;
 }
 
+// Loaded lazily: the module calls TurboModuleRegistry.getEnforcing on import,
+// which crashes the web bundle (react-native-web has no TurboModuleRegistry).
+const nativeShare = (): typeof import('react-native-share') => require('react-native-share');
+
 /** WhatsApp apps on this phone, normal first. */
 async function installedWhatsApps(): Promise<('whatsapp' | 'whatsappbusiness')[]> {
   const check = async (pkg: string) => {
     try {
-      return (await Share.isPackageInstalled(pkg)).isInstalled;
+      return (await nativeShare().default.isPackageInstalled(pkg)).isInstalled;
     } catch {
       return false;
     }
@@ -266,7 +270,8 @@ export async function sendBillOnWhatsApp(b: Bill, s: BillSettings, phone: string
 
   // whatsAppNumber opens that chat directly; the library supports it on
   // Android but leaves it out of its types.
-  const social: Social.Whatsapp | Social.Whatsappbusiness =
+  const { default: Share, Social } = nativeShare();
+  const social: SocialApp.Whatsapp | SocialApp.Whatsappbusiness =
     app === 'whatsapp' ? Social.Whatsapp : Social.Whatsappbusiness;
   const options = {
     social,

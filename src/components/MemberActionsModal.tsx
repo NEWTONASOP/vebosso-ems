@@ -206,26 +206,7 @@ export function MemberActionsModal({
             ) : null}
           </View>
 
-          {/* 2. Documents */}
-          <View style={styles.group}>
-            <NavRow
-              label="Documents"
-              hint={
-                pendingDocsCount > 0
-                  ? `${pendingDocsCount} waiting for your approval`
-                  : 'ID, certificates and other papers'
-              }
-              hintColor={pendingDocsCount > 0 ? AppTheme.amber : undefined}
-              badge={pendingDocsCount > 0 ? String(pendingDocsCount) : undefined}
-              icon="file-text"
-              iconColor={AppTheme.violet}
-              iconBg={AppTheme.violetSoft}
-              onPress={onOpenDocuments}
-              isLast
-            />
-          </View>
-
-          {/* 3. Attendance — calendar, the day's log, then per-day extras */}
+          {/* 2. Attendance — calendar, the day's log, then per-day extras */}
           <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Attendance</Text>
           <MemberAttendancePanel
             memberId={member.id}
@@ -263,6 +244,20 @@ export function MemberActionsModal({
                     iconColor={AppTheme.violet}
                     iconBg={AppTheme.violetSoft}
                     onPress={onOpenExpenses}
+                  />
+                  <NavRow
+                    label="Documents"
+                    hint={
+                      pendingDocsCount > 0
+                        ? `${pendingDocsCount} waiting for your approval`
+                        : 'ID, certificates and other papers'
+                    }
+                    hintColor={pendingDocsCount > 0 ? AppTheme.amber : undefined}
+                    badge={pendingDocsCount > 0 ? String(pendingDocsCount) : undefined}
+                    icon="file-text"
+                    iconColor={AppTheme.violet}
+                    iconBg={AppTheme.violetSoft}
+                    onPress={onOpenDocuments}
                     isLast
                   />
                 </View>
@@ -277,7 +272,7 @@ export function MemberActionsModal({
             )}
           />
 
-          {/* 4. Admin */}
+          {/* 3. Admin */}
           <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Manage</Text>
           <View style={styles.group}>
             {member.role === 'member' && (
