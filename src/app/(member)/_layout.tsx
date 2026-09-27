@@ -81,6 +81,13 @@ export default function MemberLayout() {
             href: null,
           }}
         />
+        {/* Only for people the owner gave Bills to — opened from home. */}
+        <Tabs.Screen
+          name="bills"
+          options={{
+            href: null,
+          }}
+        />
         <Tabs.Screen
           name="notifications"
           options={{

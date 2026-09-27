@@ -1,6 +1,10 @@
 // ============================================================================
-// VEBOSSO EMS — Owner Bills (list)
-// Estimates | Client bills, filtered by status, with drafts and trash.
+// VEBOSSO EMS — Bills (list)
+// VEBOSSO | Navgrah, then Estimates | Client bills, filtered by status, with
+// drafts and trash. The brand picked here is the one new bills are made for.
+// Shared
+// by the owner (a tab) and anyone given Bills (opened from their home). Only
+// the owner sees the completed-bills total.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -12,18 +16,34 @@ import { Snackbar, Text } from 'react-native-paper';
 import { BillSettingsSheet } from '../../../components/BillSettingsSheet';
 import { AppTheme as T, appSoftShadow, screenChrome } from '../../../constants/theme';
 import { rupees } from '../../../lib/accounts';
+import { BRAND_KEYS, BRANDS, brandOf } from '../../../lib/billBrands';
 import { BILL_STATUS_TONE, billTotals, fetchBills, STATUS_LABEL } from '../../../lib/bills';
-import { Bill, BillKind, BillStatus } from '../../../types/database';
+import { useBillsBase } from '../../../lib/billsAccess';
+import { useAuthStore } from '../../../store/authStore';
+import { Bill, BillBrand, BillKind, BillStatus } from '../../../types/database';
 
 type Filter = 'all' | BillStatus;
 
 const FILTERS: Record<BillKind, Filter[]> = {
   estimate: ['all', 'draft', 'trash'],
-  client: ['all', 'pending', 'done', 'completed', 'draft', 'trash'],
+  client: ['all', 'pending', 'completed', 'draft', 'trash'],
 };
 
-export default function OwnerBillsScreen() {
+// Remembered while the app is open, so coming back to Bills keeps the brand.
+const remembered: { brand: BillBrand } = { brand: 'vebosso' };
+const rememberBrand = (b: BillBrand) => {
+  remembered.brand = b;
+};
+
+export default function BillsScreen() {
   const router = useRouter();
+  const base = useBillsBase();
+  const isOwner = useAuthStore((s) => s.profile?.role === 'owner');
+  const [brand, setBrandState] = useState<BillBrand>(() => remembered.brand);
+  const setBrand = (b: BillBrand) => {
+    rememberBrand(b);
+    setBrandState(b);
+  };
   const [kind, setKind] = useState<BillKind>('estimate');
   const [filter, setFilter] = useState<Filter>('all');
   const [bills, setBills] = useState<Bill[]>([]);
@@ -58,7 +78,14 @@ export default function OwnerBillsScreen() {
     setRefreshing(false);
   };
 
-  const ofKind = useMemo(() => bills.filter((b) => b.kind === kind), [bills, kind]);
+  const ofBrand = useMemo(() => bills.filter((b) => brandOf(b) === brand), [bills, brand]);
+  const ofKind = useMemo(() => ofBrand.filter((b) => b.kind === kind), [ofBrand, kind]);
+
+  // Owner only: every completed client bill of this brand, all time.
+  const completed = useMemo(() => {
+    const done = ofBrand.filter((b) => b.kind === 'client' && b.status === 'completed');
+    return { count: done.length, total: done.reduce((sum, b) => sum + billTotals(b).total, 0) };
+  }, [ofBrand]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: 0 };
@@ -88,9 +115,16 @@ export default function OwnerBillsScreen() {
   return (
     <View style={screenChrome.root}>
       <View style={screenChrome.headerRow}>
-        <View style={{ flexShrink: 1 }}>
-          <Text style={screenChrome.title}>Bills</Text>
-          <Text style={screenChrome.subtitle}>Estimates and client bills</Text>
+        <View style={styles.titleRow}>
+          {!isOwner ? (
+            <Pressable onPress={() => router.back()} style={styles.back} hitSlop={8} accessibilityLabel="Back">
+              <Feather name="chevron-left" size={24} color={T.ink} />
+            </Pressable>
+          ) : null}
+          <View style={{ flexShrink: 1 }}>
+            <Text style={screenChrome.title}>Bills</Text>
+            <Text style={screenChrome.subtitle}>Estimates and client bills</Text>
+          </View>
         </View>
         <View style={styles.headerActions}>
           <Pressable style={styles.iconBtn} onPress={() => setSettingsOpen(true)} accessibilityLabel="Bill settings">
@@ -98,7 +132,7 @@ export default function OwnerBillsScreen() {
           </Pressable>
           <Pressable
             style={styles.newBtn}
-            onPress={() => router.push(`/(owner)/bills/new?kind=${kind}` as any)}
+            onPress={() => router.push(`${base}/new?kind=${kind}&brand=${brand}` as any)}
             accessibilityLabel={`New ${kind === 'client' ? 'client bill' : 'estimate'}`}
           >
             <Feather name="plus" size={16} color={T.white} />
@@ -106,6 +140,45 @@ export default function OwnerBillsScreen() {
           </Pressable>
         </View>
       </View>
+
+      <View style={styles.brands}>
+        {BRAND_KEYS.map((k) => {
+          const active = brand === k;
+          const t = BRANDS[k];
+          return (
+            <Pressable
+              key={k}
+              onPress={() => setBrand(k)}
+              style={[styles.brandBtn, active && { backgroundColor: t.primary, borderColor: t.primary }]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`${t.label} bills`}
+            >
+              <View style={styles.brandDots}>
+                {t.colors.map((c) => (
+                  <View key={c} style={[styles.brandDot, { backgroundColor: c }, active && styles.brandDotOnDark]} />
+                ))}
+              </View>
+              <Text style={[styles.brandText, active && styles.brandTextActive]}>{t.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {isOwner && !isLoading ? (
+        <View style={styles.totalCard}>
+          <View style={styles.totalIcon}>
+            <Feather name="check-circle" size={17} color={T.green} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.totalLabel}>{BRANDS[brand].label} completed bills · all time</Text>
+            <Text style={styles.totalValue}>{rupees(completed.total)}</Text>
+          </View>
+          <Text style={styles.totalCount}>
+            {completed.count} {completed.count === 1 ? 'bill' : 'bills'}
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.segment}>
         {(['estimate', 'client'] as const).map((k) => (
@@ -169,7 +242,7 @@ export default function OwnerBillsScreen() {
                 ? 'No drafts'
                 : filter === 'trash'
                   ? 'Trash is empty'
-                  : `No ${kind === 'client' ? 'client bills' : 'estimates'} yet`}
+                  : `No ${BRANDS[brand].label} ${kind === 'client' ? 'client bills' : 'estimates'} yet`}
             </Text>
           </View>
         ) : (
@@ -179,7 +252,7 @@ export default function OwnerBillsScreen() {
             return (
               <Pressable
                 key={b.id}
-                onPress={() => router.push(`/(owner)/bills/${b.id}` as any)}
+                onPress={() => router.push(`${base}/${b.id}` as any)}
                 style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
                 accessibilityRole="button"
                 accessibilityLabel={`${b.number ?? 'Draft'} ${b.client_name ?? ''}`}
@@ -193,15 +266,23 @@ export default function OwnerBillsScreen() {
                   ) : null}
                 </View>
                 <Text style={styles.client} numberOfLines={1}>{b.client_name || 'No name yet'}</Text>
-                <Text style={styles.meta} numberOfLines={1}>
-                  {[
-                    b.event_type,
-                    b.function_date ? format(parseISO(b.function_date), 'd MMM yyyy') : null,
-                    b.venue,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ') || `Edited ${format(new Date(b.updated_at), 'd MMM, h:mm a')}`}
-                </Text>
+                {b.event_type ? (
+                  <Text style={styles.meta} numberOfLines={1}>{b.event_type}</Text>
+                ) : null}
+                <View style={styles.facts}>
+                  <View style={styles.fact}>
+                    <Feather name="calendar" size={13} color={b.function_date ? T.inkSoft : T.mute} />
+                    <Text style={[styles.factText, !b.function_date && styles.factEmpty]} numberOfLines={1}>
+                      {b.function_date ? format(parseISO(b.function_date), 'EEE, d MMM yyyy') : 'No date yet'}
+                    </Text>
+                  </View>
+                  <View style={styles.fact}>
+                    <Feather name="map-pin" size={13} color={b.venue ? T.inkSoft : T.mute} />
+                    <Text style={[styles.factText, !b.venue && styles.factEmpty]} numberOfLines={1}>
+                      {b.venue || 'No venue yet'}
+                    </Text>
+                  </View>
+                </View>
                 <View style={styles.money}>
                   <Text style={styles.moneyText}>Total {rupees(t.total)}</Text>
                   <Text style={[styles.moneyText, { color: t.balance > 0 ? T.coral : T.green }]}>
@@ -214,7 +295,9 @@ export default function OwnerBillsScreen() {
         )}
       </ScrollView>
 
-      {settingsOpen ? <BillSettingsSheet onDismiss={() => setSettingsOpen(false)} onSaved={setSnack} /> : null}
+      {settingsOpen ? (
+        <BillSettingsSheet brand={brand} onDismiss={() => setSettingsOpen(false)} onSaved={setSnack} />
+      ) : null}
       <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>
         {snack}
       </Snackbar>
@@ -223,7 +306,49 @@ export default function OwnerBillsScreen() {
 }
 
 const styles = StyleSheet.create({
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
+  back: { width: 32, height: 40, justifyContent: 'center', marginLeft: -8 },
   headerActions: { flexDirection: 'row', gap: 8 },
+  brands: { flexDirection: 'row', gap: 8, marginHorizontal: 20, marginBottom: 12 },
+  brandBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: T.soft2,
+    backgroundColor: T.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  brandDots: { flexDirection: 'row', gap: 3 },
+  brandDot: { width: 8, height: 8, borderRadius: 4 },
+  brandDotOnDark: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },
+  brandText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: T.inkSoft },
+  brandTextActive: { color: T.white },
+  totalCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    backgroundColor: T.card,
+    borderRadius: 18,
+    padding: 12,
+    ...appSoftShadow,
+  },
+  totalIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: T.greenSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  totalLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: T.mute },
+  totalValue: { fontFamily: 'Inter_800ExtraBold', fontSize: 19, color: T.ink, marginTop: 1 },
+  totalCount: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
   iconBtn: {
     width: 42,
     height: 42,
@@ -294,6 +419,10 @@ const styles = StyleSheet.create({
   statusText: { fontFamily: 'Inter_700Bold', fontSize: 11 },
   client: { fontFamily: 'Inter_700Bold', fontSize: 16, color: T.ink },
   meta: { fontFamily: 'Inter_400Regular', fontSize: 13, color: T.mute },
+  facts: { gap: 4, marginTop: 6 },
+  fact: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  factText: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 13.5, color: T.ink },
+  factEmpty: { fontFamily: 'Inter_400Regular', color: T.mute },
   money: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   moneyText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
 });

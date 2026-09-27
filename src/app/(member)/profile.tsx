@@ -5,19 +5,19 @@
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import { Alert } from '../../lib/alert';
-import { Text } from 'react-native-paper';
+import { Switch, Text } from 'react-native-paper';
 import { APP_NAME, ROLE_LABELS } from '../../constants/roles';
 import {
   AppTheme as T,
   AppSpace,
   AppRadius,
+  appShadow,
   appSoftShadow,
   screenChrome,
   RoleAccent,
 } from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
 import { ProfilePhotoEditor } from '../../components/ProfilePhotoEditor';
-import { UserAvatar } from '../../components/UserAvatar';
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import Constants from 'expo-constants';
@@ -28,6 +28,7 @@ import { ExpensesSheet } from '../../components/ExpensesSheet';
 import { PageTransition } from '../../components/PageTransition';
 import { SalarySheet } from '../../components/SalarySheet';
 import { useState } from 'react';
+import { useSundayReminder } from '../../lib/useSundayReminder';
 
 export default function MemberProfileScreen() {
   const router = useRouter();
@@ -65,30 +66,21 @@ export default function MemberProfileScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <UserAvatar
-              uri={profile.avatar_url}
-              size={36}
-              label={profile.full_name.substring(0, 1).toUpperCase()}
-              style={{ backgroundColor: roleAccent.soft }}
-              labelStyle={[styles.miniAvatarText, { color: roleAccent.color }]}
-            />
-          </View>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <View style={styles.headerRight} />
+        <View style={screenChrome.header}>
+          <Text style={screenChrome.title}>Profile</Text>
         </View>
 
-        <View style={styles.heroSection}>
-          <View style={styles.photo}>
-            <ProfilePhotoEditor size={88} color={roleAccent.color} bg={roleAccent.soft} />
-          </View>
-          <Text style={styles.heroLabel}>Employee code</Text>
-          <Text style={styles.heroValue}>{profile.employee_id}</Text>
-          <View style={[styles.rolePill, { backgroundColor: roleAccent.soft }]}>
-            <Text style={[styles.rolePillText, { color: roleAccent.color }]}>
-              {ROLE_LABELS[profile.role]}
-            </Text>
+        {/* Profile card — same as the owner and manager settings */}
+        <View style={styles.profileCard}>
+          <ProfilePhotoEditor size={60} color={roleAccent.color} bg={roleAccent.soft} />
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName} numberOfLines={2}>{profile.full_name}</Text>
+            <View style={styles.roleBadge}>
+              <View style={[styles.roleDot, { backgroundColor: roleAccent.color }]} />
+              <Text style={styles.profileRole}>
+                {ROLE_LABELS[profile.role]} • {profile.employee_id}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -125,6 +117,11 @@ export default function MemberProfileScreen() {
               label="Travel expenses"
               icon="navigation"
               onPress={() => setOpenSheet('expenses')}
+            />
+            <ActionRow
+              label="Leave Requests"
+              icon="calendar"
+              onPress={() => router.push('/(member)/leaves')}
               isLast
             />
           </View>
@@ -138,11 +135,7 @@ export default function MemberProfileScreen() {
               icon="key"
               onPress={() => router.push('/(auth)/change-password')}
             />
-            <ActionRow
-              label="Leave Requests"
-              icon="calendar"
-              onPress={() => router.push('/(member)/leaves')}
-            />
+            <SundayReminderRow />
             <ActionRow
               label="Sign Out"
               icon="log-out"
@@ -199,6 +192,27 @@ interface ActionRowProps {
   isLast?: boolean;
 }
 
+/** On/off for the 11:30 AM check-in reminder on Sundays. */
+function SundayReminderRow() {
+  const { enabled, saving, setEnabled } = useSundayReminder();
+  const toggle = async (value: boolean) => {
+    const error = await setEnabled(value);
+    if (error) Alert.alert(error);
+  };
+  return (
+    <View style={rowStyles.rowWrapper}>
+      <View style={rowStyles.rowContent}>
+        <View style={{ flex: 1, paddingRight: 12 }}>
+          <Text style={rowStyles.label}>Sunday check-in reminder</Text>
+          <Text style={rowStyles.hint}>The 11:30 AM reminder, on Sundays too</Text>
+        </View>
+        <Switch value={enabled} onValueChange={(v) => void toggle(v)} disabled={saving} color={T.green} />
+      </View>
+      <View style={rowStyles.separator} />
+    </View>
+  );
+}
+
 function ActionRow({ label, icon, onPress, isDestructive, isLast }: ActionRowProps) {
   return (
     <Pressable
@@ -223,6 +237,12 @@ function ActionRow({ label, icon, onPress, isDestructive, isLast }: ActionRowPro
 }
 
 const rowStyles = StyleSheet.create({
+  hint: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12.5,
+    color: T.mute,
+    marginTop: 2,
+  },
   rowWrapper: {
     backgroundColor: T.card,
   },
@@ -246,76 +266,57 @@ const rowStyles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     color: T.coral,
   },
+  // A whole pixel: a hairline (0.5px) lands crisp on some rows and faded on
+  // others, so the dividers looked uneven.
   separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: T.hairline,
+    height: 1,
+    backgroundColor: 'rgba(18, 20, 25, 0.06)',
     marginHorizontal: 16,
   },
 });
 
 const styles = StyleSheet.create({
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: T.card,
+    marginHorizontal: AppSpace.screen,
+    marginTop: 8,
+    borderRadius: AppRadius.hero,
+    padding: 20,
+    ...appShadow,
+    gap: 16,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 18,
+    color: T.ink,
+    letterSpacing: -0.3,
+  },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  roleDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  profileRole: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    color: T.mute,
+  },
   scrollContent: {
     paddingBottom: 110,
     width: '100%',
     maxWidth: 600,
     alignSelf: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: AppSpace.screen,
-    paddingTop: screenChrome.header.paddingTop,
-    paddingBottom: 12,
-  },
-  headerLeft: {
-    width: 44,
-    alignItems: 'flex-start',
-  },
-  miniAvatarText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 15,
-  },
-  headerTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 17,
-    color: T.ink,
-    letterSpacing: -0.35,
-  },
-  headerRight: {
-    width: 44,
-  },
-  photo: {
-    marginBottom: 16,
-  },
-  heroSection: {
-    alignItems: 'center',
-    paddingVertical: 28,
-  },
-  heroLabel: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    color: T.mute,
-    letterSpacing: -0.1,
-  },
-  heroValue: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 40,
-    color: T.ink,
-    letterSpacing: -0.9,
-    marginVertical: 4,
-  },
-  rolePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    height: 28,
-    borderRadius: AppRadius.pill,
-    marginTop: 6,
-  },
-  rolePillText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
   },
   sectionContainer: {
     marginTop: AppSpace.xxl,

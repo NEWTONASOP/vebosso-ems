@@ -1,14 +1,23 @@
 // ============================================================================
 // VEBOSSO EMS — Owner Account ledger
-// Date | Particular | Credit | Debit, newest first, with totals, a month filter
-// and + to add an entry. Tap a row to edit or delete it.
+// Newest first, with totals, a month filter and + to add an entry. On a phone
+// each entry is a card (particular, date, signed amount); on a wide screen it
+// is the Date | Particular | Credit | Debit table. Tap an entry to edit it.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AccountExportSheet } from '../../../components/AccountExportSheet';
@@ -44,6 +53,8 @@ export default function AccountLedgerScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  // Below this the four-column table gets cramped, so entries become cards.
+  const wide = useWindowDimensions().width >= 640;
 
   /** Back to the Accounts list — never out to another tab. */
   const backToList = () => {
@@ -142,17 +153,19 @@ export default function AccountLedgerScreen() {
 
       <AccountPeriodFilter period={period} onChange={setPeriod} />
 
-      <View style={[styles.tr, styles.th]}>
-        <Text style={[styles.thText, styles.cDate]}>Date</Text>
-        <Text style={[styles.thText, styles.cPart]}>Particular</Text>
-        <Text style={[styles.thText, styles.cNum]}>Credit(₹)</Text>
-        <Text style={[styles.thText, styles.cNum]}>Debit(₹)</Text>
-      </View>
+      {wide ? (
+        <View style={[styles.tr, styles.th]}>
+          <Text style={[styles.thText, styles.cDate]}>Date</Text>
+          <Text style={[styles.thText, styles.cPart]}>Particular</Text>
+          <Text style={[styles.thText, styles.cNum]}>Credit(₹)</Text>
+          <Text style={[styles.thText, styles.cNum]}>Debit(₹)</Text>
+        </View>
+      ) : null}
     </View>
   );
 
   const footer =
-    txns.length > 0 ? (
+    txns.length > 0 && wide ? (
       <View style={styles.tfoot}>
         <View style={styles.tr}>
           <View style={styles.cDate} />
@@ -208,7 +221,7 @@ export default function AccountLedgerScreen() {
           ListHeaderComponent={header}
           ListFooterComponent={footer}
           ListEmptyComponent={
-            <View style={styles.empty}>
+            <View style={[styles.empty, !wide && styles.emptyCard]}>
               <Text style={styles.emptyText}>
                 {period ? `No entries in ${periodLabel(period)}` : 'No entries yet — tap + to add one'}
               </Text>
@@ -218,6 +231,39 @@ export default function AccountLedgerScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.charcoal} />}
           renderItem={({ item, index }) => {
             const color = item.kind === 'credit' ? T.green : T.coral;
+            const photos = item.receipts?.length ?? 0;
+            if (!wide) {
+              const credit = item.kind === 'credit';
+              return (
+                <Pressable
+                  onPress={() => setEditing(item)}
+                  style={({ pressed }) => [styles.entry, pressed && styles.tdPressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.kind} ${money(item.amount)} on ${item.txn_date}, ${item.particular ?? ''}`}
+                >
+                  <View style={[styles.entryIcon, { backgroundColor: credit ? T.greenSoft : T.coralSoft }]}>
+                    <Feather name={credit ? 'arrow-down-left' : 'arrow-up-right'} size={15} color={color} />
+                  </View>
+                  <View style={styles.entryText}>
+                    <Text style={styles.entryTitle} numberOfLines={2}>
+                      {item.particular || (credit ? 'Credit' : 'Debit')}
+                    </Text>
+                    <View style={styles.entryMetaRow}>
+                      <Text style={styles.entryMeta}>{format(parseISO(item.txn_date), 'EEE, d MMM yyyy')}</Text>
+                      {photos ? (
+                        <View style={styles.entryClip}>
+                          <Feather name="paperclip" size={11} color={T.mute} />
+                          <Text style={styles.entryMeta}>{photos}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                  <Text style={[styles.entryAmount, { color }]} numberOfLines={1}>
+                    {credit ? '+' : '−'} ₹{money(item.amount)}
+                  </Text>
+                </Pressable>
+              );
+            }
             return (
               <Pressable
                 onPress={() => setEditing(item)}
@@ -226,7 +272,10 @@ export default function AccountLedgerScreen() {
                 accessibilityLabel={`${item.kind} ${money(item.amount)} on ${item.txn_date}, ${item.particular ?? ''}`}
               >
                 <Text style={[styles.tdText, styles.cDate, { color }]}>{format(parseISO(item.txn_date), 'dd-MM-yyyy')}</Text>
-                <Text style={[styles.tdText, styles.cPart, { color }]}>{item.particular || '—'}</Text>
+                <Text style={[styles.tdText, styles.cPart, { color }]}>
+                  {item.particular || '—'}
+                  {photos ? <Text style={styles.clip}>{`  📎${photos}`}</Text> : null}
+                </Text>
                 <Text style={[styles.tdText, styles.cNum]}>{item.kind === 'credit' ? money(item.amount) : '0'}</Text>
                 <Text style={[styles.tdText, styles.cNum]}>{item.kind === 'debit' ? money(item.amount) : '0'}</Text>
               </Pressable>
@@ -356,6 +405,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: T.mute },
+  emptyCard: { borderRadius: 18, marginTop: 4 },
+  clip: { fontSize: 11, color: T.mute },
+  entry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: T.card,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginTop: 8,
+    ...appSoftShadow,
+  },
+  entryIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  entryText: { flex: 1, minWidth: 0 },
+  entryTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14.5, color: T.ink, lineHeight: 19 },
+  entryMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  entryMeta: { fontFamily: 'Inter_400Regular', fontSize: 12, color: T.mute },
+  entryClip: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  entryAmount: { fontFamily: 'Inter_700Bold', fontSize: 15, flexShrink: 0 },
   fab: {
     position: 'absolute',
     right: 20,

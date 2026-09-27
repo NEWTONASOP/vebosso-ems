@@ -40,6 +40,7 @@ export function VenueFormSheet({ onDismiss, onSaved, venue, existing }: VenueFor
     contact_role: venue?.contact_role ?? '',
     contact_name: venue?.contact_name ?? '',
     contact_email: venue?.contact_email ?? '',
+    contact_phone: venue?.contact_phone ?? '',
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -123,7 +124,16 @@ export function VenueFormSheet({ onDismiss, onSaved, venue, existing }: VenueFor
 
       <Text style={[styles.group, { marginTop: 18 }]}>Person you met</Text>
       <Field label="Their role" value={form.contact_role ?? ''} onChange={set('contact_role')} placeholder="Their designation at the venue" inputRef={chain.reg('contact_role')} onNext={chain.next('contact_name')} />
-      <Field label="Name" value={form.contact_name ?? ''} onChange={set('contact_name')} placeholder="Full name" inputRef={chain.reg('contact_name')} onNext={chain.next('contact_email')} />
+      <Field label="Name" value={form.contact_name ?? ''} onChange={set('contact_name')} placeholder="Full name" inputRef={chain.reg('contact_name')} onNext={chain.next('contact_phone')} />
+      <Field
+        label="Phone"
+        value={form.contact_phone ?? ''}
+        onChange={set('contact_phone')}
+        placeholder="Their phone number"
+        keyboardType="phone-pad"
+        inputRef={chain.reg('contact_phone')}
+        onNext={chain.next('contact_email')}
+      />
       <Field
         label="Email"
         value={form.contact_email ?? ''}
@@ -149,7 +159,7 @@ function Field({
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
-  keyboardType?: 'email-address';
+  keyboardType?: 'email-address' | 'phone-pad';
   inputRef?: (el: TextInput | null) => void;
   /** Where the keyboard's Next key goes. Without it the key reads Done. */
   onNext?: () => void;
@@ -166,7 +176,7 @@ function Field({
         keyboardType={keyboardType}
         autoCapitalize={keyboardType === 'email-address' ? 'none' : 'sentences'}
         autoCorrect={keyboardType !== 'email-address'}
-        maxLength={200}
+        maxLength={keyboardType === 'phone-pad' ? 30 : 200}
         ref={inputRef}
         returnKeyType={onNext ? 'next' : 'done'}
         submitBehavior={onNext ? 'submit' : 'blurAndSubmit'}

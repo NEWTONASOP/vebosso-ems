@@ -22,11 +22,15 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnimatedPressable } from '../../components/AnimatedPressable';
+import { DepartmentsSheet } from '../../components/DepartmentsSheet';
+import { Chevron, DropdownBody } from '../../components/Dropdown';
 import { InboxKind, NeedsYouCard, OwnerInboxSheet, useOwnerInbox } from '../../components/OwnerInbox';
 import { InlineError } from '../../components/InlineError';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { MemberCard } from '../../components/MemberCard';
+import { MemberDialog } from '../../components/MemberActionsModal';
 import { OwnerMemberMenu } from '../../components/OwnerMemberMenu';
+import { DepartmentData, fetchDepartments } from '../../lib/departments';
 import { sortMembersByLiveStatus } from '../../lib/teamSort';
 import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore } from '../../store/notificationStore';
@@ -63,6 +67,11 @@ export default function OwnerDashboard() {
 
   const [refreshing, setRefreshing] = React.useState(false);
   const [menuMember, setMenuMember] = React.useState<Profile | null>(null);
+  const [menuDialog, setMenuDialog] = React.useState<MemberDialog | null>(null);
+  const [departments, setDepartments] = React.useState<DepartmentData>({ departments: [], memberOf: {} });
+  const [managingDepartments, setManagingDepartments] = React.useState(false);
+  const [teamOpen, setTeamOpen] = React.useState(false);
+  const [openDepartments, setOpenDepartments] = React.useState<Set<string>>(() => new Set());
   const [approvingId, setApprovingId] = React.useState<string | null>(null);
   const [rejectingId, setRejectingId] = React.useState<string | null>(null);
   const [snackMessage, setSnackMessage] = React.useState('');
@@ -87,6 +96,21 @@ export default function OwnerDashboard() {
     subscribeToRealtime(profile.id, 'owner');
     return () => unsubscribeFromRealtime();
   }, [profile?.id, loadData, subscribeToRealtime, unsubscribeFromRealtime]);
+
+  const applyDepartments = useCallback((res: Awaited<ReturnType<typeof fetchDepartments>>) => {
+    if (res.success) setDepartments(res.data);
+  }, []);
+  const loadDepartments = useCallback(async () => applyDepartments(await fetchDepartments()), [applyDepartments]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      fetchDepartments().then((res) => active && applyDepartments(res));
+      return () => {
+        active = false;
+      };
+    }, [applyDepartments])
+  );
 
   // Keep live status fresh while the dashboard is focused (realtime + poll fallback)
   useFocusEffect(
@@ -113,11 +137,76 @@ export default function OwnerDashboard() {
     [teamMembers, memberLiveStatus]
   );
 
+  // Team, grouped: each department with its people, then everyone without one.
+  const grouped = useMemo(() => {
+    const byDept: Record<string, Profile[]> = {};
+    const unassigned: Profile[] = [];
+    for (const m of sortedMembers) {
+      const d = departments.memberOf[m.id];
+      if (d) (byDept[d] ??= []).push(m);
+      else unassigned.push(m);
+    }
+    return { byDept, unassigned };
+  }, [sortedMembers, departments.memberOf]);
+
+  const toggleDepartment = (id: string) =>
+    setOpenDepartments((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const isWorking = (id: string) => {
+    const st = memberLiveStatus[id]?.status;
+    return st === 'working' || st === 'pending_approval' || st === 'pending_checkout';
+  };
+  const waitingIn = (people: Profile[]) => people.filter((m) => pendingByUser[m.id]).length;
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await Promise.all([loadData(), loadDepartments()]);
     setRefreshing(false);
   };
+
+  const renderMember = (member: Profile) => {
+    const live = memberLiveStatus[member.id];
+    const pending = pendingByUser[member.id];
+    return (
+      <View key={member.id}>
+        <MemberCard
+          member={member}
+          currentStatus={live?.status ?? 'offline'}
+          checkInTime={live?.checkInTime}
+          checkOutTime={live?.checkOutTime}
+          checkInPlan={live?.checkInPlan}
+          dayReport={live?.dayReport}
+          pendingTaskCount={live?.pendingTaskCount ?? 0}
+          inProgressTaskCount={live?.inProgressTaskCount ?? 0}
+          doneTaskCount={live?.doneTaskCount ?? 0}
+          activeTasks={live?.activeTasks ?? []}
+          onPress={() => {
+            setMenuDialog(null);
+            setMenuMember(member);
+          }}
+          actions={
+            pending ? (
+              <ApprovalActions
+                workLog={pending}
+                isApproving={approvingId === pending.id}
+                isRejecting={rejectingId === pending.id}
+                onApprove={() => handleApprove(pending.id)}
+                onReject={() => handleReject(pending.id)}
+              />
+            ) : undefined
+          }
+        />
+      </View>
+    );
+  };
+
+  const teamWorking = sortedMembers.filter((m) => isWorking(m.id)).length;
+  const teamWaiting = waitingIn(sortedMembers);
 
   const handleApprove = async (workLogId: string) => {
     if (!profile?.id) return;
@@ -219,10 +308,10 @@ export default function OwnerDashboard() {
             </View>
           </Animated.View>
 
-          {/* 4. The team, same cards and menu as the Team tab */}
+          {/* 4. The team — a dropdown of departments, then everyone without one */}
           <Animated.View entering={FadeInDown.delay(180).duration(500).easing(ENTER)}>
             <View style={styles.sectionHead}>
-              <Text style={[styles.sectionLabelTight, { flex: 1 }]}>Team</Text>
+              <Text style={[styles.sectionLabelTight, { flex: 1 }]}>People</Text>
               <AnimatedPressable
                 scaleTo={0.96}
                 onPress={() => router.push('/(owner)/tasks')}
@@ -244,51 +333,100 @@ export default function OwnerDashboard() {
             ) : sortedMembers.length === 0 ? (
               <Text style={styles.sectionHint}>No team members yet.</Text>
             ) : (
-              sortedMembers.map((member) => {
-                const live = memberLiveStatus[member.id];
-                const pending = pendingByUser[member.id];
-                return (
-                  <MemberCard
-                    key={member.id}
-                    member={member}
-                    currentStatus={live?.status ?? 'offline'}
-                    checkInTime={live?.checkInTime}
-                    checkOutTime={live?.checkOutTime}
-                    checkInPlan={live?.checkInPlan}
-                    dayReport={live?.dayReport}
-                    pendingTaskCount={live?.pendingTaskCount ?? 0}
-                    inProgressTaskCount={live?.inProgressTaskCount ?? 0}
-                    doneTaskCount={live?.doneTaskCount ?? 0}
-                    activeTasks={live?.activeTasks ?? []}
-                    onPress={() => setMenuMember(member)}
-                    actions={
-                      pending ? (
-                        <ApprovalActions
-                          workLog={pending}
-                          isApproving={approvingId === pending.id}
-                          isRejecting={rejectingId === pending.id}
-                          onApprove={() => handleApprove(pending.id)}
-                          onReject={() => handleReject(pending.id)}
-                        />
-                      ) : undefined
-                    }
-                  />
-                );
-              })
+              <>
+                <GroupRow
+                  icon="users"
+                  color={T.blue}
+                  soft={T.blueSoft}
+                  title="Team"
+                  hint={[
+                    `${sortedMembers.length} ${sortedMembers.length === 1 ? 'person' : 'people'}`,
+                    teamWorking ? `${teamWorking} working` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  badge={teamWaiting ? `${teamWaiting} waiting` : undefined}
+                  open={teamOpen}
+                  onPress={() => setTeamOpen((o) => !o)}
+                />
+                {teamOpen ? (
+                  <DropdownBody style={styles.teamBody}>
+                    {departments.departments.map((d) => {
+                      const people = grouped.byDept[d.id] ?? [];
+                      const open = openDepartments.has(d.id);
+                      const working = people.filter((m) => isWorking(m.id)).length;
+                      const waiting = waitingIn(people);
+                      return (
+                        <View key={d.id}>
+                          <GroupRow
+                            nested
+                            icon="layers"
+                            color={T.violet}
+                            soft={T.violetSoft}
+                            title={d.name}
+                            hint={
+                              people.length === 0
+                                ? 'No one yet'
+                                : [
+                                    `${people.length} ${people.length === 1 ? 'person' : 'people'}`,
+                                    working ? `${working} working` : null,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' · ')
+                            }
+                            badge={waiting ? `${waiting} waiting` : undefined}
+                            open={open}
+                            onPress={() => toggleDepartment(d.id)}
+                          />
+                          {open ? (
+                            <DropdownBody style={styles.departmentBody}>
+                              {people.length === 0 ? (
+                                <Text style={styles.sectionHint}>Add people from Departments below.</Text>
+                              ) : (
+                                people.map(renderMember)
+                              )}
+                            </DropdownBody>
+                          ) : null}
+                        </View>
+                      );
+                    })}
+                    {grouped.unassigned.length > 0 && departments.departments.length > 0 ? (
+                      <View>
+                        <Text style={styles.unassignedLabel}>Not in a department</Text>
+                      </View>
+                    ) : null}
+                    {grouped.unassigned.map(renderMember)}
+                  </DropdownBody>
+                ) : null}
+              </>
             )}
 
-            <AnimatedPressable
-              scaleTo={0.98}
-              onPress={() => router.push('/(owner)/team/add-member')}
-              style={styles.addMember}
-              accessibilityRole="button"
-              accessibilityLabel="Add member"
-            >
-              <View style={styles.addMemberIcon}>
-                <Feather name="user-plus" size={17} color={T.ink} />
-              </View>
-              <Text style={styles.addMemberText}>Add member</Text>
-            </AnimatedPressable>
+            <View style={styles.bottomActions}>
+              <AnimatedPressable
+                scaleTo={0.98}
+                onPress={() => router.push('/(owner)/team/add-member')}
+                style={[styles.addMember, styles.bottomAction]}
+                accessibilityRole="button"
+                accessibilityLabel="Add member"
+              >
+                <View style={styles.addMemberIcon}>
+                  <Feather name="user-plus" size={17} color={T.ink} />
+                </View>
+                <Text style={styles.addMemberText}>Add member</Text>
+              </AnimatedPressable>
+              <AnimatedPressable
+                scaleTo={0.98}
+                onPress={() => setManagingDepartments(true)}
+                style={[styles.addMember, styles.bottomAction]}
+                accessibilityRole="button"
+                accessibilityLabel="Manage departments"
+              >
+                <View style={styles.addMemberIcon}>
+                  <Feather name="layers" size={17} color={T.ink} />
+                </View>
+                <Text style={styles.addMemberText}>Departments</Text>
+              </AnimatedPressable>
+            </View>
           </Animated.View>
 
         </ScrollView>
@@ -300,11 +438,31 @@ export default function OwnerDashboard() {
           initialFilter={inboxFilter}
           onDismiss={() => setInboxFilter(null)}
           onMessage={setSnackMessage}
+          onOpenChat={(memberId) => {
+            const person = teamMembers.find((m) => m.id === memberId);
+            if (!person) return setSnackMessage('That person is no longer on the team');
+            setInboxFilter(null);
+            setMenuDialog('chat');
+            setMenuMember(person);
+          }}
+        />
+      ) : null}
+
+      {managingDepartments ? (
+        <DepartmentsSheet
+          data={departments}
+          people={sortedMembers}
+          onDismiss={() => setManagingDepartments(false)}
+          onChanged={(message) => {
+            setSnackMessage(message);
+            void loadDepartments();
+          }}
         />
       ) : null}
 
       <OwnerMemberMenu
         member={menuMember}
+        initialDialog={menuDialog}
         onClose={() => setMenuMember(null)}
         onMessage={setSnackMessage}
       />
@@ -322,6 +480,54 @@ export default function OwnerDashboard() {
 }
 
 // ---------------------------------------------------------------------------
+
+/** A tappable dropdown header: the Team button, or a department inside it. */
+function GroupRow({
+  icon,
+  color,
+  soft,
+  title,
+  hint,
+  badge,
+  open,
+  onPress,
+  nested,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  color: string;
+  soft: string;
+  title: string;
+  hint?: string;
+  badge?: string;
+  open: boolean;
+  onPress: () => void;
+  nested?: boolean;
+}) {
+  return (
+    <AnimatedPressable
+      scaleTo={0.98}
+      onPress={onPress}
+      style={[styles.groupRow, nested && styles.groupRowNested]}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{ expanded: open }}
+    >
+      <View style={[styles.groupIcon, { backgroundColor: soft }]}>
+        <Feather name={icon} size={16} color={color} />
+      </View>
+      <View style={styles.groupText}>
+        <Text style={styles.groupTitle} numberOfLines={1}>{title}</Text>
+        {hint ? <Text style={styles.groupHint} numberOfLines={1}>{hint}</Text> : null}
+      </View>
+      {badge ? (
+        <View style={styles.groupBadge}>
+          <Text style={styles.groupBadgeText}>{badge}</Text>
+        </View>
+      ) : null}
+      <Chevron open={open} color={T.mute} />
+    </AnimatedPressable>
+  );
+}
 
 function SoftBell() {
   const router = useRouter();
@@ -518,6 +724,80 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderStyle: 'dashed',
     borderColor: T.soft2,
+  },
+  bottomActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 6,
+  },
+  bottomAction: {
+    flex: 1,
+  },
+  groupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: T.card,
+    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    ...shadow,
+  },
+  groupRowNested: {
+    borderRadius: 16,
+    paddingVertical: 10,
+  },
+  groupIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  groupTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 15.5,
+    color: T.ink,
+    letterSpacing: -0.2,
+  },
+  groupHint: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12.5,
+    color: T.mute,
+    marginTop: 1,
+  },
+  groupBadge: {
+    backgroundColor: T.amberSoft,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  groupBadgeText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+    color: T.amber,
+  },
+  teamBody: {
+    paddingLeft: 10,
+  },
+  departmentBody: {
+    paddingLeft: 10,
+    marginBottom: 4,
+  },
+  unassignedLabel: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+    color: T.mute,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 6,
+    marginBottom: 8,
+    marginLeft: 4,
   },
   addMemberIcon: {
     width: 32,

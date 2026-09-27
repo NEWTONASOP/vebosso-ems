@@ -584,9 +584,10 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .select('*')
         .eq('user_id', userId)
         .eq('date', today)
-        .single();
+        // No row yet today is normal; maybeSingle returns null instead of a 406.
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         set({ errorToday: error.message, todayError: error.message, isLoadingToday: false });
         return { success: false, error: error.message };
       }

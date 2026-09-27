@@ -32,3 +32,8 @@ verify_jwt = true
 # as it stands this endpoint is publicly triggerable.
 [functions.send-checkout-reminders]
 verify_jwt = false
+
+# Same as above, for the 11:30 AM check-in reminder (032_checkin_reminders.sql).
+# Same TODO: add a shared secret so only the cron job can trigger it.
+[functions.send-checkin-reminders]
+verify_jwt = false

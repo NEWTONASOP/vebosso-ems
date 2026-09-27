@@ -2,7 +2,8 @@
 // VEBOSSO EMS — Venues Screen (shared by owner, manager, member)
 // Every venue onboarded to VEBOSSO as a table: when it was met, who met it,
 // the venue, where, and the person met there. Everyone can add; the owner can
-// edit and delete (tap a row).
+// edit and delete (tap a row). Venues in business with VEBOSSO show green —
+// anyone can mark one, only the owner can take the mark off.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -23,7 +24,7 @@ import { Snackbar, Text } from 'react-native-paper';
 import { AppTheme as T, screenChrome } from '../constants/theme';
 import { Alert } from '../lib/alert';
 import { supabase } from '../lib/supabase';
-import { deleteVenue, fetchVenues } from '../lib/venues';
+import { deleteVenue, fetchVenues, setVenueInBusiness } from '../lib/venues';
 import { Venue } from '../types/database';
 import { SheetFrame } from './SheetFrame';
 import { VenueFormSheet } from './VenueFormSheet';
@@ -35,6 +36,7 @@ const COLUMNS: { key: string; label: string; width: number }[] = [
   { key: 'location', label: 'Location', width: 170 },
   { key: 'role', label: 'Person met (role)', width: 170 },
   { key: 'name', label: 'Their name', width: 140 },
+  { key: 'phone', label: 'Their phone', width: 140 },
   { key: 'email', label: 'Their email', width: 210 },
 ];
 const TABLE_WIDTH = COLUMNS.reduce((w, c) => w + c.width, 0);
@@ -60,6 +62,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
   const [formFor, setFormFor] = useState<Venue | 'new' | null>(() => (add === '1' ? 'new' : null));
   const [detail, setDetail] = useState<Venue | null>(null);
   const [snack, setSnack] = useState('');
+  const [marking, setMarking] = useState(false);
 
   const apply = useCallback((res: Awaited<ReturnType<typeof fetchVenues>>) => {
     if (res.success) {
@@ -103,7 +106,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
     const q = query.trim().toLowerCase();
     if (!q) return venues;
     return venues.filter((v) =>
-      [v.venue_name, v.location, v.contact_name, v.contact_role, v.contact_email, v.added_by_name]
+      [v.venue_name, v.location, v.contact_name, v.contact_role, v.contact_email, v.contact_phone, v.added_by_name]
         .some((f) => f?.toLowerCase().includes(q))
     );
   }, [venues, query]);
@@ -128,6 +131,32 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
     ]);
   };
 
+  const toggleInBusiness = (v: Venue) => {
+    const next = !v.in_business;
+    const go = async () => {
+      setMarking(true);
+      const res = await setVenueInBusiness(v.id, next);
+      setMarking(false);
+      if (res.success) {
+        setDetail(null);
+        setSnack(next ? `${v.venue_name} marked in business` : 'Mark removed');
+        await load();
+      } else {
+        setSnack(res.error);
+      }
+    };
+    Alert.alert(
+      next ? 'In business with VEBOSSO?' : 'Remove the mark?',
+      next
+        ? `Mark ${v.venue_name} as a venue that has given permission and works with VEBOSSO. Only the owner can undo this.`
+        : `${v.venue_name} will no longer show as in business.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: next ? 'Mark in business' : 'Remove', style: next ? 'default' : 'destructive', onPress: () => void go() },
+      ]
+    );
+  };
+
   const cell = (col: string, v: Venue) => {
     switch (col) {
       case 'date':
@@ -142,6 +171,8 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
         return dash(v.contact_role);
       case 'name':
         return dash(v.contact_name);
+      case 'phone':
+        return dash(v.contact_phone);
       case 'email':
         return dash(v.contact_email);
       default:
@@ -234,13 +265,30 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
                     style={({ pressed }) => [
                       styles.row,
                       i % 2 === 1 && styles.rowAlt,
+                      v.in_business && styles.rowInBusiness,
                       pressed && styles.rowPressed,
                     ]}
                     accessibilityRole="button"
-                    accessibilityLabel={`${v.venue_name}, met ${cell('date', v)} by ${dash(v.added_by_name)}`}
+                    accessibilityLabel={`${v.venue_name}${v.in_business ? ', in business' : ''}, met ${cell('date', v)} by ${dash(v.added_by_name)}`}
                   >
                     {COLUMNS.map((c) =>
-                      c.key === 'email' && v.contact_email ? (
+                      c.key === 'venue' && v.in_business ? (
+                        <View key={c.key} style={[styles.venueCell, { width: c.width }]}>
+                          <Feather name="check-circle" size={14} color={T.green} style={{ marginTop: 2 }} />
+                          <Text style={[styles.cellStrong, styles.venueCellText]} numberOfLines={2}>
+                            {v.venue_name}
+                          </Text>
+                        </View>
+                      ) : c.key === 'phone' && v.contact_phone ? (
+                        <Text
+                          key={c.key}
+                          style={[styles.cell, styles.link, { width: c.width }]}
+                          numberOfLines={1}
+                          onPress={() => Linking.openURL(`tel:${v.contact_phone}`)}
+                        >
+                          {v.contact_phone}
+                        </Text>
+                      ) : c.key === 'email' && v.contact_email ? (
                         <Text
                           key={c.key}
                           style={[styles.cell, styles.link, { width: c.width }]}
@@ -268,7 +316,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
 
         {!isLoading && filtered.length > 0 ? (
           <Text style={styles.hint}>
-            Swipe the table sideways to see every column · tap a row for details
+            Green rows are in business with VEBOSSO · swipe sideways for every column · tap a row for details
           </Text>
         ) : null}
       </ScrollView>
@@ -283,7 +331,30 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
           iconColor={T.blue}
           iconBg={T.blueSoft}
           footer={
-            canManage ? (
+            <View style={{ gap: 8 }}>
+              {!detail.in_business || canManage ? (
+                <Pressable
+                  style={[styles.markBtn, detail.in_business && styles.unmarkBtn]}
+                  onPress={() => toggleInBusiness(detail)}
+                  disabled={marking}
+                >
+                  {marking ? (
+                    <ActivityIndicator color={detail.in_business ? T.inkSoft : T.white} />
+                  ) : (
+                    <>
+                      <Feather
+                        name={detail.in_business ? 'x-circle' : 'check-circle'}
+                        size={15}
+                        color={detail.in_business ? T.inkSoft : T.white}
+                      />
+                      <Text style={[styles.detailBtnText, { color: detail.in_business ? T.inkSoft : T.white }]}>
+                        {detail.in_business ? 'Remove in-business mark' : 'Mark in business with VEBOSSO'}
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+              ) : null}
+              {canManage ? (
               <View style={styles.detailActions}>
                 <Pressable style={[styles.detailBtn, styles.deleteBtn]} onPress={() => confirmDelete(detail)}>
                   <Feather name="trash-2" size={15} color={T.coral} />
@@ -300,14 +371,35 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
                   <Text style={[styles.detailBtnText, { color: T.white }]}>Edit</Text>
                 </Pressable>
               </View>
-            ) : undefined
+              ) : null}
+            </View>
           }
         >
+          {detail.in_business ? (
+            <View style={styles.inBusinessBanner}>
+              <Feather name="check-circle" size={16} color={T.green} style={{ marginTop: 2 }} />
+              <Text style={styles.inBusinessText}>
+                In business with VEBOSSO
+                {detail.in_business_by_name || detail.in_business_at ? (
+                  <Text style={styles.inBusinessMeta}>
+                    {' · marked'}
+                    {detail.in_business_by_name ? ` by ${detail.in_business_by_name}` : ''}
+                    {detail.in_business_at ? ` on ${format(new Date(detail.in_business_at), 'd MMM yyyy')}` : ''}
+                  </Text>
+                ) : null}
+              </Text>
+            </View>
+          ) : null}
           <DetailRow label="Date met" value={cell('date', detail)} />
           <DetailRow label="Team member" value={dash(detail.added_by_name)} />
           <DetailRow label="Location" value={dash(detail.location)} />
           <DetailRow label="Person met (role)" value={dash(detail.contact_role)} />
           <DetailRow label="Their name" value={dash(detail.contact_name)} />
+          <DetailRow
+            label="Their phone"
+            value={dash(detail.contact_phone)}
+            onPress={detail.contact_phone ? () => Linking.openURL(`tel:${detail.contact_phone}`) : undefined}
+          />
           <DetailRow
             label="Their email"
             value={dash(detail.contact_email)}
@@ -421,8 +513,42 @@ const styles = StyleSheet.create({
   rowAlt: {
     backgroundColor: '#FAFBFC',
   },
+  rowInBusiness: {
+    backgroundColor: T.greenSoft,
+  },
   rowPressed: {
     backgroundColor: T.soft,
+  },
+  venueCell: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 12,
+  },
+  venueCellText: {
+    flex: 1,
+    fontSize: 13.5,
+    lineHeight: 19,
+  },
+  inBusinessBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: T.greenSoft,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 6,
+  },
+  inBusinessText: {
+    flex: 1,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    color: T.green,
+    lineHeight: 20,
+  },
+  inBusinessMeta: {
+    fontFamily: 'Inter_400Regular',
+    color: T.inkSoft,
   },
   headCell: {
     paddingHorizontal: 12,
@@ -484,6 +610,19 @@ const styles = StyleSheet.create({
   },
   deleteBtn: {
     backgroundColor: T.coralSoft,
+  },
+  // Full-width on its own line, so no flex (flex: 1 collapses it in a column).
+  markBtn: {
+    height: 46,
+    borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: T.green,
+  },
+  unmarkBtn: {
+    backgroundColor: T.soft,
   },
   editBtn: {
     backgroundColor: T.charcoal,

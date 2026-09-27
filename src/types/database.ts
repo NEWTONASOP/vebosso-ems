@@ -27,6 +27,8 @@ export interface Profile {
   is_active: boolean;
   expo_push_token: string | null;
   must_change_password: boolean;
+  /** Get the 11:30 AM check-in reminder on Sundays too (default on). */
+  sunday_checkin_reminder?: boolean;
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -181,8 +183,41 @@ export interface SalaryRequest {
   paid_at: string | null;
   paid_by: string | null;
   received_at: string | null;
+  /** Rupees paid for this month, set by the owner when marking it paid. */
+  amount: number | string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** The person's monthly salary, set by the owner. */
+export interface SalarySetting {
+  user_id: string;
+  monthly_amount: number | string;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+/** One message in the owner ↔ person chat. member_id is the non-owner side. */
+export interface ChatMessage {
+  id: string;
+  member_id: string;
+  sender_id: string | null;
+  body: string;
+  created_at: string;
+  /** When the other side read it. */
+  read_at: string | null;
+}
+
+export interface Department {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface DepartmentMember {
+  user_id: string;
+  department_id: string;
+  added_at: string;
 }
 
 export interface BossMessage {
@@ -208,6 +243,11 @@ export interface Venue {
   contact_role: string | null;
   contact_name: string | null;
   contact_email: string | null;
+  contact_phone: string | null;
+  /** Given permission and working with VEBOSSO. Anyone marks; only the owner unmarks. */
+  in_business: boolean;
+  in_business_by_name: string | null;
+  in_business_at: string | null;
   added_by: string | null;
   /** Filled in by the database from added_by. */
   added_by_name: string | null;
@@ -217,7 +257,7 @@ export interface Venue {
 
 export type VenueInput = Pick<
   Venue,
-  'met_on' | 'venue_name' | 'location' | 'contact_role' | 'contact_name' | 'contact_email'
+  'met_on' | 'venue_name' | 'location' | 'contact_role' | 'contact_name' | 'contact_email' | 'contact_phone'
 >;
 
 export type ExpenseStatus = 'submitted' | 'paid' | 'received';
@@ -261,6 +301,8 @@ export interface AccountTransaction {
   /** Postgres NUMERIC — may arrive as a string. */
   amount: number | string;
   particular: string | null;
+  /** Optional receipt photos — paths in the private `account-receipts` bucket. */
+  receipts: string[];
   created_at: string;
   updated_at: string;
 }
@@ -277,7 +319,8 @@ export interface AccountSummary {
 }
 
 export type BillKind = 'estimate' | 'client';
-export type BillStatus = 'draft' | 'pending' | 'done' | 'completed' | 'trash';
+export type BillBrand = 'vebosso' | 'navgrah';
+export type BillStatus = 'draft' | 'pending' | 'completed' | 'trash';
 
 /** A service provided — description only; bills carry one total. */
 export interface BillItem {
@@ -287,6 +330,8 @@ export interface BillItem {
 export interface Bill {
   id: string;
   kind: BillKind;
+  /** Which brand the bill is made for — its logo, colours and details. */
+  brand: BillBrand;
   status: BillStatus;
   prev_status: BillStatus | null;
   /** E-0001 / B-0001 — assigned by the database on first save. */
@@ -314,12 +359,15 @@ export interface Bill {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** Set when a saved bill is changed again; the PDF shows it as revised. */
+  edited_at: string | null;
 }
 
 /** Everything the bill form edits. */
 export type BillFields = Pick<
   Bill,
   | 'kind'
+  | 'brand'
   | 'prepared_by'
   | 'client_name'
   | 'venue'

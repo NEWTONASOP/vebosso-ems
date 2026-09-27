@@ -1,8 +1,10 @@
 // ============================================================================
-// VEBOSSO EMS — Bill editor
-// New bills and drafts save themselves as you type; a saved bill changes only
-// when you tap Save. Once saved: share the PDF, send it to the client's
-// WhatsApp, change status, move an estimate to a client bill, trash / restore.
+// VEBOSSO EMS — Bill (view + editor)
+// A saved bill opens as the bill itself, with Edit, Share, WhatsApp, Mark
+// completed, move an estimate to a client bill, trash / restore. New bills and
+// drafts open in the editor and save themselves as you type; a saved bill
+// changes only when you tap Save (photos included), and leaving with unsaved
+// changes asks first. Used by the owner and by anyone given Bills.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -20,7 +22,7 @@ import {
   View,
 } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
-import { DatePickerModal, enGB, registerTranslation, TimePickerModal } from 'react-native-paper-dates';
+import { DatePickerModal, enGB, registerTranslation } from 'react-native-paper-dates';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTheme as T, appSoftShadow, screenChrome } from '../../../constants/theme';
 import { money, num } from '../../../lib/accounts';
@@ -46,35 +48,31 @@ import {
   updateBill,
   uploadBillImage,
 } from '../../../lib/bills';
-import { BillPreviewSheet } from '../../../components/BillPreviewSheet';
+import { BillPage, BillPreviewSheet } from '../../../components/BillPreviewSheet';
+import { HourPickerModal, hourLabel } from '../../../components/DateTimeFields';
+import { useBillsBase } from '../../../lib/billsAccess';
 import { useAuthStore } from '../../../store/authStore';
-import { Bill, BillFields, BillKind, BillSettings, BillStatus } from '../../../types/database';
+import { Bill, BillBrand, BillFields, BillKind, BillSettings, BillStatus } from '../../../types/database';
+import { BRANDS, brandOf } from '../../../lib/billBrands';
 
 registerTranslation('en-GB', enGB);
 
-/** "7:00 PM – 11:30 PM" ⇄ two times. */
-type Clock = { hours: number; minutes: number };
-
-const clockLabel = (c: Clock | null) => {
-  if (!c) return null;
-  const h12 = c.hours % 12 === 0 ? 12 : c.hours % 12;
-  return `${h12}:${String(c.minutes).padStart(2, '0')} ${c.hours < 12 ? 'AM' : 'PM'}`;
-};
-
-function parseTiming(timing: string | null): [Clock | null, Clock | null] {
-  const found = [...String(timing ?? '').matchAll(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi)].map((m) => {
-    let h = Number(m[1]) % 12;
-    if (m[3].toUpperCase() === 'PM') h += 12;
-    return { hours: h, minutes: Number(m[2]) };
+/** "7 PM – 11 PM" ⇄ two hours (0–23). Whole hours only; bills saved earlier
+ *  as "7:30 PM" still read back, at the hour. */
+function parseTiming(timing: string | null): [number | null, number | null] {
+  const found = [...String(timing ?? '').matchAll(/(\d{1,2})(?::\d{2})?\s*(AM|PM)/gi)].map((m) => {
+    const h = Number(m[1]) % 12;
+    return m[2].toUpperCase() === 'PM' ? h + 12 : h;
   });
   return [found[0] ?? null, found[1] ?? null];
 }
 
-const joinTiming = (from: Clock | null, to: Clock | null) =>
-  [clockLabel(from), clockLabel(to)].filter(Boolean).join(' – ');
+const joinTiming = (from: number | null, to: number | null) =>
+  [from, to].filter((h): h is number => h !== null).map(hourLabel).join(' – ');
 
-const emptyForm = (kind: BillKind): BillFields => ({
+const emptyForm = (kind: BillKind, brand: BillBrand): BillFields => ({
   kind,
+  brand,
   prepared_by: '',
   client_name: '',
   venue: '',
@@ -96,6 +94,7 @@ const emptyForm = (kind: BillKind): BillFields => ({
 
 const fromBill = (b: Bill): BillFields => ({
   kind: b.kind,
+  brand: brandOf(b),
   prepared_by: b.prepared_by ?? '',
   client_name: b.client_name ?? '',
   venue: b.venue ?? '',
@@ -118,7 +117,7 @@ const fromBill = (b: Bill): BillFields => ({
 /** Has the owner typed anything worth keeping as a draft? */
 const hasContent = (f: BillFields, defaults: BillFields) =>
   (Object.keys(f) as (keyof BillFields)[]).some((k) => {
-    if (k === 'kind' || k === 'prepared_by' || k === 'terms') return false;
+    if (k === 'kind' || k === 'brand' || k === 'prepared_by' || k === 'terms') return false;
     if (k === 'items') return f.items.some((i) => i.description.trim());
     if (k === 'images') return f.images.length > 0;
     return JSON.stringify(f[k] ?? '') !== JSON.stringify(defaults[k] ?? '');
@@ -129,13 +128,16 @@ export default function BillEditorScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
-  const params = useLocalSearchParams<{ id: string; kind?: string }>();
+  const params = useLocalSearchParams<{ id: string; kind?: string; brand?: string }>();
+  const newBrand: BillBrand = params.brand === 'navgrah' ? 'navgrah' : 'vebosso';
   const isNew = params.id === 'new';
   const profileName = useAuthStore((s) => s.profile?.full_name ?? '');
 
   const [bill, setBill] = useState<Bill | null>(null);
   const [settings, setSettings] = useState<BillSettings | null>(null);
-  const [form, setForm] = useState<BillFields>(() => emptyForm(params.kind === 'client' ? 'client' : 'estimate'));
+  const [form, setForm] = useState<BillFields>(() =>
+    emptyForm(params.kind === 'client' ? 'client' : 'estimate', newBrand)
+  );
   const [defaults, setDefaults] = useState<BillFields | null>(null);
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
@@ -151,6 +153,13 @@ export default function BillEditorScreen() {
 
   // A snapshot of the bill as it stands when Preview is tapped.
   const [preview, setPreview] = useState<Bill | null>(null);
+  // A saved bill opens as the bill itself; Edit switches to the form.
+  const [viewing, setViewing] = useState(false);
+  // Photos uploaded to a saved bill but not saved yet — removed on discard.
+  const newImages = useRef<string[]>([]);
+  // A service row to focus once it has rendered (Enter adds the next one).
+  const focusItem = useRef<number | null>(null);
+  const billsBase = useBillsBase();
 
   const isDraft = !bill || bill.status === 'draft';
   // Latest row for async callbacks (autosave, image upload) without re-subscribing.
@@ -164,18 +173,18 @@ export default function BillEditorScreen() {
   const backToList = useCallback(() => {
     const routes = navigation.getState()?.routes ?? [];
     if (routes.length > 1) navigation.goBack();
-    else router.replace('/(owner)/bills' as any);
-  }, [navigation, router]);
+    else router.replace(billsBase as any);
+  }, [navigation, router, billsBase]);
 
   // ---- Load --------------------------------------------------------------
   useEffect(() => {
     let active = true;
     (async () => {
-      const s = await fetchBillSettings();
-      const settingsData = s.success ? s.data : null;
       if (isNew) {
+        const s = await fetchBillSettings(newBrand);
+        const settingsData = s.success ? s.data : null;
         const f = {
-          ...emptyForm(params.kind === 'client' ? 'client' : 'estimate'),
+          ...emptyForm(params.kind === 'client' ? 'client' : 'estimate', newBrand),
           prepared_by: profileName,
           terms: settingsData?.default_terms ?? '',
         };
@@ -187,8 +196,10 @@ export default function BillEditorScreen() {
         return;
       }
       const res = await fetchBill(params.id);
+      // Each bill prints with its own brand's details.
+      const s = await fetchBillSettings(res.success ? brandOf(res.data) : 'vebosso');
       if (!active) return;
-      setSettings(settingsData);
+      setSettings(s.success ? s.data : null);
       if (!res.success) {
         setError(res.error);
         setLoading(false);
@@ -198,13 +209,14 @@ export default function BillEditorScreen() {
       setBill(res.data);
       setForm(f);
       setDefaults(f);
+      setViewing(res.data.status !== 'draft');
       setImageUrls(await signBillImages(res.data.images ?? []));
       setLoading(false);
     })();
     return () => {
       active = false;
     };
-  }, [isNew, params.id, params.kind, profileName]);
+  }, [isNew, params.id, params.kind, newBrand, profileName]);
 
   // ---- Drafts: write as you type -----------------------------------------
   /** The row for this bill, creating the draft on first use. */
@@ -243,18 +255,11 @@ export default function BillEditorScreen() {
     return () => clearTimeout(timer);
   }, [form, dirty, isDraft, defaults, ensureBill]);
 
-  // Leaving a saved bill with unsaved edits asks first.
-  useEffect(() => {
-    const unsub = navigation.addListener('beforeRemove' as any, (e: any) => {
-      if (!dirty || isDraft) return;
-      e.preventDefault();
-      Alert.alert('Discard changes?', 'Your edits to this bill haven’t been saved.', [
-        { text: 'Keep editing', style: 'cancel' },
-        { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
-      ]);
-    });
-    return unsub;
-  }, [navigation, dirty, isDraft]);
+  /** Photos added since the last save go away with the edits. */
+  const dropNewImages = () => {
+    for (const path of newImages.current) void removeBillImage(path);
+    newImages.current = [];
+  };
 
   const set = <K extends keyof BillFields>(k: K, v: BillFields[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -269,6 +274,21 @@ export default function BillEditorScreen() {
       form.items.map((it, j) => (j === i ? { ...it, ...patch } : it))
     );
   const addItem = () => set('items', [...form.items, { description: '' }]);
+
+  /** Enter in a service: on to the next one, or start a new one. */
+  const onItemEnter = (i: number) => {
+    if (i < form.items.length - 1) return focusNext(`item-${i + 1}`)();
+    if (!form.items[i].description.trim()) return focusNext('total')();
+    focusItem.current = i + 1;
+    addItem();
+  };
+
+  useEffect(() => {
+    const i = focusItem.current;
+    if (i === null || i >= form.items.length) return;
+    focusItem.current = null;
+    focusNext(`item-${i}`)();
+  }, [form.items.length, focusNext]);
   const removeItem = (i: number) =>
     set('items', form.items.length === 1 ? [{ description: '' }] : form.items.filter((_, j) => j !== i));
 
@@ -299,13 +319,21 @@ export default function BillEditorScreen() {
         else setError(up.error);
       }
       if (added.length) {
-        const images = [...form.images, ...added];
-        // Images are stored straight away so files never go unreferenced.
-        const saved = await updateBill(target.id, { images });
-        if (saved.success) setBill(saved.data);
-        setForm((f) => ({ ...f, images }));
-        setDefaults((d) => (d ? { ...d, images } : d));
-        setImageUrls({ ...imageUrls, ...(await signBillImages(added)) });
+        const signed = await signBillImages(added);
+        setImageUrls((u) => ({ ...u, ...signed }));
+        if (target.status === 'draft') {
+          // Drafts keep everything as you go.
+          const images = [...form.images, ...added];
+          const saved = await updateBill(target.id, { images });
+          if (saved.success) setBill(saved.data);
+          setForm((f) => ({ ...f, images }));
+          setDefaults((d) => (d ? { ...d, images } : d));
+        } else {
+          // A saved bill changes only on Save — new photos are an unsaved edit.
+          newImages.current.push(...added);
+          setForm((f) => ({ ...f, images: [...f.images, ...added] }));
+          setDirty(true);
+        }
       }
     } finally {
       setBusy(null);
@@ -320,6 +348,12 @@ export default function BillEditorScreen() {
         style: 'destructive',
         onPress: async () => {
           const images = form.images.filter((p) => p !== path);
+          if (!isDraft) {
+            // Saved bill: gone on Save (the file is deleted then), back on discard.
+            setForm((f) => ({ ...f, images }));
+            setDirty(true);
+            return;
+          }
           if (bill) {
             const saved = await updateBill(bill.id, { images });
             if (saved.success) setBill(saved.data);
@@ -333,18 +367,78 @@ export default function BillEditorScreen() {
   };
 
   // ---- Save & actions ------------------------------------------------------
-  const save = async () => {
-    if (!form.client_name?.trim()) return setError('Enter the Bride and Groom name');
+  /** true when saved. After saving, the bill shows as itself again. */
+  const save = useCallback(async (): Promise<boolean> => {
+    if (!form.client_name?.trim()) {
+      setError('Enter the Bride and Groom name');
+      return false;
+    }
     setSaving(true);
     const target = await ensureBill(form);
-    if (!target) return setSaving(false);
+    if (!target) {
+      setSaving(false);
+      return false;
+    }
     const res = await saveBill(target.id, form, target.status === 'trash' ? 'trash' : target.status);
     setSaving(false);
-    if (!res.success) return setError(res.error);
+    if (!res.success) {
+      setError(res.error);
+      return false;
+    }
+    // Photos taken off the bill go for good once the change is saved.
+    for (const path of (defaults?.images ?? []).filter((p) => !form.images.includes(p))) void removeBillImage(path);
+    newImages.current = [];
     setBill(res.data);
     setDefaults(form);
     setDirty(false);
+    setViewing(true);
     setSnack(target.status === 'draft' ? `Saved as ${res.data.number}` : 'Changes saved');
+    return true;
+  }, [form, defaults, ensureBill]);
+  // Leaving a saved bill with unsaved edits (text or photos) asks first.
+  useEffect(() => {
+    const unsub = navigation.addListener('beforeRemove' as any, (e: any) => {
+      if (!dirty || isDraft) return;
+      e.preventDefault();
+      Alert.alert('Unsaved changes', 'Your edits to this bill haven’t been saved.', [
+        { text: 'Keep editing', style: 'cancel' },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () => {
+            dropNewImages();
+            navigation.dispatch(e.data.action);
+          },
+        },
+        {
+          text: 'Save',
+          onPress: async () => {
+            if (await save()) navigation.dispatch(e.data.action);
+          },
+        },
+      ]);
+    });
+    return unsub;
+  }, [navigation, dirty, isDraft, save]);
+
+  /** Back from the form to the bill; unsaved changes ask first. */
+  const leaveEdit = () => {
+    if (!dirty) return setViewing(true);
+    Alert.alert('Unsaved changes', 'Your edits to this bill haven’t been saved.', [
+      { text: 'Keep editing', style: 'cancel' },
+      {
+        text: 'Discard',
+        style: 'destructive',
+        onPress: () => {
+          dropNewImages();
+          if (defaults) setForm(defaults);
+          setDirty(false);
+          setError('');
+          setViewing(true);
+        },
+      },
+      { text: 'Save', onPress: () => void save() },
+    ]);
   };
 
   const act = async (key: string, fn: () => Promise<unknown>, done?: string) => {
@@ -380,6 +474,7 @@ export default function BillEditorScreen() {
       created_by: null,
       created_at: now,
       updated_at: now,
+      edited_at: null,
       ...form,
     };
     setPreview({ ...base, ...form });
@@ -411,6 +506,18 @@ export default function BillEditorScreen() {
       },
       `Marked ${STATUS_LABEL[s].toLowerCase()}`
     );
+
+  const markCompleted = () =>
+    Alert.alert('Mark as completed?', 'The bill moves to Completed.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Mark completed', onPress: () => void changeStatus('completed') },
+    ]);
+
+  const reopen = () =>
+    Alert.alert('Not completed?', 'The bill goes back to Pending.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Back to pending', onPress: () => void changeStatus('pending') },
+    ]);
 
   const convert = () => {
     if (!bill || unsavedBeforeShare()) return;
@@ -490,23 +597,111 @@ export default function BillEditorScreen() {
   const tone = BILL_STATUS_TONE[status];
   const saved = !!bill && status !== 'draft';
   const inTrash = status === 'trash';
+  const statusLabel = form.kind === 'estimate' && saved && !inTrash ? 'Estimate' : STATUS_LABEL[status];
+
+  if (viewing && bill && settings) {
+    return (
+      <View style={screenChrome.root}>
+        <View style={screenChrome.headerRow}>
+          <View style={styles.titleRow}>
+            <Pressable onPress={backToList} style={styles.back} hitSlop={8} accessibilityLabel="Back to bills">
+              <Feather name="chevron-left" size={24} color={T.ink} />
+            </Pressable>
+            <View style={{ flexShrink: 1 }}>
+              <Text style={styles.title} numberOfLines={1}>{bill.number ?? 'Bill'}</Text>
+              <View style={styles.subRow}>
+                <View style={[styles.statusPill, { backgroundColor: BRANDS[form.brand].primary }]}>
+                  <Text style={[styles.statusPillText, { color: '#fff' }]}>{BRANDS[form.brand].label}</Text>
+                </View>
+                <View style={[styles.statusPill, { backgroundColor: tone.bg }]}>
+                  <Text style={[styles.statusPillText, { color: tone.color }]}>{statusLabel}</Text>
+                </View>
+                <Text style={styles.draftNote} numberOfLines={1}>
+                  {bill.client_name || (bill.estimate_number ? `from ${bill.estimate_number}` : '')}
+                </Text>
+              </View>
+            </View>
+          </View>
+          <View style={styles.headerActions}>
+            {inTrash ? (
+              <Pressable style={styles.iconBtn} onPress={deleteForever} accessibilityLabel="Delete for good">
+                <Feather name="trash-2" size={16} color={T.coral} />
+              </Pressable>
+            ) : (
+              <Pressable style={styles.iconBtn} onPress={trash} accessibilityLabel="Move to trash">
+                <Feather name="trash-2" size={16} color={T.inkSoft} />
+              </Pressable>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.page}>
+          <BillPage bill={bill} settings={settings} />
+        </View>
+
+        <View style={[styles.viewBar, { paddingBottom: 96 + insets.bottom }]}>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {inTrash ? (
+            <Pressable style={styles.editBtn} onPress={restore} disabled={busy === 'restore'}>
+              {busy === 'restore' ? (
+                <ActivityIndicator color={T.white} />
+              ) : (
+                <>
+                  <Feather name="rotate-ccw" size={16} color={T.white} />
+                  <Text style={styles.editText}>Restore</Text>
+                </>
+              )}
+            </Pressable>
+          ) : (
+            <>
+              <View style={styles.actionsRow}>
+                <ActionBtn icon="share-2" label="Share PDF" busy={busy === 'share'} onPress={share} />
+                <ActionBtn icon="message-circle" label="WhatsApp" busy={busy === 'wa'} onPress={whatsapp} tint={T.green} />
+                {form.kind === 'estimate' ? (
+                  <ActionBtn icon="arrow-right-circle" label="To client bill" busy={busy === 'convert'} onPress={convert} tint={T.violet} />
+                ) : status === 'completed' ? (
+                  <ActionBtn icon="check-circle" label="Completed" busy={busy === 'status'} onPress={reopen} tint={T.green} />
+                ) : (
+                  <ActionBtn icon="check" label="Mark completed" busy={busy === 'status'} onPress={markCompleted} tint={T.green} />
+                )}
+              </View>
+              <Pressable style={styles.editBtn} onPress={() => setViewing(false)} accessibilityRole="button">
+                <Feather name="edit-2" size={16} color={T.white} />
+                <Text style={styles.editText}>Edit</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+
+        <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000} wrapperStyle={{ marginBottom: 190 }}>
+          {snack}
+        </Snackbar>
+      </View>
+    );
+  }
 
   return (
     <View style={screenChrome.root}>
       <View style={screenChrome.headerRow}>
         <View style={styles.titleRow}>
-          <Pressable onPress={backToList} style={styles.back} hitSlop={8} accessibilityLabel="Back to bills">
+          <Pressable
+            onPress={saved ? leaveEdit : backToList}
+            style={styles.back}
+            hitSlop={8}
+            accessibilityLabel={saved ? 'Back to the bill' : 'Back to bills'}
+          >
             <Feather name="chevron-left" size={24} color={T.ink} />
           </Pressable>
           <View style={{ flexShrink: 1 }}>
             <Text style={styles.title} numberOfLines={1}>
-              {bill?.number ?? `New ${KIND_LABEL[form.kind].toLowerCase()}`}
+              {bill?.number ? `Edit ${bill.number}` : `New ${KIND_LABEL[form.kind].toLowerCase()}`}
             </Text>
             <View style={styles.subRow}>
-              <View style={[styles.statusPill, { backgroundColor: tone.bg }]}>
-                <Text style={[styles.statusPillText, { color: tone.color }]}>
-                  {form.kind === 'estimate' && saved && !inTrash ? 'Estimate' : STATUS_LABEL[status]}
-                </Text>
+              <View style={[styles.statusPill, { backgroundColor: BRANDS[form.brand].primary }]}>
+                  <Text style={[styles.statusPillText, { color: '#fff' }]}>{BRANDS[form.brand].label}</Text>
+                </View>
+                <View style={[styles.statusPill, { backgroundColor: tone.bg }]}>
+                <Text style={[styles.statusPillText, { color: tone.color }]}>{statusLabel}</Text>
               </View>
               {isDraft ? (
                 <Text style={styles.draftNote}>
@@ -563,39 +758,6 @@ export default function BillEditorScreen() {
             </View>
           ) : null}
 
-          {/* Saved: actions */}
-          {saved && !inTrash ? (
-            <View style={styles.actionsCard}>
-              <View style={styles.actionsRow}>
-                <ActionBtn icon="eye" label="Preview" onPress={openPreview} />
-                <ActionBtn icon="share-2" label="Share PDF" busy={busy === 'share'} onPress={share} />
-                <ActionBtn icon="message-circle" label="WhatsApp" busy={busy === 'wa'} onPress={whatsapp} tint={T.green} />
-                {form.kind === 'estimate' ? (
-                  <ActionBtn icon="arrow-right-circle" label="To client bill" busy={busy === 'convert'} onPress={convert} tint={T.violet} />
-                ) : null}
-              </View>
-              {form.kind === 'client' ? (
-                <View style={styles.statusRow}>
-                  {(['pending', 'done', 'completed'] as const).map((s) => {
-                    const active = status === s;
-                    const c = BILL_STATUS_TONE[s];
-                    return (
-                      <Pressable
-                        key={s}
-                        onPress={() => !active && changeStatus(s)}
-                        style={[styles.statusBtn, active && { backgroundColor: c.bg, borderColor: c.color }]}
-                        accessibilityRole="radio"
-                        accessibilityState={{ checked: active }}
-                      >
-                        <Text style={[styles.statusBtnText, active && { color: c.color }]}>{STATUS_LABEL[s]}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-
           <Section title="Details">
             <Field label="Prepared By" value={form.prepared_by} onChange={(v) => set('prepared_by', v)} inputRef={reg('prepared_by')} onNext={focusNext('client_name')} />
             <Field label="Bride and Groom Name *" value={form.client_name} onChange={(v) => set('client_name', v)} inputRef={reg('client_name')} onNext={focusNext('venue')} />
@@ -616,12 +778,12 @@ export default function BillEditorScreen() {
               <View style={styles.timeRow}>
                 <Pressable style={styles.pick} onPress={() => setPicker('from')} accessibilityLabel="Start time">
                   <Feather name="clock" size={15} color={T.inkSoft} />
-                  <Text style={[styles.pickText, !timeFrom && styles.pickPlaceholder]}>{clockLabel(timeFrom) ?? 'From'}</Text>
+                  <Text style={[styles.pickText, timeFrom === null && styles.pickPlaceholder]}>{timeFrom === null ? 'From' : hourLabel(timeFrom)}</Text>
                 </Pressable>
                 <Feather name="arrow-right" size={15} color={T.mute} />
                 <Pressable style={styles.pick} onPress={() => setPicker('to')} accessibilityLabel="End time">
                   <Feather name="clock" size={15} color={T.inkSoft} />
-                  <Text style={[styles.pickText, !timeTo && styles.pickPlaceholder]}>{clockLabel(timeTo) ?? 'To'}</Text>
+                  <Text style={[styles.pickText, timeTo === null && styles.pickPlaceholder]}>{timeTo === null ? 'To' : hourLabel(timeTo)}</Text>
                 </Pressable>
                 {form.timing ? (
                   <Pressable onPress={() => set('timing', null)} hitSlop={8} accessibilityLabel="Clear timing">
@@ -644,13 +806,24 @@ export default function BillEditorScreen() {
                   onChangeText={(v) => setItem(i, { description: v })}
                   style={[styles.input, styles.itemDesc]}
                   multiline
+                  ref={reg(`item-${i}`)}
+                  // Enter adds the next service instead of a new line.
+                  returnKeyType="next"
+                  submitBehavior="submit"
+                  onSubmitEditing={() => onItemEnter(i)}
                 />
                 <Pressable onPress={() => removeItem(i)} hitSlop={6} style={styles.itemRemove} accessibilityLabel="Remove row">
                   <Feather name="x" size={15} color={T.mute} />
                 </Pressable>
               </View>
             ))}
-            <Pressable onPress={addItem} style={styles.addRow}>
+            <Pressable
+              onPress={() => {
+                focusItem.current = form.items.length;
+                addItem();
+              }}
+              style={styles.addRow}
+            >
               <Feather name="plus" size={15} color={T.ink} />
               <Text style={styles.addRowText}>Add service</Text>
             </Pressable>
@@ -752,21 +925,16 @@ export default function BillEditorScreen() {
         label="Date of function"
         saveLabel="Done"
       />
-      <TimePickerModal
-        locale="en-GB"
+      <HourPickerModal
         visible={picker === 'from' || picker === 'to'}
-        label={picker === 'to' ? 'Ends at' : 'Starts at'}
-        hours={(picker === 'to' ? timeTo : timeFrom)?.hours ?? (picker === 'to' ? 23 : 19)}
-        minutes={(picker === 'to' ? timeTo : timeFrom)?.minutes ?? 0}
-        use24HourClock={false}
+        title={picker === 'to' ? 'Ends at' : 'Starts at'}
+        value={picker === 'to' ? timeTo : timeFrom}
         onDismiss={() => setPicker(null)}
-        onConfirm={(c) => {
+        onPick={(h) => {
           const which = picker;
           setPicker(null);
-          set('timing', which === 'to' ? joinTiming(timeFrom, c) : joinTiming(c, timeTo));
+          set('timing', which === 'to' ? joinTiming(timeFrom, h) : joinTiming(h, timeTo));
         }}
-        confirmLabel="Done"
-        cancelLabel="Cancel"
       />
 
       {/* Save bar */}
@@ -781,7 +949,7 @@ export default function BillEditorScreen() {
           </View>
           <Pressable
             style={[styles.saveBtn, !isDraft && !dirty && styles.saveBtnIdle]}
-            onPress={save}
+            onPress={() => void save()}
             disabled={saving || (!isDraft && !dirty)}
             accessibilityRole="button"
           >
@@ -984,7 +1152,25 @@ const styles = StyleSheet.create({
   segActive: { backgroundColor: T.card, ...appSoftShadow },
   segText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: T.inkSoft },
   segTextActive: { color: T.ink },
-  actionsCard: { backgroundColor: T.card, borderRadius: 20, padding: 10, gap: 10, ...appSoftShadow },
+  page: { flex: 1 },
+  viewBar: {
+    backgroundColor: T.card,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    gap: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: T.hairline,
+  },
+  editBtn: {
+    height: 50,
+    borderRadius: 999,
+    backgroundColor: T.charcoal,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  editText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: T.white },
   actionsRow: { flexDirection: 'row', gap: 8 },
   actionBtn: {
     flex: 1,
@@ -996,17 +1182,6 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   actionText: { fontFamily: 'Inter_600SemiBold', fontSize: 12.5, color: T.ink },
-  statusRow: { flexDirection: 'row', gap: 8 },
-  statusBtn: {
-    flex: 1,
-    height: 38,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: T.soft2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusBtnText: { fontFamily: 'Inter_700Bold', fontSize: 13, color: T.inkSoft },
   section: { gap: 8 },
   sectionTitle: {
     fontFamily: 'Inter_700Bold',

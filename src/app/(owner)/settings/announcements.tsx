@@ -110,8 +110,10 @@ export default function AnnouncementsScreen() {
         >
           <Feather name="arrow-left" size={18} color={T.charcoal} />
         </Pressable>
-        <Text style={screenChrome.title}>Announcements</Text>
-        <View style={styles.headerSpacer} />
+        {/* Takes only the space left, so the New button always fits. */}
+        <Text style={[screenChrome.title, styles.title]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          Announcements
+        </Text>
         {isOwner && (
           <Pressable
             style={({ pressed }) => [
@@ -251,7 +253,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     gap: 12,
   },
-  headerSpacer: { flex: 1 },
+  title: { flex: 1, fontSize: 26 },
   btnPressed: {
     transform: [{ scale: 0.97 }],
     opacity: 0.9,

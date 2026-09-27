@@ -2,7 +2,7 @@
 // VEBOSSO EMS — Owner Inbox ("Needs you now")
 // Everything waiting on the owner, in one place:
 //   check-ins · checkouts (incl. backfilled days) · leave requests ·
-//   documents · salary requests · travel expenses · messages to the boss
+//   documents · salary requests · travel expenses · unread chat messages
 // useOwnerInbox() gathers it and keeps it live; NeedsYouCard is the dashboard
 // summary; OwnerInboxSheet lists every item with its action.
 // ============================================================================
@@ -20,8 +20,7 @@ import {
   documentKind,
   fetchAllPendingDocuments,
   fetchAllSalaryRequests,
-  fetchOpenBossMessages,
-  markBossMessageDone,
+  fetchMonthlySalary,
   markSalaryPaid,
   openDocumentFile,
   PendingDocument,
@@ -29,12 +28,13 @@ import {
   salaryMonthLabel,
   WaitingSalaryRequest,
 } from '../lib/employeeRecords';
+import { fetchUnreadChats, markChatRead, UnreadChat } from '../lib/chat';
 import { fetchAllSubmittedExpenses, formatAmount, markExpensePaid, WaitingExpense } from '../lib/expenses';
 import { supabase } from '../lib/supabase';
 import { formatWorkLogDateForMessage } from '../lib/workLogDates';
 import { useAuthStore } from '../store/authStore';
 import { useWorkStore } from '../store/workStore';
-import { BossMessageWithSender, LeaveRequestWithProfile, WorkLogWithProfile } from '../types/database';
+import { LeaveRequestWithProfile, WorkLogWithProfile } from '../types/database';
 import { AnimatedPressable } from './AnimatedPressable';
 import { SheetFrame } from './SheetFrame';
 import { UserAvatar } from './UserAvatar';
@@ -67,7 +67,7 @@ const loadExtras = async () => {
     fetchAllPendingDocuments(),
     fetchAllSalaryRequests(),
     fetchAllSubmittedExpenses(),
-    fetchOpenBossMessages(),
+    fetchUnreadChats(),
   ]);
   return { docs, salary, expenses, messages };
 };
@@ -79,7 +79,8 @@ export interface OwnerInbox {
   documents: PendingDocument[];
   salary: WaitingSalaryRequest[];
   expenses: WaitingExpense[];
-  messages: BossMessageWithSender[];
+  /** One entry per person with unread chat messages. */
+  messages: UnreadChat[];
   counts: Record<InboxKind, number>;
   total: number;
   refresh: () => Promise<void>;
@@ -95,7 +96,7 @@ export function useOwnerInbox(): OwnerInbox {
   const [documents, setDocuments] = useState<PendingDocument[]>([]);
   const [salary, setSalary] = useState<WaitingSalaryRequest[]>([]);
   const [expenses, setExpenses] = useState<WaitingExpense[]>([]);
-  const [messages, setMessages] = useState<BossMessageWithSender[]>([]);
+  const [messages, setMessages] = useState<UnreadChat[]>([]);
 
   const applyExtras = useCallback((res: Awaited<ReturnType<typeof loadExtras>>) => {
     if (res.docs.success) setDocuments(res.docs.data);
@@ -131,7 +132,7 @@ export function useOwnerInbox(): OwnerInbox {
       timer = setTimeout(() => void refresh(), 400);
     };
     const channel = supabase.channel(`owner_inbox_${Math.random().toString(36).slice(2, 8)}`);
-    for (const table of ['employee_documents', 'salary_requests', 'expense_claims', 'boss_messages', 'leave_requests']) {
+    for (const table of ['employee_documents', 'salary_requests', 'expense_claims', 'chat_messages', 'leave_requests']) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, soon);
     }
     channel.subscribe();
@@ -152,7 +153,7 @@ export function useOwnerInbox(): OwnerInbox {
       document: documents.length,
       salary: salary.length,
       expense: expenses.length,
-      message: messages.length,
+      message: messages.reduce((n, m) => n + m.count, 0),
     };
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
     return { checkIns, checkOuts, leaves, documents, salary, expenses, messages, counts, total, refresh };
@@ -219,11 +220,14 @@ export function OwnerInboxSheet({
   initialFilter,
   onDismiss,
   onMessage,
+  onOpenChat,
 }: {
   inbox: OwnerInbox;
   initialFilter: InboxKind | 'all';
   onDismiss: () => void;
   onMessage: (message: string) => void;
+  /** Opens that person's sheet on their chat. */
+  onOpenChat?: (memberId: string) => void;
 }) {
   const ownerId = useAuthStore((s) => s.profile?.id);
   const approveCheckIn = useWorkStore((s) => s.approveCheckIn);
@@ -415,7 +419,15 @@ export function OwnerInboxSheet({
                         {
                           text: 'Mark paid',
                           onPress: () =>
-                            void run(r.id, () => markSalaryPaid(r.user_id, r.month, ownerId), 'Marked as paid'),
+                            void run(
+                              r.id,
+                              async () => {
+                                // Paid at their monthly salary, when one is set.
+                                const monthly = await fetchMonthlySalary(r.user_id);
+                                return markSalaryPaid(r.user_id, r.month, ownerId, monthly.success ? monthly.data : null);
+                              },
+                              'Marked as paid',
+                            ),
                         },
                       ],
                     ),
@@ -464,18 +476,30 @@ export function OwnerInboxSheet({
       {show('message')
         ? inbox.messages.map((m) => (
             <InboxItem
-              key={m.id}
-              name={m.sender?.full_name}
-              meta={formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
-              body={m.body}
+              key={m.memberId}
+              name={m.person?.full_name}
+              avatar={m.person?.avatar_url}
+              meta={`${m.count > 1 ? `${m.count} new · ` : ''}${formatDistanceToNow(new Date(m.latest.created_at), { addSuffix: true })}`}
+              body={m.latest.body}
               fullBody
-              busy={busy === m.id}
+              busy={busy === m.memberId}
               actions={[
                 {
-                  label: 'Done',
-                  tone: 'approve',
-                  onPress: () => run(m.id, () => markBossMessageDone(m), 'Marked done'),
+                  label: 'Mark read',
+                  tone: 'plain',
+                  onPress: () =>
+                    run(
+                      m.memberId,
+                      async () => {
+                        await markChatRead(m.memberId);
+                        return { success: true };
+                      },
+                      'Marked read',
+                    ),
                 },
+                ...(onOpenChat
+                  ? [{ label: 'Reply', tone: 'approve' as const, onPress: () => onOpenChat(m.memberId) }]
+                  : []),
               ]}
             />
           ))

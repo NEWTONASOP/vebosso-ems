@@ -19,6 +19,7 @@ import { InlineError } from '../../components/InlineError';
 import { ListSkeleton, StatusCardSkeleton } from '../../components/LoadingSkeleton';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
 import { MessageButtons } from '../../components/MessageButtons';
+import { BillsShortcut } from '../../components/BillsShortcut';
 import { VenuesShortcut } from '../../components/VenuesShortcut';
 import { NotificationBell } from '../../components/NotificationBell';
 import { QuickActionCard } from '../../components/QuickActionCard';
@@ -498,6 +499,7 @@ export default function ManagerDashboard() {
         <MessageButtons onMessage={setSnackMessage} />
         <View style={{ height: 10 }} />
         <VenuesShortcut role="manager" />
+        <BillsShortcut role="manager" />
       </View>
 
       {todayTasks.length > 0 && (

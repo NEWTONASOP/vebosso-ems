@@ -1,16 +1,17 @@
 // ============================================================================
 // VEBOSSO EMS — Sheet Frame
 // The bottom sheet shell (title, scrolling body, Close) shared by the
-// documents, salary, tasks and message sheets.
+// documents, salary, tasks and message sheets. With `inline`, the same body
+// and footer render in place instead — e.g. as a dropdown inside another sheet.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
-import { ReactNode } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ReactNode, useRef } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Modal, Portal, Text } from 'react-native-paper';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTheme, appSoftShadow } from '../constants/theme';
-import { useKeyboardHeight } from '../lib/useKeyboardHeight';
+import { useSheetLift } from '../lib/useKeyboardHeight';
+import { useSheetEntrance } from '../lib/useSheetEntrance';
 
 interface SheetFrameProps {
   visible: boolean;
@@ -23,6 +24,10 @@ interface SheetFrameProps {
   children: ReactNode;
   /** Pinned under the scrolling body — e.g. a message box. */
   footer?: ReactNode;
+  /** Render body + footer in place, without the sheet, header or scroll. */
+  inline?: boolean;
+  /** Keep the body scrolled to the bottom as it grows (chat). */
+  stickToEnd?: boolean;
 }
 
 export function SheetFrame({
@@ -35,22 +40,26 @@ export function SheetFrame({
   iconBg = AppTheme.soft,
   children,
   footer,
+  inline,
+  stickToEnd,
 }: SheetFrameProps) {
-  const keyboard = useKeyboardHeight();
-  const { height } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
+  const lifted = useSheetLift();
+  const entrance = useSheetEntrance('sheet');
+  const scrollRef = useRef<ScrollView>(null);
   if (!visible) return null;
 
-  // With the keyboard open, sit on top of it and fit in the space above. The
-  // modal already keeps clear of the system bars (insets); Android reports the
-  // keyboard without the nav bar, iOS with the home-indicator strip.
-  const lift = Platform.OS === 'ios' ? Math.max(0, keyboard - insets.bottom) : keyboard;
-  const lifted =
-    keyboard > 0 ? { marginBottom: lift, maxHeight: height - insets.top - insets.bottom - lift - 8 } : null;
+  if (inline) {
+    return (
+      <View>
+        {children}
+        {footer ? <View style={styles.inlineFooter}>{footer}</View> : null}
+      </View>
+    );
+  }
 
   return (
     <Portal>
-      <Modal visible onDismiss={onDismiss} contentContainerStyle={[styles.container, lifted]}>
+      <Modal visible onDismiss={onDismiss} contentContainerStyle={[styles.container, lifted, entrance]}>
         <View style={styles.inner}>
           <View style={styles.header}>
             {icon ? (
@@ -74,6 +83,8 @@ export function SheetFrame({
           </View>
 
           <ScrollView
+            ref={scrollRef}
+            onContentSizeChange={stickToEnd ? () => scrollRef.current?.scrollToEnd({ animated: false }) : undefined}
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
@@ -191,6 +202,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 4,
+  },
+  inlineFooter: {
+    marginTop: 10,
   },
   footer: {
     marginTop: 12,

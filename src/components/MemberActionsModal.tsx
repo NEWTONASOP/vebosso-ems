@@ -1,67 +1,54 @@
 // ============================================================================
 // VEBOSSO EMS — Member Actions Modal (Owner Team)
-// Everything about one person, top to bottom: who they are, today, documents,
-// attendance (calendar + the day's log), tasks, salary, location, admin.
+// Everything about one person, top to bottom: who they are, attendance
+// (calendar + the day's log), work & pay, location, admin. In Work & pay,
+// Tasks by Boss and Messages open as dialogs over this sheet (onOpenDialog);
+// salary, travel expenses and documents open as dropdowns in place (the host
+// renders what goes inside, renderPanel).
 // White cards on the grey canvas, one idea per card.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
-import { format } from 'date-fns';
+import { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Modal, Portal, Text } from 'react-native-paper';
+import { Modal, Portal, Switch, Text } from 'react-native-paper';
 import { AppTheme, RoleAccent, appSoftShadow } from '../constants/theme';
-import { ROLE_LABELS, WORK_LOG_STATUS_CONFIG } from '../constants/roles';
-import { Profile, WorkLogStatus } from '../types/database';
-import { MemberActiveTask } from './MemberCard';
+import { ROLE_LABELS } from '../constants/roles';
+import { useSheetLift } from '../lib/useKeyboardHeight';
+import { useSheetEntrance } from '../lib/useSheetEntrance';
+import { Profile } from '../types/database';
 import { BackfillGrantBar } from './BackfillGrantBar';
+import { Chevron, DropdownBody } from './Dropdown';
 import { MemberAttendancePanel } from './MemberAttendancePanel';
 import { MemberLocationSection } from './MemberLocationSection';
 import { UserAvatar } from './UserAvatar';
+
+export type MemberPanel = 'salary' | 'expenses' | 'documents';
+export type MemberDialog = 'tasks' | 'chat';
 
 interface MemberActionsModalProps {
   visible: boolean;
   member: Profile | null;
   onDismiss: () => void;
-  onOpenDocuments: () => void;
+  /** The open dropdown, if any. */
+  openPanel: MemberPanel | null;
+  onTogglePanel: (panel: MemberPanel) => void;
+  /** What goes inside an open dropdown. */
+  renderPanel: (panel: MemberPanel) => ReactNode;
+  /** Tasks by Boss / Messages — shown as a dialog over this sheet. */
+  onOpenDialog: (dialog: MemberDialog) => void;
   /** Uploads waiting for the owner's approval. */
   pendingDocsCount?: number;
-  onOpenTasks: () => void;
-  onOpenSalary: () => void;
-  onOpenExpenses: () => void;
+  /** Messages from this person the owner hasn't read. */
+  unreadChatCount?: number;
   onAssignManager: () => void;
   onManageProfile: () => void;
-  currentStatus?: WorkLogStatus | 'offline' | 'on_leave';
-  checkInTime?: string | null;
-  checkOutTime?: string | null;
-  checkInPlan?: string | null;
-  dayReport?: string | null;
+  /** Whether they can use Bills; null while loading. */
+  billsAccess?: boolean | null;
+  onToggleBillsAccess?: (grant: boolean) => void;
   pendingTaskCount?: number;
   inProgressTaskCount?: number;
   doneTaskCount?: number;
-  activeTasks?: MemberActiveTask[];
-}
-
-function getStatusDisplay(status: WorkLogStatus | 'offline' | 'on_leave') {
-  if (status === 'offline') {
-    return { label: 'Not checked in', color: AppTheme.mute, bg: AppTheme.soft };
-  }
-  if (status === 'on_leave') {
-    return { label: 'On Leave', color: AppTheme.amber, bg: AppTheme.amberSoft };
-  }
-  const config = WORK_LOG_STATUS_CONFIG[status];
-  const statusTheme: Record<string, { color: string; bg: string }> = {
-    pending_approval: { color: AppTheme.amber, bg: AppTheme.amberSoft },
-    working: { color: AppTheme.green, bg: AppTheme.greenSoft },
-    pending_checkout: { color: AppTheme.violet, bg: AppTheme.violetSoft },
-    done: { color: AppTheme.inkSoft, bg: AppTheme.soft },
-    rejected: { color: AppTheme.coral, bg: AppTheme.coralSoft },
-  };
-  const theme = statusTheme[status];
-  return {
-    label: config?.label || 'Unknown',
-    color: theme?.color || AppTheme.mute,
-    bg: theme?.bg || AppTheme.soft,
-  };
 }
 
 function getAvatarColors(role: Profile['role']) {
@@ -90,39 +77,29 @@ export function MemberActionsModal({
   visible,
   member,
   onDismiss,
-  onOpenDocuments,
+  openPanel,
+  onTogglePanel,
+  renderPanel,
+  onOpenDialog,
   pendingDocsCount = 0,
-  onOpenTasks,
-  onOpenSalary,
-  onOpenExpenses,
+  unreadChatCount = 0,
   onAssignManager,
   onManageProfile,
-  currentStatus = 'offline',
-  checkInTime,
-  checkOutTime,
-  checkInPlan,
-  dayReport,
+  billsAccess = null,
+  onToggleBillsAccess,
   pendingTaskCount = 0,
   inProgressTaskCount = 0,
   doneTaskCount = 0,
 }: MemberActionsModalProps) {
+  const lifted = useSheetLift();
+  const entrance = useSheetEntrance('sheet');
 
   if (!visible || !member) return null;
 
-  const status = getStatusDisplay(currentStatus);
   const avatarColors = getAvatarColors(member.role);
   const roleMuted = getRoleMutedColor(member.role);
-  const isWorking =
-    currentStatus === 'working' ||
-    currentStatus === 'pending_approval' ||
-    currentStatus === 'pending_checkout';
-  const isDone = currentStatus === 'done';
-  const workSummary = isDone && dayReport ? dayReport : checkInPlan || null;
-  const workLabel = isDone && dayReport ? 'Day report' : isWorking ? 'Working on' : 'Plan';
   const openTaskTotal = pendingTaskCount + inProgressTaskCount;
-
-  const formattedCheckIn = checkInTime ? format(new Date(checkInTime), 'h:mm a') : null;
-  const formattedCheckOut = checkOutTime ? format(new Date(checkOutTime), 'h:mm a') : null;
+  const firstName = member.full_name.split(' ')[0];
 
   const taskHint =
     openTaskTotal > 0 || doneTaskCount > 0
@@ -131,9 +108,26 @@ export function MemberActionsModal({
           .join(' · ')
       : 'Give a task or see past ones';
 
+  /** A Work & pay row plus its dropdown. */
+  const panelRow = (
+    key: MemberPanel,
+    row: Omit<Parameters<typeof NavRow>[0], 'onPress' | 'expanded' | 'isLast'>,
+    isLast = false
+  ) => {
+    const open = openPanel === key;
+    return (
+      <View key={key}>
+        <NavRow {...row} onPress={() => onTogglePanel(key)} expanded={open} isLast={isLast && !open} />
+        {open ? (
+          <DropdownBody style={[styles.panel, !isLast && styles.panelDivider]}>{renderPanel(key)}</DropdownBody>
+        ) : null}
+      </View>
+    );
+  };
+
   return (
     <Portal>
-      <Modal visible onDismiss={onDismiss} contentContainerStyle={styles.container}>
+      <Modal visible onDismiss={onDismiss} contentContainerStyle={[styles.container, lifted, entrance]}>
         {/* Identity — stays put while the rest scrolls */}
         <View style={styles.header}>
           <View style={styles.grabber} />
@@ -175,39 +169,10 @@ export function MemberActionsModal({
           showsVerticalScrollIndicator={false}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
         >
-          {/* 1. Today */}
-          <View style={styles.card}>
-            <View style={styles.todayTop}>
-              <Text style={styles.cardTitle}>Today</Text>
-              <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-                <View style={[styles.statusDot, { backgroundColor: status.color }]} />
-                <Text style={[styles.statusLabel, { color: status.color }]}>{status.label}</Text>
-              </View>
-            </View>
-
-            {formattedCheckIn || formattedCheckOut ? (
-              <View style={styles.timesRow}>
-                <TimeCell icon="log-in" label="In" value={formattedCheckIn} color={AppTheme.green} />
-                <View style={styles.timesDivider} />
-                <TimeCell icon="log-out" label="Out" value={formattedCheckOut} color={AppTheme.inkSoft} />
-              </View>
-            ) : null}
-
-            {currentStatus === 'on_leave' ? (
-              <Text style={styles.muted}>On approved leave today.</Text>
-            ) : workSummary ? (
-              <View style={styles.summaryBlock}>
-                <Text style={styles.summaryLabel}>{workLabel}</Text>
-                <Text style={styles.summaryBody} numberOfLines={4}>{workSummary}</Text>
-              </View>
-            ) : !formattedCheckIn ? (
-              <Text style={styles.muted}>Hasn’t started the day yet.</Text>
-            ) : null}
-          </View>
-
-          {/* 2. Attendance — calendar, the day's log, then per-day extras */}
-          <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Attendance</Text>
+          {/* 1. Attendance — calendar, the day's log, then per-day extras */}
+          <Text style={styles.sectionTitle}>Attendance</Text>
           <MemberAttendancePanel
             memberId={member.id}
             accentColor={RoleAccent.owner.color}
@@ -227,39 +192,48 @@ export function MemberActionsModal({
                     icon="clipboard"
                     iconColor={AppTheme.blue}
                     iconBg={AppTheme.blueSoft}
-                    onPress={onOpenTasks}
+                    onPress={() => onOpenDialog('tasks')}
                   />
                   <NavRow
-                    label="Salary"
-                    hint="Requests, payments and receipts"
-                    icon="credit-card"
-                    iconColor={AppTheme.green}
-                    iconBg={AppTheme.greenSoft}
-                    onPress={onOpenSalary}
-                  />
-                  <NavRow
-                    label="Travel expenses"
-                    hint="Claims, payments and receipts"
-                    icon="navigation"
+                    label="Messages"
+                    hint={unreadChatCount > 0 ? `${unreadChatCount} new from ${firstName}` : `Chat with ${firstName}`}
+                    hintColor={unreadChatCount > 0 ? AppTheme.violet : undefined}
+                    badge={unreadChatCount > 0 ? String(unreadChatCount) : undefined}
+                    icon="message-circle"
                     iconColor={AppTheme.violet}
                     iconBg={AppTheme.violetSoft}
-                    onPress={onOpenExpenses}
+                    onPress={() => onOpenDialog('chat')}
                   />
-                  <NavRow
-                    label="Documents"
-                    hint={
-                      pendingDocsCount > 0
-                        ? `${pendingDocsCount} waiting for your approval`
-                        : 'ID, certificates and other papers'
-                    }
-                    hintColor={pendingDocsCount > 0 ? AppTheme.amber : undefined}
-                    badge={pendingDocsCount > 0 ? String(pendingDocsCount) : undefined}
-                    icon="file-text"
-                    iconColor={AppTheme.violet}
-                    iconBg={AppTheme.violetSoft}
-                    onPress={onOpenDocuments}
-                    isLast
-                  />
+                  {panelRow('salary', {
+                    label: 'Salary',
+                    hint: 'Monthly salary, payments and receipts',
+                    icon: 'credit-card',
+                    iconColor: AppTheme.green,
+                    iconBg: AppTheme.greenSoft,
+                  })}
+                  {panelRow('expenses', {
+                    label: 'Travel expenses',
+                    hint: 'Claims, payments and receipts',
+                    icon: 'navigation',
+                    iconColor: AppTheme.violet,
+                    iconBg: AppTheme.violetSoft,
+                  })}
+                  {panelRow(
+                    'documents',
+                    {
+                      label: 'Documents',
+                      hint:
+                        pendingDocsCount > 0
+                          ? `${pendingDocsCount} waiting for your approval`
+                          : 'ID, certificates and other papers',
+                      hintColor: pendingDocsCount > 0 ? AppTheme.amber : undefined,
+                      badge: pendingDocsCount > 0 ? String(pendingDocsCount) : undefined,
+                      icon: 'file-text',
+                      iconColor: AppTheme.violet,
+                      iconBg: AppTheme.violetSoft,
+                    },
+                    true
+                  )}
                 </View>
                 <View style={styles.locationWrap}>
                   <MemberLocationSection
@@ -272,50 +246,60 @@ export function MemberActionsModal({
             )}
           />
 
-          {/* 3. Admin */}
-          <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Manage</Text>
-          <View style={styles.group}>
-            {member.role === 'member' && (
+          {/* 2. Admin */}
+          <View>
+            <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Manage</Text>
+            <View style={styles.group}>
+              {member.role === 'member' && (
+                <NavRow
+                  label="Assign Manager"
+                  icon="users"
+                  iconColor={AppTheme.violet}
+                  iconBg={AppTheme.violetSoft}
+                  onPress={onAssignManager}
+                />
+              )}
+              {onToggleBillsAccess ? (
+                <Pressable
+                  style={({ pressed }) => [styles.navRow, pressed && styles.navRowPressed]}
+                  onPress={() => billsAccess !== null && onToggleBillsAccess(!billsAccess)}
+                  disabled={billsAccess === null}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: !!billsAccess }}
+                  accessibilityLabel="Bills access"
+                >
+                  <View style={[styles.navIcon, { backgroundColor: AppTheme.violetSoft }]}>
+                    <Feather name="file-text" size={16} color={AppTheme.violet} />
+                  </View>
+                  <View style={[styles.navText, styles.navTextDivider]}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.navLabel}>Bills access</Text>
+                      <Text style={styles.navHint} numberOfLines={1}>
+                        {billsAccess ? 'Can create and manage bills' : 'Let them create and manage bills'}
+                      </Text>
+                    </View>
+                    <Switch
+                      value={!!billsAccess}
+                      disabled={billsAccess === null}
+                      onValueChange={(v) => onToggleBillsAccess(v)}
+                      color={AppTheme.violet}
+                    />
+                  </View>
+                </Pressable>
+              ) : null}
               <NavRow
-                label="Assign Manager"
-                icon="users"
-                iconColor={AppTheme.violet}
-                iconBg={AppTheme.violetSoft}
-                onPress={onAssignManager}
+                label="Manage Profile"
+                icon="settings"
+                iconColor={AppTheme.charcoal}
+                iconBg={AppTheme.soft}
+                onPress={onManageProfile}
+                isLast
               />
-            )}
-            <NavRow
-              label="Manage Profile"
-              icon="settings"
-              iconColor={AppTheme.charcoal}
-              iconBg={AppTheme.soft}
-              onPress={onManageProfile}
-              isLast
-            />
+            </View>
           </View>
         </ScrollView>
       </Modal>
     </Portal>
-  );
-}
-
-function TimeCell({
-  icon,
-  label,
-  value,
-  color,
-}: {
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  value: string | null;
-  color: string;
-}) {
-  return (
-    <View style={styles.timeCell}>
-      <Feather name={icon} size={13} color={value ? color : AppTheme.mute} />
-      <Text style={styles.timeLabel}>{label}</Text>
-      <Text style={[styles.timeValue, !value && { color: AppTheme.mute }]}>{value ?? '—'}</Text>
-    </View>
   );
 }
 
@@ -369,7 +353,11 @@ function NavRow({
             <Text style={styles.navBadgeText}>{badge}</Text>
           </View>
         ) : null}
-        <Feather name={trailingIcon} size={16} color={AppTheme.mute} />
+        {expanded === undefined ? (
+          <Feather name={trailingIcon} size={16} color={AppTheme.mute} />
+        ) : (
+          <Chevron open={expanded} size={16} color={AppTheme.mute} />
+        )}
       </View>
     </Pressable>
   );
@@ -471,94 +459,6 @@ const styles = StyleSheet.create({
   sectionTitleSpaced: {
     marginTop: 22,
   },
-  card: {
-    backgroundColor: AppTheme.card,
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
-    gap: 12,
-    ...appSoftShadow,
-  },
-  cardTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 16,
-    color: AppTheme.ink,
-    letterSpacing: -0.3,
-  },
-  muted: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    color: AppTheme.mute,
-  },
-
-  // Today card
-  todayTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    height: 26,
-    borderRadius: 13,
-    gap: 6,
-  },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  statusLabel: {
-    fontSize: 12,
-    fontFamily: 'Inter_700Bold',
-  },
-  timesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: AppTheme.soft,
-    borderRadius: 14,
-    paddingVertical: 10,
-  },
-  timesDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: AppTheme.hairline,
-  },
-  timeCell: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  timeLabel: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12.5,
-    color: AppTheme.mute,
-  },
-  timeValue: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 14,
-    color: AppTheme.ink,
-  },
-  summaryBlock: {
-    gap: 4,
-  },
-  summaryLabel: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 11,
-    color: AppTheme.mute,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  summaryBody: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    color: AppTheme.inkSoft,
-    lineHeight: 20,
-  },
 
   // Grouped rows
   group: {
@@ -624,5 +524,14 @@ const styles = StyleSheet.create({
   },
   locationWrap: {
     marginTop: 16,
+  },
+  panel: {
+    paddingHorizontal: 14,
+    paddingTop: 4,
+    paddingBottom: 14,
+  },
+  panelDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: AppTheme.hairline,
   },
 });

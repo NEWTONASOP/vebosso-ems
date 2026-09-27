@@ -1,9 +1,12 @@
 // ============================================================================
 // VEBOSSO EMS — Accounts ledger (owner only; RLS in migration 026)
 // Balance convention everywhere: balance = credit − debit.
+// Entries can carry receipt photos (private `account-receipts` bucket, 030).
 // ============================================================================
 
 import { endOfMonth, format, startOfMonth } from 'date-fns';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { uploadCheckoutPhoto } from '../store/workStore';
 import { Account, AccountSummary, AccountTransaction, TxnKind } from '../types/database';
 import { parseSupabaseError } from './errors';
 import { supabase } from './supabase';
@@ -90,10 +93,16 @@ export async function updateAccount(id: string, name: string, note?: string | nu
   return { success: true, data: undefined };
 }
 
-/** Deletes the account and every entry in it. */
+/** Deletes the account, every entry in it, and their receipt photos. */
 export async function deleteAccount(id: string): Promise<Result> {
+  const { data: withReceipts } = await supabase
+    .from('account_transactions')
+    .select('receipts')
+    .eq('account_id', id)
+    .neq('receipts', '{}');
   const { error } = await supabase.from('accounts').delete().eq('id', id);
   if (error) return fail(error);
+  await removeReceipts(((withReceipts || []) as { receipts: string[] }[]).flatMap((r) => r.receipts ?? []));
   return { success: true, data: undefined };
 }
 
@@ -132,6 +141,8 @@ export interface TxnInput {
   kind: TxnKind;
   amount: number;
   particular: string | null;
+  /** Receipt photo paths; left out (e.g. imports) keeps what is there. */
+  receipts?: string[];
 }
 
 const cleanTxn = (t: TxnInput) => ({
@@ -139,6 +150,7 @@ const cleanTxn = (t: TxnInput) => ({
   kind: t.kind,
   amount: Math.round(t.amount * 100) / 100,
   particular: t.particular?.trim().slice(0, 500) || null,
+  ...(t.receipts ? { receipts: t.receipts } : {}),
 });
 
 export async function addTransaction(accountId: string, t: TxnInput): Promise<Result> {
@@ -153,10 +165,45 @@ export async function updateTransaction(id: string, t: TxnInput): Promise<Result
   return { success: true, data: undefined };
 }
 
-export async function deleteTransaction(id: string): Promise<Result> {
+/** Removes the entry and its receipt photos. */
+export async function deleteTransaction(id: string, receipts: string[] = []): Promise<Result> {
   const { error } = await supabase.from('account_transactions').delete().eq('id', id);
   if (error) return fail(error);
+  await removeReceipts(receipts);
   return { success: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------
+// Receipts
+
+export const RECEIPTS_BUCKET = 'account-receipts';
+export const MAX_RECEIPTS = 5;
+
+/** Shrunk to 1600px wide JPEG, like bill images. Returns the stored path. */
+export async function uploadReceipt(accountId: string, uri: string): Promise<Result<string>> {
+  try {
+    const small = await ImageManipulator.manipulateAsync(uri, [{ resize: { width: 1600 } }], {
+      compress: 0.7,
+      format: ImageManipulator.SaveFormat.JPEG,
+    });
+    const path = `${accountId}/${Date.now()}_${Math.random().toString(36).slice(2, 6)}.jpg`;
+    await uploadCheckoutPhoto(path, small.uri, 'jpg', RECEIPTS_BUCKET, false, 'image/jpeg');
+    return { success: true, data: path };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function removeReceipts(paths: string[]) {
+  if (paths.length) await supabase.storage.from(RECEIPTS_BUCKET).remove(paths);
+}
+
+export async function signReceipts(paths: string[]): Promise<Record<string, string>> {
+  if (paths.length === 0) return {};
+  const { data } = await supabase.storage.from(RECEIPTS_BUCKET).createSignedUrls(paths, 3600);
+  const out: Record<string, string> = {};
+  for (const item of data || []) if (item.path && item.signedUrl) out[item.path] = item.signedUrl;
+  return out;
 }
 
 /** Imports: insert many entries in chunks. Returns how many were saved. */

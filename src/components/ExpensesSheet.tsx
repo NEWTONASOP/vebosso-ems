@@ -44,6 +44,8 @@ const loadAll = async (userId: string) => {
 };
 
 interface ExpensesSheetProps {
+  /** Show in place (e.g. a dropdown in the member sheet) instead of as a sheet. */
+  inline?: boolean;
   onDismiss: () => void;
   userId: string;
   userName: string;
@@ -51,7 +53,7 @@ interface ExpensesSheetProps {
   ownerId?: string;
 }
 
-export function ExpensesSheet({ onDismiss, userId, userName, mode, ownerId }: ExpensesSheetProps) {
+export function ExpensesSheet({ onDismiss, userId, userName, mode, ownerId, inline }: ExpensesSheetProps) {
   const [claims, setClaims] = useState<ExpenseClaim[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -134,6 +136,7 @@ export function ExpensesSheet({ onDismiss, userId, userName, mode, ownerId }: Ex
 
   return (
     <SheetFrame
+      inline={inline}
       visible
       onDismiss={onDismiss}
       title="Travel expenses"

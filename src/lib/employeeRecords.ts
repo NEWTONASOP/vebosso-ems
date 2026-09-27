@@ -15,6 +15,7 @@ import {
   BossMessageWithSender,
   EmployeeDocument,
   SalaryRequest,
+  SalarySetting,
 } from '../types/database';
 import { parseSupabaseError } from './errors';
 import { sendPushNotification, sendPushNotificationToRole } from './notifications';
@@ -247,6 +248,27 @@ export async function deleteDocument(doc: EmployeeDocument): Promise<Result> {
 
 export const salaryMonthLabel = (month: string) => format(parseISO(month), 'MMMM yyyy');
 
+/** The person's monthly salary, or null when the owner hasn't set one. */
+export async function fetchMonthlySalary(userId: string): Promise<Result<number | null>> {
+  const { data, error } = await supabase
+    .from('salary_settings')
+    .select('monthly_amount')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) return fail(error);
+  const row = data as Pick<SalarySetting, 'monthly_amount'> | null;
+  return { success: true, data: row ? Number(row.monthly_amount) : null };
+}
+
+/** Owner only (RLS). */
+export async function setMonthlySalary(userId: string, amount: number, ownerId: string): Promise<Result> {
+  const { error } = await supabase
+    .from('salary_settings')
+    .upsert({ user_id: userId, monthly_amount: amount, updated_by: ownerId }, { onConflict: 'user_id' });
+  if (error) return fail(error);
+  return { success: true, data: undefined };
+}
+
 export async function fetchSalaryRequests(userId: string): Promise<Result<SalaryRequest[]>> {
   const { data, error } = await supabase
     .from('salary_requests')
@@ -297,8 +319,16 @@ export async function requestSalary(userId: string, month: string): Promise<Resu
   return { success: true, data: undefined };
 }
 
-/** Owner only. Works on a request, or records a month nobody asked for yet. */
-export async function markSalaryPaid(userId: string, month: string, ownerId: string): Promise<Result> {
+/**
+ * Owner only. Works on a request, or records a month nobody asked for yet.
+ * @param amount rupees paid for this month (null if not recorded)
+ */
+export async function markSalaryPaid(
+  userId: string,
+  month: string,
+  ownerId: string,
+  amount: number | null = null,
+): Promise<Result> {
   const { error } = await supabase.from('salary_requests').upsert(
     {
       user_id: userId,
@@ -306,16 +336,18 @@ export async function markSalaryPaid(userId: string, month: string, ownerId: str
       status: 'paid',
       paid_at: new Date().toISOString(),
       paid_by: ownerId,
+      amount,
     },
     { onConflict: 'user_id,month' },
   );
 
   if (error) return fail(error);
 
+  const rupees = amount !== null ? ` (₹${amount.toLocaleString('en-IN')})` : '';
   sendPushNotification(
     userId,
     'Salary Paid ✅',
-    `Your ${salaryMonthLabel(month)} salary has been paid. Tap Received once it reaches you.`,
+    `Your ${salaryMonthLabel(month)} salary${rupees} has been paid. Tap Received once it reaches you.`,
     { type: 'salary_paid', month },
   );
 

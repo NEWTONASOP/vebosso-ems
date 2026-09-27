@@ -9,7 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import { format, isToday, isYesterday, parseISO, startOfDay } from 'date-fns';
 import { useState } from 'react';
 import { Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Modal, Portal, Text } from 'react-native-paper';
 import { DatePickerModal, enGB, registerTranslation, TimePickerModal } from 'react-native-paper-dates';
 import { AppTheme as T } from '../constants/theme';
 
@@ -163,6 +163,66 @@ export function TimeField({
   );
 }
 
+/** "7 PM" for 19. */
+export const hourLabel = (h: number) => `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' : 'PM'}`;
+
+const HOUR_GROUPS: { label: string; hours: number[] }[] = [
+  { label: 'Morning', hours: [6, 7, 8, 9, 10, 11] },
+  { label: 'Afternoon', hours: [12, 13, 14, 15, 16, 17] },
+  { label: 'Evening', hours: [18, 19, 20, 21, 22, 23] },
+  { label: 'Night', hours: [0, 1, 2, 3, 4, 5] },
+];
+
+/** Pick a whole hour — no minutes. Tapping an hour picks it and closes. */
+export function HourPickerModal({
+  visible,
+  title,
+  value,
+  onDismiss,
+  onPick,
+}: {
+  visible: boolean;
+  title: string;
+  /** 0–23, or null when nothing is picked yet. */
+  value: number | null;
+  onDismiss: () => void;
+  onPick: (hour: number) => void;
+}) {
+  return (
+    <Portal>
+      <Modal visible={visible} onDismiss={onDismiss} contentContainerStyle={styles.hourSheet}>
+        <View style={styles.hourHead}>
+          <Text style={styles.hourTitle}>{title}</Text>
+          <Pressable onPress={onDismiss} hitSlop={10} style={styles.hourClose} accessibilityLabel="Close">
+            <Feather name="x" size={17} color={T.inkSoft} />
+          </Pressable>
+        </View>
+        {HOUR_GROUPS.map((g) => (
+          <View key={g.label} style={styles.hourGroup}>
+            <Text style={styles.hourGroupLabel}>{g.label}</Text>
+            <View style={styles.hourGrid}>
+              {g.hours.map((h) => {
+                const active = h === value;
+                return (
+                  <Pressable
+                    key={h}
+                    onPress={() => onPick(h)}
+                    style={[styles.hourChip, active && styles.chipActive]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{hourLabel(h)}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ))}
+      </Modal>
+    </Portal>
+  );
+}
+
 const styles = StyleSheet.create({
   field: { marginBottom: 10 },
   label: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft, marginBottom: 6 },
@@ -189,4 +249,39 @@ const styles = StyleSheet.create({
   },
   timeText: { fontFamily: 'Inter_500Medium', fontSize: 15, color: T.ink },
   placeholder: { color: T.mute },
+  hourSheet: {
+    backgroundColor: T.card,
+    marginHorizontal: 20,
+    borderRadius: 24,
+    padding: 18,
+  },
+  hourHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  hourTitle: { flex: 1, fontFamily: 'Inter_700Bold', fontSize: 17, color: T.ink },
+  hourClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    backgroundColor: T.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hourGroup: { marginTop: 10 },
+  hourGroupLabel: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+    color: T.mute,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  hourGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  hourChip: {
+    width: '30%',
+    flexGrow: 1,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: T.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

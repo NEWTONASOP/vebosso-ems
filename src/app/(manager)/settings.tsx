@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Switch, Text } from 'react-native-paper';
 import { InfoRow } from '../../components/InfoRow';
 import { DocumentsSheet } from '../../components/DocumentsSheet';
 import { ExpensesSheet } from '../../components/ExpensesSheet';
@@ -27,6 +27,28 @@ import {
 import { Alert } from '../../lib/alert';
 import { useAuthStore } from '../../store/authStore';
 import { ProfilePhotoEditor } from '../../components/ProfilePhotoEditor';
+import { useSundayReminder } from '../../lib/useSundayReminder';
+
+/** On/off for the 11:30 AM check-in reminder on Sundays. */
+function SundayReminderRow() {
+  const { enabled, saving, setEnabled } = useSundayReminder();
+  const toggle = async (value: boolean) => {
+    const error = await setEnabled(value);
+    if (error) Alert.alert(error);
+  };
+  return (
+    <View style={styles.actionRow}>
+      <View style={[styles.iconContainer, { backgroundColor: AppTheme.greenSoft }]}>
+        <Feather name="bell" size={18} color={AppTheme.green} />
+      </View>
+      <View style={styles.actionInfo}>
+        <Text style={styles.actionTitle}>Sunday check-in reminder</Text>
+        <Text style={styles.actionSubtitle}>The 11:30 AM reminder, on Sundays too</Text>
+      </View>
+      <Switch value={enabled} onValueChange={(v) => void toggle(v)} disabled={saving} color={AppTheme.green} />
+    </View>
+  );
+}
 
 export default function ManagerSettingsScreen() {
   const router = useRouter();
@@ -142,6 +164,8 @@ export default function ManagerSettingsScreen() {
             iconBg={AppTheme.blueSoft}
             onPress={() => router.push('/(manager)/leaves')}
           />
+          <View style={styles.separator} />
+          <SundayReminderRow />
         </View>
 
         <View style={styles.signOutCard}>

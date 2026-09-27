@@ -21,6 +21,7 @@ import { Alert } from '../../../lib/alert';
 import { useAuthStore } from '../../../store/authStore';
 import { ProfilePhotoEditor } from '../../../components/ProfilePhotoEditor';
 import { useWorkStore } from '../../../store/workStore';
+import { useSundayReminder } from '../../../lib/useSundayReminder';
 
 export default function OwnerSettingsScreen() {
   const router = useRouter();
@@ -119,6 +120,8 @@ export default function OwnerSettingsScreen() {
               color={AppTheme.charcoal}
             />
           </View>
+          <View style={styles.separator} />
+          <SundaySummaryRow />
         </View>
 
         {/* Account */}
@@ -188,6 +191,27 @@ interface SettingsRowProps {
   title: string;
   subtitle: string;
   onPress: () => void;
+}
+
+/** On/off for the 11:30 AM attendance summary on Sundays. */
+function SundaySummaryRow() {
+  const { enabled, saving, setEnabled } = useSundayReminder();
+  const toggle = async (value: boolean) => {
+    const error = await setEnabled(value);
+    if (error) Alert.alert(error);
+  };
+  return (
+    <View style={styles.toggleRow}>
+      <View style={[styles.iconContainer, { backgroundColor: AppTheme.greenSoft }]}>
+        <Feather name="sun" size={18} color={AppTheme.green} />
+      </View>
+      <View style={styles.settingInfo}>
+        <Text style={styles.settingTitle}>Sunday attendance summary</Text>
+        <Text style={styles.settingSubtitle}>The 11:30 AM check-in summary, on Sundays too</Text>
+      </View>
+      <Switch value={enabled} onValueChange={(v) => void toggle(v)} disabled={saving} color={AppTheme.charcoal} />
+    </View>
+  );
 }
 
 function SettingsRow({ icon, iconColor, iconBg, title, subtitle, onPress }: SettingsRowProps) {

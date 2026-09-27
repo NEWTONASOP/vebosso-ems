@@ -2,6 +2,7 @@
 // VEBOSSO EMS — Venues
 // Anyone can add a venue and read the list; only the owner can edit or delete
 // (RLS, migration 024). The adder's name is filled in by the database.
+// Anyone can mark a venue "in business"; only the owner can unmark it (029).
 // ============================================================================
 
 import { Venue, VenueInput } from '../types/database';
@@ -29,6 +30,7 @@ function clean(input: VenueInput): VenueInput {
     contact_role: opt(input.contact_role),
     contact_name: opt(input.contact_name),
     contact_email: opt(input.contact_email)?.toLowerCase() ?? null,
+    contact_phone: opt(input.contact_phone),
   };
 }
 
@@ -67,6 +69,13 @@ export async function addVenue(input: VenueInput, adderId: string, isOwner: bool
 /** Owner only (RLS). */
 export async function updateVenue(id: string, input: VenueInput): Promise<Result> {
   const { error } = await supabase.from('venues').update(clean(input)).eq('id', id);
+  if (error) return fail(error);
+  return { success: true, data: undefined };
+}
+
+/** Anyone can mark; only the owner can unmark (checked by the database). */
+export async function setVenueInBusiness(id: string, value: boolean): Promise<Result> {
+  const { error } = await supabase.rpc('set_venue_in_business', { p_venue_id: id, p_value: value });
   if (error) return fail(error);
   return { success: true, data: undefined };
 }

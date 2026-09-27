@@ -1,26 +1,36 @@
 // ============================================================================
 // VEBOSSO EMS — Bill settings
-// Business details printed on every bill, and the terms new bills start with.
+// One brand's business details printed on its bills, and the terms its new
+// bills start with.
 // ============================================================================
 
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
+import { BRANDS } from '../lib/billBrands';
 import { fetchBillSettings, saveBillSettings } from '../lib/bills';
-import { BillSettings } from '../types/database';
+import { BillBrand, BillSettings } from '../types/database';
 import { SheetFrame } from './SheetFrame';
 
 type Form = Pick<BillSettings, 'business_name' | 'tagline' | 'address' | 'phone' | 'email' | 'website' | 'default_terms'>;
 
-export function BillSettingsSheet({ onDismiss, onSaved }: { onDismiss: () => void; onSaved: (m: string) => void }) {
+export function BillSettingsSheet({
+  brand,
+  onDismiss,
+  onSaved,
+}: {
+  brand: BillBrand;
+  onDismiss: () => void;
+  onSaved: (m: string) => void;
+}) {
   const [form, setForm] = useState<Form | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let active = true;
-    fetchBillSettings().then((res) => {
+    fetchBillSettings(brand).then((res) => {
       if (!active) return;
       if (res.success) setForm(res.data);
       else setError(res.error);
@@ -28,17 +38,17 @@ export function BillSettingsSheet({ onDismiss, onSaved }: { onDismiss: () => voi
     return () => {
       active = false;
     };
-  }, []);
+  }, [brand]);
 
   const set = (k: keyof Form) => (v: string) => setForm((f) => (f ? { ...f, [k]: v } : f));
 
   const save = async () => {
     if (!form) return;
     setSaving(true);
-    const res = await saveBillSettings(form);
+    const res = await saveBillSettings(brand, form);
     setSaving(false);
     if (!res.success) return setError(res.error);
-    onSaved('Bill settings saved');
+    onSaved(`${BRANDS[brand].label} bill settings saved`);
     onDismiss();
   };
 
@@ -61,8 +71,8 @@ export function BillSettingsSheet({ onDismiss, onSaved }: { onDismiss: () => voi
     <SheetFrame
       visible
       onDismiss={onDismiss}
-      title="Bill settings"
-      subtitle="Printed on every estimate and bill"
+      title={`${BRANDS[brand].label} bill settings`}
+      subtitle={`Printed on every ${BRANDS[brand].label} estimate and bill`}
       icon="settings"
       iconColor={T.charcoal}
       iconBg={T.soft}

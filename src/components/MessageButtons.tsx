@@ -1,22 +1,39 @@
 // ============================================================================
 // VEBOSSO EMS — Message Buttons (member home / manager dashboard)
-// "Message Boss" writes privately to the owner; "Message Team" posts to the
-// whole company's News feed.
+// "Message Boss" opens the private chat with the owner (unread count on the
+// button); "Message Team" posts to the whole company's News feed.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AppTheme as T, appSoftShadow } from '../constants/theme';
-import { postToTeam, sendBossMessage } from '../lib/employeeRecords';
+import { countMyUnread } from '../lib/chat';
+import { postToTeam } from '../lib/employeeRecords';
 import { useAuthStore } from '../store/authStore';
 import { AnimatedPressable } from './AnimatedPressable';
+import { ChatSheet } from './ChatPanel';
 import { MessageComposeSheet } from './MessageComposeSheet';
 
 export function MessageButtons({ onMessage }: { onMessage: (message: string) => void }) {
   const profile = useAuthStore((s) => s.profile);
   const [open, setOpen] = useState<'boss' | 'team' | null>(null);
+  const [unread, setUnread] = useState(0);
+  const profileId = profile?.id;
+
+  // Re-count on focus and whenever the chat closes.
+  useFocusEffect(
+    useCallback(() => {
+      if (!profileId || open === 'boss') return;
+      let active = true;
+      countMyUnread(profileId).then((n) => active && setUnread(n));
+      return () => {
+        active = false;
+      };
+    }, [profileId, open])
+  );
 
   if (!profile) return null;
 
@@ -34,6 +51,11 @@ export function MessageButtons({ onMessage }: { onMessage: (message: string) => 
             <Feather name="briefcase" size={15} color={T.violet} />
           </View>
           <Text style={styles.label}>Message Boss</Text>
+          {unread > 0 ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{unread}</Text>
+            </View>
+          ) : null}
         </AnimatedPressable>
         <AnimatedPressable
           scaleTo={0.97}
@@ -50,20 +72,13 @@ export function MessageButtons({ onMessage }: { onMessage: (message: string) => 
       </View>
 
       {open === 'boss' ? (
-        <MessageComposeSheet
-          visible
-          onDismiss={() => setOpen(null)}
-          title="Message the Boss"
-          subtitle="Only the boss sees this"
-          icon="briefcase"
-          iconColor={T.violet}
-          iconBg={T.violetSoft}
-          placeholder="What do you need from the boss?"
-          onSend={async (text) => {
-            const res = await sendBossMessage(profile.id, text);
-            if (!res.success) return res.error;
+        <ChatSheet
+          memberId={profile.id}
+          title="Chat with the Boss"
+          subtitle="Only you and the boss see this"
+          onDismiss={() => {
+            setUnread(0);
             setOpen(null);
-            onMessage('Sent to the boss');
           }}
         />
       ) : null}
@@ -117,5 +132,19 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
     color: T.ink,
+  },
+  badge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    backgroundColor: T.coral,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+    color: T.white,
   },
 });

@@ -1,5 +1,5 @@
 // ============================================================================
-// VEBOSSO EMS — Bills (owner only; RLS in migration 027)
+// VEBOSSO EMS — Bills (owner, and people the owner gave Bills to; RLS 027/030)
 // Estimates and client bills. A new bill is written as a draft as soon as
 // anything is typed; "Save" moves it out of draft and the database gives it a
 // number (E-0001 / B-0001).
@@ -8,7 +8,8 @@
 import * as ImageManipulator from 'expo-image-manipulator';
 import { uploadCheckoutPhoto } from '../store/workStore';
 import { AppTheme as T } from '../constants/theme';
-import { Bill, BillFields, BillItem, BillKind, BillSettings, BillStatus } from '../types/database';
+import { Bill, BillBrand, BillFields, BillItem, BillKind, BillSettings, BillStatus } from '../types/database';
+import { BRANDS } from './billBrands';
 import { num } from './accounts';
 import { parseSupabaseError } from './errors';
 import { supabase } from './supabase';
@@ -27,7 +28,6 @@ export const KIND_LABEL: Record<BillKind, string> = { estimate: 'Estimate', clie
 export const STATUS_LABEL: Record<BillStatus, string> = {
   draft: 'Draft',
   pending: 'Pending',
-  done: 'Done',
   completed: 'Completed',
   trash: 'Trash',
 };
@@ -35,7 +35,6 @@ export const STATUS_LABEL: Record<BillStatus, string> = {
 export const BILL_STATUS_TONE: Record<BillStatus, { color: string; bg: string }> = {
   draft: { color: T.inkSoft, bg: T.soft },
   pending: { color: T.amber, bg: T.amberSoft },
-  done: { color: T.blue, bg: T.blueSoft },
   completed: { color: T.green, bg: T.greenSoft },
   trash: { color: T.coral, bg: T.coralSoft },
 };
@@ -105,12 +104,12 @@ export async function createDraft(fields: Partial<BillFields>): Promise<Result<B
 
 export async function updateBill(
   id: string,
-  fields: Partial<BillFields> & { status?: BillStatus },
+  fields: Partial<BillFields> & { status?: BillStatus; edited_at?: string },
 ): Promise<Result<Bill>> {
-  const { status, ...rest } = fields;
+  const { status, edited_at, ...rest } = fields;
   const { data, error } = await supabase
     .from('bills')
-    .update({ ...cleanFields(rest), ...(status ? { status } : {}) })
+    .update({ ...cleanFields(rest), ...(status ? { status } : {}), ...(edited_at ? { edited_at } : {}) })
     .eq('id', id)
     .select()
     .single();
@@ -118,9 +117,14 @@ export async function updateBill(
   return { success: true, data: data as Bill };
 }
 
-/** Leave draft (a number is assigned) — or just save changes to a saved bill. */
+/**
+ * Leave draft (a number is assigned) — or save changes to a saved bill, which
+ * marks it as revised on the PDF.
+ */
 export async function saveBill(id: string, fields: Partial<BillFields>, currentStatus: BillStatus) {
-  return updateBill(id, { ...fields, status: currentStatus === 'draft' ? 'pending' : currentStatus });
+  return currentStatus === 'draft'
+    ? updateBill(id, { ...fields, status: 'pending' })
+    : updateBill(id, { ...fields, status: currentStatus, edited_at: new Date().toISOString() });
 }
 
 export const setBillStatus = (id: string, status: BillStatus) => updateBill(id, { status });
@@ -173,15 +177,17 @@ export async function signBillImages(paths: string[], seconds = 3600): Promise<R
 // ---------------------------------------------------------------------------
 // Settings
 
-export async function fetchBillSettings(): Promise<Result<BillSettings>> {
-  const { data, error } = await supabase.from('bill_settings').select('*').eq('id', 1).maybeSingle();
+/** The brand's business details (bill_settings row 1 = VEBOSSO, 2 = Navgrah). */
+export async function fetchBillSettings(brand: BillBrand = 'vebosso'): Promise<Result<BillSettings>> {
+  const id = BRANDS[brand].settingsId;
+  const { data, error } = await supabase.from('bill_settings').select('*').eq('id', id).maybeSingle();
   if (error) return fail(error);
   return {
     success: true,
     data: (data as BillSettings) ?? {
-      id: 1,
-      business_name: 'VEBOSSO',
-      tagline: 'Venue Booking Service Solutions',
+      id,
+      business_name: BRANDS[brand].label,
+      tagline: brand === 'navgrah' ? 'imagination to reality' : 'Venue Booking Service Solutions',
       address: null,
       phone: null,
       email: null,
@@ -192,14 +198,16 @@ export async function fetchBillSettings(): Promise<Result<BillSettings>> {
   };
 }
 
-export async function saveBillSettings(s: Partial<BillSettings>): Promise<Result> {
+export async function saveBillSettings(brand: BillBrand, s: Partial<BillSettings>): Promise<Result> {
   const clean: Record<string, string | null> = {};
   for (const [k, v] of Object.entries(s)) {
     if (k === 'id' || k === 'updated_at') continue;
     clean[k] = typeof v === 'string' && v.trim() ? v.trim() : null;
   }
-  if (!clean.business_name) clean.business_name = 'VEBOSSO';
-  const { error } = await supabase.from('bill_settings').upsert({ id: 1, ...clean, updated_at: new Date().toISOString() });
+  if (!clean.business_name) clean.business_name = BRANDS[brand].label;
+  const { error } = await supabase
+    .from('bill_settings')
+    .upsert({ id: BRANDS[brand].settingsId, ...clean, updated_at: new Date().toISOString() });
   if (error) return fail(error);
   return { success: true, data: undefined };
 }

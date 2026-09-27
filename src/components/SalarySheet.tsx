@@ -2,28 +2,34 @@
 // VEBOSSO EMS — Salary Sheet
 // Salary is paid outside the app; this is the Requested → Paid → Received
 // conversation for one person, month by month.
-//   self:  ask for a month's salary (or remind), confirm received.
-//   owner: mark a month paid — on a request, or for any month directly.
+//   self:  see the monthly salary, ask for a month's salary (or remind),
+//          confirm received.
+//   owner: set the monthly salary; mark a month paid with the amount paid —
+//          on a request, or for any month directly.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
 import { addMonths, format, isAfter, startOfMonth, subMonths } from 'date-fns';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { Alert } from '../lib/alert';
 import {
+  fetchMonthlySalary,
   fetchSalaryRequests,
   markSalaryPaid,
   markSalaryReceived,
   requestSalary,
   salaryMonthLabel,
+  setMonthlySalary,
 } from '../lib/employeeRecords';
 import { SalaryRequest, SalaryStatus } from '../types/database';
 import { SheetFrame } from './SheetFrame';
 
 interface SalarySheetProps {
+  /** Show in place (e.g. a dropdown in the member sheet) instead of as a sheet. */
+  inline?: boolean;
   visible: boolean;
   onDismiss: () => void;
   userId: string;
@@ -41,7 +47,21 @@ const STATUS: Record<SalaryStatus, { label: string; color: string; bg: string; i
 
 const monthKey = (d: Date) => format(startOfMonth(d), 'yyyy-MM-dd');
 
-export function SalarySheet({ visible, onDismiss, userId, userName, mode, ownerId }: SalarySheetProps) {
+const rupees = (n: number | string | null | undefined) =>
+  n === null || n === undefined || n === '' ? null : `₹${Number(n).toLocaleString('en-IN')}`;
+
+/** "25,000" / "₹ 25000.50" → 25000.5; null when not a valid amount. */
+const parseRupees = (text: string) => {
+  const n = Number(text.replace(/[,\s₹]/g, ''));
+  return text.trim() && Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
+};
+
+const loadAll = async (userId: string) => {
+  const [records, monthly] = await Promise.all([fetchSalaryRequests(userId), fetchMonthlySalary(userId)]);
+  return { records, monthly };
+};
+
+export function SalarySheet({ visible, onDismiss, userId, userName, mode, ownerId, inline }: SalarySheetProps) {
   const [records, setRecords] = useState<SalaryRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -49,19 +69,25 @@ export function SalarySheet({ visible, onDismiss, userId, userName, mode, ownerI
   const [notice, setNotice] = useState('');
   // Salary usually lands at the start of the next month, so default to last month.
   const [month, setMonth] = useState(() => startOfMonth(subMonths(new Date(), 1)));
+  const [monthly, setMonthly] = useState<number | null>(null);
+  // Owner: editing the monthly salary; the amount for the month being paid
+  // (null = use the monthly salary).
+  const [editingMonthly, setEditingMonthly] = useState<string | null>(null);
+  const [payText, setPayText] = useState<string | null>(null);
 
-  const apply = useCallback((res: Awaited<ReturnType<typeof fetchSalaryRequests>>) => {
-    if (res.success) setRecords(res.data);
-    else setError(res.error);
+  const apply = useCallback((res: Awaited<ReturnType<typeof loadAll>>) => {
+    if (res.records.success) setRecords(res.records.data);
+    else setError(res.records.error);
+    if (res.monthly.success) setMonthly(res.monthly.data);
     setIsLoading(false);
   }, []);
 
-  const load = useCallback(async () => apply(await fetchSalaryRequests(userId)), [apply, userId]);
+  const load = useCallback(async () => apply(await loadAll(userId)), [apply, userId]);
 
   // Mounted only while open, so this loads once on open.
   useEffect(() => {
     let active = true;
-    fetchSalaryRequests(userId).then((res) => active && apply(res));
+    loadAll(userId).then((res) => active && apply(res));
     return () => {
       active = false;
     };
@@ -83,6 +109,7 @@ export function SalarySheet({ visible, onDismiss, userId, userName, mode, ownerI
     } else {
       setError(res.error || 'Something went wrong');
     }
+    return res.success;
   };
 
   const handleSelfAsk = () =>
@@ -92,16 +119,32 @@ export function SalarySheet({ visible, onDismiss, userId, userName, mode, ownerI
       selectedRecord ? 'Reminder sent to the boss' : 'Request sent to the boss',
     );
 
+  const saveMonthly = () => {
+    if (!ownerId || editingMonthly === null) return;
+    const amount = parseRupees(editingMonthly);
+    if (amount === null) return setError('Enter the monthly salary');
+    void run('monthly', () => setMonthlySalary(userId, amount, ownerId), 'Monthly salary saved').then(
+      (ok) => ok && setEditingMonthly(null)
+    );
+  };
+
+  const payValue = payText ?? (monthly !== null ? String(monthly) : '');
+
   const confirmPaid = (monthIso: string) => {
     if (!ownerId) return;
+    const amount = parseRupees(payValue);
+    if (payValue.trim() && amount === null) return setError('That amount doesn’t look right');
     Alert.alert(
       'Mark as paid?',
-      `${userName} will be told the ${salaryMonthLabel(monthIso)} salary is paid.`,
+      `${userName} will be told the ${salaryMonthLabel(monthIso)} salary${amount !== null ? ` (${rupees(amount)})` : ''} is paid.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Mark paid',
-          onPress: () => run(monthIso, () => markSalaryPaid(userId, monthIso, ownerId), 'Marked as paid'),
+          onPress: () =>
+            void run(monthIso, () => markSalaryPaid(userId, monthIso, ownerId, amount), 'Marked as paid').then(
+              (ok) => ok && setPayText(null)
+            ),
         },
       ],
     );
@@ -129,6 +172,8 @@ export function SalarySheet({ visible, onDismiss, userId, userName, mode, ownerI
     primaryAction = () => confirmPaid(selectedKey);
   }
 
+  const paidAmount = rupees(selectedRecord?.amount);
+
   const picker = (
     <View>
       <View style={styles.monthRow}>
@@ -140,6 +185,7 @@ export function SalarySheet({ visible, onDismiss, userId, userName, mode, ownerI
           {selectedStatus ? (
             <Text style={[styles.monthState, { color: STATUS[selectedStatus].color }]}>
               {STATUS[selectedStatus].label}
+              {paidAmount && selectedStatus !== 'requested' ? ` · ${paidAmount}` : ''}
             </Text>
           ) : (
             <Text style={styles.monthStateMute}>Nothing yet</Text>
@@ -154,6 +200,25 @@ export function SalarySheet({ visible, onDismiss, userId, userName, mode, ownerI
           <Feather name="chevron-right" size={18} color={T.ink} />
         </Pressable>
       </View>
+
+      {mode === 'owner' && primaryLabel ? (
+        <View style={styles.payRow}>
+          <Text style={styles.payLabel}>Amount paid</Text>
+          <Text style={styles.rupee}>₹</Text>
+          <TextInput
+            value={payValue}
+            onChangeText={(t) => {
+              setPayText(t);
+              if (error) setError('');
+            }}
+            placeholder={monthly === null ? 'Amount' : undefined}
+            placeholderTextColor={T.mute}
+            keyboardType="decimal-pad"
+            maxLength={12}
+            style={styles.payInput}
+          />
+        </View>
+      ) : null}
 
       {primaryLabel && primaryAction ? (
         <Pressable style={styles.primary} onPress={primaryAction} disabled={busy !== null}>
@@ -175,6 +240,7 @@ export function SalarySheet({ visible, onDismiss, userId, userName, mode, ownerI
 
   return (
     <SheetFrame
+      inline={inline}
       visible={visible}
       onDismiss={onDismiss}
       title="Salary"
@@ -186,6 +252,61 @@ export function SalarySheet({ visible, onDismiss, userId, userName, mode, ownerI
     >
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+
+      {!isLoading && (mode === 'owner' || monthly !== null) ? (
+        <View style={styles.monthlyCard}>
+          {editingMonthly !== null ? (
+            <>
+              <Text style={styles.monthlyLabel}>Monthly salary</Text>
+              <View style={styles.monthlyEditRow}>
+                <Text style={styles.rupee}>₹</Text>
+                <TextInput
+                  value={editingMonthly}
+                  onChangeText={(t) => {
+                    setEditingMonthly(t);
+                    if (error) setError('');
+                  }}
+                  keyboardType="decimal-pad"
+                  maxLength={12}
+                  autoFocus
+                  style={styles.payInput}
+                  returnKeyType="done"
+                  onSubmitEditing={saveMonthly}
+                />
+                <Pressable style={styles.smallBtnGhost} onPress={() => setEditingMonthly(null)} hitSlop={4}>
+                  <Text style={styles.smallBtnGhostText}>Cancel</Text>
+                </Pressable>
+                <Pressable style={styles.smallBtn} onPress={saveMonthly} disabled={busy === 'monthly'}>
+                  {busy === 'monthly' ? (
+                    <ActivityIndicator size="small" color={T.white} />
+                  ) : (
+                    <Text style={styles.smallBtnText}>Save</Text>
+                  )}
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <View style={styles.monthlyRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.monthlyLabel}>Monthly salary</Text>
+                <Text style={[styles.monthlyValue, monthly === null && styles.monthlyUnset]}>
+                  {rupees(monthly) ?? 'Not set'}
+                </Text>
+              </View>
+              {mode === 'owner' ? (
+                <Pressable
+                  style={styles.smallBtnGhost}
+                  onPress={() => setEditingMonthly(monthly !== null ? String(monthly) : '')}
+                  accessibilityLabel={monthly === null ? 'Set monthly salary' : 'Change monthly salary'}
+                >
+                  <Feather name="edit-2" size={13} color={T.inkSoft} />
+                  <Text style={styles.smallBtnGhostText}>{monthly === null ? 'Set' : 'Change'}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          )}
+        </View>
+      ) : null}
 
       {isLoading ? (
         <ActivityIndicator color={T.charcoal} style={{ marginVertical: 24 }} />
@@ -212,7 +333,12 @@ export function SalarySheet({ visible, onDismiss, userId, userName, mode, ownerI
                 <Feather name={s.icon} size={15} color={s.color} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.recordMonth}>{salaryMonthLabel(r.month)}</Text>
+                <Text style={styles.recordMonth}>
+                  {salaryMonthLabel(r.month)}
+                  {r.amount !== null && r.amount !== undefined ? (
+                    <Text style={styles.recordAmount}>{`  ${rupees(r.amount)}`}</Text>
+                  ) : null}
+                </Text>
                 {when ? <Text style={styles.recordWhen}>{when}</Text> : null}
               </View>
               <View style={[styles.chip, { backgroundColor: s.bg }]}>
@@ -329,6 +455,101 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
     color: T.white,
+  },
+  recordAmount: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    color: T.inkSoft,
+  },
+  monthlyCard: {
+    backgroundColor: T.soft,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
+  },
+  monthlyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  monthlyLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    color: T.mute,
+  },
+  monthlyValue: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 18,
+    color: T.ink,
+    marginTop: 2,
+  },
+  monthlyUnset: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 15,
+    color: T.mute,
+  },
+  monthlyEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+  },
+  rupee: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 17,
+    color: T.inkSoft,
+  },
+  payRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+  },
+  payLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: T.inkSoft,
+    marginRight: 4,
+  },
+  payInput: {
+    flex: 1,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: T.card,
+    borderWidth: 1,
+    borderColor: T.soft2,
+    paddingHorizontal: 12,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 16,
+    color: T.ink,
+  },
+  smallBtn: {
+    height: 38,
+    minWidth: 64,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: T.charcoal,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  smallBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: T.white,
+  },
+  smallBtnGhost: {
+    height: 36,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: T.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  smallBtnGhostText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: T.inkSoft,
   },
   doneNote: {
     marginTop: 12,

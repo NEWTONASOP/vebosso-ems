@@ -28,7 +28,8 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
 
   // One tap to finish: anything not done yet goes straight to the note sheet.
   const nextStatus: TaskStatus | null = task.status === 'done' ? null : 'done';
-  const nextLabel = nextStatus ? 'Done' : null;
+  // An action, not a status — the soft green "Done" pill is kept for finished tasks.
+  const nextLabel = nextStatus ? 'Mark done' : null;
 
   const getStatusStyle = () => {
     switch (task.status) {
@@ -129,7 +130,10 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
                 pressed && styles.btnPressed,
               ]}
               onPress={handleAction}
+              accessibilityRole="button"
+              accessibilityLabel={`Mark ${task.title} as done`}
             >
+              <Feather name="check" size={14} color={AppTheme.white} />
               <Text
                 style={[
                   styles.actionBtnText,
@@ -235,18 +239,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   actionBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 999,
     justifyContent: 'center',
     alignItems: 'center',
   },
   completeBtn: {
-    backgroundColor: AppTheme.greenSoft,
-    borderRadius: 14,
+    backgroundColor: AppTheme.charcoal,
   },
   completeBtnText: {
-    color: AppTheme.green,
+    color: AppTheme.white,
   },
   actionBtnText: {
     fontFamily: 'Inter_700Bold',

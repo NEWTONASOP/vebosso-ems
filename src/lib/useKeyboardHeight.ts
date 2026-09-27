@@ -6,7 +6,7 @@
 // ============================================================================
 
 import { useEffect, useRef, useState } from 'react';
-import { Dimensions, Keyboard, Platform, View } from 'react-native';
+import { Dimensions, Keyboard, Platform, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export function useKeyboardHeight() {
@@ -25,6 +25,21 @@ export function useKeyboardHeight() {
   }, []);
 
   return height;
+}
+
+/**
+ * Style for a bottom sheet (Paper Modal content) so it sits on top of the
+ * keyboard and fits in the space above it. null while the keyboard is closed.
+ * The modal already keeps clear of the system bars; Android reports the
+ * keyboard without the nav bar, iOS with the home-indicator strip.
+ */
+export function useSheetLift() {
+  const keyboard = useKeyboardHeight();
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  if (keyboard <= 0) return null;
+  const lift = Platform.OS === 'ios' ? Math.max(0, keyboard - insets.bottom) : keyboard;
+  return { marginBottom: lift, maxHeight: height - insets.top - insets.bottom - lift - 8 };
 }
 
 /**

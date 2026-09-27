@@ -3,6 +3,7 @@
 // The bill exactly as the client gets it (same HTML the PDF is printed from),
 // laid out as an A4 page and scaled to fit the screen. Works for drafts and
 // unsaved edits too, so the owner can check before saving or sending.
+// BillPage is the page on its own — also what a saved bill opens to.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -12,6 +13,7 @@ import { Modal, Portal, Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTheme as T } from '../constants/theme';
 import { buildBillHtml } from '../lib/billPdf';
+import { useSheetEntrance } from '../lib/useSheetEntrance';
 import { Bill, BillSettings } from '../types/database';
 import { BillPreviewFrame } from './BillPreviewFrame';
 
@@ -37,6 +39,33 @@ function asPreviewPage(html: string): string {
   return html.includes('</head>') ? html.replace('</head>', `${extra}</head>`) : extra + html;
 }
 
+/** The bill as an A4 page, fitted to the space it is given. */
+export function BillPage({ bill, settings }: { bill: Bill; settings: BillSettings }) {
+  const [html, setHtml] = useState<string | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    buildBillHtml(bill, settings)
+      .then((h) => active && setHtml(asPreviewPage(h)))
+      .catch((e) => active && setError(e?.message || 'Could not build the preview'));
+    return () => {
+      active = false;
+    };
+  }, [bill, settings]);
+
+  if (error) return <Text style={styles.error}>{error}</Text>;
+  if (!html) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator color={T.charcoal} />
+        <Text style={styles.loadingText}>Preparing preview…</Text>
+      </View>
+    );
+  }
+  return <BillPreviewFrame html={html} />;
+}
+
 export function BillPreviewSheet({
   bill,
   settings,
@@ -53,22 +82,11 @@ export function BillPreviewSheet({
   shareHint?: string;
 }) {
   const insets = useSafeAreaInsets();
-  const [html, setHtml] = useState<string | null>(null);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let active = true;
-    buildBillHtml(bill, settings)
-      .then((h) => active && setHtml(asPreviewPage(h)))
-      .catch((e) => active && setError(e?.message || 'Could not build the preview'));
-    return () => {
-      active = false;
-    };
-  }, [bill, settings]);
+  const entrance = useSheetEntrance('sheet');
 
   return (
     <Portal>
-      <Modal visible onDismiss={onDismiss} contentContainerStyle={[styles.container, { paddingTop: insets.top }]}>
+      <Modal visible onDismiss={onDismiss} contentContainerStyle={[styles.container, { paddingTop: insets.top }, entrance]}>
         <View style={styles.header}>
           <Pressable onPress={onDismiss} style={styles.iconBtn} hitSlop={8} accessibilityLabel="Close preview">
             <Feather name="x" size={18} color={T.ink} />
@@ -92,16 +110,7 @@ export function BillPreviewSheet({
         </View>
 
         <View style={styles.body}>
-          {error ? (
-            <Text style={styles.error}>{error}</Text>
-          ) : html ? (
-            <BillPreviewFrame html={html} />
-          ) : (
-            <View style={styles.loading}>
-              <ActivityIndicator color={T.charcoal} />
-              <Text style={styles.loadingText}>Preparing preview…</Text>
-            </View>
-          )}
+          <BillPage bill={bill} settings={settings} />
         </View>
       </Modal>
     </Portal>

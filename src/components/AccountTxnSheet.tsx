@@ -1,16 +1,29 @@
 // ============================================================================
 // VEBOSSO EMS — Add / edit a ledger entry
-// Date · Credit(+) / Debit(−) · Amount · Particular. Editing also offers Delete.
+// Date · Credit(+) / Debit(−) · Amount · Particular · optional receipt photos.
+// Editing also offers Delete. Photos upload as they are added; ones added and
+// then abandoned (sheet closed without saving) are removed again.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
 import { addDays, format } from 'date-fns';
-import { useState } from 'react';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { Alert } from '../lib/alert';
-import { addTransaction, deleteTransaction, num, updateTransaction } from '../lib/accounts';
+import {
+  addTransaction,
+  deleteTransaction,
+  MAX_RECEIPTS,
+  num,
+  removeReceipts,
+  signReceipts,
+  updateTransaction,
+  uploadReceipt,
+} from '../lib/accounts';
 import { AccountTransaction, TxnKind } from '../types/database';
 import { DateField } from './DateTimeFields';
 import { useFieldChain } from '../lib/useFieldChain';
@@ -43,15 +56,74 @@ export function AccountTxnSheet({
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const chain = useFieldChain();
+  const [receipts, setReceipts] = useState<string[]>(txn?.receipts ?? []);
+  const [receiptUrls, setReceiptUrls] = useState<Record<string, string>>({});
+  const [uploading, setUploading] = useState(false);
+  const [enlarged, setEnlarged] = useState<string | null>(null);
+  // Uploaded in this sheet but not saved yet — removed if the sheet closes.
+  const fresh = useRef<string[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    signReceipts(txn?.receipts ?? []).then((u) => active && setReceiptUrls(u));
+    return () => {
+      active = false;
+    };
+  }, [txn]);
+
+  const close = () => {
+    void removeReceipts(fresh.current);
+    fresh.current = [];
+    onDismiss();
+  };
+
+  const addReceipt = async (source: 'library' | 'camera') => {
+    if (receipts.length >= MAX_RECEIPTS) return setError(`Up to ${MAX_RECEIPTS} photos`);
+    try {
+      if (source === 'camera') {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (perm.status !== 'granted') return setError('Camera permission is needed');
+      }
+      const res =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
+          : await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: 'images',
+              allowsMultipleSelection: true,
+              selectionLimit: MAX_RECEIPTS - receipts.length,
+              quality: 0.8,
+            });
+      if (res.canceled || !res.assets?.length) return;
+      setUploading(true);
+      setError('');
+      const added: string[] = [];
+      for (const a of res.assets.slice(0, MAX_RECEIPTS - receipts.length)) {
+        const up = await uploadReceipt(accountId, a.uri);
+        if (up.success) added.push(up.data);
+        else setError(up.error);
+      }
+      fresh.current.push(...added);
+      setReceipts((r) => [...r, ...added]);
+      const urls = await signReceipts(added);
+      setReceiptUrls((u) => ({ ...u, ...urls }));
+    } catch {
+      setError('Could not add the photo');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const save = async () => {
     const amount = Number(amountText.replace(/[,\s₹]/g, ''));
     if (!amountText.trim() || !Number.isFinite(amount) || amount <= 0) return setError('Enter the amount');
-    const input = { txn_date: date, kind, amount, particular: particular || null };
+    const input = { txn_date: date, kind, amount, particular: particular || null, receipts };
     setSaving(true);
     const res = txn ? await updateTransaction(txn.id, input) : await addTransaction(accountId, input);
     setSaving(false);
     if (!res.success) return setError(res.error);
+    // Photos taken off the entry go for good once it is saved.
+    void removeReceipts((txn?.receipts ?? []).filter((p) => !receipts.includes(p)));
+    fresh.current = [];
     onSaved(txn ? 'Entry updated' : 'Entry added');
     onDismiss();
   };
@@ -64,8 +136,9 @@ export function AccountTxnSheet({
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          const res = await deleteTransaction(txn.id);
+          const res = await deleteTransaction(txn.id, [...(txn.receipts ?? []), ...fresh.current]);
           if (!res.success) return setError(res.error);
+          fresh.current = [];
           onSaved('Entry deleted');
           onDismiss();
         },
@@ -78,7 +151,7 @@ export function AccountTxnSheet({
   return (
     <SheetFrame
       visible
-      onDismiss={onDismiss}
+      onDismiss={close}
       title={txn ? 'Edit entry' : 'Add entry'}
       subtitle={accountName}
       icon={kind === 'credit' ? 'plus-circle' : 'minus-circle'}
@@ -166,6 +239,55 @@ export function AccountTxnSheet({
           { label: 'Yesterday', value: yesterday },
         ]}
       />
+
+      <Text style={styles.label}>Receipt photos <Text style={styles.optional}>(optional)</Text></Text>
+      {enlarged && receiptUrls[enlarged] ? (
+        <Pressable onPress={() => setEnlarged(null)} accessibilityLabel="Close photo">
+          <Image source={{ uri: receiptUrls[enlarged] }} style={styles.large} contentFit="contain" />
+        </Pressable>
+      ) : null}
+      <View style={styles.receipts}>
+        {receipts.map((p) => (
+          <View key={p}>
+            <Pressable onPress={() => setEnlarged(enlarged === p ? null : p)} accessibilityLabel="View photo">
+              {receiptUrls[p] ? (
+                <Image source={{ uri: receiptUrls[p] }} style={[styles.thumb, enlarged === p && styles.thumbActive]} contentFit="cover" />
+              ) : (
+                <View style={styles.thumb} />
+              )}
+            </Pressable>
+            <Pressable
+              style={styles.thumbX}
+              onPress={() => {
+                setReceipts((r) => r.filter((x) => x !== p));
+                if (enlarged === p) setEnlarged(null);
+              }}
+              hitSlop={6}
+              accessibilityLabel="Remove photo"
+            >
+              <Feather name="x" size={11} color={T.white} />
+            </Pressable>
+          </View>
+        ))}
+        {receipts.length < MAX_RECEIPTS ? (
+          <>
+            <Pressable style={styles.addPhoto} onPress={() => addReceipt('library')} disabled={uploading}>
+              {uploading ? (
+                <ActivityIndicator color={T.charcoal} />
+              ) : (
+                <>
+                  <Feather name="image" size={17} color={T.inkSoft} />
+                  <Text style={styles.addPhotoText}>Photos</Text>
+                </>
+              )}
+            </Pressable>
+            <Pressable style={styles.addPhoto} onPress={() => addReceipt('camera')} disabled={uploading}>
+              <Feather name="camera" size={17} color={T.inkSoft} />
+              <Text style={styles.addPhotoText}>Camera</Text>
+            </Pressable>
+          </>
+        ) : null}
+      </View>
     </SheetFrame>
   );
 }
@@ -198,6 +320,32 @@ const styles = StyleSheet.create({
   },
   amountInput: { flex: 1, fontFamily: 'Inter_700Bold', fontSize: 18 },
   error: { fontFamily: 'Inter_500Medium', fontSize: 13, color: T.coral, marginBottom: 8 },
+  optional: { fontFamily: 'Inter_400Regular', color: T.mute },
+  receipts: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  thumb: { width: 64, height: 64, borderRadius: 12, backgroundColor: T.soft2 },
+  thumbActive: { borderWidth: 2, borderColor: T.charcoal },
+  thumbX: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: T.charcoal,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addPhoto: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    backgroundColor: T.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+  },
+  addPhotoText: { fontFamily: 'Inter_500Medium', fontSize: 11, color: T.inkSoft },
+  large: { width: '100%', height: 300, borderRadius: 14, backgroundColor: T.charcoalDeep, marginBottom: 10 },
   footerRow: { flexDirection: 'row', gap: 8 },
   btn: { height: 48, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   deleteBtn: { width: 56, backgroundColor: T.coralSoft },

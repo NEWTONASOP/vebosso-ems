@@ -24,6 +24,8 @@ const fetchMemberTasks = async (memberId: string) =>
     .limit(40);
 
 interface MemberTasksSheetProps {
+  /** Show in place (e.g. a dropdown in the member sheet) instead of as a sheet. */
+  inline?: boolean;
   visible: boolean;
   onDismiss: () => void;
   memberId: string;
@@ -39,6 +41,7 @@ export function MemberTasksSheet({
   memberName,
   assignerId,
   onMessage,
+  inline,
 }: MemberTasksSheetProps) {
   const addTask = useWorkStore((s) => s.addTask);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -122,6 +125,7 @@ export function MemberTasksSheet({
 
   return (
     <SheetFrame
+      inline={inline}
       visible={visible}
       onDismiss={onDismiss}
       title="Tasks by Boss"

@@ -74,6 +74,8 @@ function FileTile({ kind, size }: { kind: DocumentKind; size: { width: number; h
 }
 
 interface DocumentsSheetProps {
+  /** Show in place (e.g. a dropdown in the member sheet) instead of as a sheet. */
+  inline?: boolean;
   visible: boolean;
   onDismiss: () => void;
   /** Whose documents. */
@@ -92,6 +94,7 @@ export function DocumentsSheet({
   userName,
   currentUserId,
   canManage,
+  inline,
 }: DocumentsSheetProps) {
   const [docs, setDocs] = useState<EmployeeDocument[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
@@ -322,6 +325,7 @@ export function DocumentsSheet({
 
   return (
     <SheetFrame
+      inline={inline}
       visible={visible}
       onDismiss={onDismiss}
       title={isOwnDocs ? 'My Documents' : 'Documents'}

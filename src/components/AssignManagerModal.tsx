@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Modal, Portal, Searchbar, Text } from 'react-native-paper';
+import { useSheetEntrance } from '../lib/useSheetEntrance';
 import { AppTheme, appShadow, appSoftShadow } from '../constants/theme';
 import { Profile } from '../types/database';
 import { AnimatedPressable } from './AnimatedPressable';
@@ -28,6 +29,7 @@ export function AssignManagerModal({
   isLoading = false,
 }: AssignManagerModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const entrance = useSheetEntrance('dialog');
   const [selectedManagerId, setSelectedManagerId] = useState<string | null>(null);
 
   React.useEffect(() => {
@@ -54,7 +56,7 @@ export function AssignManagerModal({
       <Modal
         visible={visible}
         onDismiss={onDismiss}
-        contentContainerStyle={styles.modal}
+        contentContainerStyle={[styles.modal, entrance]}
       >
         <View style={styles.header}>
           <View style={styles.headerTop}>

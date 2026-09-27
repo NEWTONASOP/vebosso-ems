@@ -99,20 +99,6 @@ export function ProfilePhotoEditor({
     }
   };
 
-  const handlePress = () => {
-    if (busy) return;
-    // Web has no camera sheet worth offering; go straight to the file picker.
-    if (Platform.OS === 'web') {
-      void pick('library');
-      return;
-    }
-    Alert.alert('Profile photo', undefined, [
-      { text: 'Take photo', onPress: () => void pick('camera') },
-      { text: 'Choose from photos', onPress: () => void pick('library') },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
   const handleRemove = () => {
     Alert.alert('Remove photo?', 'Your initials will show instead.', [
       { text: 'Cancel', style: 'cancel' },
@@ -128,6 +114,23 @@ export function ProfilePhotoEditor({
           if (!res.success) notify(res.error || 'Could not remove your photo');
         },
       },
+    ]);
+  };
+
+  const handlePress = () => {
+    if (busy) return;
+    // Web has no camera sheet worth offering; go straight to the file picker.
+    if (Platform.OS === 'web') {
+      void pick('library');
+      return;
+    }
+    Alert.alert('Profile photo', undefined, [
+      { text: 'Take photo', onPress: () => void pick('camera') },
+      { text: 'Choose from photos', onPress: () => void pick('library') },
+      ...(profile.avatar_url
+        ? [{ text: 'Remove photo', style: 'destructive' as const, onPress: handleRemove }]
+        : []),
+      { text: 'Cancel', style: 'cancel' },
     ]);
   };
 
@@ -162,7 +165,7 @@ export function ProfilePhotoEditor({
           <Feather name="camera" size={Math.round(badge * 0.5)} color={T.white} />
         </View>
       </Pressable>
-      {profile.avatar_url && !busy ? (
+      {Platform.OS === 'web' && profile.avatar_url && !busy ? (
         <Pressable onPress={handleRemove} hitSlop={8} accessibilityRole="button">
           <Text style={styles.remove}>Remove photo</Text>
         </Pressable>
