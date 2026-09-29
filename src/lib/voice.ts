@@ -15,13 +15,12 @@ export const VOICE_BUCKET = 'voice-notes';
 /** Longest voice note, so files stay small. */
 export const VOICE_MAX_MS = 3 * 60 * 1000;
 
-/** AAC in .m4a (plays on phones and in browsers), mono and light for speech. */
-export const VOICE_RECORDING: RecordingOptions = {
-  ...RecordingPresets.HIGH_QUALITY,
-  numberOfChannels: 1,
-  sampleRate: 22050,
-  bitRate: 48000,
-};
+/**
+ * AAC in .m4a (plays on phones and in browsers). The stock preset on purpose:
+ * overriding the sample rate, channels and bitrate recorded silence on some
+ * phones, whose encoders don't handle those combinations.
+ */
+export const VOICE_RECORDING: RecordingOptions = RecordingPresets.HIGH_QUALITY;
 
 export interface VoiceClip {
   uri: string;
