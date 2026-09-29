@@ -152,6 +152,32 @@ serve(async (req) => {
         console.warn('Could not nullify assigned_by tasks (non-fatal):', tasksUpdateError.message);
       }
 
+      // Step 1b: Remove the member's files through the Storage API. Supabase
+      // blocks plain SQL deletes on storage.objects, so the old profile trigger
+      // could no longer do this and made the whole delete fail.
+      const removeFolder = async (bucket: string, prefix: string): Promise<void> => {
+        const { data: entries, error: listError } = await adminClient.storage
+          .from(bucket)
+          .list(prefix, { limit: 1000 });
+        if (listError || !entries?.length) return;
+        const files: string[] = [];
+        for (const entry of entries) {
+          // Folders come back without an id; go one level down into them.
+          if (entry.id) files.push(`${prefix}/${entry.name}`);
+          else await removeFolder(bucket, `${prefix}/${entry.name}`);
+        }
+        if (files.length) await adminClient.storage.from(bucket).remove(files);
+      };
+      try {
+        for (const bucket of ['checkouts', 'documents', 'avatars', 'expenses']) {
+          await removeFolder(bucket, user_id);
+        }
+        await removeFolder('voice-notes', `chat/${user_id}`);
+        await removeFolder('voice-notes', `task/${user_id}`);
+      } catch (storageError) {
+        console.warn('Storage cleanup failed (non-fatal):', storageError);
+      }
+
       // Step 2: Delete user from Supabase Auth — cascades to profiles, which cascades to
       // work_logs, sessions, leave_requests, tasks(assigned_to), announcements
       const { error: deleteError } = await adminClient.auth.admin.deleteUser(user_id);
