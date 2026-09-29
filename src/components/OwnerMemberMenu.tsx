@@ -130,6 +130,7 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
 
   const toggleAccess = async (feature: Feature, grant: boolean) => {
     if (!profile?.id) return;
+    if (access?.[feature] === grant) return; // already in that state (double tap)
     const label = FEATURES.find((f) => f.key === feature)?.label ?? feature;
     setAccess((a) => (a ? { ...a, [feature]: grant } : a));
     const res = await setFeatureAccess(member.id, feature, grant, profile.id);

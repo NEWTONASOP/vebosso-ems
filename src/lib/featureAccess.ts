@@ -37,14 +37,20 @@ export async function setFeatureAccess(
   grant: boolean,
   ownerId: string,
 ): Promise<Result> {
-  const { error } = grant
+  // ignoreDuplicates + select() returns a row only when it was newly inserted, so a
+  // double tap (or re-granting) doesn't notify the person a second time.
+  const { data, error } = grant
     ? await supabase
         .from('feature_access')
-        .upsert({ user_id: userId, feature, granted_by: ownerId }, { onConflict: 'user_id,feature' })
-    : await supabase.from('feature_access').delete().eq('user_id', userId).eq('feature', feature);
+        .upsert(
+          { user_id: userId, feature, granted_by: ownerId },
+          { onConflict: 'user_id,feature', ignoreDuplicates: true },
+        )
+        .select('feature')
+    : await supabase.from('feature_access').delete().eq('user_id', userId).eq('feature', feature).select('feature');
   if (error) return { success: false, error: parseSupabaseError(error) };
 
-  if (grant) {
+  if (grant && (data?.length ?? 0) > 0) {
     const label = FEATURES.find((f) => f.key === feature)?.label ?? feature;
     sendPushNotification(userId, `${label} access`, `You can now use ${label}. Find it on your home screen.`, {
       type: 'feature_access',
