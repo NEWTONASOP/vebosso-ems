@@ -1,34 +1,55 @@
 // ============================================================================
 // VEBOSSO EMS — Member Profile Screen
+// Same layout as the manager profile.
 // ============================================================================
 
-import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
-import { Alert } from '../../lib/alert';
-import { Switch, Text } from 'react-native-paper';
-import { APP_NAME, ROLE_LABELS } from '../../constants/roles';
-import {
-  AppTheme as T,
-  AppSpace,
-  AppRadius,
-  appShadow,
-  appSoftShadow,
-  screenChrome,
-  RoleAccent,
-} from '../../constants/theme';
-import { useAuthStore } from '../../store/authStore';
-import { ProfilePhotoEditor } from '../../components/ProfilePhotoEditor';
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import Constants from 'expo-constants';
-
-import { InfoRow } from '../../components/InfoRow';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Switch, Text } from 'react-native-paper';
 import { DocumentsSheet } from '../../components/DocumentsSheet';
 import { ExpensesSheet } from '../../components/ExpensesSheet';
+import { InfoRow } from '../../components/InfoRow';
 import { PageTransition } from '../../components/PageTransition';
+import { ProfilePhotoEditor } from '../../components/ProfilePhotoEditor';
 import { SalarySheet } from '../../components/SalarySheet';
-import { useState } from 'react';
+import { APP_NAME, ROLE_LABELS } from '../../constants/roles';
+import {
+  AppRadius,
+  AppSpace,
+  AppTheme,
+  RoleAccent,
+  appShadow,
+  appSoftShadow,
+  screenChrome,
+} from '../../constants/theme';
+import { Alert } from '../../lib/alert';
 import { useSundayReminder } from '../../lib/useSundayReminder';
+import { useAuthStore } from '../../store/authStore';
+
+/** On/off for the 11:30 AM check-in reminder on Sundays. */
+function SundayReminderRow() {
+  const { enabled, saving, setEnabled } = useSundayReminder();
+  const toggle = async (value: boolean) => {
+    const error = await setEnabled(value);
+    if (error) Alert.alert(error);
+  };
+  return (
+    <View style={styles.actionRow}>
+      <View style={[styles.iconContainer, { backgroundColor: AppTheme.greenSoft }]}>
+        <Feather name="bell" size={18} color={AppTheme.green} />
+      </View>
+      <View style={styles.actionInfo}>
+        <Text style={styles.actionTitle}>Sunday check-in reminder</Text>
+        <Text style={styles.actionSubtitle}>The 11:30 AM reminder, on Sundays too</Text>
+      </View>
+      <Switch value={enabled} onValueChange={(v) => void toggle(v)} disabled={saving} color={AppTheme.green} />
+    </View>
+  );
+}
 
 export default function MemberProfileScreen() {
   const router = useRouter();
@@ -43,13 +64,6 @@ export default function MemberProfileScreen() {
   };
 
   if (!profile) return null;
-
-  const roleAccent =
-    profile.role === 'owner'
-      ? RoleAccent.owner
-      : profile.role === 'manager'
-        ? RoleAccent.manager
-        : RoleAccent.member;
 
   const getJoinedDate = () => {
     try {
@@ -70,13 +84,17 @@ export default function MemberProfileScreen() {
           <Text style={screenChrome.title}>Profile</Text>
         </View>
 
-        {/* Profile card — same as the owner and manager settings */}
+        {/* Profile card — role accent on avatar only */}
         <View style={styles.profileCard}>
-          <ProfilePhotoEditor size={60} color={roleAccent.color} bg={roleAccent.soft} />
+          <ProfilePhotoEditor
+            size={60}
+            color={RoleAccent.member.color}
+            bg={RoleAccent.member.soft}
+          />
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName} numberOfLines={2}>{profile.full_name}</Text>
+            <Text style={styles.profileName}>{profile.full_name}</Text>
             <View style={styles.roleBadge}>
-              <View style={[styles.roleDot, { backgroundColor: roleAccent.color }]} />
+              <View style={styles.roleDot} />
               <Text style={styles.profileRole}>
                 {ROLE_LABELS[profile.role]} • {profile.employee_id}
               </Text>
@@ -84,73 +102,94 @@ export default function MemberProfileScreen() {
           </View>
         </View>
 
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Details</Text>
-          <View style={styles.groupedCard}>
-            <InfoRow
-              label="Status"
-              value="Active"
-              valueBadge
-              badgeColor={T.greenSoft}
-              badgeTextColor={T.green}
-            />
-            <InfoRow label="Full Name" value={profile.full_name} />
-            <InfoRow label="Designation" value={profile.department || 'Not assigned'} />
-            <InfoRow label="Joined" value={getJoinedDate()} isLast />
-          </View>
+        <Text style={styles.sectionLabel}>Details</Text>
+        <View style={styles.groupedCard}>
+          <InfoRow
+            label="Status"
+            value="Active"
+            valueBadge
+            badgeColor={AppTheme.greenSoft}
+            badgeTextColor={AppTheme.green}
+          />
+          <InfoRow label="Full Name" value={profile.full_name} />
+          <InfoRow label="Designation" value={profile.department || 'Not assigned'} />
+          <InfoRow label="Joined" value={getJoinedDate()} isLast />
         </View>
 
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Work & Pay</Text>
-          <View style={styles.groupedCard}>
-            <ActionRow
-              label="My Documents"
-              icon="file-text"
-              onPress={() => setOpenSheet('documents')}
-            />
-            <ActionRow
-              label="Salary"
-              icon="credit-card"
-              onPress={() => setOpenSheet('salary')}
-            />
-            <ActionRow
-              label="Travel expenses"
-              icon="navigation"
-              onPress={() => setOpenSheet('expenses')}
-            />
-            <ActionRow
-              label="Leave Requests"
-              icon="calendar"
-              onPress={() => router.push('/(member)/leaves')}
-              isLast
-            />
-          </View>
+        <Text style={styles.sectionLabel}>Work & pay</Text>
+        <View style={styles.groupedCard}>
+          <ActionRow
+            label="My Documents"
+            subtitle="Upload ID, certificates and other papers"
+            icon="file-text"
+            iconColor={AppTheme.violet}
+            iconBg={AppTheme.violetSoft}
+            onPress={() => setOpenSheet('documents')}
+          />
+          <View style={styles.separator} />
+          <ActionRow
+            label="Salary"
+            subtitle="Ask the boss and confirm when it arrives"
+            icon="credit-card"
+            iconColor={AppTheme.green}
+            iconBg={AppTheme.greenSoft}
+            onPress={() => setOpenSheet('salary')}
+          />
+          <View style={styles.separator} />
+          <ActionRow
+            label="Travel expenses"
+            subtitle="Send what you spent; confirm when it’s paid"
+            icon="navigation"
+            iconColor={AppTheme.violet}
+            iconBg={AppTheme.violetSoft}
+            onPress={() => setOpenSheet('expenses')}
+          />
         </View>
 
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Security & Settings</Text>
-          <View style={styles.groupedCard}>
-            <ActionRow
-              label="Change Password"
-              icon="key"
-              onPress={() => router.push('/(auth)/change-password')}
-            />
-            <SundayReminderRow />
-            <ActionRow
-              label="Sign Out"
-              icon="log-out"
-              onPress={handleSignOut}
-              isDestructive
-              isLast
-            />
-          </View>
+        <Text style={styles.sectionLabel}>Security & settings</Text>
+        <View style={styles.groupedCard}>
+          <ActionRow
+            label="Change Password"
+            subtitle="Update your account password"
+            icon="key"
+            iconColor={AppTheme.amber}
+            iconBg={AppTheme.amberSoft}
+            onPress={() => router.push('/(auth)/change-password')}
+          />
+          <View style={styles.separator} />
+          <ActionRow
+            label="Leave Requests"
+            subtitle="Apply for time off and track status"
+            icon="calendar"
+            iconColor={AppTheme.blue}
+            iconBg={AppTheme.blueSoft}
+            onPress={() => router.push('/(member)/leaves')}
+          />
+          <View style={styles.separator} />
+          <SundayReminderRow />
+        </View>
+
+        <View style={styles.signOutCard}>
+          <Pressable
+            style={({ pressed }) => [styles.actionRow, pressed && styles.rowPressed]}
+            onPress={handleSignOut}
+            accessibilityRole="button"
+            accessibilityLabel="Sign Out"
+          >
+            <View style={[styles.iconContainer, { backgroundColor: AppTheme.coralSoft }]}>
+              <Feather name="log-out" size={18} color={AppTheme.coral} />
+            </View>
+            <View style={styles.actionInfo}>
+              <Text style={styles.signOutTitle}>Sign Out</Text>
+              <Text style={styles.actionSubtitle}>Log out of your account</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={AppTheme.coral} />
+          </Pressable>
         </View>
 
         <View style={styles.appInfo}>
           <Text style={styles.appName}>{APP_NAME} EMS</Text>
-          <Text style={styles.appVersion}>
-            Version {Constants.expoConfig?.version || '1.0.0'}
-          </Text>
+          <Text style={styles.appVersion}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
         </View>
       </ScrollView>
       {openSheet === 'documents' ? (
@@ -184,102 +223,50 @@ export default function MemberProfileScreen() {
   );
 }
 
+// ============================================================================
+// Row Components
+// ============================================================================
+
 interface ActionRowProps {
   label: string;
+  subtitle: string;
   icon: string;
+  iconColor: string;
+  iconBg: string;
   onPress: () => void;
-  isDestructive?: boolean;
-  isLast?: boolean;
 }
 
-/** On/off for the 11:30 AM check-in reminder on Sundays. */
-function SundayReminderRow() {
-  const { enabled, saving, setEnabled } = useSundayReminder();
-  const toggle = async (value: boolean) => {
-    const error = await setEnabled(value);
-    if (error) Alert.alert(error);
-  };
-  return (
-    <View style={rowStyles.rowWrapper}>
-      <View style={rowStyles.rowContent}>
-        <View style={{ flex: 1, paddingRight: 12 }}>
-          <Text style={rowStyles.label}>Sunday check-in reminder</Text>
-          <Text style={rowStyles.hint}>The 11:30 AM reminder, on Sundays too</Text>
-        </View>
-        <Switch value={enabled} onValueChange={(v) => void toggle(v)} disabled={saving} color={T.green} />
-      </View>
-      <View style={rowStyles.separator} />
-    </View>
-  );
-}
-
-function ActionRow({ label, icon, onPress, isDestructive, isLast }: ActionRowProps) {
+function ActionRow({ label, subtitle, icon, iconColor, iconBg, onPress }: ActionRowProps) {
   return (
     <Pressable
-      style={({ pressed }) => [rowStyles.rowWrapper, pressed && rowStyles.pressed]}
+      style={({ pressed }) => [styles.actionRow, pressed && styles.rowPressed]}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <View style={rowStyles.rowContent}>
-        <Text style={[rowStyles.label, isDestructive && rowStyles.destructiveText]}>
-          {label}
-        </Text>
-        <Feather
-          name={icon as any}
-          size={16}
-          color={isDestructive ? T.coral : T.inkSoft}
-        />
+      <View style={[styles.iconContainer, { backgroundColor: iconBg }]}>
+        <Feather name={icon as any} size={18} color={iconColor} />
       </View>
-      {!isLast && <View style={rowStyles.separator} />}
+      <View style={styles.actionInfo}>
+        <Text style={styles.actionTitle}>{label}</Text>
+        <Text style={styles.actionSubtitle}>{subtitle}</Text>
+      </View>
+      <Feather name="chevron-right" size={16} color={AppTheme.mute} />
     </Pressable>
   );
 }
 
-const rowStyles = StyleSheet.create({
-  hint: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12.5,
-    color: T.mute,
-    marginTop: 2,
-  },
-  rowWrapper: {
-    backgroundColor: T.card,
-  },
-  pressed: {
-    backgroundColor: T.soft,
-  },
-  rowContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    minHeight: 48,
-  },
-  label: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    color: T.inkSoft,
-  },
-  destructiveText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: T.coral,
-  },
-  // A whole pixel: a hairline (0.5px) lands crisp on some rows and faded on
-  // others, so the dividers looked uneven.
-  separator: {
-    height: 1,
-    backgroundColor: 'rgba(18, 20, 25, 0.06)',
-    marginHorizontal: 16,
-  },
-});
-
 const styles = StyleSheet.create({
+  scrollContent: {
+    paddingBottom: 110,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+  },
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: T.card,
+    backgroundColor: AppTheme.card,
     marginHorizontal: AppSpace.screen,
     marginTop: 8,
     borderRadius: AppRadius.hero,
@@ -293,7 +280,7 @@ const styles = StyleSheet.create({
   profileName: {
     fontFamily: 'Inter_700Bold',
     fontSize: 18,
-    color: T.ink,
+    color: AppTheme.ink,
     letterSpacing: -0.3,
   },
   roleBadge: {
@@ -305,35 +292,83 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
+    backgroundColor: RoleAccent.member.color,
     marginRight: 6,
   },
   profileRole: {
     fontFamily: 'Inter_500Medium',
     fontSize: 13,
-    color: T.mute,
+    color: AppTheme.mute,
   },
-  scrollContent: {
-    paddingBottom: 110,
-    width: '100%',
-    maxWidth: 600,
-    alignSelf: 'center',
-  },
-  sectionContainer: {
-    marginTop: AppSpace.xxl,
+  sectionLabel: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    color: AppTheme.mute,
+    letterSpacing: -0.1,
     paddingHorizontal: AppSpace.screen,
-  },
-  sectionTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 17,
-    color: T.ink,
-    letterSpacing: -0.35,
+    marginTop: 24,
     marginBottom: 10,
   },
   groupedCard: {
-    backgroundColor: T.card,
+    backgroundColor: AppTheme.card,
+    marginHorizontal: AppSpace.screen,
     borderRadius: AppRadius.card,
     overflow: 'hidden',
     ...appSoftShadow,
+  },
+  signOutCard: {
+    backgroundColor: AppTheme.card,
+    marginHorizontal: AppSpace.screen,
+    marginTop: 16,
+    borderRadius: AppRadius.card,
+    overflow: 'hidden',
+    ...appSoftShadow,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 56,
+    backgroundColor: AppTheme.card,
+  },
+  rowPressed: {
+    backgroundColor: AppTheme.soft,
+  },
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  actionInfo: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  actionTitle: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: AppTheme.ink,
+    letterSpacing: -0.2,
+  },
+  actionSubtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: AppTheme.mute,
+    marginTop: 2,
+  },
+  signOutTitle: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: AppTheme.coral,
+    letterSpacing: -0.2,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: AppTheme.hairline,
+    marginLeft: 64,
   },
   appInfo: {
     alignItems: 'center',
@@ -342,12 +377,12 @@ const styles = StyleSheet.create({
   appName: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
-    color: T.mute,
+    color: AppTheme.mute,
   },
   appVersion: {
     fontFamily: 'Inter_400Regular',
-    fontSize: 11,
-    color: T.mute,
+    fontSize: 12,
+    color: AppTheme.mute,
     marginTop: 2,
   },
 });
