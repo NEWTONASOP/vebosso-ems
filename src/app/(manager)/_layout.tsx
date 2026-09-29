@@ -122,9 +122,15 @@ export default function ManagerLayout() {
           href: null,
         }}
       />
-      {/* Only for people the owner gave Bills to — opened from home. */}
+      {/* Bills and Accounts: only for people the owner gave them to, opened from home. */}
       <Tabs.Screen
         name="bills"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="accounts"
         options={{
           href: null,
         }}

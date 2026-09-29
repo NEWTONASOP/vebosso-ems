@@ -35,7 +35,6 @@ import {
   billTotals,
   convertToClientBill,
   createDraft,
-  deleteBillForever,
   fetchBill,
   fetchBillSettings,
   KIND_LABEL,
@@ -50,7 +49,7 @@ import {
 } from '../../../lib/bills';
 import { BillPage, BillPreviewSheet } from '../../../components/BillPreviewSheet';
 import { HourPickerModal, hourLabel } from '../../../components/DateTimeFields';
-import { useBillsBase } from '../../../lib/billsAccess';
+import { useFeatureBase } from '../../../lib/featureAccess';
 import { useAuthStore } from '../../../store/authStore';
 import { Bill, BillBrand, BillFields, BillKind, BillSettings, BillStatus } from '../../../types/database';
 import { BRANDS, brandOf } from '../../../lib/billBrands';
@@ -159,7 +158,7 @@ export default function BillEditorScreen() {
   const newImages = useRef<string[]>([]);
   // A service row to focus once it has rendered (Enter adds the next one).
   const focusItem = useRef<number | null>(null);
-  const billsBase = useBillsBase();
+  const billsBase = useFeatureBase('bills');
 
   const isDraft = !bill || bill.status === 'draft';
   // Latest row for async callbacks (autosave, image upload) without re-subscribing.
@@ -567,23 +566,6 @@ export default function BillEditorScreen() {
       'Restored'
     );
 
-  const deleteForever = () =>
-    bill &&
-    Alert.alert('Delete for good?', 'This bill, its images and its PDF are removed permanently.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () =>
-          void act('delete', async () => {
-            const res = await deleteBillForever(bill);
-            if (!res.success) throw new Error(res.error);
-            setDirty(false);
-            backToList();
-          }),
-      },
-    ]);
-
   // ---- Render ------------------------------------------------------------
   if (loading) {
     return (
@@ -623,15 +605,12 @@ export default function BillEditorScreen() {
             </View>
           </View>
           <View style={styles.headerActions}>
-            {inTrash ? (
-              <Pressable style={styles.iconBtn} onPress={deleteForever} accessibilityLabel="Delete for good">
-                <Feather name="trash-2" size={16} color={T.coral} />
-              </Pressable>
-            ) : (
+            {/* Bills are never deleted: trash is final, and can be restored. */}
+            {!inTrash ? (
               <Pressable style={styles.iconBtn} onPress={trash} accessibilityLabel="Move to trash">
                 <Feather name="trash-2" size={16} color={T.inkSoft} />
               </Pressable>
-            )}
+            ) : null}
           </View>
         </View>
 
@@ -717,16 +696,10 @@ export default function BillEditorScreen() {
           <Pressable style={styles.iconBtn} onPress={openPreview} accessibilityLabel="Preview bill">
             <Feather name="eye" size={16} color={T.ink} />
           </Pressable>
-          {bill ? (
-            inTrash ? (
-              <Pressable style={styles.iconBtn} onPress={deleteForever} accessibilityLabel="Delete for good">
-                <Feather name="trash-2" size={16} color={T.coral} />
-              </Pressable>
-            ) : (
-              <Pressable style={styles.iconBtn} onPress={trash} accessibilityLabel="Move to trash">
-                <Feather name="trash-2" size={16} color={T.inkSoft} />
-              </Pressable>
-            )
+          {bill && !inTrash ? (
+            <Pressable style={styles.iconBtn} onPress={trash} accessibilityLabel="Move to trash">
+              <Feather name="trash-2" size={16} color={T.inkSoft} />
+            </Pressable>
           ) : null}
         </View>
       </View>

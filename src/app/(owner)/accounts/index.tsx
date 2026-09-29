@@ -16,6 +16,8 @@ import { AccountImportSheet } from '../../../components/AccountImportSheet';
 import { AccountPeriodFilter } from '../../../components/AccountPeriodFilter';
 import { AppTheme as T, appShadow, appSoftShadow, screenChrome } from '../../../constants/theme';
 import { fetchAccounts, fetchSummaries, num, Period, periodLabel, rupees } from '../../../lib/accounts';
+import { useFeatureBase } from '../../../lib/featureAccess';
+import { useAuthStore } from '../../../store/authStore';
 import { Account, AccountSummary } from '../../../types/database';
 
 const loadAll = async (period: Period) => {
@@ -23,8 +25,11 @@ const loadAll = async (period: Period) => {
   return { accounts, summaries };
 };
 
-export default function OwnerAccountsScreen() {
+export default function AccountsScreen() {
   const router = useRouter();
+  // Shared with people given Accounts (opened from their home, so a back button).
+  const base = useFeatureBase('accounts');
+  const isOwner = useAuthStore((s) => s.profile?.role === 'owner');
   const [period, setPeriod] = useState<Period>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [summaries, setSummaries] = useState<Record<string, AccountSummary>>({});
@@ -90,11 +95,18 @@ export default function OwnerAccountsScreen() {
   return (
     <View style={screenChrome.root}>
       <View style={screenChrome.headerRow}>
-        <View style={{ flexShrink: 1 }}>
-          <Text style={screenChrome.title}>Accounts</Text>
-          <Text style={screenChrome.subtitle}>
-            {isLoading ? 'Loading…' : `${accounts.length} account${accounts.length === 1 ? '' : 's'}`}
-          </Text>
+        <View style={styles.titleRow}>
+          {!isOwner ? (
+            <Pressable onPress={() => router.back()} style={styles.back} hitSlop={8} accessibilityLabel="Back">
+              <Feather name="chevron-left" size={24} color={T.ink} />
+            </Pressable>
+          ) : null}
+          <View style={{ flexShrink: 1 }}>
+            <Text style={screenChrome.title}>Accounts</Text>
+            <Text style={screenChrome.subtitle}>
+              {isLoading ? 'Loading…' : `${accounts.length} account${accounts.length === 1 ? '' : 's'}`}
+            </Text>
+          </View>
         </View>
         <View style={styles.headerActions}>
           <Pressable style={styles.iconBtn} onPress={() => setSheet('import')} accessibilityLabel="Import">
@@ -186,7 +198,7 @@ export default function OwnerAccountsScreen() {
               return (
                 <Pressable
                   key={a.id}
-                  onPress={() => router.push(`/(owner)/accounts/${a.id}` as any)}
+                  onPress={() => router.push(`${base}/${a.id}` as any)}
                   style={({ pressed }) => [styles.row, i > 0 && styles.rowDivider, pressed && styles.rowPressed]}
                   accessibilityRole="button"
                   accessibilityLabel={`${a.name}, balance ${rupees(balance)}`}
@@ -227,7 +239,7 @@ export default function OwnerAccountsScreen() {
           onSaved={(account, m) => {
             setSnack(m);
             void load();
-            if (account) router.push(`/(owner)/accounts/${account.id}` as any);
+            if (account) router.push(`${base}/${account.id}` as any);
           }}
         />
       ) : null}
@@ -253,6 +265,8 @@ export default function OwnerAccountsScreen() {
 }
 
 const styles = StyleSheet.create({
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
+  back: { width: 32, height: 40, justifyContent: 'center', marginLeft: -8 },
   headerActions: { flexDirection: 'row', gap: 8 },
   iconBtn: {
     width: 42,

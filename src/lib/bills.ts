@@ -135,15 +135,6 @@ export const restoreBill = (b: Bill) => updateBill(b.id, { status: b.prev_status
 /** Estimate → client bill (gets a B- number; E- number kept). */
 export const convertToClientBill = (id: string) => updateBill(id, { kind: 'client', status: 'pending' });
 
-/** For good: the row, its images and its PDF. */
-export async function deleteBillForever(b: Bill): Promise<Result> {
-  const { error } = await supabase.from('bills').delete().eq('id', b.id);
-  if (error) return fail(error);
-  const paths = [...(b.images ?? []), `pdf/${b.id}.pdf`];
-  await supabase.storage.from(BUCKET).remove(paths);
-  return { success: true, data: undefined };
-}
-
 // ---------------------------------------------------------------------------
 // Images
 

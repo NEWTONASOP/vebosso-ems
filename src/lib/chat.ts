@@ -2,12 +2,14 @@
 // VEBOSSO EMS — Chat between the owner and one person
 // Every conversation belongs to the non-owner side (member_id); any owner can
 // read and reply. Replaces the one-way "Message Boss" (migration 029).
+// A message can be text, a voice note, or both (033).
 // ============================================================================
 
 import { ChatMessage } from '../types/database';
 import { parseSupabaseError } from './errors';
 import { sendPushNotification, sendPushNotificationToRole } from './notifications';
 import { supabase } from './supabase';
+import { uploadVoiceNote, VoiceClip } from './voice';
 
 type Result<T = undefined> = { success: true; data: T } | { success: false; error: string };
 
@@ -38,30 +40,40 @@ export async function sendChatMessage(params: {
   memberId: string;
   senderId: string;
   senderName: string;
-  body: string;
+  body?: string;
+  voice?: VoiceClip | null;
 }): Promise<Result<ChatMessage>> {
-  const { memberId, senderId, senderName, body } = params;
-  const text = body.trim().slice(0, CHAT_MAX);
-  if (!text) return { success: false, error: 'Write a message first' };
+  const { memberId, senderId, senderName, voice } = params;
+  const text = (params.body ?? '').trim().slice(0, CHAT_MAX);
+  if (!text && !voice) return { success: false, error: 'Write a message first' };
+
+  let audio: { audio_path: string; audio_ms: number } | null = null;
+  if (voice) {
+    const up = await uploadVoiceNote('chat', memberId, voice);
+    if (!up.success) return up;
+    audio = { audio_path: up.data, audio_ms: Math.round(voice.durationMs) };
+  }
 
   const { data, error } = await supabase
     .from('chat_messages')
-    .insert({ member_id: memberId, sender_id: senderId, body: text })
+    .insert({ member_id: memberId, sender_id: senderId, body: text || null, ...(audio ?? {}) })
     .select()
     .single();
   if (error) return fail(error);
+
+  const preview = text ? text.slice(0, 300) : '🎤 Voice message';
 
   const fromMember = senderId === memberId;
   if (fromMember) {
     sendPushNotificationToRole(
       'owner',
       `Message from ${senderName}`,
-      text.slice(0, 300),
+      preview,
       { type: 'chat_message', member_id: memberId },
       [senderId],
     );
   } else {
-    sendPushNotification(memberId, `Message from ${senderName}`, text.slice(0, 300), {
+    sendPushNotification(memberId, `Message from ${senderName}`, preview, {
       type: 'chat_message',
       member_id: memberId,
     });

@@ -1,15 +1,14 @@
 // ============================================================================
 // VEBOSSO EMS — Owner Member Menu
-// The sheet an owner gets when tapping a team member. Salary, travel expenses
-// and documents open as dropdowns inside it; Tasks by Boss, Messages and
-// Assign Manager open as dialogs on top, with the member sheet still open
-// underneath.
+// The sheet an owner gets when tapping a team member. Tasks by Boss,
+// Messages, Salary, Travel expenses, Documents and Assign Manager open as
+// dialogs on top, with the member sheet still open underneath.
 // Shared by the Dashboard and Team screens.
 // ============================================================================
 
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { fetchHasBillsAccess, setBillsAccess } from '../lib/billsAccess';
+import { Feature, FEATURES, fetchFeatureAccess, setFeatureAccess } from '../lib/featureAccess';
 import { countUnreadFrom } from '../lib/chat';
 import { countPendingDocuments } from '../lib/employeeRecords';
 import { parseSupabaseError } from '../lib/errors';
@@ -21,7 +20,7 @@ import { AssignManagerModal } from './AssignManagerModal';
 import { ChatSheet } from './ChatPanel';
 import { DocumentsSheet } from './DocumentsSheet';
 import { ExpensesSheet } from './ExpensesSheet';
-import { MemberActionsModal, MemberDialog, MemberPanel } from './MemberActionsModal';
+import { MemberActionsModal, MemberDialog } from './MemberActionsModal';
 import { MemberTasksSheet } from './MemberTasksSheet';
 import { SalarySheet } from './SalarySheet';
 
@@ -35,7 +34,6 @@ interface OwnerMemberMenuProps {
   initialDialog?: MemberDialog | null;
 }
 
-const noop = () => {};
 
 export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = null }: OwnerMemberMenuProps) {
   const router = useRouter();
@@ -44,13 +42,12 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
   const memberLiveStatus = useWorkStore((s) => s.memberLiveStatus);
   const fetchTeamMembers = useWorkStore((s) => s.fetchTeamMembers);
 
-  const [panel, setPanel] = useState<MemberPanel | null>(null);
   const [dialog, setDialog] = useState<MemberDialog | null>(initialDialog);
   const [assigning, setAssigning] = useState(false);
   const [isAssigningManager, setIsAssigningManager] = useState(false);
   const [pendingDocs, setPendingDocs] = useState(0);
   const [unreadChat, setUnreadChat] = useState(0);
-  const [billsAccess, setBillsAccessState] = useState<boolean | null>(null);
+  const [access, setAccess] = useState<Record<Feature, boolean> | null>(null);
 
   // Re-count when a dropdown opens or closes — e.g. after reviewing documents
   // or reading the chat.
@@ -63,12 +60,12 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
     return () => {
       active = false;
     };
-  }, [memberId, panel, dialog]);
+  }, [memberId, dialog]);
 
   useEffect(() => {
     if (!memberId) return;
     let active = true;
-    fetchHasBillsAccess(memberId).then((has) => active && setBillsAccessState(has));
+    fetchFeatureAccess(memberId).then((a) => active && setAccess(a));
     return () => {
       active = false;
     };
@@ -78,10 +75,9 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
   const [lastMemberId, setLastMemberId] = useState<string | null>(null);
   if ((member?.id ?? null) !== lastMemberId) {
     setLastMemberId(member?.id ?? null);
-    setPanel(null);
     setDialog(initialDialog);
     setAssigning(false);
-    setBillsAccessState(null);
+    setAccess(null);
   }
 
   if (!member) return null;
@@ -132,56 +128,16 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
     }
   };
 
-  const toggleBillsAccess = async (grant: boolean) => {
+  const toggleAccess = async (feature: Feature, grant: boolean) => {
     if (!profile?.id) return;
-    setBillsAccessState(grant);
-    const res = await setBillsAccess(member.id, grant, profile.id);
+    const label = FEATURES.find((f) => f.key === feature)?.label ?? feature;
+    setAccess((a) => (a ? { ...a, [feature]: grant } : a));
+    const res = await setFeatureAccess(member.id, feature, grant, profile.id);
     if (!res.success) {
-      setBillsAccessState(!grant);
+      setAccess((a) => (a ? { ...a, [feature]: !grant } : a));
       return onMessage(res.error);
     }
-    onMessage(grant ? `${member.full_name} can now use Bills` : `Bills removed for ${member.full_name}`);
-  };
-
-  const renderPanel = (key: MemberPanel) => {
-    if (!profile?.id) return null;
-    switch (key) {
-      case 'salary':
-        return (
-          <SalarySheet
-            inline
-            visible
-            onDismiss={noop}
-            userId={member.id}
-            userName={member.full_name}
-            mode="owner"
-            ownerId={profile.id}
-          />
-        );
-      case 'expenses':
-        return (
-          <ExpensesSheet
-            inline
-            onDismiss={noop}
-            userId={member.id}
-            userName={member.full_name}
-            mode="owner"
-            ownerId={profile.id}
-          />
-        );
-      case 'documents':
-        return (
-          <DocumentsSheet
-            inline
-            visible
-            onDismiss={noop}
-            userId={member.id}
-            userName={member.full_name}
-            currentUserId={profile.id}
-            canManage
-          />
-        );
-    }
+    onMessage(grant ? `${member.full_name} can now use ${label}` : `${label} removed for ${member.full_name}`);
   };
 
   return (
@@ -190,15 +146,12 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
         visible
         member={member}
         onDismiss={onClose}
-        openPanel={panel}
-        onTogglePanel={(key) => setPanel((p) => (p === key ? null : key))}
-        renderPanel={renderPanel}
         pendingDocsCount={pendingDocs}
         onOpenDialog={setDialog}
         unreadChatCount={dialog === 'chat' ? 0 : unreadChat}
         onAssignManager={() => setAssigning(true)}
-        billsAccess={billsAccess}
-        onToggleBillsAccess={(grant) => void toggleBillsAccess(grant)}
+        access={access}
+        onToggleAccess={(feature, grant) => void toggleAccess(feature, grant)}
         onManageProfile={() => {
           onClose();
           router.push(`/(owner)/member/${member.id}` as any);
@@ -216,6 +169,38 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
           memberName={member.full_name}
           assignerId={profile.id}
           onMessage={onMessage}
+        />
+      ) : null}
+
+      {dialog === 'salary' && profile?.id ? (
+        <SalarySheet
+          visible
+          onDismiss={() => setDialog(null)}
+          userId={member.id}
+          userName={member.full_name}
+          mode="owner"
+          ownerId={profile.id}
+        />
+      ) : null}
+
+      {dialog === 'expenses' && profile?.id ? (
+        <ExpensesSheet
+          onDismiss={() => setDialog(null)}
+          userId={member.id}
+          userName={member.full_name}
+          mode="owner"
+          ownerId={profile.id}
+        />
+      ) : null}
+
+      {dialog === 'documents' && profile?.id ? (
+        <DocumentsSheet
+          visible
+          onDismiss={() => setDialog(null)}
+          userId={member.id}
+          userName={member.full_name}
+          currentUserId={profile.id}
+          canManage
         />
       ) : null}
 

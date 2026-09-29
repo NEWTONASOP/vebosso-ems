@@ -3,6 +3,7 @@
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
+import { VoiceNote } from './VoiceNote';
 import { format } from 'date-fns';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Divider, Modal, Portal, Text } from 'react-native-paper';
@@ -23,6 +24,8 @@ interface TaskDetailModalProps {
     completion_note: string | null;
     completed_at: string | null;
     created_at: string;
+    voice_path?: string | null;
+    voice_ms?: number | null;
     assignee: {
       id: string;
       full_name: string;
@@ -124,6 +127,17 @@ export function TaskDetailModal({
 
           {/* Task Title */}
           <Text style={styles.title}>{task.title}</Text>
+
+          {/* Voice note from whoever gave the task */}
+          {task.voice_path ? (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Feather name="mic" size={16} color={AppTheme.mute} />
+                <Text style={styles.sectionLabel}>Voice note</Text>
+              </View>
+              <VoiceNote path={task.voice_path} durationMs={task.voice_ms} />
+            </View>
+          ) : null}
 
           {/* Description */}
           {task.description && (

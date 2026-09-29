@@ -37,6 +37,7 @@ import {
   periodLabel,
   rupees,
 } from '../../../lib/accounts';
+import { useFeatureBase } from '../../../lib/featureAccess';
 import { Account, AccountSummary, AccountTransaction } from '../../../types/database';
 
 const load = async (id: string, period: Period) => {
@@ -51,6 +52,7 @@ const load = async (id: string, period: Period) => {
 
 export default function AccountLedgerScreen() {
   const router = useRouter();
+  const base = useFeatureBase('accounts');
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   // Below this the four-column table gets cramped, so entries become cards.
@@ -60,7 +62,7 @@ export default function AccountLedgerScreen() {
   const backToList = () => {
     const routes = navigation.getState()?.routes ?? [];
     if (routes.length > 1) navigation.goBack();
-    else router.replace('/(owner)/accounts' as any);
+    else router.replace(base as any);
   };
   const { id } = useLocalSearchParams<{ id: string }>();
   const [period, setPeriod] = useState<Period>(null);

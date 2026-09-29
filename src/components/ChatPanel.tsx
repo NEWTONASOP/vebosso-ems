@@ -3,6 +3,7 @@
 // ChatPanel: in place, e.g. the Messages dropdown in the owner's member sheet.
 // ChatSheet: a bottom sheet, e.g. "Message Boss" on the person's side.
 // New messages arrive in realtime and are marked read while the chat is open.
+// Anyone can send a voice message: with the box empty, the button records.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -16,6 +17,8 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { ChatMessage } from '../types/database';
 import { SheetFrame } from './SheetFrame';
+import { RecordingBar, useVoiceRecorder, VoiceNote } from './VoiceNote';
+import { VoiceClip } from '../lib/voice';
 
 // ----------------------------------------------------------------------------
 
@@ -69,13 +72,14 @@ function useChat(memberId: string) {
     };
   }, [apply, memberId]);
 
-  const send = async (body: string) => {
+  const send = async (body: string, voice?: VoiceClip | null) => {
     if (!profile) return false;
     const res = await sendChatMessage({
       memberId,
       senderId: profile.id,
       senderName: isOwner ? 'the boss' : profile.full_name,
       body,
+      voice,
     });
     if (!res.success) {
       setError(res.error);
@@ -123,9 +127,12 @@ function Bubbles({
         return (
           <View key={m.id} style={[styles.bubbleWrap, mine ? styles.wrapMine : styles.wrapTheirs]}>
             <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
-              <Text style={[styles.body, mine && styles.bodyMine]} selectable>
-                {m.body}
-              </Text>
+              {m.audio_path ? <VoiceNote path={m.audio_path} durationMs={m.audio_ms} dark={mine} /> : null}
+              {m.body ? (
+                <Text style={[styles.body, mine && styles.bodyMine, m.audio_path ? { marginTop: 6 } : null]} selectable>
+                  {m.body}
+                </Text>
+              ) : null}
             </View>
             <Text style={[styles.meta, mine && styles.metaMine]}>
               {stamp(m.created_at)}
@@ -138,9 +145,10 @@ function Bubbles({
   );
 }
 
-function Composer({ onSend }: { onSend: (body: string) => Promise<boolean> }) {
+function Composer({ onSend }: { onSend: (body: string, voice?: VoiceClip | null) => Promise<boolean> }) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const voice = useVoiceRecorder();
 
   const submit = async () => {
     if (!text.trim() || sending) return;
@@ -150,8 +158,33 @@ function Composer({ onSend }: { onSend: (body: string) => Promise<boolean> }) {
     if (ok) setText('');
   };
 
+  const sendVoice = async () => {
+    const clip = await voice.stop();
+    if (!clip) return;
+    setSending(true);
+    await onSend('', clip);
+    setSending(false);
+  };
+
+  if (voice.recording || (sending && !text.trim())) {
+    return (
+      <View style={styles.composerWrap}>
+        <RecordingBar
+          durationMs={voice.durationMs}
+          sending={sending}
+          onCancel={() => void voice.cancel()}
+          onSend={() => void sendVoice()}
+        />
+      </View>
+    );
+  }
+
+  const empty = !text.trim();
+
   return (
-    <View style={styles.composer}>
+    <View style={styles.composerWrap}>
+      {voice.error ? <Text style={styles.error}>{voice.error}</Text> : null}
+    <View style={[styles.composer, { marginTop: 0 }]}>
       <TextInput
         value={text}
         onChangeText={setText}
@@ -161,15 +194,28 @@ function Composer({ onSend }: { onSend: (body: string) => Promise<boolean> }) {
         multiline
         maxLength={CHAT_MAX}
       />
-      <Pressable
-        style={[styles.send, !text.trim() && styles.sendIdle]}
-        onPress={submit}
-        disabled={!text.trim() || sending}
-        accessibilityRole="button"
-        accessibilityLabel="Send message"
-      >
-        {sending ? <ActivityIndicator size="small" color={T.white} /> : <Feather name="send" size={17} color={T.white} />}
-      </Pressable>
+      {empty ? (
+        <Pressable
+          style={styles.send}
+          // At the length limit, what was recorded is sent.
+          onPress={() => void voice.start(() => void sendVoice())}
+          accessibilityRole="button"
+          accessibilityLabel="Record a voice message"
+        >
+          <Feather name="mic" size={18} color={T.white} />
+        </Pressable>
+      ) : (
+        <Pressable
+          style={styles.send}
+          onPress={submit}
+          disabled={sending}
+          accessibilityRole="button"
+          accessibilityLabel="Send message"
+        >
+          {sending ? <ActivityIndicator size="small" color={T.white} /> : <Feather name="send" size={17} color={T.white} />}
+        </Pressable>
+      )}
+    </View>
     </View>
   );
 }
@@ -260,6 +306,7 @@ const styles = StyleSheet.create({
   metaMine: { textAlign: 'right' },
   earlier: { alignSelf: 'center', paddingVertical: 6, marginBottom: 6 },
   earlierText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.blue },
+  composerWrap: { marginTop: 12 },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 12 },
   input: {
     flex: 1,

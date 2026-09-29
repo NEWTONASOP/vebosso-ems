@@ -10,6 +10,7 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import { AnimatedPressable } from './AnimatedPressable';
 import { TaskCompleteModal } from './TaskCompleteModal';
 import { TaskDetailModal } from './TaskDetailModal';
+import { VoiceNote } from './VoiceNote';
 
 import { Feather } from '@expo/vector-icons';
 import { AppTheme, appSoftShadow } from '../constants/theme';
@@ -151,6 +152,12 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
             </View>
           )}
         </View>
+        {/* Voice note from whoever gave the task, playable right here. */}
+        {task.voice_path ? (
+          <View style={styles.voiceRow}>
+            <VoiceNote path={task.voice_path} durationMs={task.voice_ms} />
+          </View>
+        ) : null}
       </Animated.View>
 
       {/* Completion Modal */}
@@ -261,6 +268,12 @@ const styles = StyleSheet.create({
   btnPressed: {
     transform: [{ scale: 0.96 }],
     opacity: 0.9,
+  },
+  voiceRow: {
+    paddingLeft: 62,
+    paddingRight: 16,
+    paddingBottom: 12,
+    marginTop: -4,
   },
   statusBadge: {
     paddingHorizontal: 10,

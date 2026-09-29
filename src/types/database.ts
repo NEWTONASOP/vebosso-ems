@@ -109,6 +109,9 @@ export interface Task {
   due_date: string | null;
   completion_note: string | null;
   completed_at: string | null;
+  /** Optional voice note from whoever gave the task (voice-notes bucket). */
+  voice_path?: string | null;
+  voice_ms?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -202,7 +205,11 @@ export interface ChatMessage {
   id: string;
   member_id: string;
   sender_id: string | null;
-  body: string;
+  /** Text; null for a voice-only message. */
+  body: string | null;
+  /** Voice note (voice-notes bucket), with its length. */
+  audio_path?: string | null;
+  audio_ms?: number | null;
   created_at: string;
   /** When the other side read it. */
   read_at: string | null;
@@ -244,6 +251,8 @@ export interface Venue {
   contact_name: string | null;
   contact_email: string | null;
   contact_phone: string | null;
+  /** The city it is in (venue_cities); null = not set. */
+  city_id: string | null;
   /** Given permission and working with VEBOSSO. Anyone marks; only the owner unmarks. */
   in_business: boolean;
   in_business_by_name: string | null;
@@ -257,8 +266,16 @@ export interface Venue {
 
 export type VenueInput = Pick<
   Venue,
-  'met_on' | 'venue_name' | 'location' | 'contact_role' | 'contact_name' | 'contact_email' | 'contact_phone'
+  'met_on' | 'venue_name' | 'location' | 'contact_role' | 'contact_name' | 'contact_email' | 'contact_phone' | 'city_id'
 >;
+
+/** A city venues are grouped under. Anyone with Venues access can add one. */
+export interface VenueCity {
+  id: string;
+  name: string;
+  created_by: string | null;
+  created_at: string;
+}
 
 export type ExpenseStatus = 'submitted' | 'paid' | 'received';
 
@@ -430,6 +447,8 @@ export interface TaskInsert {
   description?: string | null;
   status?: TaskStatus;
   due_date?: string | null;
+  voice_path?: string | null;
+  voice_ms?: number | null;
 }
 
 export interface AnnouncementInsert {

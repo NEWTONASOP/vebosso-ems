@@ -12,7 +12,7 @@ import { CheckInModal } from '../../components/CheckInModal';
 import { CheckOutModal } from '../../components/CheckOutModal';
 import { InlineError } from '../../components/InlineError';
 import { MessageButtons } from '../../components/MessageButtons';
-import { BillsShortcut } from '../../components/BillsShortcut';
+import { FeatureShortcut } from '../../components/FeatureShortcut';
 import { VenuesShortcut } from '../../components/VenuesShortcut';
 import { StatusCardSkeleton } from '../../components/LoadingSkeleton';
 import { NotificationBell } from '../../components/NotificationBell';
@@ -427,9 +427,9 @@ export default function MemberHomeScreen() {
 
           <View style={styles.messageRow}>
             <MessageButtons onMessage={setSnackMessage} />
-            <View style={{ height: 10 }} />
             <VenuesShortcut role="member" />
-            <BillsShortcut role="member" />
+            <FeatureShortcut feature="bills" role="member" />
+            <FeatureShortcut feature="accounts" role="member" />
           </View>
 
           {todayTasks.length > 0 && (

@@ -14,6 +14,11 @@ import { supabase } from '../lib/supabase';
 import { useWorkStore } from '../store/workStore';
 import { Task } from '../types/database';
 import { SheetFrame } from './SheetFrame';
+import { RecordingBar, useVoiceRecorder, VoiceNote } from './VoiceNote';
+import { uploadVoiceNote, VoiceClip } from '../lib/voice';
+
+/** Title for a task given only as a voice note. */
+export const VOICE_TASK_TITLE = '🎤 Voice task';
 
 const fetchMemberTasks = async (memberId: string) =>
   await supabase
@@ -67,18 +72,31 @@ export function MemberTasksSheet({
     };
   }, [apply, memberId]);
 
-  const handleSend = async () => {
+  const voice = useVoiceRecorder();
+
+  /** Text, a voice note, or both (the text becomes the title). */
+  const handleSend = async (clip?: VoiceClip | null) => {
     const message = text.trim();
-    if (!message) return;
+    if (!message && !clip) return;
     setIsSending(true);
     setError('');
+    let voiceFields: { voice_path: string; voice_ms: number } | null = null;
+    if (clip) {
+      const up = await uploadVoiceNote('task', memberId, clip);
+      if (!up.success) {
+        setIsSending(false);
+        return setError(up.error);
+      }
+      voiceFields = { voice_path: up.data, voice_ms: Math.round(clip.durationMs) };
+    }
     const res = await addTask({
       assigned_to: memberId,
       assigned_by: assignerId,
-      title: message.slice(0, 2000),
+      title: (message || VOICE_TASK_TITLE).slice(0, 2000),
       description: null,
       due_date: null,
       status: 'pending',
+      ...(voiceFields ?? {}),
     });
     setIsSending(false);
     if (res.success) {
@@ -93,9 +111,24 @@ export function MemberTasksSheet({
   const open = tasks.filter((t) => t.status !== 'done');
   const done = tasks.filter((t) => t.status === 'done');
 
-  const composer = (
+  const sendVoice = async () => {
+    const clip = await voice.stop();
+    if (clip) await handleSend(clip);
+  };
+
+  const composer = voice.recording || (isSending && !text.trim()) ? (
     <View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      <RecordingBar
+        durationMs={voice.durationMs}
+        sending={isSending}
+        onCancel={() => void voice.cancel()}
+        onSend={() => void sendVoice()}
+      />
+    </View>
+  ) : (
+    <View>
+      {error || voice.error ? <Text style={styles.error}>{error || voice.error}</Text> : null}
       <View style={styles.composer}>
         <TextInput
           value={text}
@@ -107,18 +140,29 @@ export function MemberTasksSheet({
           maxLength={2000}
           editable={!isSending}
         />
-        <Pressable
-          style={[styles.sendBtn, !text.trim() && { opacity: 0.4 }]}
-          onPress={handleSend}
-          disabled={isSending || !text.trim()}
-          accessibilityLabel="Give task"
-        >
-          {isSending ? (
-            <ActivityIndicator size="small" color={T.white} />
-          ) : (
-            <Feather name="send" size={16} color={T.white} />
-          )}
-        </Pressable>
+        {text.trim() ? (
+          <Pressable
+            style={styles.sendBtn}
+            onPress={() => void handleSend()}
+            disabled={isSending}
+            accessibilityLabel="Give task"
+          >
+            {isSending ? (
+              <ActivityIndicator size="small" color={T.white} />
+            ) : (
+              <Feather name="send" size={16} color={T.white} />
+            )}
+          </Pressable>
+        ) : (
+          <Pressable
+            style={styles.sendBtn}
+            // At the length limit, what was recorded is sent as the task.
+            onPress={() => void voice.start(() => void sendVoice())}
+            accessibilityLabel="Give a task as a voice note"
+          >
+            <Feather name="mic" size={16} color={T.white} />
+          </Pressable>
+        )}
       </View>
     </View>
   );
@@ -142,7 +186,7 @@ export function MemberTasksSheet({
       ) : (
         <>
           <Text style={styles.group}>Open · {open.length}</Text>
-          {open.length === 0 ? <Text style={styles.groupEmpty}>Nothing open — all caught up.</Text> : null}
+          {open.length === 0 ? <Text style={styles.groupEmpty}>Nothing open. All caught up.</Text> : null}
           {open.map((t) => (
             <TaskLine key={t.id} task={t} />
           ))}
@@ -164,7 +208,14 @@ function TaskLine({ task }: { task: Task }) {
         <Feather name={isDone ? 'check' : 'circle'} size={12} color={isDone ? T.green : T.amber} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.lineText, isDone && styles.lineTextDone]}>{task.title}</Text>
+        {!(task.voice_path && task.title === VOICE_TASK_TITLE) ? (
+          <Text style={[styles.lineText, isDone && styles.lineTextDone]}>{task.title}</Text>
+        ) : null}
+        {task.voice_path ? (
+          <View style={{ marginTop: 4 }}>
+            <VoiceNote path={task.voice_path} durationMs={task.voice_ms} />
+          </View>
+        ) : null}
         {task.description ? <Text style={styles.lineSub}>{task.description}</Text> : null}
         {isDone && task.completion_note ? (
           <Text style={styles.note}>“{task.completion_note}”</Text>

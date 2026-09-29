@@ -51,3 +51,7 @@ google-services.json
 graphify-out
 .vercel
 .env*
+
+# Gradle cache/output inside local native modules (created by editors / local builds)
+modules/**/android/.gradle/
+modules/**/android/build/

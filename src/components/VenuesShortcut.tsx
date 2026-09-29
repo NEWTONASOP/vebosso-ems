@@ -1,7 +1,8 @@
 // ============================================================================
 // VEBOSSO EMS — Venues Shortcut (member home / manager dashboard)
 // Opens the venues table; "+ Add" jumps straight into the add form, since the
-// moment someone needs this is right after meeting a venue.
+// moment someone needs this is right after meeting a venue. Only shows for
+// someone the owner gave Venues to.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -10,6 +11,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AppTheme as T, appSoftShadow } from '../constants/theme';
+import { useHasFeature } from '../lib/featureAccess';
 import { supabase } from '../lib/supabase';
 
 const countVenues = async () =>
@@ -18,16 +20,20 @@ const countVenues = async () =>
 export function VenuesShortcut({ role }: { role: 'manager' | 'member' }) {
   const router = useRouter();
   const [count, setCount] = useState<number | null>(null);
+  const allowed = useHasFeature('venues');
 
   useFocusEffect(
     useCallback(() => {
+      if (!allowed) return;
       let active = true;
       countVenues().then((res) => active && setCount(res.count ?? null));
       return () => {
         active = false;
       };
-    }, [])
+    }, [allowed])
   );
+
+  if (!allowed) return null;
 
   const path = role === 'manager' ? '/(manager)/venues' : '/(member)/venues';
 
@@ -63,6 +69,7 @@ export function VenuesShortcut({ role }: { role: 'manager' | 'member' }) {
 
 const styles = StyleSheet.create({
   card: {
+    marginTop: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,

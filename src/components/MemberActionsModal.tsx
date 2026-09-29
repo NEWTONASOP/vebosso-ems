@@ -1,41 +1,35 @@
 // ============================================================================
 // VEBOSSO EMS — Member Actions Modal (Owner Team)
 // Everything about one person, top to bottom: who they are, attendance
-// (calendar + the day's log), work & pay, location, admin. In Work & pay,
-// Tasks by Boss and Messages open as dialogs over this sheet (onOpenDialog);
-// salary, travel expenses and documents open as dropdowns in place (the host
-// renders what goes inside, renderPanel).
+// (calendar + the day's log), work & pay, location, admin. Every Work & pay
+// row (tasks, messages, salary, travel expenses, documents) opens as a dialog
+// over this sheet (onOpenDialog), which stays open underneath.
 // White cards on the grey canvas, one idea per card.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
-import { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Modal, Portal, Switch, Text } from 'react-native-paper';
 import { AppTheme, RoleAccent, appSoftShadow } from '../constants/theme';
 import { ROLE_LABELS } from '../constants/roles';
+import { Feature, FEATURES } from '../lib/featureAccess';
 import { useSheetLift } from '../lib/useKeyboardHeight';
 import { useSheetEntrance } from '../lib/useSheetEntrance';
 import { Profile } from '../types/database';
 import { BackfillGrantBar } from './BackfillGrantBar';
-import { Chevron, DropdownBody } from './Dropdown';
+import { Chevron } from './Dropdown';
 import { MemberAttendancePanel } from './MemberAttendancePanel';
 import { MemberLocationSection } from './MemberLocationSection';
 import { UserAvatar } from './UserAvatar';
 
-export type MemberPanel = 'salary' | 'expenses' | 'documents';
-export type MemberDialog = 'tasks' | 'chat';
+export type MemberDialog = 'tasks' | 'chat' | 'salary' | 'expenses' | 'documents';
 
 interface MemberActionsModalProps {
   visible: boolean;
   member: Profile | null;
   onDismiss: () => void;
   /** The open dropdown, if any. */
-  openPanel: MemberPanel | null;
-  onTogglePanel: (panel: MemberPanel) => void;
-  /** What goes inside an open dropdown. */
-  renderPanel: (panel: MemberPanel) => ReactNode;
-  /** Tasks by Boss / Messages — shown as a dialog over this sheet. */
+  /** Tasks, messages, salary, travel expenses, documents — as a dialog over this sheet. */
   onOpenDialog: (dialog: MemberDialog) => void;
   /** Uploads waiting for the owner's approval. */
   pendingDocsCount?: number;
@@ -43,9 +37,9 @@ interface MemberActionsModalProps {
   unreadChatCount?: number;
   onAssignManager: () => void;
   onManageProfile: () => void;
-  /** Whether they can use Bills; null while loading. */
-  billsAccess?: boolean | null;
-  onToggleBillsAccess?: (grant: boolean) => void;
+  /** Which of Bills / Venues / Accounts they can use; null while loading. */
+  access?: Record<Feature, boolean> | null;
+  onToggleAccess?: (feature: Feature, grant: boolean) => void;
   pendingTaskCount?: number;
   inProgressTaskCount?: number;
   doneTaskCount?: number;
@@ -77,16 +71,13 @@ export function MemberActionsModal({
   visible,
   member,
   onDismiss,
-  openPanel,
-  onTogglePanel,
-  renderPanel,
   onOpenDialog,
   pendingDocsCount = 0,
   unreadChatCount = 0,
   onAssignManager,
   onManageProfile,
-  billsAccess = null,
-  onToggleBillsAccess,
+  access = null,
+  onToggleAccess,
   pendingTaskCount = 0,
   inProgressTaskCount = 0,
   doneTaskCount = 0,
@@ -107,23 +98,6 @@ export function MemberActionsModal({
           .filter(Boolean)
           .join(' · ')
       : 'Give a task or see past ones';
-
-  /** A Work & pay row plus its dropdown. */
-  const panelRow = (
-    key: MemberPanel,
-    row: Omit<Parameters<typeof NavRow>[0], 'onPress' | 'expanded' | 'isLast'>,
-    isLast = false
-  ) => {
-    const open = openPanel === key;
-    return (
-      <View key={key}>
-        <NavRow {...row} onPress={() => onTogglePanel(key)} expanded={open} isLast={isLast && !open} />
-        {open ? (
-          <DropdownBody style={[styles.panel, !isLast && styles.panelDivider]}>{renderPanel(key)}</DropdownBody>
-        ) : null}
-      </View>
-    );
-  };
 
   return (
     <Portal>
@@ -204,36 +178,37 @@ export function MemberActionsModal({
                     iconBg={AppTheme.violetSoft}
                     onPress={() => onOpenDialog('chat')}
                   />
-                  {panelRow('salary', {
-                    label: 'Salary',
-                    hint: 'Monthly salary, payments and receipts',
-                    icon: 'credit-card',
-                    iconColor: AppTheme.green,
-                    iconBg: AppTheme.greenSoft,
-                  })}
-                  {panelRow('expenses', {
-                    label: 'Travel expenses',
-                    hint: 'Claims, payments and receipts',
-                    icon: 'navigation',
-                    iconColor: AppTheme.violet,
-                    iconBg: AppTheme.violetSoft,
-                  })}
-                  {panelRow(
-                    'documents',
-                    {
-                      label: 'Documents',
-                      hint:
-                        pendingDocsCount > 0
-                          ? `${pendingDocsCount} waiting for your approval`
-                          : 'ID, certificates and other papers',
-                      hintColor: pendingDocsCount > 0 ? AppTheme.amber : undefined,
-                      badge: pendingDocsCount > 0 ? String(pendingDocsCount) : undefined,
-                      icon: 'file-text',
-                      iconColor: AppTheme.violet,
-                      iconBg: AppTheme.violetSoft,
-                    },
-                    true
-                  )}
+                  <NavRow
+                    label="Salary"
+                    hint="Monthly salary, payments and receipts"
+                    icon="credit-card"
+                    iconColor={AppTheme.green}
+                    iconBg={AppTheme.greenSoft}
+                    onPress={() => onOpenDialog('salary')}
+                  />
+                  <NavRow
+                    label="Travel expenses"
+                    hint="Claims, payments and receipts"
+                    icon="navigation"
+                    iconColor={AppTheme.violet}
+                    iconBg={AppTheme.violetSoft}
+                    onPress={() => onOpenDialog('expenses')}
+                  />
+                  <NavRow
+                    label="Documents"
+                    hint={
+                      pendingDocsCount > 0
+                        ? `${pendingDocsCount} waiting for your approval`
+                        : 'ID, certificates and other papers'
+                    }
+                    hintColor={pendingDocsCount > 0 ? AppTheme.amber : undefined}
+                    badge={pendingDocsCount > 0 ? String(pendingDocsCount) : undefined}
+                    icon="file-text"
+                    iconColor={AppTheme.violet}
+                    iconBg={AppTheme.violetSoft}
+                    onPress={() => onOpenDialog('documents')}
+                    isLast
+                  />
                 </View>
                 <View style={styles.locationWrap}>
                   <MemberLocationSection
@@ -259,34 +234,40 @@ export function MemberActionsModal({
                   onPress={onAssignManager}
                 />
               )}
-              {onToggleBillsAccess ? (
-                <Pressable
-                  style={({ pressed }) => [styles.navRow, pressed && styles.navRowPressed]}
-                  onPress={() => billsAccess !== null && onToggleBillsAccess(!billsAccess)}
-                  disabled={billsAccess === null}
-                  accessibilityRole="switch"
-                  accessibilityState={{ checked: !!billsAccess }}
-                  accessibilityLabel="Bills access"
-                >
-                  <View style={[styles.navIcon, { backgroundColor: AppTheme.violetSoft }]}>
-                    <Feather name="file-text" size={16} color={AppTheme.violet} />
-                  </View>
-                  <View style={[styles.navText, styles.navTextDivider]}>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={styles.navLabel}>Bills access</Text>
-                      <Text style={styles.navHint} numberOfLines={1}>
-                        {billsAccess ? 'Can create and manage bills' : 'Let them create and manage bills'}
-                      </Text>
-                    </View>
-                    <Switch
-                      value={!!billsAccess}
-                      disabled={billsAccess === null}
-                      onValueChange={(v) => onToggleBillsAccess(v)}
-                      color={AppTheme.violet}
-                    />
-                  </View>
-                </Pressable>
-              ) : null}
+              {onToggleAccess
+                ? FEATURES.map((f) => {
+                    const on = !!access?.[f.key];
+                    return (
+                      <Pressable
+                        key={f.key}
+                        style={({ pressed }) => [styles.navRow, pressed && styles.navRowPressed]}
+                        onPress={() => access && onToggleAccess(f.key, !on)}
+                        disabled={!access}
+                        accessibilityRole="switch"
+                        accessibilityState={{ checked: on }}
+                        accessibilityLabel={`${f.label} access`}
+                      >
+                        <View style={[styles.navIcon, { backgroundColor: AppTheme.violetSoft }]}>
+                          <Feather name={f.icon} size={16} color={AppTheme.violet} />
+                        </View>
+                        <View style={[styles.navText, styles.navTextDivider]}>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={styles.navLabel}>{f.label} access</Text>
+                            <Text style={styles.navHint} numberOfLines={1}>
+                              {on ? `Can ${f.hint.toLowerCase()}` : 'Off'}
+                            </Text>
+                          </View>
+                          <Switch
+                            value={on}
+                            disabled={!access}
+                            onValueChange={(v) => onToggleAccess(f.key, v)}
+                            color={AppTheme.violet}
+                          />
+                        </View>
+                      </Pressable>
+                    );
+                  })
+                : null}
               <NavRow
                 label="Manage Profile"
                 icon="settings"
@@ -524,14 +505,5 @@ const styles = StyleSheet.create({
   },
   locationWrap: {
     marginTop: 16,
-  },
-  panel: {
-    paddingHorizontal: 14,
-    paddingTop: 4,
-    paddingBottom: 14,
-  },
-  panelDivider: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: AppTheme.hairline,
   },
 });

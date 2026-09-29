@@ -18,7 +18,7 @@ import { AppTheme as T, appSoftShadow, screenChrome } from '../../../constants/t
 import { rupees } from '../../../lib/accounts';
 import { BRAND_KEYS, BRANDS, brandOf } from '../../../lib/billBrands';
 import { BILL_STATUS_TONE, billTotals, fetchBills, STATUS_LABEL } from '../../../lib/bills';
-import { useBillsBase } from '../../../lib/billsAccess';
+import { useFeatureBase } from '../../../lib/featureAccess';
 import { useAuthStore } from '../../../store/authStore';
 import { Bill, BillBrand, BillKind, BillStatus } from '../../../types/database';
 
@@ -37,7 +37,7 @@ const rememberBrand = (b: BillBrand) => {
 
 export default function BillsScreen() {
   const router = useRouter();
-  const base = useBillsBase();
+  const base = useFeatureBase('bills');
   const isOwner = useAuthStore((s) => s.profile?.role === 'owner');
   const [brand, setBrandState] = useState<BillBrand>(() => remembered.brand);
   const setBrand = (b: BillBrand) => {
@@ -104,7 +104,16 @@ export default function BillsScreen() {
         (b) =>
           !q ||
           [b.number, b.client_name, b.venue, b.phone, b.event_type].some((f) => f?.toLowerCase().includes(q))
-      );
+      )
+      // Latest function date first; bills without a date after those, newest edit first.
+      .sort((a, b) => {
+        if (a.function_date && b.function_date) {
+          if (a.function_date !== b.function_date) return a.function_date < b.function_date ? 1 : -1;
+        } else if (a.function_date || b.function_date) {
+          return a.function_date ? -1 : 1;
+        }
+        return a.updated_at < b.updated_at ? 1 : -1;
+      });
   }, [ofKind, filter, query]);
 
   const switchKind = (k: BillKind) => {
@@ -241,7 +250,7 @@ export default function BillsScreen() {
               {filter === 'draft'
                 ? 'No drafts'
                 : filter === 'trash'
-                  ? 'Trash is empty'
+                  ? 'Trash is empty. Trashed bills stay here and can be restored.'
                   : `No ${BRANDS[brand].label} ${kind === 'client' ? 'client bills' : 'estimates'} yet`}
             </Text>
           </View>

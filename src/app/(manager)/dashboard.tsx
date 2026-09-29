@@ -19,7 +19,9 @@ import { InlineError } from '../../components/InlineError';
 import { ListSkeleton, StatusCardSkeleton } from '../../components/LoadingSkeleton';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
 import { MessageButtons } from '../../components/MessageButtons';
-import { BillsShortcut } from '../../components/BillsShortcut';
+import { VOICE_TASK_TITLE } from '../../components/MemberTasksSheet';
+import { uploadVoiceNote, VoiceClip } from '../../lib/voice';
+import { FeatureShortcut } from '../../components/FeatureShortcut';
 import { VenuesShortcut } from '../../components/VenuesShortcut';
 import { NotificationBell } from '../../components/NotificationBell';
 import { QuickActionCard } from '../../components/QuickActionCard';
@@ -198,17 +200,32 @@ export default function ManagerDashboard() {
     setAssignTaskModalVisible(true);
   };
 
-  const handleAssignTask = async (title: string, description: string | null, dueDate: string | null) => {
+  const handleAssignTask = async (
+    title: string,
+    description: string | null,
+    dueDate: string | null,
+    voice?: VoiceClip | null,
+  ) => {
     if (!profile?.id || !selectedMember?.id) return;
 
     setIsAssigningTask(true);
+    let voiceFields: { voice_path: string; voice_ms: number } | null = null;
+    if (voice) {
+      const up = await uploadVoiceNote('task', selectedMember.id, voice);
+      if (!up.success) {
+        setIsAssigningTask(false);
+        throw new Error(up.error);
+      }
+      voiceFields = { voice_path: up.data, voice_ms: Math.round(voice.durationMs) };
+    }
     const result = await addTask({
       assigned_to: selectedMember.id,
       assigned_by: profile.id,
-      title,
+      title: title || VOICE_TASK_TITLE,
       description,
       due_date: dueDate,
       status: 'pending',
+      ...(voiceFields ?? {}),
     });
     setIsAssigningTask(false);
 
@@ -497,9 +514,9 @@ export default function ManagerDashboard() {
 
       <View style={styles.messageRow}>
         <MessageButtons onMessage={setSnackMessage} />
-        <View style={{ height: 10 }} />
         <VenuesShortcut role="manager" />
-        <BillsShortcut role="manager" />
+        <FeatureShortcut feature="bills" role="manager" />
+        <FeatureShortcut feature="accounts" role="manager" />
       </View>
 
       {todayTasks.length > 0 && (

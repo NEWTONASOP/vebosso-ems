@@ -3,9 +3,11 @@
 // Anyone can add a venue and read the list; only the owner can edit or delete
 // (RLS, migration 024). The adder's name is filled in by the database.
 // Anyone can mark a venue "in business"; only the owner can unmark it (029).
+// Since 033 all of it needs Venues access; venues sit under cities, which
+// anyone with access can add.
 // ============================================================================
 
-import { Venue, VenueInput } from '../types/database';
+import { Venue, VenueCity, VenueInput } from '../types/database';
 import { parseSupabaseError } from './errors';
 import { sendPushNotificationToRole } from './notifications';
 import { supabase } from './supabase';
@@ -31,6 +33,7 @@ function clean(input: VenueInput): VenueInput {
     contact_name: opt(input.contact_name),
     contact_email: opt(input.contact_email)?.toLowerCase() ?? null,
     contact_phone: opt(input.contact_phone),
+    city_id: input.city_id || null,
   };
 }
 
@@ -71,6 +74,23 @@ export async function updateVenue(id: string, input: VenueInput): Promise<Result
   const { error } = await supabase.from('venues').update(clean(input)).eq('id', id);
   if (error) return fail(error);
   return { success: true, data: undefined };
+}
+
+export async function fetchCities(): Promise<Result<VenueCity[]>> {
+  const { data, error } = await supabase.from('venue_cities').select('*').order('name', { ascending: true });
+  if (error) return fail(error);
+  return { success: true, data: (data || []) as VenueCity[] };
+}
+
+export async function addCity(name: string): Promise<Result<VenueCity>> {
+  const clean = name.trim().replace(/\s+/g, ' ').slice(0, 80);
+  if (!clean) return { success: false, error: 'Type the city name' };
+  const { data, error } = await supabase.from('venue_cities').insert({ name: clean }).select().single();
+  if (error) {
+    const text = parseSupabaseError(error);
+    return { success: false, error: /duplicate|unique/i.test(text) ? `${clean} is already on the list` : text };
+  }
+  return { success: true, data: data as VenueCity };
 }
 
 /** Anyone can mark; only the owner can unmark (checked by the database). */
