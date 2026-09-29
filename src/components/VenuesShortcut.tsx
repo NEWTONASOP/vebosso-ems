@@ -1,8 +1,6 @@
 // ============================================================================
 // VEBOSSO EMS — Venues Shortcut (member home / manager dashboard)
-// Opens the venues table; "+ Add" jumps straight into the add form, since the
-// moment someone needs this is right after meeting a venue. Only shows for
-// someone the owner gave Venues to.
+// Opens the venues table. Only shows for someone the owner gave Venues to.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -50,19 +48,10 @@ export function VenuesShortcut({ role }: { role: 'manager' | 'member' }) {
       <View style={{ flex: 1 }}>
         <Text style={styles.title}>Venues</Text>
         <Text style={styles.hint} numberOfLines={1}>
-          {count === null ? 'Venues onboarded to VEBOSSO' : `${count} onboarded · add one you met`}
+          {count === null ? 'Venues onboarded to VEBOSSO' : `${count} onboarded`}
         </Text>
       </View>
-      <Pressable
-        style={({ pressed }) => [styles.add, pressed && { opacity: 0.85 }]}
-        onPress={() => router.push(`${path}?add=1` as any)}
-        hitSlop={6}
-        accessibilityRole="button"
-        accessibilityLabel="Add a venue"
-      >
-        <Feather name="plus" size={14} color={T.white} />
-        <Text style={styles.addText}>Add</Text>
-      </Pressable>
+      <Feather name="chevron-right" size={18} color={T.mute} />
     </Pressable>
   );
 }
@@ -97,19 +86,5 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     color: T.mute,
     marginTop: 1,
-  },
-  add: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    height: 34,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    backgroundColor: T.charcoal,
-  },
-  addText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    color: T.white,
   },
 });

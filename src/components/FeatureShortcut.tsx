@@ -1,7 +1,6 @@
 // ============================================================================
 // VEBOSSO EMS — Bills / Accounts shortcut (member home / manager dashboard)
 // Only shows for someone the owner gave that feature to.
-// Bills: "+ New" starts an estimate.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -18,7 +17,6 @@ const CONFIG = {
     icon: 'file-text' as const,
     color: T.violet,
     soft: T.violetSoft,
-    newPath: '/new?kind=estimate',
   },
   accounts: {
     title: 'Accounts',
@@ -26,7 +24,6 @@ const CONFIG = {
     icon: 'book' as const,
     color: T.green,
     soft: T.greenSoft,
-    newPath: null,
   },
 };
 
@@ -52,20 +49,7 @@ export function FeatureShortcut({ feature, role }: { feature: 'bills' | 'account
         <Text style={styles.title}>{c.title}</Text>
         <Text style={styles.hint} numberOfLines={1}>{c.hint}</Text>
       </View>
-      {c.newPath ? (
-        <Pressable
-          style={({ pressed }) => [styles.add, pressed && { opacity: 0.85 }]}
-          onPress={() => router.push(`${path}${c.newPath}` as any)}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityLabel={`New ${c.title.toLowerCase()}`}
-        >
-          <Feather name="plus" size={14} color={T.white} />
-          <Text style={styles.addText}>New</Text>
-        </Pressable>
-      ) : (
-        <Feather name="chevron-right" size={18} color={T.mute} />
-      )}
+      <Feather name="chevron-right" size={18} color={T.mute} />
     </Pressable>
   );
 }
@@ -101,19 +85,5 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     color: T.mute,
     marginTop: 1,
-  },
-  add: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    height: 34,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    backgroundColor: T.charcoal,
-  },
-  addText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    color: T.white,
   },
 });
