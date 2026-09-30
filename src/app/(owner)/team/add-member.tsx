@@ -19,6 +19,7 @@ import {
 import { EMPLOYEE_ID_PREFIX } from '../../../constants/roles';
 import { parseFunctionError } from '../../../lib/errors';
 import { supabase } from '../../../lib/supabase';
+import { getDownloadUrl } from '../../../lib/versionCheck';
 import { useKeyboardOverlap } from '../../../lib/useKeyboardHeight';
 import { useWorkStore } from '../../../store/workStore';
 
@@ -118,9 +119,21 @@ export default function AddMemberScreen() {
 
   const handleCopyCredentials = async () => {
     if (!createdCredentials) return;
-    const text = `VEBOSSO EMS Credentials\nEmployee ID: ${createdCredentials.employeeId}\nPassword: ${createdCredentials.password}`;
+    let text = `VEBOSSO EMS Credentials\nEmployee ID: ${createdCredentials.employeeId}\nPassword: ${createdCredentials.password}`;
+    // The latest release link (kept current by the release workflow); the
+    // credentials are still copied if it can't be fetched.
+    let hasLink = false;
+    try {
+      const apkUrl = await getDownloadUrl();
+      text += `\n\nDownload the app (Android):\n${apkUrl}`;
+      hasLink = true;
+    } catch {
+      // no link
+    }
     await Clipboard.setStringAsync(text);
-    setSnackMessage('Credentials copied to clipboard!');
+    setSnackMessage(
+      hasLink ? 'Credentials and app link copied to clipboard!' : 'Credentials copied (app link unavailable)'
+    );
   };
 
   if (createdCredentials) {

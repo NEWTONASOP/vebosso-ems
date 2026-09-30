@@ -1,12 +1,13 @@
 // ============================================================================
 // VEBOSSO EMS — Add / edit a ledger entry
 // Date · Credit(+) / Debit(−) · Amount · Particular · optional receipt photos.
-// Editing also offers Delete. Photos upload as they are added; ones added and
+// An existing entry opens read-only; Edit switches to the form, and Delete is
+// on both. Photos upload as they are added; ones added and
 // then abandoned (sheet closed without saving) are removed again.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
-import { addDays, format } from 'date-fns';
+import { addDays, format, parseISO } from 'date-fns';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useRef, useState } from 'react';
@@ -18,6 +19,7 @@ import {
   addTransaction,
   deleteTransaction,
   MAX_RECEIPTS,
+  money,
   num,
   removeReceipts,
   signReceipts,
@@ -60,6 +62,8 @@ export function AccountTxnSheet({
   const [receiptUrls, setReceiptUrls] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState(false);
   const [enlarged, setEnlarged] = useState<string | null>(null);
+  // An existing entry opens to read; Edit switches to the form.
+  const [viewing, setViewing] = useState(!!txn);
   // Uploaded in this sheet but not saved yet — removed if the sheet closes.
   const fresh = useRef<string[]>([]);
 
@@ -152,7 +156,7 @@ export function AccountTxnSheet({
     <SheetFrame
       visible
       onDismiss={close}
-      title={txn ? 'Edit entry' : 'Add entry'}
+      title={viewing ? 'Entry' : txn ? 'Edit entry' : 'Add entry'}
       subtitle={accountName}
       icon={kind === 'credit' ? 'plus-circle' : 'minus-circle'}
       iconColor={kind === 'credit' ? T.green : T.coral}
@@ -166,13 +170,56 @@ export function AccountTxnSheet({
                 <Feather name="trash-2" size={16} color={T.coral} />
               </Pressable>
             ) : null}
-            <Pressable style={[styles.btn, styles.saveBtn]} onPress={save} disabled={saving}>
-              {saving ? <ActivityIndicator color={T.white} /> : <Text style={styles.saveText}>{txn ? 'Save' : 'Add entry'}</Text>}
-            </Pressable>
+            {viewing ? (
+              <Pressable style={[styles.btn, styles.saveBtn]} onPress={() => setViewing(false)} accessibilityLabel="Edit entry">
+                <Text style={styles.saveText}>Edit</Text>
+              </Pressable>
+            ) : (
+              <Pressable style={[styles.btn, styles.saveBtn]} onPress={save} disabled={saving}>
+                {saving ? <ActivityIndicator color={T.white} /> : <Text style={styles.saveText}>{txn ? 'Save' : 'Add entry'}</Text>}
+              </Pressable>
+            )}
           </View>
         </View>
       }
     >
+      {viewing && txn ? (
+        <View>
+          <Text style={[styles.viewAmount, { color: kind === 'credit' ? T.green : T.coral }]}>
+            {kind === 'credit' ? '+' : '−'} ₹{money(txn.amount)}
+          </Text>
+          <Text style={styles.viewKind}>{kind === 'credit' ? 'Credit' : 'Debit'}</Text>
+
+          <Text style={styles.label}>Particular</Text>
+          <Text style={styles.viewValue}>{txn.particular || '—'}</Text>
+
+          <Text style={styles.label}>Date</Text>
+          <Text style={styles.viewValue}>{format(parseISO(txn.txn_date), 'EEE, d MMM yyyy')}</Text>
+
+          {receipts.length ? (
+            <>
+              <Text style={styles.label}>Receipt photos</Text>
+              {enlarged && receiptUrls[enlarged] ? (
+                <Pressable onPress={() => setEnlarged(null)} accessibilityLabel="Close photo">
+                  <Image source={{ uri: receiptUrls[enlarged] }} style={styles.large} contentFit="contain" />
+                </Pressable>
+              ) : null}
+              <View style={styles.receipts}>
+                {receipts.map((p) => (
+                  <Pressable key={p} onPress={() => setEnlarged(enlarged === p ? null : p)} accessibilityLabel="View photo">
+                    {receiptUrls[p] ? (
+                      <Image source={{ uri: receiptUrls[p] }} style={[styles.thumb, enlarged === p && styles.thumbActive]} contentFit="cover" />
+                    ) : (
+                      <View style={styles.thumb} />
+                    )}
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : null}
+        </View>
+      ) : (
+      <>
       <Text style={styles.label}>Type</Text>
       <View style={styles.kindRow}>
         {(['credit', 'debit'] as const).map((k) => {
@@ -288,12 +335,17 @@ export function AccountTxnSheet({
           </>
         ) : null}
       </View>
+      </>
+      )}
     </SheetFrame>
   );
 }
 
 const styles = StyleSheet.create({
   label: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft, marginBottom: 6, marginTop: 12 },
+  viewAmount: { fontFamily: 'Inter_700Bold', fontSize: 30, letterSpacing: -0.5 },
+  viewKind: { fontFamily: 'Inter_500Medium', fontSize: 13, color: T.mute, marginTop: 2 },
+  viewValue: { fontFamily: 'Inter_500Medium', fontSize: 16, color: T.ink },
   kindRow: { flexDirection: 'row', gap: 8 },
   kind: {
     flex: 1,
