@@ -36,6 +36,7 @@ import { useAuthStore } from '../store/authStore';
 import { useWorkStore } from '../store/workStore';
 import { LeaveRequestWithProfile, WorkLogWithProfile } from '../types/database';
 import { AnimatedPressable } from './AnimatedPressable';
+import { ImageViewerModal } from './ImageViewerModal';
 import { SheetFrame } from './SheetFrame';
 import { UserAvatar } from './UserAvatar';
 
@@ -394,18 +395,9 @@ export function OwnerInboxSheet({
               avatar={d.person?.avatar_url}
               meta={`${documentKind(d.mime_type) === 'image' ? 'Photo' : documentKind(d.mime_type).toUpperCase()} · ${formatDistanceToNow(new Date(d.created_at), { addSuffix: true })}`}
               body={d.name}
+              extra={<DocumentPreview doc={d} onMessage={onMessage} />}
               busy={busy === d.id}
               actions={[
-                {
-                  label: 'View',
-                  tone: 'plain',
-                  onPress: async () => {
-                    const { data } = await supabase.storage.from('documents').createSignedUrl(d.file_path, 600);
-                    if (!data?.signedUrl) return onMessage('Could not load this file');
-                    const res = await openDocumentFile(d, data.signedUrl);
-                    if (!res.success) onMessage(res.error);
-                  },
-                },
                 {
                   label: 'Reject',
                   tone: 'reject',
@@ -598,6 +590,71 @@ function Section({ kind }: { kind: InboxKind }) {
 }
 
 /**
+ * The file waiting for approval, in the card itself so it is seen before
+ * Approve / Reject. A photo opens big in a popup when tapped; a PDF / Word file
+ * is a tile that opens it in the phone's app.
+ */
+function DocumentPreview({ doc, onMessage }: { doc: PendingDocument; onMessage: (message: string) => void }) {
+  const kind = documentKind(doc.mime_type);
+  const isImage = kind === 'image';
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [enlarged, setEnlarged] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    supabase.storage
+      .from('documents')
+      .createSignedUrl(doc.file_path, 600)
+      .then(({ data }) => {
+        if (!active) return;
+        if (data?.signedUrl) setUrl(data.signedUrl);
+        else setFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [doc.file_path]);
+
+  const open = async () => {
+    if (!url) return;
+    if (isImage) return setEnlarged(true);
+    const res = await openDocumentFile(doc, url);
+    if (!res.success) onMessage(res.error);
+  };
+
+  return (
+    <>
+      <Pressable
+        style={isImage ? styles.docPreview : styles.docFile}
+        disabled={!url}
+        onPress={() => void open()}
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${doc.name}`}
+      >
+        {isImage ? (
+          url ? (
+            <Image source={{ uri: url }} style={styles.docPreviewImage} contentFit="cover" />
+          ) : failed ? (
+            <Feather name="alert-circle" size={20} color={T.mute} />
+          ) : (
+            <ActivityIndicator color={T.charcoal} />
+          )
+        ) : (
+          <>
+            <Feather name="file-text" size={20} color={T.inkSoft} />
+            <Text style={styles.docFileText}>{kind.toUpperCase()} · tap to open</Text>
+          </>
+        )}
+      </Pressable>
+      {isImage ? (
+        <ImageViewerModal uri={enlarged ? url : null} title={doc.name} onDismiss={() => setEnlarged(false)} />
+      ) : null}
+    </>
+  );
+}
+
+/**
  * Check-in / checkout photos from the private `checkouts` bucket. Nothing is
  * fetched until the owner opens them, so a long inbox stays quick.
  */
@@ -756,6 +813,29 @@ function InboxItem({
 }
 
 const styles = StyleSheet.create({
+  docFile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    height: 56,
+    borderRadius: 14,
+    backgroundColor: T.soft,
+    paddingHorizontal: 14,
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  docFileText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
+  docPreview: {
+    height: 200,
+    borderRadius: 14,
+    backgroundColor: T.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  docPreviewImage: { width: '100%', height: '100%' },
   amountLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft, marginBottom: 6 },
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   amountRupee: { fontFamily: 'Inter_700Bold', fontSize: 20, color: T.inkSoft },

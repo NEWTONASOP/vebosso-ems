@@ -28,6 +28,7 @@ import {
   uploadDocument,
 } from '../lib/employeeRecords';
 import { DocumentStatus, EmployeeDocument } from '../types/database';
+import { ImageViewerModal } from './ImageViewerModal';
 import { SheetFrame } from './SheetFrame';
 
 async function loadDocuments(userId: string) {
@@ -107,7 +108,8 @@ export function DocumentsSheet({
   const [newName, setNewName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
-  const [preview, setPreview] = useState<EmployeeDocument | null>(null);
+  // The photo open in the big popup.
+  const [viewerDoc, setViewerDoc] = useState<EmployeeDocument | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
 
@@ -186,7 +188,7 @@ export function DocumentsSheet({
 
   const openDoc = async (doc: EmployeeDocument) => {
     if (documentKind(doc.mime_type) === 'image') {
-      setPreview(doc);
+      setViewerDoc(doc);
       return;
     }
     const url = urls[doc.file_path];
@@ -254,7 +256,7 @@ export function DocumentsSheet({
         onPress: async () => {
           const res = await deleteDocument(doc);
           if (res.success) {
-            if (preview?.id === doc.id) setPreview(null);
+            if (viewerDoc?.id === doc.id) setViewerDoc(null);
             await load();
           } else {
             setError(res.error);
@@ -337,15 +339,11 @@ export function DocumentsSheet({
     >
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      {preview && urls[preview.file_path] ? (
-        <View style={styles.previewWrap}>
-          <Image source={{ uri: urls[preview.file_path] }} style={styles.preview} contentFit="contain" />
-          <Pressable style={styles.previewClose} onPress={() => setPreview(null)} hitSlop={8}>
-            <Feather name="x" size={16} color={T.white} />
-          </Pressable>
-          <Text style={styles.previewName}>{preview.name}</Text>
-        </View>
-      ) : null}
+      <ImageViewerModal
+        uri={viewerDoc ? urls[viewerDoc.file_path] ?? null : null}
+        title={viewerDoc?.name}
+        onDismiss={() => setViewerDoc(null)}
+      />
 
       {isLoading ? (
         <ActivityIndicator color={T.charcoal} style={{ marginVertical: 24 }} />
@@ -438,6 +436,23 @@ export function DocumentsSheet({
                 )
               ) : null}
             </View>
+
+            {/* Seen big and in full before Approve / Reject. Tap to open it properly. */}
+            {needsReview && kind === 'image' ? (
+              <Pressable
+                style={styles.reviewImageWrap}
+                onPress={() => setViewerDoc(doc)}
+                disabled={!url}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${doc.name}`}
+              >
+                {url ? (
+                  <Image source={{ uri: url }} style={styles.reviewImage} contentFit="cover" />
+                ) : (
+                  <ActivityIndicator color={T.charcoal} />
+                )}
+              </Pressable>
+            ) : null}
 
             {needsReview ? (
               <View style={styles.reviewRow}>
@@ -570,6 +585,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  reviewImageWrap: {
+    height: 200,
+    borderRadius: 14,
+    backgroundColor: T.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginTop: 10,
+  },
+  reviewImage: { width: '100%', height: '100%' },
   docName: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
