@@ -8,7 +8,7 @@
 import * as ImageManipulator from 'expo-image-manipulator';
 import { uploadCheckoutPhoto } from '../store/workStore';
 import { AppTheme as T } from '../constants/theme';
-import { Bill, BillBrand, BillFields, BillItem, BillKind, BillSettings, BillStatus } from '../types/database';
+import { Bill, BillBrand, BillEdit, BillFields, BillItem, BillKind, BillSettings, BillStatus } from '../types/database';
 import { BRANDS } from './billBrands';
 import { num } from './accounts';
 import { parseSupabaseError } from './errors';
@@ -65,6 +65,65 @@ export async function fetchBill(id: string): Promise<Result<Bill>> {
   const { data, error } = await supabase.from('bills').select('*').eq('id', id).single();
   if (error) return fail(error);
   return { success: true, data: data as Bill };
+}
+
+// ---------------------------------------------------------------------------
+// History (038)
+
+/** Newest first. */
+export async function fetchBillEdits(billId: string): Promise<Result<BillEdit[]>> {
+  const { data, error } = await supabase
+    .from('bill_edits')
+    .select('*')
+    .eq('bill_id', billId)
+    .order('edited_at', { ascending: false })
+    .limit(100);
+  if (error) return fail(error);
+  return { success: true, data: (data || []) as BillEdit[] };
+}
+
+const EDIT_FIELD_LABEL: Record<string, string> = {
+  kind: 'Type',
+  brand: 'Brand',
+  status: 'Status',
+  number: 'Bill number',
+  prepared_by: 'Prepared by',
+  client_name: 'Bride and Groom',
+  venue: 'Venue',
+  function_date: 'Function date',
+  guests: 'Guests',
+  hall_floor: 'Hall / floor',
+  event_type: 'Event',
+  timing: 'Timing',
+  phone: 'Phone',
+  alt_phone: 'Alternate phone',
+  address: 'Address',
+  total: 'Total',
+  advance: 'Advance',
+  balance: 'Balance',
+  terms: 'Terms',
+  items: 'Services',
+  images: 'Photos',
+};
+
+/** One changed field as a label and readable old / new values. */
+export function describeEdit(change: BillEdit['changes'][number]): { label: string; from: string; to: string } {
+  const show = (v: unknown): string => {
+    if (v === null || v === undefined || v === '') return 'empty';
+    if (change.field === 'total' || change.field === 'advance' || change.field === 'balance') {
+      const n = Number(v);
+      return Number.isFinite(n) ? `₹${n.toLocaleString('en-IN')}` : String(v);
+    }
+    if (change.field === 'status') return STATUS_LABEL[v as BillStatus] ?? String(v);
+    if (change.field === 'kind') return KIND_LABEL[v as BillKind] ?? String(v);
+    if (change.field === 'images') return `${v} photo${Number(v) === 1 ? '' : 's'}`;
+    return String(v);
+  };
+  return {
+    label: EDIT_FIELD_LABEL[change.field] ?? change.field,
+    from: show(change.from),
+    to: show(change.to),
+  };
 }
 
 // ---------------------------------------------------------------------------

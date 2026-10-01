@@ -12,7 +12,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
 import { PageTransition } from '../../components/PageTransition';
-import { TaskDetailModal } from '../../components/TaskDetailModal';
+import { TaskDetailModal, TaskManage } from '../../components/TaskDetailModal';
 import {
   AppTheme as T,
   AppSpace,
@@ -39,7 +39,7 @@ interface TaskWithAssignee extends Task {
 export default function ManagerTaskTrackingScreen() {
   const router = useRouter();
   const { profile } = useAuthStore();
-  const { reassignTask } = useWorkStore();
+  const { reassignTask, updateTask, approveTask, rejectTask } = useWorkStore();
   const [tasks, setTasks] = useState<TaskWithAssignee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -130,6 +130,33 @@ export default function ManagerTaskTrackingScreen() {
     }
   };
 
+  /** Edit, approve or reject from the task popup; refreshes the list on success. */
+  const manage: TaskManage | undefined = selectedTask && profile?.id
+    ? {
+        onSave: async (changes) => {
+          const res = await updateTask(selectedTask.id, changes);
+          if (!res.success) return res.error || 'Could not save';
+          setSnackMessage('Task updated');
+          fetchAssignedTasks(true);
+          return null;
+        },
+        onApprove: async () => {
+          const res = await approveTask(selectedTask.id, profile.id);
+          if (!res.success) return res.error || 'Could not approve';
+          setSnackMessage('Task approved');
+          fetchAssignedTasks(true);
+          return null;
+        },
+        onReject: async (reason) => {
+          const res = await rejectTask(selectedTask.id, profile.id, reason);
+          if (!res.success) return res.error || 'Could not reject';
+          setSnackMessage('Task sent back');
+          fetchAssignedTasks(true);
+          return null;
+        },
+      }
+    : undefined;
+
   const filteredTasks = filter === 'all'
     ? tasks
     : tasks.filter((t) => t.status === filter);
@@ -139,6 +166,7 @@ export default function ManagerTaskTrackingScreen() {
     done: tasks.filter((t) => t.status === 'done').length,
     inProgress: tasks.filter((t) => t.status === 'in_progress').length,
     pending: tasks.filter((t) => t.status === 'pending').length,
+    review: tasks.filter((t) => t.status === 'review').length,
   };
 
   const getStatusConfig = (status: TaskStatus) => {
@@ -149,6 +177,13 @@ export default function ManagerTaskTrackingScreen() {
           color: T.green,
           bgColor: T.greenSoft,
           label: 'Completed',
+        };
+      case 'review':
+        return {
+          icon: 'eye',
+          color: T.violet,
+          bgColor: T.violetSoft,
+          label: 'To review',
         };
       case 'in_progress':
         return {
@@ -180,6 +215,7 @@ export default function ManagerTaskTrackingScreen() {
     { key: 'all' as const, label: 'All', count: stats.total },
     { key: 'pending' as const, label: 'Pending', count: stats.pending },
     { key: 'in_progress' as const, label: 'Running', count: stats.inProgress },
+    { key: 'review' as const, label: 'To review', count: stats.review },
     { key: 'done' as const, label: 'Done', count: stats.done },
   ];
 
@@ -359,6 +395,7 @@ export default function ManagerTaskTrackingScreen() {
           onDismiss={() => setShowDetailModal(false)}
           task={selectedTask}
           onReassign={handleReassignPress}
+          manage={manage}
         />
 
         <MemberPickerModal

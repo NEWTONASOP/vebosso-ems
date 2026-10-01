@@ -12,7 +12,7 @@ import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { useFocusEffect } from 'expo-router';
 import { Image } from 'expo-image';
 import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AppTheme as T, appShadow } from '../constants/theme';
 import { Alert } from '../lib/alert';
@@ -251,9 +251,33 @@ export function OwnerInboxSheet({
     onMessage(res.success ? done : res.error || 'Something went wrong');
   };
 
+  // Salary being paid: the amount is asked for, starting at their monthly salary.
+  const [paying, setPaying] = useState<WaitingSalaryRequest | null>(null);
+  const [amountText, setAmountText] = useState('');
+  const [amountError, setAmountError] = useState('');
+
+  const openSalaryPayment = async (r: WaitingSalaryRequest) => {
+    const monthly = await fetchMonthlySalary(r.user_id);
+    setAmountText(monthly.success && monthly.data ? String(monthly.data) : '');
+    setAmountError('');
+    setPaying(r);
+  };
+
+  const confirmSalaryPayment = () => {
+    if (!paying) return;
+    const trimmed = amountText.replace(/[,\s₹]/g, '');
+    const amount = trimmed ? Number(trimmed) : null;
+    if (amount !== null && (!Number.isFinite(amount) || amount <= 0)) {
+      return setAmountError('Enter a valid amount');
+    }
+    const r = paying;
+    setPaying(null);
+    void run(r.id, () => markSalaryPaid(r.user_id, r.month, ownerId!, amount), 'Marked as paid');
+  };
+
   if (!ownerId) return null;
 
-  const show = (k: InboxKind) => (filter === 'all' || filter === k) && inbox.counts[k] > 0;
+  const show =(k: InboxKind) => (filter === 'all' || filter === k) && inbox.counts[k] > 0;
   const whenLabel = (date: string) => formatWorkLogDateForMessage(date) ?? format(parseISO(date), 'd MMM');
 
   const workLogItem = (w: WorkLogWithProfile, isCheckout: boolean) => (
@@ -295,6 +319,7 @@ export function OwnerInboxSheet({
   const empty = filter !== 'all' && inbox.counts[filter] === 0;
 
   return (
+    <>
     <SheetFrame
       visible
       onDismiss={onDismiss}
@@ -410,27 +435,7 @@ export function OwnerInboxSheet({
                 {
                   label: 'Mark as paid',
                   tone: 'approve',
-                  onPress: () =>
-                    Alert.alert(
-                      'Mark as paid?',
-                      `${r.person?.full_name ?? 'They'} will be told the ${salaryMonthLabel(r.month)} salary is paid.`,
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'Mark paid',
-                          onPress: () =>
-                            void run(
-                              r.id,
-                              async () => {
-                                // Paid at their monthly salary, when one is set.
-                                const monthly = await fetchMonthlySalary(r.user_id);
-                                return markSalaryPaid(r.user_id, r.month, ownerId, monthly.success ? monthly.data : null);
-                              },
-                              'Marked as paid',
-                            ),
-                        },
-                      ],
-                    ),
+                  onPress: () => void openSalaryPayment(r),
                 },
               ]}
             />
@@ -505,6 +510,50 @@ export function OwnerInboxSheet({
           ))
         : null}
     </SheetFrame>
+
+    {paying ? (
+      <SheetFrame
+        visible
+        onDismiss={() => setPaying(null)}
+        title="Mark salary paid"
+        subtitle={`${paying.person?.full_name ?? 'Employee'} · ${salaryMonthLabel(paying.month)}`}
+        icon="credit-card"
+        iconColor={T.green}
+        iconBg={T.greenSoft}
+        footer={
+          <View>
+            {amountError ? <Text style={styles.amountError}>{amountError}</Text> : null}
+            <Pressable style={styles.payBtn} onPress={confirmSalaryPayment} accessibilityRole="button">
+              <Text style={styles.payBtnText}>Mark as paid</Text>
+            </Pressable>
+          </View>
+        }
+      >
+        <Text style={styles.amountLabel}>Amount paid</Text>
+        <View style={styles.amountRow}>
+          <Text style={styles.amountRupee}>₹</Text>
+          <TextInput
+            value={amountText}
+            onChangeText={(t) => {
+              setAmountText(t);
+              if (amountError) setAmountError('');
+            }}
+            style={styles.amountInput}
+            keyboardType="decimal-pad"
+            maxLength={12}
+            autoFocus
+            placeholder="Leave empty if not recording"
+            placeholderTextColor={T.mute}
+            returnKeyType="done"
+            onSubmitEditing={confirmSalaryPayment}
+          />
+        </View>
+        <Text style={styles.amountHint}>
+          Starts at their monthly salary. {paying.person?.full_name ?? 'They'} will be told it is paid, with this amount.
+        </Text>
+      </SheetFrame>
+    ) : null}
+    </>
   );
 }
 
@@ -707,6 +756,29 @@ function InboxItem({
 }
 
 const styles = StyleSheet.create({
+  amountLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft, marginBottom: 6 },
+  amountRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  amountRupee: { fontFamily: 'Inter_700Bold', fontSize: 20, color: T.inkSoft },
+  amountInput: {
+    flex: 1,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: T.soft,
+    paddingHorizontal: 14,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 18,
+    color: T.ink,
+  },
+  amountHint: { fontFamily: 'Inter_400Regular', fontSize: 12.5, color: T.mute, marginTop: 10 },
+  amountError: { fontFamily: 'Inter_500Medium', fontSize: 13, color: T.coral, marginBottom: 8 },
+  payBtn: {
+    height: 48,
+    borderRadius: 999,
+    backgroundColor: T.charcoal,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  payBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: T.white },
   // Dashboard card
   card: {
     backgroundColor: T.charcoal,

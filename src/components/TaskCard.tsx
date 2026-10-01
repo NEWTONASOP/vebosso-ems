@@ -28,7 +28,8 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
   const [showDetailModal, setShowDetailModal] = useState(false);
 
   // One tap to finish: anything not done yet goes straight to the note sheet.
-  const nextStatus: TaskStatus | null = task.status === 'done' ? null : 'done';
+  // Once sent for review it waits for the person who gave it to approve or reject.
+  const nextStatus: TaskStatus | null = task.status === 'done' || task.status === 'review' ? null : 'done';
   // An action, not a status — the soft green "Done" pill is kept for finished tasks.
   const nextLabel = nextStatus ? 'Mark done' : null;
 
@@ -39,6 +40,12 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
           icon: 'check-circle',
           color: AppTheme.green,
           bgColor: AppTheme.greenSoft,
+        };
+      case 'review':
+        return {
+          icon: 'eye',
+          color: AppTheme.violet,
+          bgColor: AppTheme.violetSoft,
         };
       case 'in_progress':
         return {
@@ -104,7 +111,6 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
                 <Text style={[styles.title, task.status === 'done' && styles.titleDone]} numberOfLines={2}>
                   {task.title}
                 </Text>
-                <Feather name="chevron-right" size={14} color={AppTheme.soft2} />
               </View>
               <View style={styles.metaRow}>
                 {dueDate && (
@@ -117,6 +123,17 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
                     {dueDate ? ` • ${task.description}` : task.description}
                   </Text>
                 )}
+              </View>
+              {/* Sent back by whoever gave the task: say why, so it can be redone. */}
+              {task.rejection_reason && task.status !== 'done' && task.status !== 'review' ? (
+                <Text style={styles.rejected} numberOfLines={3}>
+                  Rejected: {task.rejection_reason}
+                </Text>
+              ) : null}
+              {/* The title and description are cut short here; say so, so it is clear the row opens. */}
+              <View style={styles.viewRow}>
+                <Text style={styles.viewText}>View full task</Text>
+                <Feather name="chevron-right" size={13} color={AppTheme.blue} />
               </View>
             </View>
           </Pressable>
@@ -147,7 +164,13 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
           ) : (
             <View style={[styles.statusBadge, { backgroundColor: statusStyle.bgColor }]}>
               <Text style={[styles.statusBadgeText, { color: statusStyle.color }]}>
-                {task.status === 'done' ? 'Done' : task.status === 'in_progress' ? 'Running' : 'Pending'}
+                {task.status === 'done'
+                  ? 'Done'
+                  : task.status === 'review'
+                    ? 'In review'
+                    : task.status === 'in_progress'
+                      ? 'Running'
+                      : 'Pending'}
               </Text>
             </View>
           )}
@@ -264,6 +287,24 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
     fontSize: 12,
     letterSpacing: -0.1,
+  },
+  rejected: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12.5,
+    color: AppTheme.coral,
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  viewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginTop: 6,
+  },
+  viewText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    color: AppTheme.blue,
   },
   btnPressed: {
     transform: [{ scale: 0.96 }],

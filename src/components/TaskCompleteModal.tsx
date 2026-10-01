@@ -61,7 +61,7 @@ export function TaskCompleteModal({
             </View>
 
             <View style={styles.inputSection}>
-              <Text style={styles.inputLabel}>Add a note (optional)</Text>
+              <Text style={styles.inputLabel}>Add a note (optional). Whoever gave you this task will approve it or send it back.</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Brief summary of your work..."
@@ -98,7 +98,7 @@ export function TaskCompleteModal({
                 textColor={AppTheme.white}
                 labelStyle={styles.submitButtonText}
               >
-                {note.trim() ? 'Submit' : 'Mark Done'}
+                Send for approval
               </Button>
             </View>
           </View>

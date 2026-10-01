@@ -6,7 +6,8 @@ export type UserRole = 'owner' | 'manager' | 'member';
 
 export type WorkLogStatus = 'pending_approval' | 'working' | 'pending_checkout' | 'done' | 'rejected';
 
-export type TaskStatus = 'pending' | 'in_progress' | 'done';
+/** 'review' = finished by the assignee, waiting for the person who gave it to approve or reject. */
+export type TaskStatus = 'pending' | 'in_progress' | 'review' | 'done';
 
 export type LeaveStatus = 'pending' | 'approved' | 'rejected';
 
@@ -112,6 +113,10 @@ export interface Task {
   /** Optional voice note from whoever gave the task (voice-notes bucket). */
   voice_path?: string | null;
   voice_ms?: number | null;
+  /** Why the last attempt was rejected; the task is back to pending until redone. */
+  rejection_reason?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -380,6 +385,18 @@ export interface Bill {
   edited_at: string | null;
 }
 
+/** One line of a bill's history (038): who changed it, when, and what. */
+export interface BillEdit {
+  id: string;
+  bill_id: string;
+  bill_number: string | null;
+  action: 'created' | 'edited';
+  edited_by: string | null;
+  edited_by_name: string | null;
+  edited_at: string;
+  changes: { field: string; from: unknown; to: unknown }[];
+}
+
 /** Everything the bill form edits. */
 export type BillFields = Pick<
   Bill,
@@ -492,6 +509,9 @@ export interface TaskUpdate {
   assigned_to?: string;
   completion_note?: string | null;
   completed_at?: string | null;
+  rejection_reason?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
 }
 
 // ============================================================================

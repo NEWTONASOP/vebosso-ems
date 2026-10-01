@@ -47,6 +47,7 @@ import {
   updateBill,
   uploadBillImage,
 } from '../../../lib/bills';
+import { BillHistorySheet } from '../../../components/BillHistorySheet';
 import { BillPage, BillPreviewSheet } from '../../../components/BillPreviewSheet';
 import { HourPickerModal, hourLabel } from '../../../components/DateTimeFields';
 import { useFeatureBase } from '../../../lib/featureAccess';
@@ -154,6 +155,7 @@ export default function BillEditorScreen() {
   const [preview, setPreview] = useState<Bill | null>(null);
   // A saved bill opens as the bill itself; Edit switches to the form.
   const [viewing, setViewing] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   // Photos uploaded to a saved bill but not saved yet — removed on discard.
   const newImages = useRef<string[]>([]);
   // A service row to focus once it has rendered (Enter adds the next one).
@@ -605,6 +607,9 @@ export default function BillEditorScreen() {
             </View>
           </View>
           <View style={styles.headerActions}>
+            <Pressable style={styles.iconBtn} onPress={() => setShowHistory(true)} accessibilityLabel="Edit history">
+              <Feather name="clock" size={16} color={T.inkSoft} />
+            </Pressable>
             {/* Bills are never deleted: trash is final, and can be restored. */}
             {!inTrash ? (
               <Pressable style={styles.iconBtn} onPress={trash} accessibilityLabel="Move to trash">
@@ -655,6 +660,10 @@ export default function BillEditorScreen() {
         <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000} wrapperStyle={{ marginBottom: 190 }}>
           {snack}
         </Snackbar>
+
+        {showHistory ? (
+          <BillHistorySheet billId={bill.id} billNumber={bill.number} onDismiss={() => setShowHistory(false)} />
+        ) : null}
       </View>
     );
   }
@@ -696,6 +705,11 @@ export default function BillEditorScreen() {
           <Pressable style={styles.iconBtn} onPress={openPreview} accessibilityLabel="Preview bill">
             <Feather name="eye" size={16} color={T.ink} />
           </Pressable>
+          {saved ? (
+            <Pressable style={styles.iconBtn} onPress={() => setShowHistory(true)} accessibilityLabel="Edit history">
+              <Feather name="clock" size={16} color={T.inkSoft} />
+            </Pressable>
+          ) : null}
           {bill && !inTrash ? (
             <Pressable style={styles.iconBtn} onPress={trash} accessibilityLabel="Move to trash">
               <Feather name="trash-2" size={16} color={T.inkSoft} />
@@ -867,6 +881,10 @@ export default function BillEditorScreen() {
           </Section>
         </ScrollView>
       </View>
+
+      {showHistory && bill ? (
+        <BillHistorySheet billId={bill.id} billNumber={bill.number} onDismiss={() => setShowHistory(false)} />
+      ) : null}
 
       {preview && settings ? (
         <BillPreviewSheet

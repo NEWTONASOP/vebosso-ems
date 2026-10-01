@@ -225,15 +225,6 @@ export function MemberActionsModal({
           <View>
             <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Manage</Text>
             <View style={styles.group}>
-              {member.role === 'member' && (
-                <NavRow
-                  label="Assign Manager"
-                  icon="users"
-                  iconColor={AppTheme.violet}
-                  iconBg={AppTheme.violetSoft}
-                  onPress={onAssignManager}
-                />
-              )}
               {onToggleAccess
                 ? FEATURES.map((f) => {
                     const on = !!access?.[f.key];
@@ -268,6 +259,15 @@ export function MemberActionsModal({
                     );
                   })
                 : null}
+              {member.role === 'member' && (
+                <NavRow
+                  label="Assign Manager"
+                  icon="users"
+                  iconColor={AppTheme.violet}
+                  iconBg={AppTheme.violetSoft}
+                  onPress={onAssignManager}
+                />
+              )}
               <NavRow
                 label="Manage Profile"
                 icon="settings"

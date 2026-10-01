@@ -102,7 +102,7 @@ interface WorkState {
   checkOut: (report: string, photoUris?: string[]) => Promise<{ success: boolean; error?: string }>;
   fetchTodayLog: (userId: string) => Promise<{ success: boolean; error?: string }>;
   fetchTodayTasks: (userId: string) => Promise<{ success: boolean; error?: string }>;
-  updateTaskStatus: (taskId: string, status: 'pending' | 'in_progress' | 'done', completionNote?: string) => Promise<{ success: boolean; error?: string }>;
+  updateTaskStatus: (taskId: string, status: 'pending' | 'in_progress' | 'review' | 'done', completionNote?: string) => Promise<{ success: boolean; error?: string }>;
 
   // Actions — Owner/Manager
   fetchPendingApprovals: (managerId?: string) => Promise<{ success: boolean; error?: string }>;
@@ -114,6 +114,15 @@ interface WorkState {
   fetchStats: (managerId?: string) => Promise<{ success: boolean; error?: string }>;
   addTask: (task: TaskInsert) => Promise<{ success: boolean; error?: string }>;
   reassignTask: (taskId: string, newAssigneeId: string, assignerId: string) => Promise<{ success: boolean; error?: string }>;
+  /** Change a task's title, description or due date; the assignee is told. */
+  updateTask: (
+    taskId: string,
+    changes: { title: string; description: string | null; due_date: string | null },
+  ) => Promise<{ success: boolean; error?: string }>;
+  /** Accept finished work: the task is done. */
+  approveTask: (taskId: string, reviewerId: string) => Promise<{ success: boolean; error?: string }>;
+  /** Send finished work back with a reason; it has to be done again. */
+  rejectTask: (taskId: string, reviewerId: string, reason: string) => Promise<{ success: boolean; error?: string }>;
 
   // Actions — Announcements
   fetchAnnouncements: (role: string, userId: string) => Promise<{ success: boolean; error?: string }>;
@@ -157,6 +166,9 @@ interface WorkState {
   // General
   reset: () => void;
 }
+
+/** Counts team loads, so a slower, older one can't overwrite a newer result. */
+let teamFetchSeq = 0;
 
 /**
  * Upload a local/web file URI to a storage bucket. `upsert` must stay false
@@ -653,10 +665,12 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
   updateTaskStatus: async (taskId: string, status, completionNote?: string) => {
     try {
-      const updateData: any = { status };
-      
-      // If marking as done, also save completion note and timestamp
-      if (status === 'done') {
+      // Finishing a task sends it for review; the person who gave it closes it.
+      const finishing = status === 'done';
+      const updateData: any = { status: finishing ? 'review' : status };
+
+      // Finishing also saves the note and timestamp
+      if (finishing) {
         updateData.completion_note = completionNote || null;
         updateData.completed_at = new Date().toISOString();
       }
@@ -668,8 +682,8 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
       if (error) return { success: false, error: error.message };
 
-      // Notify task creator/assigner when task is completed
-      if (status === 'done') {
+      // Tell whoever gave the task that it is ready to review
+      if (finishing) {
         try {
           const { data: task } = await supabase
             .from('tasks')
@@ -681,8 +695,8 @@ export const useWorkStore = create<WorkState>((set, get) => ({
             const assigneeName = (task as any).profiles?.full_name || 'A team member';
             sendPushNotification(
               task.assigned_by,
-              'Task Completed ✅',
-              `${assigneeName} completed: "${task.title}"`,
+              'Task Ready to Review 🔎',
+              `${assigneeName} finished: "${task.title}". Approve or reject it.`,
               { type: 'task_completed', task_id: taskId }
             );
           }
@@ -904,19 +918,35 @@ export const useWorkStore = create<WorkState>((set, get) => ({
   },
 
   fetchTeamMembers: async (managerId?: string) => {
+    // Several screens load the team at once; only the newest call may write.
+    const seq = ++teamFetchSeq;
     try {
       set({ isLoadingTeam: true, errorTeam: null, teamError: null });
 
-      let query = supabase
-        .from('profiles')
-        .select('*')
-        .eq('is_active', true)
-        .neq('role', 'owner')
-        .order('full_name');
+      const load = () => {
+        let query = supabase
+          .from('profiles')
+          .select('*')
+          .eq('is_active', true)
+          .neq('role', 'owner')
+          .order('full_name');
+        if (managerId) query = query.eq('manager_id', managerId);
+        return query;
+      };
 
-      if (managerId) query = query.eq('manager_id', managerId);
+      let { data, error } = await load();
 
-      const { data, error } = await query;
+      // On a fresh page load the first read can come back empty without an
+      // error (the sign-in isn't fully attached yet), and nothing asked again,
+      // so the team stayed blank until a reload. Ask once more before
+      // believing there is nobody.
+      if (!error && (data?.length ?? 0) === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        ({ data, error } = await load());
+      }
+
+      if (seq !== teamFetchSeq) return { success: true };
+
       if (error) {
         set({ errorTeam: error.message, teamError: error.message, isLoadingTeam: false });
         return { success: false, error: error.message };
@@ -1134,6 +1164,94 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         );
       }
 
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  updateTask: async (taskId, changes) => {
+    try {
+      const title = changes.title.trim();
+      if (!title) return { success: false, error: 'Write the task' };
+
+      const { data: task, error } = await supabase
+        .from('tasks')
+        .update({
+          title: title.slice(0, 2000),
+          description: changes.description?.trim() || null,
+          due_date: changes.due_date || null,
+        })
+        .eq('id', taskId)
+        .select('assigned_to, title')
+        .single();
+
+      if (error) return { success: false, error: error.message };
+
+      sendPushNotification(task.assigned_to, 'Task Updated ✏️', task.title, {
+        type: 'task_updated',
+        task_id: taskId,
+      });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  approveTask: async (taskId, reviewerId) => {
+    try {
+      const now = new Date().toISOString();
+      const { data: task, error } = await supabase
+        .from('tasks')
+        .update({
+          status: 'done',
+          reviewed_by: reviewerId,
+          reviewed_at: now,
+          rejection_reason: null,
+          completed_at: now,
+        })
+        .eq('id', taskId)
+        .select('assigned_to, title')
+        .single();
+
+      if (error) return { success: false, error: error.message };
+
+      sendPushNotification(task.assigned_to, 'Task Approved ✅', task.title, {
+        type: 'task_approved',
+        task_id: taskId,
+      });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  rejectTask: async (taskId, reviewerId, reason) => {
+    try {
+      const why = reason.trim();
+      if (!why) return { success: false, error: 'Write why it is rejected' };
+
+      const { data: task, error } = await supabase
+        .from('tasks')
+        .update({
+          status: 'pending',
+          reviewed_by: reviewerId,
+          reviewed_at: new Date().toISOString(),
+          rejection_reason: why.slice(0, 1000),
+          completed_at: null,
+        })
+        .eq('id', taskId)
+        .select('assigned_to, title')
+        .single();
+
+      if (error) return { success: false, error: error.message };
+
+      sendPushNotification(
+        task.assigned_to,
+        'Task Needs Redoing ↩️',
+        `"${task.title}" was rejected: ${why.slice(0, 120)}`,
+        { type: 'task_rejected', task_id: taskId },
+      );
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };

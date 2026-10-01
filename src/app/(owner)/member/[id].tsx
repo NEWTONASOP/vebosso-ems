@@ -4,6 +4,7 @@
 
 import { Feather } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -17,6 +18,7 @@ import {
 } from 'react-native';
 import { Snackbar, Switch, Text, TextInput } from 'react-native-paper';
 import { InlineError } from '../../../components/InlineError';
+import { Alert } from '../../../lib/alert';
 import {
   AppRadius,
   AppSpace,
@@ -28,6 +30,7 @@ import {
 import { ROLE_LABELS } from '../../../constants/roles';
 import { parseFunctionError, parseSupabaseError } from '../../../lib/errors';
 import { supabase } from '../../../lib/supabase';
+import { getDownloadUrl } from '../../../lib/versionCheck';
 import { useKeyboardOverlap } from '../../../lib/useKeyboardHeight';
 import { useAuthStore } from '../../../store/authStore';
 import { useWorkStore } from '../../../store/workStore';
@@ -59,6 +62,7 @@ export default function MemberProfileManagementScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [isCopyingLogin, setIsCopyingLogin] = useState(false);
 
   // Statuses
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
@@ -206,6 +210,64 @@ export default function MemberProfileManagementScreen() {
     } finally {
       setIsUpdatingPassword(false);
     }
+  };
+
+  /**
+   * Sets a new random password (the old one can't be read back — only its hash
+   * is stored), makes them change it at next sign-in, and copies the employee
+   * ID, the new password and the latest app link.
+   */
+  const resetAndCopyLogin = async () => {
+    if (!memberId || !member) return;
+    setIsCopyingLogin(true);
+    try {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$!';
+      let password = '';
+      for (let i = 0; i < 10; i++) password += chars.charAt(Math.floor(Math.random() * chars.length));
+
+      const { data, error } = await supabase.functions.invoke('admin-update-member', {
+        body: { action: 'update-password', user_id: memberId, password },
+      });
+      if (error) return setSnackMessage(parseFunctionError(error));
+      if (data?.error) return setSnackMessage(data.error);
+
+      // A temporary password: they pick their own when they sign in.
+      const { error: flagError } = await supabase
+        .from('profiles')
+        .update({ must_change_password: true } as any)
+        .eq('id', memberId);
+      if (flagError) if (__DEV__) console.warn('Could not force password change:', flagError);
+      setMustChangePassword(true);
+
+      let text = `VEBOSSO EMS Credentials\nEmployee ID: ${member.employee_id}\nPassword: ${password}`;
+      let hasLink = false;
+      try {
+        const apkUrl = await getDownloadUrl();
+        text += `\n\nDownload the app (Android):\n${apkUrl}`;
+        hasLink = true;
+      } catch {
+        // no link
+      }
+      await Clipboard.setStringAsync(text);
+      setSnackMessage(
+        hasLink ? 'New password set. Login details and app link copied' : 'New password set. Login details copied'
+      );
+    } catch (err: any) {
+      setSnackMessage(err.message || 'Failed to reset password');
+    } finally {
+      setIsCopyingLogin(false);
+    }
+  };
+
+  const handleCopyLogin = () => {
+    Alert.alert(
+      'Create a new password?',
+      `${member?.full_name ?? 'This person'}'s current password will stop working. A new one is created and copied with the app link, and they must change it when they sign in.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Create & copy', onPress: () => void resetAndCopyLogin() },
+      ],
+    );
   };
 
   const handleToggleActive = async (newValue: boolean) => {
@@ -393,6 +455,33 @@ export default function MemberProfileManagementScreen() {
               </View>
             </View>
           </View>
+        </View>
+
+        {/* Login details: a new password, copied with the employee ID and app link */}
+        <View style={[styles.card, { marginTop: 16 }]}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.secondaryBtn,
+              { marginTop: 0, flexDirection: 'row', gap: 8 },
+              pressed && styles.btnPressed,
+            ]}
+            onPress={handleCopyLogin}
+            disabled={isCopyingLogin}
+            accessibilityLabel="Copy ID, password and app link"
+          >
+            {isCopyingLogin ? (
+              <ActivityIndicator color={T.ink} size="small" />
+            ) : (
+              <>
+                <Feather name="copy" size={15} color={T.ink} />
+                <Text style={styles.secondaryBtnText}>Copy ID, Password & App Link</Text>
+              </>
+            )}
+          </Pressable>
+          <Text style={styles.copyHint}>
+            Creates a new password, copies it with the employee ID and the app link, and makes them change it at
+            sign-in. The old password stops working.
+          </Text>
         </View>
 
         {/* Profile Editor Section */}
@@ -861,6 +950,12 @@ const styles = StyleSheet.create({
     borderRadius: AppRadius.pill,
     height: 48,
     marginTop: 6,
+  },
+  copyHint: {
+    fontSize: 12.5,
+    fontFamily: 'Inter_400Regular',
+    color: T.mute,
+    marginTop: 8,
   },
   secondaryBtnText: {
     fontFamily: 'Inter_600SemiBold',

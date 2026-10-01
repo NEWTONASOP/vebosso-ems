@@ -183,7 +183,7 @@ export default function ManagerDashboard() {
     }
   }, [checkOut]);
 
-  const handleStatusChange = async (taskId: string, status: 'pending' | 'in_progress' | 'done', completionNote?: string) => {
+  const handleStatusChange = async (taskId: string, status: 'pending' | 'in_progress' | 'review' | 'done', completionNote?: string) => {
     const result = await updateTaskStatus(taskId, status, completionNote);
     if (!result.success) {
       setSnackMessage(result.error || 'Failed to update task status');

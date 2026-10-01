@@ -5,12 +5,20 @@
 import { Feather } from '@expo/vector-icons';
 import { VoiceNote } from './VoiceNote';
 import { format } from 'date-fns';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { Divider, Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { TaskStatus } from '../types/database';
 import { AnimatedPressable } from './AnimatedPressable';
 import { UserAvatar } from './UserAvatar';
+
+/** What the owner or manager can do with a task. Each returns an error message, or null on success. */
+export interface TaskManage {
+  onSave: (changes: { title: string; description: string | null; due_date: string | null }) => Promise<string | null>;
+  onApprove: () => Promise<string | null>;
+  onReject: (reason: string) => Promise<string | null>;
+}
 
 interface TaskDetailModalProps {
   visible: boolean;
@@ -26,7 +34,9 @@ interface TaskDetailModalProps {
     created_at: string;
     voice_path?: string | null;
     voice_ms?: number | null;
-    assignee: {
+    rejection_reason?: string | null;
+    /** Left out where the person is already obvious, e.g. inside their own task list. */
+    assignee?: {
       id: string;
       full_name: string;
       employee_id: string;
@@ -40,6 +50,8 @@ interface TaskDetailModalProps {
     };
   } | null;
   onReassign?: () => void;
+  /** Owner / manager only: edit the task, approve or reject finished work. */
+  manage?: TaskManage;
 }
 
 export function TaskDetailModal({
@@ -47,8 +59,38 @@ export function TaskDetailModal({
   onDismiss,
   task,
   onReassign,
+  manage,
 }: TaskDetailModalProps) {
+  const [mode, setMode] = useState<'view' | 'edit' | 'reject'>('view');
+  const [title, setTitle] = useState('');
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  // Always opens to the plain view, whichever task it is.
+  useEffect(() => {
+    setMode('view');
+    setError('');
+    setReason('');
+  }, [task?.id, visible]);
+
   if (!task) return null;
+
+  const startEdit = () => {
+    setTitle(task.title);
+    setError('');
+    setMode('edit');
+  };
+
+  /** Runs an action that reports an error message; closes on success. */
+  const run = async (action: () => Promise<string | null>) => {
+    setBusy(true);
+    setError('');
+    const message = await action();
+    setBusy(false);
+    if (message) return setError(message);
+    onDismiss();
+  };
 
   const getStatusConfig = (status: TaskStatus) => {
     switch (status) {
@@ -58,6 +100,13 @@ export function TaskDetailModal({
           color: AppTheme.green,
           bgColor: AppTheme.greenSoft,
           label: 'Completed',
+        };
+      case 'review':
+        return {
+          icon: 'eye',
+          color: AppTheme.violet,
+          bgColor: AppTheme.violetSoft,
+          label: 'Awaiting approval',
         };
       case 'in_progress':
         return {
@@ -119,14 +168,46 @@ export function TaskDetailModal({
           </View>
 
           {/* Status Badge */}
-          <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
-            <Text style={[styles.statusBadgeText, { color: statusConfig.color }]}>
-              {statusConfig.label}
-            </Text>
-          </View>
+          {mode !== 'edit' ? (
+            <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
+              <Text style={[styles.statusBadgeText, { color: statusConfig.color }]}>
+                {statusConfig.label}
+              </Text>
+            </View>
+          ) : null}
 
-          {/* Task Title */}
-          <Text style={styles.title}>{task.title}</Text>
+          {mode === 'edit' ? (
+            <View style={styles.section}>
+              <Text style={styles.fieldLabel}>Task</Text>
+              <TextInput
+                value={title}
+                onChangeText={setTitle}
+                style={[styles.input, styles.inputMulti]}
+                multiline
+                maxLength={2000}
+                placeholder="What needs doing"
+                placeholderTextColor={AppTheme.mute}
+              />
+            </View>
+          ) : (
+            <Text style={styles.title}>{task.title}</Text>
+          )}
+
+          {/* Editing shows only the message; everything else is for reading. */}
+          {mode !== 'edit' ? (
+          <>
+          {/* Why it was sent back */}
+          {task.rejection_reason && task.status !== 'done' ? (
+            <View style={styles.rejectBox}>
+              <View style={styles.sectionHeader}>
+                <Feather name="corner-up-left" size={16} color={AppTheme.coral} />
+                <Text style={[styles.sectionLabel, { color: AppTheme.coral }]}>
+                  {task.status === 'review' ? 'Earlier rejection' : 'Rejected — do it again'}
+                </Text>
+              </View>
+              <Text style={styles.rejectText}>{task.rejection_reason}</Text>
+            </View>
+          ) : null}
 
           {/* Voice note from whoever gave the task */}
           {task.voice_path ? (
@@ -210,7 +291,7 @@ export function TaskDetailModal({
           )}
 
           {/* Completion Note */}
-          {task.status === 'done' && task.completion_note && (
+          {(task.status === 'done' || task.status === 'review') && task.completion_note && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Feather name="edit-3" size={16} color={AppTheme.green} />
@@ -225,11 +306,11 @@ export function TaskDetailModal({
           )}
 
           {/* Completed At */}
-          {task.status === 'done' && task.completed_at && (
+          {(task.status === 'done' || task.status === 'review') && task.completed_at && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Feather name="check" size={16} color={AppTheme.mute} />
-                <Text style={styles.sectionLabel}>Completed At</Text>
+                <Text style={styles.sectionLabel}>{task.status === 'review' ? 'Finished At' : 'Completed At'}</Text>
               </View>
               <Text style={styles.infoText}>{getFormattedDateTime(task.completed_at)}</Text>
             </View>
@@ -243,9 +324,82 @@ export function TaskDetailModal({
             </View>
             <Text style={styles.infoText}>{getFormattedDateTime(task.created_at)}</Text>
           </View>
+          </>
+          ) : null}
 
-          {/* Reassign Button - only show for non-done tasks */}
-          {task.status !== 'done' && onReassign && (
+          {/* Owner / manager: approve or reject finished work, edit the task */}
+          {manage ? (
+            <>
+              <Divider style={styles.divider} />
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+
+              {mode === 'reject' ? (
+                <View>
+                  <Text style={styles.fieldLabel}>Why is it rejected?</Text>
+                  <TextInput
+                    value={reason}
+                    onChangeText={(t) => {
+                      setReason(t);
+                      if (error) setError('');
+                    }}
+                    style={[styles.input, styles.inputMulti]}
+                    multiline
+                    maxLength={1000}
+                    autoFocus
+                    placeholder="What needs to be redone"
+                    placeholderTextColor={AppTheme.mute}
+                  />
+                  <View style={styles.btnRow}>
+                    <AnimatedPressable scaleTo={0.96} style={[styles.btn, styles.btnSoft]} onPress={() => setMode('view')} disabled={busy}>
+                      <Text style={styles.btnSoftText}>Back</Text>
+                    </AnimatedPressable>
+                    <AnimatedPressable
+                      scaleTo={0.96}
+                      style={[styles.btn, styles.btnReject]}
+                      onPress={() => run(() => manage.onReject(reason))}
+                      disabled={busy || !reason.trim()}
+                    >
+                      {busy ? <ActivityIndicator color={AppTheme.white} size="small" /> : <Text style={styles.btnDarkText}>Reject task</Text>}
+                    </AnimatedPressable>
+                  </View>
+                </View>
+              ) : mode === 'edit' ? (
+                <View style={styles.btnRow}>
+                  <AnimatedPressable scaleTo={0.96} style={[styles.btn, styles.btnSoft]} onPress={() => setMode('view')} disabled={busy}>
+                    <Text style={styles.btnSoftText}>Cancel</Text>
+                  </AnimatedPressable>
+                  <AnimatedPressable
+                    scaleTo={0.96}
+                    style={[styles.btn, styles.btnDark]}
+                    onPress={() => run(() => manage.onSave({ title, description: task.description, due_date: task.due_date }))}
+                    disabled={busy || !title.trim()}
+                  >
+                    {busy ? <ActivityIndicator color={AppTheme.white} size="small" /> : <Text style={styles.btnDarkText}>Save changes</Text>}
+                  </AnimatedPressable>
+                </View>
+              ) : (
+                <View style={{ gap: 10 }}>
+                  {task.status === 'review' ? (
+                    <View style={styles.btnRow}>
+                      <AnimatedPressable scaleTo={0.96} style={[styles.btn, styles.btnRejectSoft]} onPress={() => { setError(''); setMode('reject'); }} disabled={busy}>
+                        <Text style={styles.btnRejectSoftText}>Reject</Text>
+                      </AnimatedPressable>
+                      <AnimatedPressable scaleTo={0.96} style={[styles.btn, styles.btnApprove]} onPress={() => run(manage.onApprove)} disabled={busy}>
+                        {busy ? <ActivityIndicator color={AppTheme.white} size="small" /> : <Text style={styles.btnDarkText}>Approve</Text>}
+                      </AnimatedPressable>
+                    </View>
+                  ) : null}
+                  <AnimatedPressable scaleTo={0.96} style={[styles.btn, styles.btnSoft]} onPress={startEdit} disabled={busy}>
+                    <Feather name="edit-2" size={16} color={AppTheme.ink} />
+                    <Text style={styles.btnSoftText}>Edit task</Text>
+                  </AnimatedPressable>
+                </View>
+              )}
+            </>
+          ) : null}
+
+          {/* Reassign Button - only for tasks still being worked on */}
+          {(task.status === 'pending' || task.status === 'in_progress') && onReassign && mode === 'view' && (
             <>
               <Divider style={styles.divider} />
               <AnimatedPressable
@@ -388,6 +542,56 @@ const styles = StyleSheet.create({
     color: AppTheme.inkSoft,
     lineHeight: 22,
   },
+  fieldLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: AppTheme.inkSoft,
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  input: {
+    borderRadius: 14,
+    backgroundColor: AppTheme.soft,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 15,
+    color: AppTheme.ink,
+  },
+  inputMulti: { minHeight: 120, maxHeight: 320, textAlignVertical: 'top' },
+  rejectBox: {
+    backgroundColor: AppTheme.coralSoft,
+    borderRadius: 14,
+    padding: 14,
+    borderLeftWidth: 3,
+    borderLeftColor: AppTheme.coral,
+    marginBottom: 16,
+  },
+  rejectText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    color: AppTheme.ink,
+    lineHeight: 21,
+  },
+  error: { fontFamily: 'Inter_500Medium', fontSize: 13, color: AppTheme.coral, marginBottom: 10 },
+  btnRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  btn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  btnSoft: { backgroundColor: AppTheme.soft },
+  btnSoftText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: AppTheme.ink },
+  btnDark: { backgroundColor: AppTheme.charcoal },
+  btnDarkText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: AppTheme.white },
+  btnApprove: { backgroundColor: AppTheme.green },
+  btnReject: { backgroundColor: AppTheme.coral },
+  btnRejectSoft: { backgroundColor: AppTheme.coralSoft },
+  btnRejectSoftText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: AppTheme.coral },
   reassignButton: {
     backgroundColor: AppTheme.charcoal,
     borderRadius: 14,

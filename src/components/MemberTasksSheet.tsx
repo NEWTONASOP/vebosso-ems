@@ -14,6 +14,7 @@ import { supabase } from '../lib/supabase';
 import { useWorkStore } from '../store/workStore';
 import { Task } from '../types/database';
 import { SheetFrame } from './SheetFrame';
+import { TaskDetailModal, TaskManage } from './TaskDetailModal';
 import { RecordingBar, useVoiceRecorder, VoiceNote } from './VoiceNote';
 import { uploadVoiceNote, VoiceClip } from '../lib/voice';
 
@@ -49,6 +50,10 @@ export function MemberTasksSheet({
   inline,
 }: MemberTasksSheetProps) {
   const addTask = useWorkStore((s) => s.addTask);
+  const updateTask = useWorkStore((s) => s.updateTask);
+  const approveTask = useWorkStore((s) => s.approveTask);
+  const rejectTask = useWorkStore((s) => s.rejectTask);
+  const [selected, setSelected] = useState<Task | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [text, setText] = useState('');
@@ -108,8 +113,39 @@ export function MemberTasksSheet({
     }
   };
 
-  const open = tasks.filter((t) => t.status !== 'done');
+  // Finished work waiting for approval comes first.
+  const open = [
+    ...tasks.filter((t) => t.status === 'review'),
+    ...tasks.filter((t) => t.status !== 'done' && t.status !== 'review'),
+  ];
   const done = tasks.filter((t) => t.status === 'done');
+
+  /** Edit, approve or reject from the task popup; reloads the list on success. */
+  const manage: TaskManage | undefined = selected
+    ? {
+        onSave: async (changes) => {
+          const res = await updateTask(selected.id, changes);
+          if (!res.success) return res.error || 'Could not save';
+          onMessage?.('Task updated');
+          await load();
+          return null;
+        },
+        onApprove: async () => {
+          const res = await approveTask(selected.id, assignerId);
+          if (!res.success) return res.error || 'Could not approve';
+          onMessage?.('Task approved');
+          await load();
+          return null;
+        },
+        onReject: async (reason) => {
+          const res = await rejectTask(selected.id, assignerId, reason);
+          if (!res.success) return res.error || 'Could not reject';
+          onMessage?.('Task sent back');
+          await load();
+          return null;
+        },
+      }
+    : undefined;
 
   const sendVoice = async () => {
     const clip = await voice.stop();
@@ -168,6 +204,7 @@ export function MemberTasksSheet({
   );
 
   return (
+    <>
     <SheetFrame
       inline={inline}
       visible={visible}
@@ -188,24 +225,47 @@ export function MemberTasksSheet({
           <Text style={styles.group}>Open · {open.length}</Text>
           {open.length === 0 ? <Text style={styles.groupEmpty}>Nothing open. All caught up.</Text> : null}
           {open.map((t) => (
-            <TaskLine key={t.id} task={t} />
+            <TaskLine key={t.id} task={t} onPress={() => setSelected(t)} />
           ))}
           {done.length > 0 ? <Text style={[styles.group, { marginTop: 14 }]}>Done · {done.length}</Text> : null}
           {done.map((t) => (
-            <TaskLine key={t.id} task={t} />
+            <TaskLine key={t.id} task={t} onPress={() => setSelected(t)} />
           ))}
         </>
       )}
     </SheetFrame>
+
+    <TaskDetailModal
+      visible={!!selected}
+      onDismiss={() => setSelected(null)}
+      task={selected}
+      manage={manage}
+    />
+    </>
   );
 }
 
-function TaskLine({ task }: { task: Task }) {
+function TaskLine({ task, onPress }: { task: Task; onPress: () => void }) {
   const isDone = task.status === 'done';
+  const inReview = task.status === 'review';
   return (
-    <View style={styles.line}>
-      <View style={[styles.dot, { backgroundColor: isDone ? T.greenSoft : T.amberSoft }]}>
-        <Feather name={isDone ? 'check' : 'circle'} size={12} color={isDone ? T.green : T.amber} />
+    <Pressable
+      style={({ pressed }) => [styles.line, pressed && { opacity: 0.6 }]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Open task: ${task.title}`}
+    >
+      <View
+        style={[
+          styles.dot,
+          { backgroundColor: isDone ? T.greenSoft : inReview ? T.violetSoft : T.amberSoft },
+        ]}
+      >
+        <Feather
+          name={isDone ? 'check' : inReview ? 'eye' : 'circle'}
+          size={12}
+          color={isDone ? T.green : inReview ? T.violet : T.amber}
+        />
       </View>
       <View style={{ flex: 1 }}>
         {!(task.voice_path && task.title === VOICE_TASK_TITLE) ? (
@@ -217,16 +277,21 @@ function TaskLine({ task }: { task: Task }) {
           </View>
         ) : null}
         {task.description ? <Text style={styles.lineSub}>{task.description}</Text> : null}
-        {isDone && task.completion_note ? (
+        {(isDone || inReview) && task.completion_note ? (
           <Text style={styles.note}>“{task.completion_note}”</Text>
         ) : null}
+        {task.rejection_reason && !isDone && !inReview ? (
+          <Text style={styles.rejected}>Rejected: {task.rejection_reason}</Text>
+        ) : null}
         <Text style={styles.lineMeta}>
-          {isDone && task.completed_at
-            ? `Done ${format(new Date(task.completed_at), 'd MMM, h:mm a')}`
-            : `Given ${format(new Date(task.created_at), 'd MMM, h:mm a')}`}
+          {inReview && task.completed_at
+            ? `Waiting for your approval · finished ${format(new Date(task.completed_at), 'd MMM, h:mm a')}`
+            : isDone && task.completed_at
+              ? `Done ${format(new Date(task.completed_at), 'd MMM, h:mm a')}`
+              : `Given ${format(new Date(task.created_at), 'd MMM, h:mm a')}`}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -286,6 +351,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
     color: T.green,
+    marginTop: 3,
+  },
+  rejected: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    color: T.coral,
     marginTop: 3,
   },
   lineMeta: {
