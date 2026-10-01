@@ -478,7 +478,6 @@ export function OwnerInboxSheet({
               avatar={m.person?.avatar_url}
               meta={`${m.count > 1 ? `${m.count} new · ` : ''}${formatDistanceToNow(new Date(m.latest.created_at), { addSuffix: true })}`}
               body={m.latest.body ?? '🎤 Voice message'}
-              fullBody
               busy={busy === m.memberId}
               actions={[
                 {
@@ -745,7 +744,6 @@ function InboxItem({
   avatar,
   meta,
   body,
-  fullBody,
   extra,
   busy,
   actions,
@@ -754,7 +752,6 @@ function InboxItem({
   avatar?: string | null;
   meta: string;
   body?: string | null;
-  fullBody?: boolean;
   /** Anything between the text and the buttons, e.g. photos. */
   extra?: ReactNode;
   busy: boolean;
@@ -777,7 +774,8 @@ function InboxItem({
         </View>
       </View>
       {body ? (
-        <Text style={styles.itemBody} numberOfLines={fullBody ? undefined : 4}>{body}</Text>
+        // Whole text, never cut short: this is what is being approved.
+        <Text style={styles.itemBody}>{body}</Text>
       ) : null}
       {extra}
       <View style={styles.itemActions}>

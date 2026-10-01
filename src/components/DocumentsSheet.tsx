@@ -391,17 +391,18 @@ export function DocumentsSheet({
                       onSubmitEditing={() => handleRename(doc)}
                     />
                   ) : (
-                    <View style={styles.nameRow}>
-                      <Text style={[styles.docName, { flexShrink: 1 }]} numberOfLines={1}>{doc.name}</Text>
-                      <View style={[styles.statusChip, { backgroundColor: chip.bg }]}>
-                        <Text style={[styles.statusChipText, { color: chip.color }]}>{chip.label}</Text>
-                      </View>
-                    </View>
+                    // The whole name, wrapping if it is long; the status sits under it.
+                    <Text style={styles.docName}>{doc.name}</Text>
                   )}
-                  <Text style={styles.docMeta}>
-                    {format(new Date(doc.created_at), 'd MMM yyyy')}
-                    {kind !== 'image' ? ` · ${KIND_BADGE[kind].label} · tap to open` : ''}
-                  </Text>
+                  <View style={styles.statusRow}>
+                    <View style={[styles.statusChip, { backgroundColor: chip.bg }]}>
+                      <Text style={[styles.statusChipText, { color: chip.color }]}>{chip.label}</Text>
+                    </View>
+                    <Text style={[styles.docMeta, { marginTop: 0, flexShrink: 1 }]}>
+                      {format(new Date(doc.created_at), 'd MMM yyyy')}
+                      {kind !== 'image' ? ` · ${KIND_BADGE[kind].label} · tap to open` : ''}
+                    </Text>
+                  </View>
                 </View>
                 {openingId === doc.id ? <ActivityIndicator size="small" color={T.charcoal} /> : null}
               </Pressable>
@@ -525,10 +526,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  nameRow: {
+  statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 6,
+    marginTop: 4,
   },
   statusChip: {
     paddingHorizontal: 7,

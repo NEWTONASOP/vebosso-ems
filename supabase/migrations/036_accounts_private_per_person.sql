@@ -59,18 +59,20 @@ DROP POLICY IF EXISTS "account_receipts_team_all" ON storage.objects;
 DROP POLICY IF EXISTS "account_receipts_own_all" ON storage.objects;
 CREATE POLICY "account_receipts_own_all" ON storage.objects
   FOR ALL TO authenticated
+  -- objects.name, not name: inside the sub-select a bare `name` would be the
+  -- account's name (see 039).
   USING (
     bucket_id = 'account-receipts'
     AND EXISTS (
       SELECT 1 FROM public.accounts a
-      WHERE a.id::text = (storage.foldername(name))[1]
+      WHERE a.id::text = (storage.foldername(objects.name))[1]
     )
   )
   WITH CHECK (
     bucket_id = 'account-receipts'
     AND EXISTS (
       SELECT 1 FROM public.accounts a
-      WHERE a.id::text = (storage.foldername(name))[1]
+      WHERE a.id::text = (storage.foldername(objects.name))[1]
     )
   );
 
