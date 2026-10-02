@@ -248,9 +248,9 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
   time: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    color: AppTheme.mute,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: AppTheme.inkSoft,
   },
   railCol: {
     width: RAIL_WIDTH,
@@ -352,9 +352,9 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    color: AppTheme.mute,
-    lineHeight: 19,
+    fontSize: 14,
+    color: AppTheme.inkSoft,
+    lineHeight: 20,
     marginTop: 6,
   },
   empty: {

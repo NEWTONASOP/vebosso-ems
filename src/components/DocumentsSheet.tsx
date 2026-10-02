@@ -14,7 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SmoothTextInput as TextInput } from './SmoothTextInput';
-import { Text } from 'react-native-paper';
+import { Menu, Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { Alert } from '../lib/alert';
 import {
@@ -113,6 +113,8 @@ export function DocumentsSheet({
   // The photo open in the big popup.
   const [viewerDoc, setViewerDoc] = useState<EmployeeDocument | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  // The document whose ⋮ menu is open.
+  const [menuFor, setMenuFor] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
 
   const isOwnDocs = userId === currentUserId;
@@ -414,27 +416,40 @@ export function DocumentsSheet({
                     <Feather name="check" size={16} color={T.green} />
                   </Pressable>
                 ) : (
-                  <>
-                    <Pressable
-                      style={styles.iconBtn}
+                  <Menu
+                    visible={menuFor === doc.id}
+                    onDismiss={() => setMenuFor(null)}
+                    anchor={
+                      <Pressable
+                        style={styles.iconBtn}
+                        onPress={() => setMenuFor(doc.id)}
+                        hitSlop={6}
+                        accessibilityLabel={`More for ${doc.name}`}
+                      >
+                        <Feather name="more-vertical" size={16} color={T.inkSoft} />
+                      </Pressable>
+                    }
+                    contentStyle={styles.menu}
+                  >
+                    <Menu.Item
+                      leadingIcon="pencil-outline"
+                      title="Rename"
                       onPress={() => {
+                        setMenuFor(null);
                         setRenamingId(doc.id);
                         setRenameText(doc.name);
                       }}
-                      hitSlop={6}
-                      accessibilityLabel={`Rename ${doc.name}`}
-                    >
-                      <Feather name="edit-2" size={15} color={T.inkSoft} />
-                    </Pressable>
-                    <Pressable
-                      style={styles.iconBtn}
-                      onPress={() => confirmDelete(doc)}
-                      hitSlop={6}
-                      accessibilityLabel={`Delete ${doc.name}`}
-                    >
-                      <Feather name="trash-2" size={15} color={T.coral} />
-                    </Pressable>
-                  </>
+                    />
+                    <Menu.Item
+                      leadingIcon="trash-can-outline"
+                      title="Delete"
+                      titleStyle={{ color: T.coral }}
+                      onPress={() => {
+                        setMenuFor(null);
+                        confirmDelete(doc);
+                      }}
+                    />
+                  </Menu>
                 )
               ) : null}
             </View>
@@ -610,6 +625,7 @@ const styles = StyleSheet.create({
     color: T.mute,
     marginTop: 2,
   },
+  menu: { backgroundColor: T.card, borderRadius: 14 },
   iconBtn: {
     width: 34,
     height: 34,

@@ -7,7 +7,7 @@
 // anyone with access can add.
 // ============================================================================
 
-import { Venue, VenueCity, VenueInput } from '../types/database';
+import { Venue, VenueCity, VenueContact, VenueInput } from '../types/database';
 import { parseSupabaseError } from './errors';
 import { sendPushNotificationToRole } from './notifications';
 import { supabase } from './supabase';
@@ -19,25 +19,60 @@ const fail = (error: unknown): { success: false; error: string } => ({
   error: parseSupabaseError(error),
 });
 
-/** Trim, drop empties to null, lowercase the email. */
+const opt = (v: string | null | undefined) => {
+  const t = (v ?? '').trim();
+  return t ? t : null;
+};
+
+/** One person, trimmed; empty fields left out. Null when nothing was filled in. */
+function cleanContact(c: VenueContact): VenueContact | null {
+  const out: VenueContact = {};
+  const role = opt(c.role)?.slice(0, 120);
+  const name = opt(c.name)?.slice(0, 120);
+  const phone = opt(c.phone)?.slice(0, 30);
+  const email = opt(c.email)?.toLowerCase();
+  if (role) out.role = role;
+  if (name) out.name = name;
+  if (phone) out.phone = phone;
+  if (email) out.email = email;
+  return Object.keys(out).length ? out : null;
+}
+
+/** Trim, drop empties to null, drop people with nothing filled in. */
 function clean(input: VenueInput): VenueInput {
-  const opt = (v: string | null | undefined) => {
-    const t = (v ?? '').trim();
-    return t ? t : null;
-  };
   return {
     met_on: input.met_on,
     venue_name: input.venue_name.trim(),
     location: opt(input.location),
-    contact_role: opt(input.contact_role),
-    contact_name: opt(input.contact_name),
-    contact_email: opt(input.contact_email)?.toLowerCase() ?? null,
-    contact_phone: opt(input.contact_phone),
+    contacts: (input.contacts ?? []).map(cleanContact).filter((c): c is VenueContact => !!c),
     city_id: input.city_id || null,
   };
 }
 
 export const isValidEmail = (email: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
+
+/**
+ * Everyone met at a venue. Falls back to the single old-style person for a
+ * venue saved before the list existed (or before migration 040 ran).
+ */
+export function venueContacts(v: Venue): VenueContact[] {
+  if (Array.isArray(v.contacts) && v.contacts.length) return v.contacts;
+  const legacy = cleanContact({ role: v.contact_role, name: v.contact_name, phone: v.contact_phone, email: v.contact_email });
+  return legacy ? [legacy] : [];
+}
+
+/** A phone number as the dialler wants it: digits and a leading +. */
+export const telUrl = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`;
+
+/** One email to several people at once. */
+export const mailtoUrl = (emails: string[]) => `mailto:${emails.map((e) => e.trim()).join(',')}`;
+
+/** Owner only (RLS). Venues in it stay, with no city (ON DELETE SET NULL). */
+export async function deleteCity(id: string): Promise<Result> {
+  const { error } = await supabase.from('venue_cities').delete().eq('id', id);
+  if (error) return fail(error);
+  return { success: true, data: undefined };
+}
 
 export async function fetchVenues(): Promise<Result<Venue[]>> {
   const { data, error } = await supabase

@@ -13,9 +13,9 @@ import { PaperOutlinedField } from './PaperOutlinedField';
 import type { TextInput as RNTextInput } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
-import { addCity, addVenue, isValidEmail, updateVenue } from '../lib/venues';
+import { addVenue, isValidEmail, updateVenue, venueContacts } from '../lib/venues';
 import { useAuthStore } from '../store/authStore';
-import { Venue, VenueCity, VenueInput } from '../types/database';
+import { Venue, VenueCity, VenueContact, VenueInput } from '../types/database';
 import { DateField } from './DateTimeFields';
 import { useFieldChain } from '../lib/useFieldChain';
 import { SheetFrame } from './SheetFrame';
@@ -27,14 +27,14 @@ interface VenueFormSheetProps {
   venue?: Venue | null;
   /** The current list, for the duplicate warning. */
   existing: Venue[];
-  /** Cities to choose from; a city added here is passed to onCityAdded. */
+  /** Cities to choose from (cities are added on the venues list). */
   cities: VenueCity[];
-  onCityAdded: (city: VenueCity) => void;
   /** Preselected city for a new venue (e.g. added from inside that city). */
   defaultCityId?: string | null;
 }
 
 const KEY = (d: Date) => format(d, 'yyyy-MM-dd');
+const newKey = () => Math.random().toString(36).slice(2, 10);
 
 export function VenueFormSheet({
   onDismiss,
@@ -42,7 +42,6 @@ export function VenueFormSheet({
   venue,
   existing,
   cities,
-  onCityAdded,
   defaultCityId = null,
 }: VenueFormSheetProps) {
   const profile = useAuthStore((s) => s.profile);
@@ -54,25 +53,23 @@ export function VenueFormSheet({
     met_on: venue?.met_on ?? today,
     venue_name: venue?.venue_name ?? '',
     location: venue?.location ?? '',
-    contact_role: venue?.contact_role ?? '',
-    contact_name: venue?.contact_name ?? '',
-    contact_email: venue?.contact_email ?? '',
-    contact_phone: venue?.contact_phone ?? '',
+    contacts: [],
     city_id: venue ? venue.city_id : defaultCityId,
   });
-  const [newCity, setNewCity] = useState<string | null>(null);
-  const [addingCity, setAddingCity] = useState(false);
+  // Everyone met there, each with a steady key so removing one doesn't shuffle
+  // the boxes. Always at least one (empty) person to fill in.
+  const [people, setPeople] = useState<(VenueContact & { key: string })[]>(() => {
+    const start = venue ? venueContacts(venue) : [];
+    return (start.length ? start : [{}]).map((c) => ({ ...c, key: newKey() }));
+  });
 
-  const saveCity = async () => {
-    if (newCity === null) return;
-    setAddingCity(true);
-    const res = await addCity(newCity);
-    setAddingCity(false);
-    if (!res.success) return setError(res.error);
-    onCityAdded(res.data);
-    setForm((f) => ({ ...f, city_id: res.data.id }));
-    setNewCity(null);
+  const setPerson = (i: number, field: keyof VenueContact) => (value: string) => {
+    setPeople((list) => list.map((p, j) => (j === i ? { ...p, [field]: value } : p)));
+    if (error) setError('');
   };
+  const addPerson = () => setPeople((list) => [...list, { key: newKey() }]);
+  const removePerson = (i: number) =>
+    setPeople((list) => (list.length === 1 ? [{ key: newKey() }] : list.filter((_, j) => j !== i)));
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -89,15 +86,20 @@ export function VenueFormSheet({
   const handleSave = async () => {
     if (!profile) return;
     if (!form.venue_name.trim()) return setError('Venue name is required');
-    const email = (form.contact_email ?? '').trim();
-    if (email && !isValidEmail(email)) return setError('That email doesn’t look right');
+    const badEmail = people.findIndex((p) => (p.email ?? '').trim() && !isValidEmail(p.email ?? ''));
+    if (badEmail >= 0) {
+      return setError(
+        people.length > 1 ? `Person ${badEmail + 1}'s email doesn’t look right` : 'That email doesn’t look right',
+      );
+    }
     const parsed = parseISO(form.met_on);
     if (!isValid(parsed) || form.met_on > today) return setError('Pick a date that isn’t in the future');
 
+    const input: VenueInput = { ...form, contacts: people.map(({ key: _key, ...c }) => c) };
     setSaving(true);
     const res = venue
-      ? await updateVenue(venue.id, form)
-      : await addVenue(form, profile.id, profile.role === 'owner');
+      ? await updateVenue(venue.id, input)
+      : await addVenue(input, profile.id, profile.role === 'owner');
     setSaving(false);
 
     if (res.success) {
@@ -140,7 +142,7 @@ export function VenueFormSheet({
           {format(parseISO(duplicate.met_on), 'd MMM yyyy')}.
         </Text>
       ) : null}
-      <Field label="Location" value={form.location ?? ''} onChange={set('location')} placeholder="Area or address" inputRef={chain.reg('location')} onNext={chain.next('contact_role')} />
+      <Field label="Location" value={form.location ?? ''} onChange={set('location')} placeholder="Area or address" inputRef={chain.reg('location')} onNext={chain.next('p0-role')} />
 
       <View style={styles.field}>
         <Text style={styles.label}>City</Text>
@@ -159,35 +161,9 @@ export function VenueFormSheet({
               </Pressable>
             );
           })}
-          {newCity === null ? (
-            <Pressable onPress={() => setNewCity('')} style={[styles.cityChip, styles.cityAdd]} accessibilityLabel="Add a city">
-              <Feather name="plus" size={14} color={T.ink} />
-              <Text style={styles.cityText}>Add city</Text>
-            </Pressable>
-          ) : null}
         </View>
-        {newCity !== null ? (
-          <View style={styles.newCityRow}>
-            <PaperOutlinedField
-              label="City name"
-              value={newCity}
-              onChangeText={(t) => {
-                setNewCity(t);
-                if (error) setError('');
-              }}
-              style={{ flex: 1 }}
-              maxLength={80}
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={saveCity}
-            />
-            <Pressable style={styles.cityCancel} onPress={() => setNewCity(null)} accessibilityLabel="Cancel">
-              <Feather name="x" size={16} color={T.inkSoft} />
-            </Pressable>
-            <Pressable style={styles.citySave} onPress={saveCity} disabled={addingCity} accessibilityLabel="Save city">
-              {addingCity ? <ActivityIndicator color={T.white} /> : <Feather name="check" size={16} color={T.white} />}
-            </Pressable>
-          </View>
+        {cities.length === 0 ? (
+          <Text style={styles.cityHint}>No cities yet — add one with “Add city” on the venues list.</Text>
         ) : null}
       </View>
 
@@ -202,26 +178,52 @@ export function VenueFormSheet({
         allow="past"
       />
 
-      <Text style={[styles.group, { marginTop: 18 }]}>Person you met</Text>
-      <Field label="Their role" value={form.contact_role ?? ''} onChange={set('contact_role')} placeholder="Their designation at the venue" inputRef={chain.reg('contact_role')} onNext={chain.next('contact_name')} />
-      <Field label="Name" value={form.contact_name ?? ''} onChange={set('contact_name')} placeholder="Full name" inputRef={chain.reg('contact_name')} onNext={chain.next('contact_phone')} />
-      <Field
-        label="Phone"
-        value={form.contact_phone ?? ''}
-        onChange={set('contact_phone')}
-        placeholder="Their phone number"
-        keyboardType="phone-pad"
-        inputRef={chain.reg('contact_phone')}
-        onNext={chain.next('contact_email')}
-      />
-      <Field
-        label="Email"
-        value={form.contact_email ?? ''}
-        onChange={set('contact_email')}
-        placeholder="Their email address"
-        keyboardType="email-address"
-        inputRef={chain.reg('contact_email')}
-      />
+      <Text style={[styles.group, { marginTop: 18 }]}>People you met</Text>
+      {people.map((p, i) => {
+        const last = i === people.length - 1;
+        return (
+          <View key={p.key} style={styles.person}>
+            <View style={styles.personHead}>
+              <Text style={styles.personTitle}>Person {i + 1}</Text>
+              {people.length > 1 ? (
+                <Pressable
+                  onPress={() => removePerson(i)}
+                  hitSlop={8}
+                  style={styles.personRemove}
+                  accessibilityLabel={`Remove person ${i + 1}`}
+                >
+                  <Feather name="x" size={14} color={T.coral} />
+                  <Text style={styles.personRemoveText}>Remove</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            <Field label="Their role" value={p.role ?? ''} onChange={setPerson(i, 'role')} placeholder="Their designation at the venue" inputRef={chain.reg(`p${i}-role`)} onNext={chain.next(`p${i}-name`)} />
+            <Field label="Name" value={p.name ?? ''} onChange={setPerson(i, 'name')} placeholder="Full name" inputRef={chain.reg(`p${i}-name`)} onNext={chain.next(`p${i}-phone`)} />
+            <Field
+              label="Phone"
+              value={p.phone ?? ''}
+              onChange={setPerson(i, 'phone')}
+              placeholder="Their phone number"
+              keyboardType="phone-pad"
+              inputRef={chain.reg(`p${i}-phone`)}
+              onNext={chain.next(`p${i}-email`)}
+            />
+            <Field
+              label="Email"
+              value={p.email ?? ''}
+              onChange={setPerson(i, 'email')}
+              placeholder="Their email address"
+              keyboardType="email-address"
+              inputRef={chain.reg(`p${i}-email`)}
+              onNext={last ? undefined : chain.next(`p${i + 1}-role`)}
+            />
+          </View>
+        );
+      })}
+      <Pressable style={styles.addPerson} onPress={addPerson} accessibilityRole="button">
+        <Feather name="user-plus" size={15} color={T.ink} />
+        <Text style={styles.addPersonText}>Add another person</Text>
+      </Pressable>
     </SheetFrame>
   );
 }
@@ -265,6 +267,30 @@ function Field({
 }
 
 const styles = StyleSheet.create({
+  person: {
+    borderRadius: 16,
+    backgroundColor: T.soft,
+    padding: 12,
+    paddingBottom: 4,
+    marginBottom: 10,
+  },
+  personHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  personTitle: { fontFamily: 'Inter_700Bold', fontSize: 13, color: T.inkSoft },
+  personRemove: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  personRemoveText: { fontFamily: 'Inter_600SemiBold', fontSize: 12.5, color: T.coral },
+  addPerson: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: T.soft2,
+    marginBottom: 8,
+  },
+  addPersonText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: T.ink },
   group: {
     fontFamily: 'Inter_700Bold',
     fontSize: 11,
@@ -306,6 +332,7 @@ const styles = StyleSheet.create({
   cityText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
   cityTextOn: { color: T.white },
   newCityRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  cityHint: { fontFamily: 'Inter_400Regular', fontSize: 12.5, color: T.mute, marginTop: 6 },
   cityCancel: {
     width: 42,
     height: 42,

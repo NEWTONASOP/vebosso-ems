@@ -442,7 +442,8 @@ export function OwnerInboxSheet({
               key={x.id}
               name={x.person?.full_name}
               avatar={x.person?.avatar_url}
-              meta={`${formatAmount(x.amount) ?? 'No amount'} · spent ${format(parseISO(x.spent_on), 'd MMM')}`}
+              meta={`Spent ${format(parseISO(x.spent_on), 'd MMM')}`}
+              amount={formatAmount(x.amount) ?? 'No amount'}
               body={x.description || (x.photos?.length ? 'Receipt photos only' : null)}
               extra={
                 <WorkLogPhotos bucket="expenses" groups={[{ label: 'Receipts', paths: x.photos ?? [] }]} />
@@ -655,8 +656,9 @@ function DocumentPreview({ doc, onMessage }: { doc: PendingDocument; onMessage: 
 }
 
 /**
- * Check-in / checkout photos from the private `checkouts` bucket. Nothing is
- * fetched until the owner opens them, so a long inbox stays quick.
+ * Photos on a card (check-in / checkout photos, expense receipts), shown right
+ * on the card as a row of thumbnails — no dropdown to open first. Tap one to
+ * see it big in a popup.
  */
 function WorkLogPhotos({
   groups,
@@ -666,69 +668,55 @@ function WorkLogPhotos({
   bucket?: string;
 }) {
   const withPhotos = groups.filter((g) => g.paths.length > 0);
-  const total = withPhotos.reduce((n, g) => n + g.paths.length, 0);
-  const [open, setOpen] = useState(false);
-  const [urls, setUrls] = useState<Record<string, string> | null>(null);
+  const pathKey = withPhotos.flatMap((g) => g.paths).join('|');
+  const [urls, setUrls] = useState<Record<string, string>>({});
   const [enlarged, setEnlarged] = useState<string | null>(null);
 
-  if (total === 0) return null;
+  useEffect(() => {
+    if (!pathKey) return;
+    let active = true;
+    supabase.storage
+      .from(bucket)
+      .createSignedUrls(pathKey.split('|'), 3600)
+      .then(({ data }) => {
+        if (!active) return;
+        const map: Record<string, string> = {};
+        for (const item of data || []) if (item.path && item.signedUrl) map[item.path] = item.signedUrl;
+        setUrls(map);
+      });
+    return () => {
+      active = false;
+    };
+  }, [bucket, pathKey]);
 
-  const toggle = async () => {
-    const next = !open;
-    setOpen(next);
-    if (next && !urls) {
-      const paths = withPhotos.flatMap((g) => g.paths);
-      const { data } = await supabase.storage.from(bucket).createSignedUrls(paths, 3600);
-      const map: Record<string, string> = {};
-      for (const item of data || []) if (item.path && item.signedUrl) map[item.path] = item.signedUrl;
-      setUrls(map);
-    }
-  };
+  if (withPhotos.length === 0) return null;
 
   return (
-    <View>
-      <Pressable
-        onPress={toggle}
-        style={styles.photosToggle}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-      >
-        <Feather name="image" size={14} color={T.inkSoft} />
-        <Text style={styles.photosToggleText}>Photos ({total})</Text>
-        <Feather name={open ? 'chevron-up' : 'chevron-down'} size={14} color={T.mute} />
-      </Pressable>
-
-      {open ? (
-        urls ? (
-          <View style={{ gap: 8, marginTop: 8 }}>
-            <ImageViewerModal
-              uri={enlarged ? urls[enlarged] ?? null : null}
-              onDismiss={() => setEnlarged(null)}
-            />
-            {withPhotos.map((g) => (
-              <View key={g.label}>
-                {withPhotos.length > 1 ? <Text style={styles.photoGroup}>{g.label}</Text> : null}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                  {g.paths.map((path) =>
-                    urls[path] ? (
-                      <Pressable
-                        key={path}
-                        onPress={() => setEnlarged(path)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`${g.label} photo`}
-                      >
-                        <Image source={{ uri: urls[path] }} style={styles.photoThumb} contentFit="cover" />
-                      </Pressable>
-                    ) : null,
-                  )}
-                </ScrollView>
-              </View>
+    <View style={{ gap: 8, marginTop: 4 }}>
+      <ImageViewerModal uri={enlarged ? urls[enlarged] ?? null : null} onDismiss={() => setEnlarged(null)} />
+      {withPhotos.map((g) => (
+        <View key={g.label}>
+          {withPhotos.length > 1 ? <Text style={styles.photoGroup}>{g.label}</Text> : null}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+            {g.paths.map((path) => (
+              <Pressable
+                key={path}
+                onPress={() => urls[path] && setEnlarged(path)}
+                accessibilityRole="button"
+                accessibilityLabel={`${g.label} photo`}
+              >
+                {urls[path] ? (
+                  <Image source={{ uri: urls[path] }} style={styles.photoThumb} contentFit="cover" />
+                ) : (
+                  <View style={[styles.photoThumb, styles.photoThumbLoading]}>
+                    <ActivityIndicator size="small" color={T.charcoal} />
+                  </View>
+                )}
+              </Pressable>
             ))}
-          </View>
-        ) : (
-          <ActivityIndicator color={T.charcoal} style={{ marginTop: 10 }} />
-        )
-      ) : null}
+          </ScrollView>
+        </View>
+      ))}
     </View>
   );
 }
@@ -739,6 +727,7 @@ function InboxItem({
   name,
   avatar,
   meta,
+  amount,
   body,
   extra,
   busy,
@@ -747,6 +736,8 @@ function InboxItem({
   name?: string | null;
   avatar?: string | null;
   meta: string;
+  /** A money amount shown large on the right, e.g. an expense. */
+  amount?: string | null;
   body?: string | null;
   /** Anything between the text and the buttons, e.g. photos. */
   extra?: ReactNode;
@@ -768,6 +759,7 @@ function InboxItem({
           <Text style={styles.itemName} numberOfLines={1}>{displayName}</Text>
           <Text style={styles.itemMeta} numberOfLines={1}>{meta}</Text>
         </View>
+        {amount ? <Text style={styles.itemAmount}>{amount}</Text> : null}
       </View>
       {body ? (
         // Whole text, never cut short: this is what is being approved.
@@ -1021,6 +1013,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: T.ink,
   },
+  itemAmount: { fontFamily: 'Inter_700Bold', fontSize: 22, color: T.ink, letterSpacing: -0.5 },
   itemMeta: {
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
@@ -1056,9 +1049,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     marginBottom: 6,
   },
+  photoThumbLoading: { alignItems: 'center', justifyContent: 'center' },
   photoThumb: {
-    width: 76,
-    height: 76,
+    width: 96,
+    height: 96,
     borderRadius: 12,
     backgroundColor: T.soft2,
   },

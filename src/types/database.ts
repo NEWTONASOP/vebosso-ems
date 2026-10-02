@@ -251,7 +251,9 @@ export interface Venue {
   met_on: string;
   venue_name: string;
   location: string | null;
-  /** Who was met at the venue — their role there, name and email. */
+  /** Everyone met at the venue (040). The contact_* fields below mirror the first one. */
+  contacts: VenueContact[];
+  /** The first person met — kept in step with contacts[0] by the database. */
   contact_role: string | null;
   contact_name: string | null;
   contact_email: string | null;
@@ -269,10 +271,15 @@ export interface Venue {
   updated_at: string;
 }
 
-export type VenueInput = Pick<
-  Venue,
-  'met_on' | 'venue_name' | 'location' | 'contact_role' | 'contact_name' | 'contact_email' | 'contact_phone' | 'city_id'
->;
+/** One person met at a venue. */
+export interface VenueContact {
+  role?: string | null;
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+}
+
+export type VenueInput = Pick<Venue, 'met_on' | 'venue_name' | 'location' | 'contacts' | 'city_id'>;
 
 /** A city venues are grouped under. Anyone with Venues access can add one. */
 export interface VenueCity {

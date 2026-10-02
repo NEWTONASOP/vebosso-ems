@@ -21,14 +21,26 @@ import {
   View,
 } from 'react-native';
 import { SmoothTextInput as TextInput } from './SmoothTextInput';
-import { Snackbar, Text } from 'react-native-paper';
+import { Menu, Snackbar, Text } from 'react-native-paper';
+import { PaperOutlinedField } from './PaperOutlinedField';
 import { AppTheme as T, screenChrome } from '../constants/theme';
 import { Alert } from '../lib/alert';
 import { supabase } from '../lib/supabase';
-import { deleteVenue, fetchCities, fetchVenues, setVenueInBusiness } from '../lib/venues';
-import { Venue, VenueCity } from '../types/database';
+import {
+  addCity,
+  deleteCity,
+  deleteVenue,
+  fetchCities,
+  fetchVenues,
+  mailtoUrl,
+  setVenueInBusiness,
+  telUrl,
+  venueContacts,
+} from '../lib/venues';
+import { Venue, VenueCity, VenueContact } from '../types/database';
 import { Chevron, DropdownBody } from './Dropdown';
 import { SheetFrame } from './SheetFrame';
+import { EmailPeopleSheet } from './EmailPeopleSheet';
 import { VenueFormSheet } from './VenueFormSheet';
 
 const COLUMNS: { key: string; label: string; width: number }[] = [
@@ -74,6 +86,25 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
   const [detail, setDetail] = useState<Venue | null>(null);
   const [snack, setSnack] = useState('');
   const [marking, setMarking] = useState(false);
+  // The "Email people" sheet: tick people, write one email to all of them.
+  const [emailing, setEmailing] = useState(false);
+  // The city whose ⋮ menu is open.
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  // Adding a city: null = not adding, '' = typing.
+  const [newCity, setNewCity] = useState<string | null>(null);
+  const [addingCity, setAddingCity] = useState(false);
+
+  const saveCity = async () => {
+    if (newCity === null) return;
+    setAddingCity(true);
+    const res = await addCity(newCity);
+    setAddingCity(false);
+    if (!res.success) return setSnack(res.error);
+    setCities((list) => [...list, res.data].sort((a, b) => a.name.localeCompare(b.name)));
+    setOpenCities((prev) => new Set(prev).add(res.data.id));
+    setNewCity(null);
+    setSnack(`${res.data.name} added`);
+  };
 
   const apply = useCallback((res: Awaited<ReturnType<typeof loadAll>>) => {
     if (res.venues.success) {
@@ -119,8 +150,12 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
     const q = query.trim().toLowerCase();
     if (!q) return venues;
     return venues.filter((v) =>
-      [v.venue_name, v.location, v.contact_name, v.contact_role, v.contact_email, v.contact_phone, v.added_by_name]
-        .some((f) => f?.toLowerCase().includes(q))
+      [
+        v.venue_name,
+        v.location,
+        v.added_by_name,
+        ...venueContacts(v).flatMap((c) => [c.name, c.role, c.email, c.phone]),
+      ].some((f) => f?.toLowerCase().includes(q))
     );
   }, [venues, query]);
 
@@ -148,6 +183,97 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
     });
 
   const cityName = (id: string | null) => cities.find((c) => c.id === id)?.name ?? null;
+
+  const open = (url: string, fail: string) => {
+    Linking.openURL(url).catch(() => setSnack(fail));
+  };
+  const call = (phone: string) => open(telUrl(phone), 'Could not open the phone app');
+
+
+  /** Owner only. Venues in it move to "No city"; nothing is deleted. */
+  const confirmDeleteCity = (c: { id: string; name: string; venues: Venue[] }) => {
+    Alert.alert(
+      `Remove ${c.name}?`,
+      c.venues.length
+        ? `The ${c.venues.length} ${c.venues.length === 1 ? 'venue' : 'venues'} in it will move to "No city". No venue is deleted.`
+        : 'This city has no venues.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove city',
+          style: 'destructive',
+          onPress: async () => {
+            const res = await deleteCity(c.id);
+            if (res.success) {
+              setSnack(`${c.name} removed`);
+              await load();
+            } else {
+              setSnack(res.error);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  /** Role / name / phone / email column: one line per person met, in the same order in every column. */
+  const peopleCell = (key: 'role' | 'name' | 'phone' | 'email', v: Venue, width: number) => {
+    const people = venueContacts(v);
+    if (!people.length) {
+      return (
+        <Text key={key} style={[styles.cell, { width }]}>
+          —
+        </Text>
+      );
+    }
+    return (
+      <View key={key} style={{ width }}>
+        {people.map((p, i) => {
+          const value = (p[key] ?? '').trim();
+          if (!value) {
+            return (
+              <Text key={i} style={styles.cell} numberOfLines={1}>
+                —
+              </Text>
+            );
+          }
+          if (key === 'phone') {
+            return (
+              <Text
+                key={i}
+                style={[styles.cell, styles.link]}
+                numberOfLines={1}
+                onPress={() => call(value)}
+                accessibilityRole="link"
+                accessibilityLabel={`Call ${value}`}
+              >
+                <Feather name="phone" size={12} color={T.blue} /> {value}
+              </Text>
+            );
+          }
+          if (key === 'email') {
+            return (
+              <Text
+                key={i}
+                style={[styles.cell, styles.link]}
+                numberOfLines={1}
+                onPress={() => open(mailtoUrl([value]), 'Could not open an email app')}
+                accessibilityRole="link"
+                accessibilityLabel={`Email ${value}`}
+              >
+                <Feather name="mail" size={12} color={T.blue} /> {value}
+              </Text>
+            );
+          }
+          return (
+            <Text key={i} style={[styles.cell, key === 'name' && styles.cellStrong]} numberOfLines={1}>
+              {value}
+            </Text>
+          );
+        })}
+      </View>
+    );
+  };
 
   const confirmDelete = (v: Venue) => {
     Alert.alert('Delete venue?', `${v.venue_name} will be removed from the list.`, [
@@ -251,24 +377,8 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
                       {v.venue_name}
                     </Text>
                   </View>
-                ) : c.key === 'phone' && v.contact_phone ? (
-                  <Text
-                    key={c.key}
-                    style={[styles.cell, styles.link, { width: c.width }]}
-                    numberOfLines={1}
-                    onPress={() => Linking.openURL(`tel:${v.contact_phone}`)}
-                  >
-                    {v.contact_phone}
-                  </Text>
-                ) : c.key === 'email' && v.contact_email ? (
-                  <Text
-                    key={c.key}
-                    style={[styles.cell, styles.link, { width: c.width }]}
-                    numberOfLines={2}
-                    onPress={() => Linking.openURL(`mailto:${v.contact_email}`)}
-                  >
-                    {v.contact_email}
-                  </Text>
+                ) : c.key === 'role' || c.key === 'name' || c.key === 'phone' || c.key === 'email' ? (
+                  peopleCell(c.key, v, c.width)
                 ) : (
                   <Text
                     key={c.key}
@@ -324,6 +434,9 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
         </Pressable>
       </View>
 
+
+
+      <View style={styles.searchRow}>
       <View style={styles.searchWrap}>
         <Feather name="search" size={16} color={T.mute} />
         <TextInput
@@ -339,6 +452,16 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
             <Feather name="x" size={16} color={T.mute} />
           </Pressable>
         ) : null}
+      </View>
+      <Pressable
+        style={({ pressed }) => [styles.emailPill, pressed && { opacity: 0.85 }]}
+        onPress={() => setEmailing(true)}
+        accessibilityRole="button"
+        accessibilityLabel="Email people you met"
+      >
+        <Feather name="mail" size={15} color={T.ink} />
+        <Text style={styles.emailPillText}>Email</Text>
+      </Pressable>
       </View>
 
       <ScrollView
@@ -371,7 +494,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
                   accessibilityLabel={`${g.name}, ${g.venues.length} venues`}
                 >
                   <View style={styles.cityIcon}>
-                    <Feather name={g.id === 'none' ? 'help-circle' : 'map'} size={16} color={T.blue} />
+                    <Feather name={g.id === 'none' ? 'help-circle' : 'map-pin'} size={16} color={T.blue} />
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.cityName} numberOfLines={1}>{g.name}</Text>
@@ -382,17 +505,42 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
                     </Text>
                   </View>
                   {g.id !== 'none' ? (
-                    <Pressable
-                      onPress={() => {
-                        setFormCity(g.id);
-                        setFormFor('new');
-                      }}
-                      style={styles.cityAdd}
-                      hitSlop={6}
-                      accessibilityLabel={`Add a venue in ${g.name}`}
+                    <Menu
+                      visible={menuFor === g.id}
+                      onDismiss={() => setMenuFor(null)}
+                      anchor={
+                        <Pressable
+                          onPress={() => setMenuFor(g.id)}
+                          style={styles.cityAdd}
+                          hitSlop={6}
+                          accessibilityLabel={`More for ${g.name}`}
+                        >
+                          <Feather name="more-vertical" size={16} color={T.ink} />
+                        </Pressable>
+                      }
+                      contentStyle={styles.menu}
                     >
-                      <Feather name="plus" size={15} color={T.ink} />
-                    </Pressable>
+                      <Menu.Item
+                        leadingIcon="plus"
+                        title="Add a venue here"
+                        onPress={() => {
+                          setMenuFor(null);
+                          setFormCity(g.id);
+                          setFormFor('new');
+                        }}
+                      />
+                      {canManage ? (
+                        <Menu.Item
+                          leadingIcon="trash-can-outline"
+                          title="Remove city"
+                          titleStyle={{ color: T.coral }}
+                          onPress={() => {
+                            setMenuFor(null);
+                            confirmDeleteCity(g);
+                          }}
+                        />
+                      ) : null}
+                    </Menu>
                   ) : null}
                   <Chevron open={open} color={T.mute} />
                 </Pressable>
@@ -402,9 +550,43 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
           })
         )}
 
+        {/* Cities are added here, on the list — not inside the venue form. */}
+        {!isLoading && !query.trim() ? (
+          newCity === null ? (
+            <Pressable style={styles.addCityBtn} onPress={() => setNewCity('')} accessibilityRole="button">
+              <Feather name="plus" size={15} color={T.ink} />
+              <Text style={styles.addCityText}>Add city</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.newCityRow}>
+              <PaperOutlinedField
+                label="City name"
+                value={newCity}
+                onChangeText={setNewCity}
+                style={{ flex: 1 }}
+                maxLength={80}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={() => void saveCity()}
+              />
+              <Pressable style={styles.cityAdd} onPress={() => setNewCity(null)} accessibilityLabel="Cancel">
+                <Feather name="x" size={16} color={T.inkSoft} />
+              </Pressable>
+              <Pressable
+                style={[styles.cityAdd, styles.citySave]}
+                onPress={() => void saveCity()}
+                disabled={addingCity}
+                accessibilityLabel="Save city"
+              >
+                {addingCity ? <ActivityIndicator color={T.white} /> : <Feather name="check" size={16} color={T.white} />}
+              </Pressable>
+            </View>
+          )
+        ) : null}
+
         {!isLoading && filtered.length > 0 ? (
           <Text style={styles.hint}>
-            Green rows are in business with VEBOSSO · swipe sideways for every column · tap a row for details
+            Green rows are in business with VEBOSSO · swipe sideways for every column · tap a phone to call, an email to write · "Email" to write to several people · tap a row for details
           </Text>
         ) : null}
       </ScrollView>
@@ -482,18 +664,19 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
           <DetailRow label="Team member" value={dash(detail.added_by_name)} />
           <DetailRow label="City" value={dash(cityName(detail.city_id))} />
           <DetailRow label="Location" value={dash(detail.location)} />
-          <DetailRow label="Person met (role)" value={dash(detail.contact_role)} />
-          <DetailRow label="Their name" value={dash(detail.contact_name)} />
-          <DetailRow
-            label="Their phone"
-            value={dash(detail.contact_phone)}
-            onPress={detail.contact_phone ? () => Linking.openURL(`tel:${detail.contact_phone}`) : undefined}
-          />
-          <DetailRow
-            label="Their email"
-            value={dash(detail.contact_email)}
-            onPress={detail.contact_email ? () => Linking.openURL(`mailto:${detail.contact_email}`) : undefined}
-          />
+          {(() => {
+            const people = venueContacts(detail);
+            if (!people.length) return <DetailRow label="People met" value="—" />;
+            return people.map((p, i) => (
+              <PersonBlock
+                key={i}
+                title={people.length > 1 ? `Person ${i + 1}` : 'Person met'}
+                person={p}
+                onCall={call}
+                onEmail={(e) => open(mailtoUrl([e]), 'Could not open an email app')}
+              />
+            ));
+          })()}
         </SheetFrame>
       ) : null}
 
@@ -502,16 +685,21 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
           venue={formFor === 'new' ? null : formFor}
           existing={venues}
           cities={cities}
-          onCityAdded={(c) => {
-            setCities((list) => [...list, c].sort((a, b) => a.name.localeCompare(b.name)));
-            setOpenCities((prev) => new Set(prev).add(c.id));
-          }}
           defaultCityId={formCity}
           onDismiss={() => setFormFor(null)}
           onSaved={(m) => {
             setSnack(m);
             void load();
           }}
+        />
+      ) : null}
+
+      {emailing ? (
+        <EmailPeopleSheet
+          venues={filtered}
+          searching={!!query.trim()}
+          onDismiss={() => setEmailing(false)}
+          onMessage={setSnack}
         />
       ) : null}
 
@@ -533,7 +721,72 @@ function DetailRow({ label, value, onPress }: { label: string; value: string; on
   );
 }
 
+/** One person met at the venue: role and name, with tap-to-call and tap-to-email. */
+function PersonBlock({
+  title,
+  person,
+  onCall,
+  onEmail,
+}: {
+  title: string;
+  person: VenueContact;
+  onCall: (phone: string) => void;
+  onEmail: (email: string) => void;
+}) {
+  return (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        {title}
+        {person.role ? ` · ${person.role}` : ''}
+      </Text>
+      <Text style={styles.detailValue} selectable>
+        {dash(person.name)}
+      </Text>
+      {person.phone ? (
+        <Text style={[styles.detailValue, styles.link, styles.contactLine]} onPress={() => onCall(person.phone!)}>
+          <Feather name="phone" size={14} color={T.blue} /> {person.phone}
+        </Text>
+      ) : null}
+      {person.email ? (
+        <Text style={[styles.detailValue, styles.link, styles.contactLine]} onPress={() => onEmail(person.email!)}>
+          <Feather name="mail" size={14} color={T.blue} /> {person.email}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginBottom: 12 },
+  menu: { backgroundColor: T.card, borderRadius: 14 },
+  addCityBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 46,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: T.soft2,
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  addCityText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: T.ink },
+  newCityRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2, marginBottom: 6 },
+  citySave: { backgroundColor: T.charcoal },
+  emailPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 46,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: T.card,
+    ...screenChrome.card,
+  },
+  emailPillText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: T.ink },
+  contactLine: { marginTop: 4 },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -550,8 +803,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginHorizontal: 20,
-    marginBottom: 12,
+    flex: 1,
+    minWidth: 0,
     height: 46,
     borderRadius: 16,
     paddingHorizontal: 14,
