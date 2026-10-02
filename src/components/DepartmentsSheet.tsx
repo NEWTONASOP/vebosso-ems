@@ -8,7 +8,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
-import { SmoothTextInput as TextInput } from './SmoothTextInput';
+import { PaperOutlinedField } from './PaperOutlinedField';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { Alert } from '../lib/alert';
@@ -83,15 +83,14 @@ export function DepartmentsSheet({
         <View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <View style={styles.addRow}>
-            <TextInput
+            <PaperOutlinedField
+              label="New department"
               value={newName}
               onChangeText={(t) => {
                 setNewName(t);
                 if (error) setError('');
               }}
-              placeholder="New department name"
-              placeholderTextColor={T.mute}
-              style={[styles.input, { flex: 1 }]}
+              style={{ flex: 1 }}
               maxLength={60}
               returnKeyType="done"
               onSubmitEditing={add}
@@ -230,14 +229,13 @@ function DepartmentEditor({
         </View>
       }
     >
-      <Text style={styles.label}>Name</Text>
-      <TextInput
+      <PaperOutlinedField
+        label="Name"
         value={name}
         onChangeText={(t) => {
           setName(t);
           if (error) setError('');
         }}
-        style={styles.input}
         maxLength={60}
         returnKeyType="done"
       />

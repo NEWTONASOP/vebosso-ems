@@ -5,7 +5,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
-import { SmoothTextInput as TextInput } from './SmoothTextInput';
+import { PaperOutlinedField } from './PaperOutlinedField';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { Alert } from '../lib/alert';
@@ -93,19 +93,17 @@ export function AccountFormSheet({
         </View>
       }
     >
-      <Text style={styles.label}>Name *</Text>
-      <TextInput
+      <PaperOutlinedField
+        label="Name *"
         value={name}
         onChangeText={(t) => {
           setName(t);
           if (error) setError('');
         }}
-        style={styles.input}
         maxLength={120}
         autoFocus={!account}
       />
-      <Text style={styles.label}>Note</Text>
-      <TextInput value={note} onChangeText={setNote} style={styles.input} maxLength={500} />
+      <PaperOutlinedField label="Note" value={note} onChangeText={setNote} style={{ marginTop: 10 }} maxLength={500} />
     </SheetFrame>
   );
 }

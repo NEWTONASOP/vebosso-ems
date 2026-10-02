@@ -9,7 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import { addDays, format, isValid, parseISO } from 'date-fns';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
-import { SmoothTextInput as TextInput } from './SmoothTextInput';
+import { PaperOutlinedField } from './PaperOutlinedField';
 import type { TextInput as RNTextInput } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
@@ -168,15 +168,14 @@ export function VenueFormSheet({
         </View>
         {newCity !== null ? (
           <View style={styles.newCityRow}>
-            <TextInput
+            <PaperOutlinedField
+              label="City name"
               value={newCity}
               onChangeText={(t) => {
                 setNewCity(t);
                 if (error) setError('');
               }}
-              placeholder="City name"
-              placeholderTextColor={T.mute}
-              style={[styles.input, { flex: 1 }]}
+              style={{ flex: 1 }}
               maxLength={80}
               autoFocus
               returnKeyType="done"
@@ -247,13 +246,11 @@ function Field({
 }) {
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
+      <PaperOutlinedField
+        label={label}
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
-        placeholderTextColor={T.mute}
-        style={styles.input}
         keyboardType={keyboardType}
         autoCapitalize={keyboardType === 'email-address' ? 'none' : 'sentences'}
         autoCorrect={keyboardType !== 'email-address'}

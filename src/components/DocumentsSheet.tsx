@@ -30,6 +30,7 @@ import {
 } from '../lib/employeeRecords';
 import { DocumentStatus, EmployeeDocument } from '../types/database';
 import { ImageViewerModal } from './ImageViewerModal';
+import { PaperOutlinedField } from './PaperOutlinedField';
 import { SheetFrame } from './SheetFrame';
 
 async function loadDocuments(userId: string) {
@@ -275,12 +276,11 @@ export function DocumentsSheet({
         <FileTile kind={pending.kind} size={styles.pendingImage} />
       )}
       <View style={{ flex: 1, gap: 8 }}>
-        <TextInput
+        <PaperOutlinedField
+          label="Document name"
           value={newName}
           onChangeText={setNewName}
-          placeholder="Document name"
-          placeholderTextColor={T.mute}
-          style={styles.input}
+          placeholder="e.g. Aadhaar card"
           maxLength={120}
           editable={!isUploading}
           autoFocus

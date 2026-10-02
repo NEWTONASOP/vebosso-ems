@@ -28,6 +28,7 @@ import {
 import { ExpenseClaim, ExpenseStatus } from '../types/database';
 import { DateField } from './DateTimeFields';
 import { ImageViewerModal } from './ImageViewerModal';
+import { PaperOutlinedField } from './PaperOutlinedField';
 import { SheetFrame } from './SheetFrame';
 
 const STATUS: Record<ExpenseStatus, { label: string; color: string; bg: string }> = {
@@ -318,16 +319,14 @@ function ExpenseComposer({
         </View>
       }
     >
-      <Text style={styles.label}>What was it for? (optional)</Text>
-      <TextInput
+      <PaperOutlinedField
+        label="What was it for? (optional)"
         value={description}
         onChangeText={(t) => {
           setDescription(t);
           if (error) setError('');
         }}
-        style={[styles.input, styles.inputMulti]}
         multiline
-        textAlignVertical="top"
         maxLength={2000}
       />
 

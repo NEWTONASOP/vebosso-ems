@@ -31,6 +31,7 @@ import { AccountTransaction, TxnKind } from '../types/database';
 import { DateField } from './DateTimeFields';
 import { useFieldChain } from '../lib/useFieldChain';
 import { ImageViewerModal } from './ImageViewerModal';
+import { PaperOutlinedField } from './PaperOutlinedField';
 import { SheetFrame } from './SheetFrame';
 
 const KEY = (d: Date) => format(d, 'yyyy-MM-dd');
@@ -259,11 +260,11 @@ export function AccountTxnSheet({
         />
       </View>
 
-      <Text style={styles.label}>Particular</Text>
-      <TextInput
+      <PaperOutlinedField
+        label="Particular"
         value={particular}
         onChangeText={setParticular}
-        style={styles.input}
+        style={{ marginTop: 12 }}
         maxLength={500}
         ref={chain.reg('particular')}
         returnKeyType="done"

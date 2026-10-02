@@ -7,7 +7,7 @@ import { VoiceNote } from './VoiceNote';
 import { format } from 'date-fns';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
-import { SmoothTextInput as TextInput } from './SmoothTextInput';
+import { PaperOutlinedField } from './PaperOutlinedField';
 import { Divider, Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { TaskStatus } from '../types/database';
@@ -186,18 +186,17 @@ export function TaskDetailModal({
 
           {mode === 'edit' ? (
             <View style={styles.section}>
-              <Text style={styles.fieldLabel}>Task</Text>
-              <TextInput
+              <PaperOutlinedField
+                label="Task"
                 defaultValue={task.title}
                 onChangeText={(t) => {
                   titleRef.current = t;
                   setHasTitle(!!t.trim());
                 }}
-                style={[styles.input, styles.inputMulti]}
                 multiline
+                tall
                 maxLength={2000}
                 placeholder="What needs doing"
-                placeholderTextColor={AppTheme.mute}
               />
             </View>
           ) : (
@@ -346,20 +345,18 @@ export function TaskDetailModal({
 
               {mode === 'reject' ? (
                 <View>
-                  <Text style={styles.fieldLabel}>Why is it rejected?</Text>
-                  <TextInput
+                  <PaperOutlinedField
+                    label="Why is it rejected?"
                     defaultValue=""
                     onChangeText={(t) => {
                       reasonRef.current = t;
                       setHasReason(!!t.trim());
                       if (error) setError('');
                     }}
-                    style={[styles.input, styles.inputMulti]}
                     multiline
                     maxLength={1000}
                     autoFocus
                     placeholder="What needs to be redone"
-                    placeholderTextColor={AppTheme.mute}
                   />
                   <View style={styles.btnRow}>
                     <AnimatedPressable scaleTo={0.96} style={[styles.btn, styles.btnSoft]} onPress={() => setMode('view')} disabled={busy}>

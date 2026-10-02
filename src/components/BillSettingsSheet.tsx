@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
-import { SmoothTextInput as TextInput } from './SmoothTextInput';
+import { PaperOutlinedField } from './PaperOutlinedField';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { BRANDS } from '../lib/billBrands';
@@ -55,13 +55,11 @@ export function BillSettingsSheet({
 
   const field = (label: string, k: keyof Form, opts: { multiline?: boolean; keyboard?: 'email-address' | 'phone-pad' } = {}) => (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
+      <PaperOutlinedField
+        label={label}
         value={(form?.[k] as string) ?? ''}
         onChangeText={set(k)}
-        style={[styles.input, opts.multiline && styles.multi]}
         multiline={opts.multiline}
-        textAlignVertical={opts.multiline ? 'top' : 'center'}
         keyboardType={opts.keyboard}
         autoCapitalize={opts.keyboard === 'email-address' ? 'none' : 'sentences'}
       />

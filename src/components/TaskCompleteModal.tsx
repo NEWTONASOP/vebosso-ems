@@ -5,7 +5,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { SmoothTextInput as TextInput } from './SmoothTextInput';
+import { PaperOutlinedField } from './PaperOutlinedField';
 import { Button, Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/theme';
 import { useKeyboardHeight } from '../lib/useKeyboardHeight';
@@ -23,9 +23,8 @@ export function TaskCompleteModal({
   onDismiss,
   onComplete,
 }: TaskCompleteModalProps) {
-  // Uncontrolled, like the check-in plan (PaperOutlinedField): the text lives
-  // in the input itself, not in state fed back on every key. Feeding it back
-  // made some Android keyboards drop or repeat letters while typing.
+  // Same box and same handling as the check-in plan: the text lives in the
+  // box, kept here only for submit and the counter.
   const noteRef = useRef('');
   const [count, setCount] = useState(0);
   // A fresh, empty box each time the dialog opens.
@@ -74,19 +73,17 @@ export function TaskCompleteModal({
 
             <View style={styles.inputSection}>
               <Text style={styles.inputLabel}>Add a note (optional). Whoever gave you this task will approve it or send it back.</Text>
-              <TextInput
+              {/* The same box as the check-in plan. */}
+              <PaperOutlinedField
                 key={fieldKey}
-                style={styles.input}
+                label="Note"
                 placeholder="Brief summary of your work..."
-                placeholderTextColor={AppTheme.mute}
                 defaultValue=""
                 onChangeText={(text) => {
                   noteRef.current = text;
                   setCount(text.length);
                 }}
                 multiline
-                numberOfLines={4}
-                textAlignVertical="top"
                 maxLength={500}
               />
               <Text style={styles.charCounter}>{count}/500</Text>
