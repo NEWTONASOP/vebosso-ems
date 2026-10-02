@@ -11,7 +11,8 @@ import { addDays, format, parseISO } from 'date-fns';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SmoothTextInput as TextInput } from './SmoothTextInput';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { Alert } from '../lib/alert';
@@ -26,6 +27,7 @@ import {
 } from '../lib/expenses';
 import { ExpenseClaim, ExpenseStatus } from '../types/database';
 import { DateField } from './DateTimeFields';
+import { ImageViewerModal } from './ImageViewerModal';
 import { SheetFrame } from './SheetFrame';
 
 const STATUS: Record<ExpenseStatus, { label: string; color: string; bg: string }> = {
@@ -162,11 +164,11 @@ export function ExpensesSheet({ onDismiss, userId, userName, mode, ownerId, inli
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
-      {enlarged && urls[enlarged] ? (
-        <Pressable onPress={() => setEnlarged(null)} accessibilityLabel="Close receipt">
-          <Image source={{ uri: urls[enlarged] }} style={styles.large} contentFit="contain" />
-        </Pressable>
-      ) : null}
+      <ImageViewerModal
+        uri={enlarged ? urls[enlarged] ?? null : null}
+        title="Receipt"
+        onDismiss={() => setEnlarged(null)}
+      />
 
       {isLoading ? (
         <ActivityIndicator color={T.charcoal} style={{ marginVertical: 24 }} />
@@ -205,12 +207,8 @@ export function ExpensesSheet({ onDismiss, userId, userName, mode, ownerId, inli
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                   {c.photos.map((p) =>
                     urls[p] ? (
-                      <Pressable key={p} onPress={() => setEnlarged(enlarged === p ? null : p)}>
-                        <Image
-                          source={{ uri: urls[p] }}
-                          style={[styles.thumb, enlarged === p && styles.thumbActive]}
-                          contentFit="cover"
-                        />
+                      <Pressable key={p} onPress={() => setEnlarged(p)} accessibilityLabel="View receipt">
+                        <Image source={{ uri: urls[p] }} style={styles.thumb} contentFit="cover" />
                       </Pressable>
                     ) : null
                   )}

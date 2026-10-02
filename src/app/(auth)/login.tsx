@@ -24,9 +24,10 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [snackError, setSnackError] = useState('');
 
-  const { signIn, isLoading, clearError } = useAuthStore();
+  const { signIn, isLoading, clearError, logoutReason, clearLogoutReason } = useAuthStore();
 
   const handleLogin = async () => {
+    clearLogoutReason();
     if (!employeeId.trim()) {
       setSnackError('Please enter your Employee ID');
       return;
@@ -66,6 +67,14 @@ export default function LoginScreen() {
         <Animated.View entering={FadeInUp.duration(800).delay(400)} style={styles.formSection}>
           <Text style={styles.welcomeText}>Welcome back</Text>
           <Text style={styles.welcomeSubtext}>Sign in with your employee credentials</Text>
+
+          {/* Why the app signed them out by itself, if it did. */}
+          {logoutReason ? (
+            <View style={styles.reasonBox}>
+              <Feather name="info" size={15} color={AppTheme.amber} />
+              <Text style={styles.reasonText}>{logoutReason}</Text>
+            </View>
+          ) : null}
 
           <TextInput
             mode="outlined"
@@ -169,6 +178,22 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  reasonBox: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-start',
+    backgroundColor: AppTheme.amberSoft,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
+  reasonText: {
+    flex: 1,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    lineHeight: 19,
+    color: AppTheme.ink,
+  },
   container: {
     ...screenChrome.root,
   },

@@ -17,6 +17,7 @@ import {
     View,
 } from 'react-native';
 import { Snackbar, Switch, Text, TextInput } from 'react-native-paper';
+import { renderSmoothInput } from '../../../components/SmoothTextInput';
 import { InlineError } from '../../../components/InlineError';
 import { Alert } from '../../../lib/alert';
 import {
@@ -492,6 +493,7 @@ export default function MemberProfileManagementScreen() {
             label="Full Name"
             value={fullName}
             onChangeText={setFullName}
+            render={renderSmoothInput}
             style={styles.input}
             outlineColor={T.soft}
             activeOutlineColor={T.charcoal}
@@ -505,6 +507,7 @@ export default function MemberProfileManagementScreen() {
             label="Designation / Department"
             value={department}
             onChangeText={setDepartment}
+            render={renderSmoothInput}
             style={styles.input}
             outlineColor={T.soft}
             activeOutlineColor={T.charcoal}
@@ -518,6 +521,7 @@ export default function MemberProfileManagementScreen() {
             label="Employee ID"
             value={employeeId}
             onChangeText={setEmployeeId}
+            render={renderSmoothInput}
             style={styles.input}
             outlineColor={T.soft}
             activeOutlineColor={T.charcoal}

@@ -11,6 +11,7 @@ import { AppTheme, appSoftShadow } from '../constants/theme';
 import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
 import { supabase } from '../lib/supabase';
 import { Task, WorkLog } from '../types/database';
+import { ImageViewerModal } from './ImageViewerModal';
 
 interface WorkLogDetailProps {
   visible: boolean;
@@ -357,26 +358,7 @@ export function WorkLogDetail({
         </ScrollView>
       </Modal>
 
-      {/* Full-screen Photo Modal */}
-      <Portal>
-        <Modal
-          visible={!!selectedPhoto}
-          onDismiss={() => setSelectedPhoto(null)}
-          contentContainerStyle={styles.fullImageModal}
-        >
-          {selectedPhoto && (
-            <View style={styles.fullImageWrapper}>
-              <Image source={{ uri: selectedPhoto }} style={styles.fullImage} resizeMode="contain" />
-              <Pressable
-                onPress={() => setSelectedPhoto(null)}
-                style={styles.closeFullImageBtn}
-              >
-                <Feather name="x" size={24} color={AppTheme.white} />
-              </Pressable>
-            </View>
-          )}
-        </Modal>
-      </Portal>
+      <ImageViewerModal uri={selectedPhoto} onDismiss={() => setSelectedPhoto(null)} />
     </Portal>
   );
 }

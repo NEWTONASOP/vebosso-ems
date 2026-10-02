@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Snackbar, Text, TextInput } from 'react-native-paper';
+import { renderSmoothInput } from '../../../components/SmoothTextInput';
 import {
   AppRadius,
   AppSpace,
@@ -238,6 +239,7 @@ export default function AddMemberScreen() {
             label="Full Name *"
             value={fullName}
             onChangeText={setFullName}
+            render={renderSmoothInput}
             maxLength={100}
             style={styles.input}
             outlineColor={T.soft}
@@ -252,6 +254,7 @@ export default function AddMemberScreen() {
             label="Designation (e.g. Designer)"
             value={department}
             onChangeText={setDepartment}
+            render={renderSmoothInput}
             maxLength={100}
             style={styles.input}
             outlineColor={T.soft}
@@ -319,6 +322,7 @@ export default function AddMemberScreen() {
             label="Employee ID"
             value={employeeId}
             onChangeText={setEmployeeId}
+            render={renderSmoothInput}
             style={styles.input}
             outlineColor={T.soft}
             activeOutlineColor={T.charcoal}

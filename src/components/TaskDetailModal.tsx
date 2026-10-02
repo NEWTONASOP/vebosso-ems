@@ -5,8 +5,9 @@
 import { Feather } from '@expo/vector-icons';
 import { VoiceNote } from './VoiceNote';
 import { format } from 'date-fns';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { SmoothTextInput as TextInput } from './SmoothTextInput';
 import { Divider, Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { TaskStatus } from '../types/database';
@@ -62,8 +63,13 @@ export function TaskDetailModal({
   manage,
 }: TaskDetailModalProps) {
   const [mode, setMode] = useState<'view' | 'edit' | 'reject'>('view');
-  const [title, setTitle] = useState('');
-  const [reason, setReason] = useState('');
+  // The task text and reject reason are uncontrolled (kept in refs, not fed
+  // back into the box on every key) — feeding them back made some Android
+  // keyboards drop or repeat letters inside popups. Only "is it empty" is state.
+  const titleRef = useRef('');
+  const reasonRef = useRef('');
+  const [hasTitle, setHasTitle] = useState(false);
+  const [hasReason, setHasReason] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -71,13 +77,15 @@ export function TaskDetailModal({
   useEffect(() => {
     setMode('view');
     setError('');
-    setReason('');
+    reasonRef.current = '';
+    setHasReason(false);
   }, [task?.id, visible]);
 
   if (!task) return null;
 
   const startEdit = () => {
-    setTitle(task.title);
+    titleRef.current = task.title;
+    setHasTitle(!!task.title.trim());
     setError('');
     setMode('edit');
   };
@@ -180,8 +188,11 @@ export function TaskDetailModal({
             <View style={styles.section}>
               <Text style={styles.fieldLabel}>Task</Text>
               <TextInput
-                value={title}
-                onChangeText={setTitle}
+                defaultValue={task.title}
+                onChangeText={(t) => {
+                  titleRef.current = t;
+                  setHasTitle(!!t.trim());
+                }}
                 style={[styles.input, styles.inputMulti]}
                 multiline
                 maxLength={2000}
@@ -337,9 +348,10 @@ export function TaskDetailModal({
                 <View>
                   <Text style={styles.fieldLabel}>Why is it rejected?</Text>
                   <TextInput
-                    value={reason}
+                    defaultValue=""
                     onChangeText={(t) => {
-                      setReason(t);
+                      reasonRef.current = t;
+                      setHasReason(!!t.trim());
                       if (error) setError('');
                     }}
                     style={[styles.input, styles.inputMulti]}
@@ -356,8 +368,8 @@ export function TaskDetailModal({
                     <AnimatedPressable
                       scaleTo={0.96}
                       style={[styles.btn, styles.btnReject]}
-                      onPress={() => run(() => manage.onReject(reason))}
-                      disabled={busy || !reason.trim()}
+                      onPress={() => run(() => manage.onReject(reasonRef.current))}
+                      disabled={busy || !hasReason}
                     >
                       {busy ? <ActivityIndicator color={AppTheme.white} size="small" /> : <Text style={styles.btnDarkText}>Reject task</Text>}
                     </AnimatedPressable>
@@ -371,8 +383,12 @@ export function TaskDetailModal({
                   <AnimatedPressable
                     scaleTo={0.96}
                     style={[styles.btn, styles.btnDark]}
-                    onPress={() => run(() => manage.onSave({ title, description: task.description, due_date: task.due_date }))}
-                    disabled={busy || !title.trim()}
+                    onPress={() =>
+                      run(() =>
+                        manage.onSave({ title: titleRef.current, description: task.description, due_date: task.due_date })
+                      )
+                    }
+                    disabled={busy || !hasTitle}
                   >
                     {busy ? <ActivityIndicator color={AppTheme.white} size="small" /> : <Text style={styles.btnDarkText}>Save changes</Text>}
                   </AnimatedPressable>
@@ -381,7 +397,7 @@ export function TaskDetailModal({
                 <View style={{ gap: 10 }}>
                   {task.status === 'review' ? (
                     <View style={styles.btnRow}>
-                      <AnimatedPressable scaleTo={0.96} style={[styles.btn, styles.btnRejectSoft]} onPress={() => { setError(''); setMode('reject'); }} disabled={busy}>
+                      <AnimatedPressable scaleTo={0.96} style={[styles.btn, styles.btnRejectSoft]} onPress={() => { setError(''); reasonRef.current = ''; setHasReason(false); setMode('reject'); }} disabled={busy}>
                         <Text style={styles.btnRejectSoftText}>Reject</Text>
                       </AnimatedPressable>
                       <AnimatedPressable scaleTo={0.96} style={[styles.btn, styles.btnApprove]} onPress={() => run(manage.onApprove)} disabled={busy}>

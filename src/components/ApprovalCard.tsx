@@ -8,6 +8,7 @@ import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-
 import { Button, Dialog, Modal, Portal, Text } from 'react-native-paper';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { AnimatedPressable } from './AnimatedPressable';
+import { ImageViewerModal } from './ImageViewerModal';
 
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -346,26 +347,7 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
         </Dialog>
       </Portal>
 
-      {/* Full-screen Photo Modal */}
-      <Portal>
-        <Modal
-          visible={!!selectedPhoto}
-          onDismiss={() => setSelectedPhoto(null)}
-          contentContainerStyle={styles.fullImageModal}
-        >
-          {selectedPhoto && (
-            <View style={styles.fullImageWrapper}>
-              <Image source={{ uri: selectedPhoto }} style={styles.fullImage} resizeMode="contain" />
-              <Pressable
-                onPress={() => setSelectedPhoto(null)}
-                style={styles.closeFullImageBtn}
-              >
-                <Feather name="x" size={24} color={AppTheme.white} />
-              </Pressable>
-            </View>
-          )}
-        </Modal>
-      </Portal>
+      <ImageViewerModal uri={selectedPhoto} onDismiss={() => setSelectedPhoto(null)} />
     </Animated.View>
   );
 }

@@ -11,7 +11,8 @@ import { addDays, format, parseISO } from 'date-fns';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { SmoothTextInput as TextInput } from './SmoothTextInput';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { Alert } from '../lib/alert';
@@ -29,6 +30,7 @@ import {
 import { AccountTransaction, TxnKind } from '../types/database';
 import { DateField } from './DateTimeFields';
 import { useFieldChain } from '../lib/useFieldChain';
+import { ImageViewerModal } from './ImageViewerModal';
 import { SheetFrame } from './SheetFrame';
 
 const KEY = (d: Date) => format(d, 'yyyy-MM-dd');
@@ -199,16 +201,11 @@ export function AccountTxnSheet({
           {receipts.length ? (
             <>
               <Text style={styles.label}>Receipt photos</Text>
-              {enlarged && receiptUrls[enlarged] ? (
-                <Pressable onPress={() => setEnlarged(null)} accessibilityLabel="Close photo">
-                  <Image source={{ uri: receiptUrls[enlarged] }} style={styles.large} contentFit="contain" />
-                </Pressable>
-              ) : null}
               <View style={styles.receipts}>
                 {receipts.map((p) => (
-                  <Pressable key={p} onPress={() => setEnlarged(enlarged === p ? null : p)} accessibilityLabel="View photo">
+                  <Pressable key={p} onPress={() => setEnlarged(p)} accessibilityLabel="View photo">
                     {receiptUrls[p] ? (
-                      <Image source={{ uri: receiptUrls[p] }} style={[styles.thumb, enlarged === p && styles.thumbActive]} contentFit="cover" />
+                      <Image source={{ uri: receiptUrls[p] }} style={styles.thumb} contentFit="cover" />
                     ) : (
                       <View style={styles.thumb} />
                     )}
@@ -288,17 +285,12 @@ export function AccountTxnSheet({
       />
 
       <Text style={styles.label}>Receipt photos <Text style={styles.optional}>(optional)</Text></Text>
-      {enlarged && receiptUrls[enlarged] ? (
-        <Pressable onPress={() => setEnlarged(null)} accessibilityLabel="Close photo">
-          <Image source={{ uri: receiptUrls[enlarged] }} style={styles.large} contentFit="contain" />
-        </Pressable>
-      ) : null}
       <View style={styles.receipts}>
         {receipts.map((p) => (
           <View key={p}>
-            <Pressable onPress={() => setEnlarged(enlarged === p ? null : p)} accessibilityLabel="View photo">
+            <Pressable onPress={() => setEnlarged(p)} accessibilityLabel="View photo">
               {receiptUrls[p] ? (
-                <Image source={{ uri: receiptUrls[p] }} style={[styles.thumb, enlarged === p && styles.thumbActive]} contentFit="cover" />
+                <Image source={{ uri: receiptUrls[p] }} style={styles.thumb} contentFit="cover" />
               ) : (
                 <View style={styles.thumb} />
               )}
@@ -337,6 +329,12 @@ export function AccountTxnSheet({
       </View>
       </>
       )}
+
+      <ImageViewerModal
+        uri={enlarged ? receiptUrls[enlarged] ?? null : null}
+        title="Receipt"
+        onDismiss={() => setEnlarged(null)}
+      />
     </SheetFrame>
   );
 }

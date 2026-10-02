@@ -18,9 +18,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
+import { SmoothTextInput as TextInput } from '../../../components/SmoothTextInput';
+import type { TextInput as RNTextInput } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
 import { DatePickerModal, enGB, registerTranslation } from 'react-native-paper-dates';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,6 +49,7 @@ import {
   uploadBillImage,
 } from '../../../lib/bills';
 import { BillHistorySheet } from '../../../components/BillHistorySheet';
+import { ImageViewerModal } from '../../../components/ImageViewerModal';
 import { BillPage, BillPreviewSheet } from '../../../components/BillPreviewSheet';
 import { HourPickerModal, hourLabel } from '../../../components/DateTimeFields';
 import { useFeatureBase } from '../../../lib/featureAccess';
@@ -156,6 +158,8 @@ export default function BillEditorScreen() {
   // A saved bill opens as the bill itself; Edit switches to the form.
   const [viewing, setViewing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  // The bill image open in the big popup.
+  const [viewImage, setViewImage] = useState<string | null>(null);
   // Photos uploaded to a saved bill but not saved yet — removed on discard.
   const newImages = useRef<string[]>([]);
   // A service row to focus once it has rendered (Enter adds the next one).
@@ -853,11 +857,13 @@ export default function BillEditorScreen() {
             <View style={styles.images}>
               {form.images.map((p) => (
                 <View key={p}>
-                  {imageUrls[p] ? (
-                    <Image source={{ uri: imageUrls[p] }} style={styles.thumb} contentFit="cover" />
-                  ) : (
-                    <View style={[styles.thumb, { backgroundColor: T.soft2 }]} />
-                  )}
+                  <Pressable onPress={() => imageUrls[p] && setViewImage(p)} accessibilityLabel="View image">
+                    {imageUrls[p] ? (
+                      <Image source={{ uri: imageUrls[p] }} style={styles.thumb} contentFit="cover" />
+                    ) : (
+                      <View style={[styles.thumb, { backgroundColor: T.soft2 }]} />
+                    )}
+                  </Pressable>
                   <Pressable style={styles.thumbX} onPress={() => removeImage(p)} hitSlop={6} accessibilityLabel="Remove image">
                     <Feather name="x" size={12} color={T.white} />
                   </Pressable>
@@ -885,6 +891,11 @@ export default function BillEditorScreen() {
       {showHistory && bill ? (
         <BillHistorySheet billId={bill.id} billNumber={bill.number} onDismiss={() => setShowHistory(false)} />
       ) : null}
+
+      <ImageViewerModal
+        uri={viewImage ? imageUrls[viewImage] ?? null : null}
+        onDismiss={() => setViewImage(null)}
+      />
 
       {preview && settings ? (
         <BillPreviewSheet
@@ -989,7 +1000,7 @@ function Field({
   keyboardType?: 'phone-pad' | 'numbers-and-punctuation';
   multiline?: boolean;
   hint?: string;
-  inputRef?: (el: TextInput | null) => void;
+  inputRef?: (el: RNTextInput | null) => void;
   /** Where the keyboard's Next key goes. Without it the key reads Done. */
   onNext?: () => void;
 }) {
@@ -1064,7 +1075,7 @@ function MoneyRow({
   onChange: (v: string) => void;
   editable?: boolean;
   hint?: string;
-  inputRef?: (el: TextInput | null) => void;
+  inputRef?: (el: RNTextInput | null) => void;
   onNext?: () => void;
 }) {
   return (

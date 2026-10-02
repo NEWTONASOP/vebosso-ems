@@ -12,7 +12,8 @@ import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { useFocusEffect } from 'expo-router';
 import { Image } from 'expo-image';
 import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SmoothTextInput as TextInput } from './SmoothTextInput';
 import { Text } from 'react-native-paper';
 import { AppTheme as T, appShadow } from '../constants/theme';
 import { Alert } from '../lib/alert';
@@ -700,11 +701,10 @@ function WorkLogPhotos({
       {open ? (
         urls ? (
           <View style={{ gap: 8, marginTop: 8 }}>
-            {enlarged && urls[enlarged] ? (
-              <Pressable onPress={() => setEnlarged(null)} accessibilityLabel="Close photo">
-                <Image source={{ uri: urls[enlarged] }} style={styles.photoLarge} contentFit="contain" />
-              </Pressable>
-            ) : null}
+            <ImageViewerModal
+              uri={enlarged ? urls[enlarged] ?? null : null}
+              onDismiss={() => setEnlarged(null)}
+            />
             {withPhotos.map((g) => (
               <View key={g.label}>
                 {withPhotos.length > 1 ? <Text style={styles.photoGroup}>{g.label}</Text> : null}
@@ -713,15 +713,11 @@ function WorkLogPhotos({
                     urls[path] ? (
                       <Pressable
                         key={path}
-                        onPress={() => setEnlarged(enlarged === path ? null : path)}
+                        onPress={() => setEnlarged(path)}
                         accessibilityRole="button"
                         accessibilityLabel={`${g.label} photo`}
                       >
-                        <Image
-                          source={{ uri: urls[path] }}
-                          style={[styles.photoThumb, enlarged === path && styles.photoThumbActive]}
-                          contentFit="cover"
-                        />
+                        <Image source={{ uri: urls[path] }} style={styles.photoThumb} contentFit="cover" />
                       </Pressable>
                     ) : null,
                   )}

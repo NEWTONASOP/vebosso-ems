@@ -3,8 +3,9 @@
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
-import { useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { SmoothTextInput as TextInput } from './SmoothTextInput';
 import { Button, Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/theme';
 import { useKeyboardHeight } from '../lib/useKeyboardHeight';
@@ -22,19 +23,30 @@ export function TaskCompleteModal({
   onDismiss,
   onComplete,
 }: TaskCompleteModalProps) {
-  const [note, setNote] = useState('');
+  // Uncontrolled, like the check-in plan (PaperOutlinedField): the text lives
+  // in the input itself, not in state fed back on every key. Feeding it back
+  // made some Android keyboards drop or repeat letters while typing.
+  const noteRef = useRef('');
+  const [count, setCount] = useState(0);
+  // A fresh, empty box each time the dialog opens.
+  const [fieldKey, setFieldKey] = useState(0);
+
+  useEffect(() => {
+    if (!visible) return;
+    noteRef.current = '';
+    setCount(0);
+    setFieldKey((k) => k + 1);
+  }, [visible]);
 
   // Centre the dialog in the space above the keyboard.
   const keyboard = useKeyboardHeight();
 
   const handleCancel = () => {
-    setNote('');
     onDismiss();
   };
 
   const handleSubmit = () => {
-    onComplete(note.trim());
-    setNote('');
+    onComplete(noteRef.current.trim());
     onDismiss();
   };
 
@@ -63,17 +75,21 @@ export function TaskCompleteModal({
             <View style={styles.inputSection}>
               <Text style={styles.inputLabel}>Add a note (optional). Whoever gave you this task will approve it or send it back.</Text>
               <TextInput
+                key={fieldKey}
                 style={styles.input}
                 placeholder="Brief summary of your work..."
                 placeholderTextColor={AppTheme.mute}
-                value={note}
-                onChangeText={setNote}
+                defaultValue=""
+                onChangeText={(text) => {
+                  noteRef.current = text;
+                  setCount(text.length);
+                }}
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
                 maxLength={500}
               />
-              <Text style={styles.charCounter}>{note.length}/500</Text>
+              <Text style={styles.charCounter}>{count}/500</Text>
             </View>
 
             <View style={styles.buttonRow}>

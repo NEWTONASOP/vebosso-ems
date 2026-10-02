@@ -18,6 +18,8 @@ interface AuthState {
   isAuthenticated: boolean;
   userRole: UserRole | null;
   userId: string | null;
+  /** Why the app signed this person out by itself — shown on the login screen. */
+  logoutReason: string | null;
 
   initialize: () => Promise<void>;
   resumeSession: () => Promise<void>;
@@ -28,8 +30,12 @@ interface AuthState {
   changePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
   setError: (error: string | null) => void;
   clearError: () => void;
+  clearLogoutReason: () => void;
   cleanup: () => void;
 }
+
+/** Shown when a saved login could no longer be renewed. */
+const EXPIRED_REASON = 'Your login expired, so you were signed out on this device. Please sign in again. (code: refresh)';
 
 let authSubscription: { data: { subscription: { unsubscribe: () => void } } } | null = null;
 
@@ -49,20 +55,30 @@ function applyAuthenticatedState(
   });
 }
 
-async function resolveSessionFromStorage(): Promise<Session | null> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return null;
+/**
+ * The saved login, renewed by Supabase only if it has expired. (Forcing a
+ * renewal on every launch and every return to the app swapped the saved token
+ * far more often than needed, and each swap is a chance for an "already used"
+ * token to sign the person out.) `expired` is set when the saved login could
+ * not be renewed at all.
+ */
+async function resolveSessionFromStorage(): Promise<{ session: Session | null; expired: boolean }> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error && isRefreshTokenFatal(error)) return { session: null, expired: true };
+  return { session: data.session ?? null, expired: false };
+}
 
-  const { data: refreshed, error } = await supabase.auth.refreshSession();
-  if (error) {
-    if (isRefreshTokenFatal(error)) {
-      await supabase.auth.signOut();
-      return null;
-    }
-    return session;
+/**
+ * Signs out on this device only. Supabase's default ends the person's login on
+ * every phone and browser, so one device's problem used to log them out
+ * everywhere.
+ */
+async function signOutThisDevice() {
+  try {
+    await supabase.auth.signOut({ scope: 'local' });
+  } catch {
+    // already signed out locally
   }
-
-  return refreshed.session ?? session;
 }
 
 async function loadProfileForSession(
@@ -102,6 +118,22 @@ async function loadProfileForSession(
 }
 
 export const useAuthStore = create<AuthState>((set, get) => {
+  /** The app signing someone out by itself, with the reason kept for the login screen. */
+  const forceSignOut = async (reason: string) => {
+    if (__DEV__) console.warn('Signed out automatically:', reason);
+    await signOutThisDevice();
+    set({
+      session: null,
+      profile: null,
+      isAuthenticated: false,
+      userRole: null,
+      userId: null,
+      isLoading: false,
+      error: reason,
+      logoutReason: reason,
+    });
+  };
+
   const hydrateFromSession = async (session: Session, signOutOnHardFailure: boolean) => {
     const profileResult = await loadProfileForSession(session.user.id, signOutOnHardFailure);
 
@@ -111,16 +143,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     }
 
     if (profileResult.shouldSignOut) {
-      await supabase.auth.signOut();
-      set({
-        session: null,
-        profile: null,
-        isAuthenticated: false,
-        userRole: null,
-        userId: null,
-        isLoading: false,
-        error: profileResult.error,
-      });
+      await forceSignOut(profileResult.error);
       return false;
     }
 
@@ -149,6 +172,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     isAuthenticated: false,
     userRole: null,
     userId: null,
+    logoutReason: null,
 
     initialize: async () => {
       try {
@@ -159,47 +183,61 @@ export const useAuthStore = create<AuthState>((set, get) => {
           authSubscription = null;
         }
 
-        const session = await resolveSessionFromStorage();
+        const { session, expired } = await resolveSessionFromStorage();
 
         if (session?.user) {
           await hydrateFromSession(session, true);
+        } else if (expired) {
+          await forceSignOut(EXPIRED_REASON);
         } else {
           set({ isLoading: false });
         }
 
         set({ isInitialized: true });
 
-        authSubscription = supabase.auth.onAuthStateChange(async (event, newSession) => {
+        // Supabase calls this while it holds its own sign-in lock; waiting on
+        // other Supabase requests in here can stall them. So only note the
+        // event here and do the work right after.
+        authSubscription = supabase.auth.onAuthStateChange((event, newSession) => {
           if (__DEV__) console.log('Auth state changed:', event);
 
-          if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && newSession?.user) {
-            await hydrateFromSession(newSession, true);
-            return;
-          }
-
-          if (event === 'SIGNED_OUT') {
-            set({
-              session: null,
-              profile: null,
-              isAuthenticated: false,
-              userRole: null,
-              userId: null,
-              isLoading: false,
-              error: null,
-            });
-            return;
-          }
-
-          if (event === 'TOKEN_REFRESHED' && newSession) {
-            set({ session: newSession });
-            const { profile, userId } = get();
-            if (!profile && userId === newSession.user.id) {
-              const profileResult = await loadProfileForSession(newSession.user.id, false);
-              if (profileResult.ok) {
-                set({ profile: profileResult.profile, userRole: profileResult.profile.role, error: null });
+          setTimeout(() => {
+            void (async () => {
+              if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && newSession?.user) {
+                // Already signed in as this person with their profile: nothing to redo.
+                const { profile, userId } = get();
+                if (profile && userId === newSession.user.id) {
+                  set({ session: newSession });
+                  return;
+                }
+                await hydrateFromSession(newSession, true);
+                return;
               }
-            }
-          }
+
+              if (event === 'SIGNED_OUT') {
+                set({
+                  session: null,
+                  profile: null,
+                  isAuthenticated: false,
+                  userRole: null,
+                  userId: null,
+                  isLoading: false,
+                });
+                return;
+              }
+
+              if (event === 'TOKEN_REFRESHED' && newSession) {
+                set({ session: newSession });
+                const { profile, userId } = get();
+                if (!profile && userId === newSession.user.id) {
+                  const profileResult = await loadProfileForSession(newSession.user.id, false);
+                  if (profileResult.ok) {
+                    set({ profile: profileResult.profile, userRole: profileResult.profile.role, error: null });
+                  }
+                }
+              }
+            })();
+          }, 0);
         });
       } catch (error) {
         if (__DEV__) console.error('Auth initialization error:', error);
@@ -213,22 +251,19 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
     resumeSession: async () => {
       const { isAuthenticated, userId } = get();
+      const { session, expired } = await resolveSessionFromStorage();
+
       if (!isAuthenticated && !userId) {
-        const session = await resolveSessionFromStorage();
         if (!session?.user) return;
         await hydrateFromSession(session, false);
         return;
       }
 
-      const { data: refreshed, error } = await supabase.auth.refreshSession();
-      if (error) {
-        if (isRefreshTokenFatal(error)) {
-          await supabase.auth.signOut();
-        }
+      if (expired) {
+        await forceSignOut(EXPIRED_REASON);
         return;
       }
-
-      const session = refreshed.session ?? get().session;
+      // Anything else unclear (offline, slow): stay signed in and try later.
       if (!session?.user) return;
 
       set({ session });
@@ -236,18 +271,10 @@ export const useAuthStore = create<AuthState>((set, get) => {
       const profileResult = await loadProfileForSession(session.user.id, false);
       if (profileResult.ok) {
         applyAuthenticatedState(set, session, profileResult.profile);
-      } else if (!profileResult.shouldSignOut) {
-        set({ error: profileResult.error });
+      } else if (profileResult.shouldSignOut) {
+        await forceSignOut(profileResult.error);
       } else {
-        await supabase.auth.signOut();
-        set({
-          session: null,
-          profile: null,
-          isAuthenticated: false,
-          userRole: null,
-          userId: null,
-          error: profileResult.error,
-        });
+        set({ error: profileResult.error });
       }
     },
 
@@ -286,7 +313,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
           if (!profileResult.ok) {
             if (profileResult.shouldSignOut) {
-              await supabase.auth.signOut();
+              await signOutThisDevice();
             }
             set({ isLoading: false, error: profileResult.error });
             return { success: false, error: profileResult.error };
@@ -336,7 +363,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
             .eq('is_active', true);
         }
 
-        await supabase.auth.signOut();
+        // This device only — their other phones / browsers stay signed in.
+        await signOutThisDevice();
 
         set({
           session: null,
@@ -346,6 +374,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           userId: null,
           isLoading: false,
           error: null,
+          logoutReason: null,
         });
       } catch (error) {
         if (__DEV__) console.error('Sign out error:', error);
@@ -427,6 +456,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
     setError: (error: string | null) => set({ error }),
     clearError: () => set({ error: null }),
+    clearLogoutReason: () => set({ logoutReason: null }),
 
     cleanup: () => {
       if (authSubscription) {

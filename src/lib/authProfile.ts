@@ -37,7 +37,10 @@ export async function fetchProfileReliable(
 
     if (error) {
       lastError = error.message;
-      if ((error as PostgrestError).code === 'PGRST116') {
+      // "No row" is not proof the account is gone: a request that went out
+      // without the login attached also comes back empty. Ask the auth server
+      // about the login itself, and only call it missing when it says so.
+      if ((error as PostgrestError).code === 'PGRST116' && (await authUserIsGone())) {
         return { status: 'not_found' };
       }
     }
@@ -48,6 +51,22 @@ export async function fetchProfileReliable(
   }
 
   return { status: 'transient_error', lastError };
+}
+
+/**
+ * True only when the auth server says this login's user no longer exists
+ * (e.g. the account was deleted). A network error or anything unclear is not
+ * treated as gone.
+ */
+async function authUserIsGone(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (data?.user) return false;
+    const msg = (error?.message ?? '').toLowerCase();
+    return msg.includes('does not exist') || msg.includes('user not found');
+  } catch {
+    return false;
+  }
 }
 
 export function isRefreshTokenFatal(error: { message?: string } | null): boolean {

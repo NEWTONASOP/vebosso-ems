@@ -8,7 +8,9 @@ import { Feather } from '@expo/vector-icons';
 
 import { addDays, format, isValid, parseISO } from 'date-fns';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { SmoothTextInput as TextInput } from './SmoothTextInput';
+import type { TextInput as RNTextInput } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { addCity, addVenue, isValidEmail, updateVenue } from '../lib/venues';
@@ -239,7 +241,7 @@ function Field({
   onChange: (v: string) => void;
   placeholder?: string;
   keyboardType?: 'email-address' | 'phone-pad';
-  inputRef?: (el: TextInput | null) => void;
+  inputRef?: (el: RNTextInput | null) => void;
   /** Where the keyboard's Next key goes. Without it the key reads Done. */
   onNext?: () => void;
 }) {

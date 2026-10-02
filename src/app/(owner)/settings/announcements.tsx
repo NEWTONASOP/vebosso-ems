@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Snackbar, Text, TextInput } from 'react-native-paper';
+import { renderSmoothInput } from '../../../components/SmoothTextInput';
 import { AnnouncementCard } from '../../../components/AnnouncementCard';
 import { EmptyState } from '../../../components/EmptyState';
 import {
@@ -139,6 +140,7 @@ export default function AnnouncementsScreen() {
             label="Title"
             value={title}
             onChangeText={setTitle}
+            render={renderSmoothInput}
             maxLength={200}
             style={styles.input}
             outlineColor={T.soft2}
@@ -152,6 +154,7 @@ export default function AnnouncementsScreen() {
             label="Message"
             value={body}
             onChangeText={setBody}
+            render={renderSmoothInput}
             multiline
             numberOfLines={3}
             maxLength={2000}
