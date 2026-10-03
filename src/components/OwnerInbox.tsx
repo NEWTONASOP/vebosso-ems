@@ -11,7 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { useFocusEffect } from 'expo-router';
 import { Image } from 'expo-image';
-import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SmoothTextInput as TextInput } from './SmoothTextInput';
 import { Text } from 'react-native-paper';
@@ -35,17 +35,34 @@ import { supabase } from '../lib/supabase';
 import { formatWorkLogDateForMessage } from '../lib/workLogDates';
 import { useAuthStore } from '../store/authStore';
 import { useWorkStore } from '../store/workStore';
-import { LeaveRequestWithProfile, WorkLogWithProfile } from '../types/database';
+import { LeaveRequestWithProfile, Task, WorkLogWithProfile } from '../types/database';
 import { AnimatedPressable } from './AnimatedPressable';
 import { ImageViewerModal } from './ImageViewerModal';
+import { PaperOutlinedField } from './PaperOutlinedField';
 import { SheetFrame } from './SheetFrame';
 import { UserAvatar } from './UserAvatar';
+import { VOICE_TASK_TITLE } from './MemberTasksSheet';
+import { VoiceNote } from './VoiceNote';
 
 // ============================================================================
 // Data
 // ============================================================================
 
-export type InboxKind = 'checkin' | 'checkout' | 'leave' | 'document' | 'salary' | 'expense' | 'message';
+export type InboxKind = 'checkin' | 'checkout' | 'leave' | 'document' | 'salary' | 'expense' | 'task' | 'message';
+
+/** A task its assignee finished, waiting for approval (status 'review'). */
+export type TaskToReview = Task & { person: { full_name: string; avatar_url: string | null } | null };
+
+/** The owner sees every task (RLS), whoever gave it; oldest finished first. */
+const fetchTasksToReview = async (): Promise<{ success: true; data: TaskToReview[] } | { success: false }> => {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*, person:profiles!tasks_assigned_to_fkey(full_name, avatar_url)')
+    .eq('status', 'review')
+    .order('completed_at', { ascending: true });
+  if (error) return { success: false };
+  return { success: true, data: (data || []) as unknown as TaskToReview[] };
+};
 
 const KINDS: {
   key: InboxKind;
@@ -61,17 +78,19 @@ const KINDS: {
   { key: 'document', one: 'document', many: 'documents', icon: 'file-text', color: T.coral, soft: T.coralSoft },
   { key: 'salary', one: 'salary request', many: 'salary requests', icon: 'credit-card', color: T.green, soft: T.greenSoft },
   { key: 'expense', one: 'travel expense', many: 'travel expenses', icon: 'navigation', color: T.violet, soft: T.violetSoft },
+  { key: 'task', one: 'task approval', many: 'task approvals', icon: 'check-square', color: T.violet, soft: T.violetSoft },
   { key: 'message', one: 'message', many: 'messages', icon: 'message-circle', color: T.inkSoft, soft: T.soft },
 ];
 
 const loadExtras = async () => {
-  const [docs, salary, expenses, messages] = await Promise.all([
+  const [docs, salary, expenses, tasks, messages] = await Promise.all([
     fetchAllPendingDocuments(),
     fetchAllSalaryRequests(),
     fetchAllSubmittedExpenses(),
+    fetchTasksToReview(),
     fetchUnreadChats(),
   ]);
-  return { docs, salary, expenses, messages };
+  return { docs, salary, expenses, tasks, messages };
 };
 
 export interface OwnerInbox {
@@ -81,6 +100,8 @@ export interface OwnerInbox {
   documents: PendingDocument[];
   salary: WaitingSalaryRequest[];
   expenses: WaitingExpense[];
+  /** Finished tasks waiting for approval. */
+  tasks: TaskToReview[];
   /** One entry per person with unread chat messages. */
   messages: UnreadChat[];
   counts: Record<InboxKind, number>;
@@ -98,12 +119,14 @@ export function useOwnerInbox(): OwnerInbox {
   const [documents, setDocuments] = useState<PendingDocument[]>([]);
   const [salary, setSalary] = useState<WaitingSalaryRequest[]>([]);
   const [expenses, setExpenses] = useState<WaitingExpense[]>([]);
+  const [tasks, setTasks] = useState<TaskToReview[]>([]);
   const [messages, setMessages] = useState<UnreadChat[]>([]);
 
   const applyExtras = useCallback((res: Awaited<ReturnType<typeof loadExtras>>) => {
     if (res.docs.success) setDocuments(res.docs.data);
     if (res.salary.success) setSalary(res.salary.data);
     if (res.expenses.success) setExpenses(res.expenses.data);
+    if (res.tasks.success) setTasks(res.tasks.data);
     if (res.messages.success) setMessages(res.messages.data);
   }, []);
 
@@ -134,7 +157,7 @@ export function useOwnerInbox(): OwnerInbox {
       timer = setTimeout(() => void refresh(), 400);
     };
     const channel = supabase.channel(`owner_inbox_${Math.random().toString(36).slice(2, 8)}`);
-    for (const table of ['employee_documents', 'salary_requests', 'expense_claims', 'chat_messages', 'leave_requests']) {
+    for (const table of ['employee_documents', 'salary_requests', 'expense_claims', 'tasks', 'chat_messages', 'leave_requests']) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, soon);
     }
     channel.subscribe();
@@ -155,11 +178,12 @@ export function useOwnerInbox(): OwnerInbox {
       document: documents.length,
       salary: salary.length,
       expense: expenses.length,
+      task: tasks.length,
       message: messages.reduce((n, m) => n + m.count, 0),
     };
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    return { checkIns, checkOuts, leaves, documents, salary, expenses, messages, counts, total, refresh };
-  }, [pendingApprovals, leaveRequests, documents, salary, expenses, messages, refresh]);
+    return { checkIns, checkOuts, leaves, documents, salary, expenses, tasks, messages, counts, total, refresh };
+  }, [pendingApprovals, leaveRequests, documents, salary, expenses, tasks, messages, refresh]);
 }
 
 // ============================================================================
@@ -236,6 +260,8 @@ export function OwnerInboxSheet({
   const rejectCheckIn = useWorkStore((s) => s.rejectCheckIn);
   const approveLeaveRequest = useWorkStore((s) => s.approveLeaveRequest);
   const rejectLeaveRequest = useWorkStore((s) => s.rejectLeaveRequest);
+  const approveTask = useWorkStore((s) => s.approveTask);
+  const rejectTask = useWorkStore((s) => s.rejectTask);
 
   const [filter, setFilter] = useState<InboxKind | 'all'>(initialFilter);
   const [busy, setBusy] = useState<string | null>(null);
@@ -251,6 +277,20 @@ export function OwnerInboxSheet({
     if (res.success && refresh) await inbox.refresh();
     setBusy(null);
     onMessage(res.success ? done : res.error || 'Something went wrong');
+  };
+
+  // A task being rejected: the reason is asked for. The text lives in the box
+  // itself (not fed back on every key), kept here only for sending.
+  const [rejectingTask, setRejectingTask] = useState<TaskToReview | null>(null);
+  const rejectReason = useRef('');
+  const [hasRejectReason, setHasRejectReason] = useState(false);
+
+  const confirmTaskReject = () => {
+    const t = rejectingTask;
+    const reason = rejectReason.current.trim();
+    if (!t || !reason) return;
+    setRejectingTask(null);
+    void run(t.id, () => rejectTask(t.id, ownerId!, reason), 'Task sent back');
   };
 
   // Salary being paid: the amount is asked for, starting at their monthly salary.
@@ -435,6 +475,50 @@ export function OwnerInboxSheet({
           ))
         : null}
 
+      {show('task') ? <Section kind="task" /> : null}
+      {show('task')
+        ? inbox.tasks.map((t) => (
+            <InboxItem
+              key={t.id}
+              name={t.person?.full_name}
+              avatar={t.person?.avatar_url}
+              meta={t.completed_at ? `Finished ${formatDistanceToNow(new Date(t.completed_at), { addSuffix: true })}` : 'Finished'}
+              body={t.title === VOICE_TASK_TITLE ? '🎤 Voice task' : t.title}
+              bodyBold
+              extra={
+                <>
+                  {t.voice_path ? <VoiceNote path={t.voice_path} durationMs={t.voice_ms} /> : null}
+                  {t.completion_note ? (
+                    <View style={styles.noteBox}>
+                      <Text style={styles.noteLabel}>Their note</Text>
+                      <Text style={styles.noteText}>{t.completion_note}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.noNote}>No note added</Text>
+                  )}
+                </>
+              }
+              busy={busy === t.id}
+              actions={[
+                {
+                  label: 'Reject',
+                  tone: 'reject',
+                  onPress: () => {
+                    rejectReason.current = '';
+                    setHasRejectReason(false);
+                    setRejectingTask(t);
+                  },
+                },
+                {
+                  label: 'Approve',
+                  tone: 'approve',
+                  onPress: () => run(t.id, () => approveTask(t.id, ownerId), 'Task approved'),
+                },
+              ]}
+            />
+          ))
+        : null}
+
       {show('expense') ? <Section kind="expense" /> : null}
       {show('expense')
         ? inbox.expenses.map((x) => (
@@ -503,6 +587,44 @@ export function OwnerInboxSheet({
           ))
         : null}
     </SheetFrame>
+
+    {rejectingTask ? (
+      <SheetFrame
+        visible
+        onDismiss={() => setRejectingTask(null)}
+        title="Reject task"
+        subtitle={rejectingTask.person?.full_name ?? undefined}
+        icon="corner-up-left"
+        iconColor={T.coral}
+        iconBg={T.coralSoft}
+        footer={
+          <Pressable
+            style={[styles.payBtn, { backgroundColor: T.coral }, !hasRejectReason && { opacity: 0.45 }]}
+            onPress={confirmTaskReject}
+            disabled={!hasRejectReason}
+            accessibilityRole="button"
+          >
+            <Text style={styles.payBtnText}>Send back to redo</Text>
+          </Pressable>
+        }
+      >
+        <PaperOutlinedField
+          label="Why is it rejected?"
+          defaultValue=""
+          onChangeText={(t) => {
+            rejectReason.current = t;
+            setHasRejectReason(!!t.trim());
+          }}
+          multiline
+          maxLength={1000}
+          autoFocus
+          placeholder="What needs to be redone"
+        />
+        <Text style={styles.amountHint}>
+          {rejectingTask.person?.full_name ?? 'They'} will see this reason and have to do the task again.
+        </Text>
+      </SheetFrame>
+    ) : null}
 
     {paying ? (
       <SheetFrame
@@ -729,6 +851,7 @@ function InboxItem({
   meta,
   amount,
   body,
+  bodyBold,
   extra,
   busy,
   actions,
@@ -739,6 +862,8 @@ function InboxItem({
   /** A money amount shown large on the right, e.g. an expense. */
   amount?: string | null;
   body?: string | null;
+  /** Show the body as a heading (the thing being approved) rather than plain text. */
+  bodyBold?: boolean;
   /** Anything between the text and the buttons, e.g. photos. */
   extra?: ReactNode;
   busy: boolean;
@@ -763,7 +888,7 @@ function InboxItem({
       </View>
       {body ? (
         // Whole text, never cut short: this is what is being approved.
-        <Text style={styles.itemBody}>{body}</Text>
+        <Text style={[styles.itemBody, bodyBold && styles.itemBodyBold]}>{body}</Text>
       ) : null}
       {extra}
       <View style={styles.itemActions}>
@@ -1020,6 +1145,20 @@ const styles = StyleSheet.create({
     color: T.mute,
     marginTop: 1,
   },
+  itemBodyBold: { fontFamily: 'Inter_700Bold', fontSize: 15.5, color: T.ink, lineHeight: 22 },
+  noteBox: {
+    backgroundColor: T.card,
+    borderRadius: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: T.violet,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  noteLabel: { fontFamily: 'Inter_700Bold', fontSize: 11, color: T.violet, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 },
+  noteText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: T.inkSoft, lineHeight: 20 },
+  noNote: { fontFamily: 'Inter_400Regular', fontSize: 13, color: T.mute, marginTop: 6, marginBottom: 2 },
   itemBody: {
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
