@@ -7,15 +7,37 @@
 
 import { Feather } from '@expo/vector-icons';
 import { format, isToday, isYesterday, parseISO, startOfDay } from 'date-fns';
-import { useState } from 'react';
+import { ReactNode, useMemo, useState } from 'react';
 import { Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import { Modal, Portal, Text } from 'react-native-paper';
+import { Modal, Portal, Text, ThemeProvider, useTheme } from 'react-native-paper';
 import { DatePickerModal, enGB, registerTranslation, TimePickerModal } from 'react-native-paper-dates';
 import { AppTheme as T } from '../constants/theme';
 
 registerTranslation('en-GB', enGB);
 
 const KEY = (d: Date) => format(d, 'yyyy-MM-dd');
+
+/**
+ * The calendar and clock paint themselves with the app theme's elevation
+ * level 3 (a grey-blue tint meant for raised menus) and its muted text colour,
+ * which left them looking washed out. Inside them: white, with dark text.
+ */
+export function PickerTheme({ children }: { children: ReactNode }) {
+  const theme = useTheme();
+  const picker = useMemo(
+    () => ({
+      ...theme,
+      colors: {
+        ...theme.colors,
+        elevation: { ...theme.colors.elevation, level3: T.card },
+        onSurfaceVariant: T.inkSoft,
+        surfaceVariant: T.soft,
+      },
+    }),
+    [theme]
+  );
+  return <ThemeProvider theme={picker}>{children}</ThemeProvider>;
+}
 
 export interface QuickDate {
   label: string;
@@ -91,6 +113,7 @@ export function DateField({
         </Pressable>
       </View>
 
+      <PickerTheme>
       <DatePickerModal
         locale="en-GB"
         mode="single"
@@ -107,6 +130,7 @@ export function DateField({
         label={label}
         saveLabel="Done"
       />
+      </PickerTheme>
     </View>
   );
 }
@@ -144,6 +168,7 @@ export function TimeField({
         <Feather name="clock" size={15} color={T.inkSoft} />
         <Text style={[styles.timeText, !shown && styles.placeholder]}>{shown ?? placeholder}</Text>
       </Pressable>
+      <PickerTheme>
       <TimePickerModal
         locale="en-GB"
         visible={open}
@@ -159,6 +184,7 @@ export function TimeField({
         confirmLabel="Done"
         cancelLabel="Cancel"
       />
+      </PickerTheme>
     </View>
   );
 }

@@ -51,7 +51,7 @@ import {
 import { BillHistorySheet } from '../../../components/BillHistorySheet';
 import { ImageViewerModal } from '../../../components/ImageViewerModal';
 import { BillPage, BillPreviewSheet } from '../../../components/BillPreviewSheet';
-import { HourPickerModal, hourLabel } from '../../../components/DateTimeFields';
+import { HourPickerModal, hourLabel, PickerTheme } from '../../../components/DateTimeFields';
 import { useFeatureBase } from '../../../lib/featureAccess';
 import { useAuthStore } from '../../../store/authStore';
 import { Bill, BillBrand, BillFields, BillKind, BillSettings, BillStatus } from '../../../types/database';
@@ -914,19 +914,21 @@ export default function BillEditorScreen() {
         />
       ) : null}
 
-      <DatePickerModal
-        locale="en-GB"
-        mode="single"
-        visible={picker === 'date'}
-        date={form.function_date ? parseISO(form.function_date) : undefined}
-        onDismiss={() => setPicker(null)}
-        onConfirm={({ date }) => {
-          setPicker(null);
-          if (date) set('function_date', format(date, 'yyyy-MM-dd'));
-        }}
-        label="Date of function"
-        saveLabel="Done"
-      />
+      <PickerTheme>
+        <DatePickerModal
+          locale="en-GB"
+          mode="single"
+          visible={picker === 'date'}
+          date={form.function_date ? parseISO(form.function_date) : undefined}
+          onDismiss={() => setPicker(null)}
+          onConfirm={({ date }) => {
+            setPicker(null);
+            if (date) set('function_date', format(date, 'yyyy-MM-dd'));
+          }}
+          label="Date of function"
+          saveLabel="Done"
+        />
+      </PickerTheme>
       <HourPickerModal
         visible={picker === 'from' || picker === 'to'}
         title={picker === 'to' ? 'Ends at' : 'Starts at'}

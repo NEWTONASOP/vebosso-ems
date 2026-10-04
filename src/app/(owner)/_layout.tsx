@@ -48,19 +48,19 @@ export default function OwnerLayout() {
         }}
       />
       <Tabs.Screen
+        name="leads"
+        options={{
+          title: 'Leads',
+          tabBarIcon: ({ color, size }) => <NavgrahLogo size={size} color={String(color)} />,
+        }}
+      />
+      <Tabs.Screen
         name="accounts"
         options={{
           title: 'Accounts',
           tabBarIcon: ({ color, size }) => (
             <Feather name="book-open" color={color} size={size} />
           ),
-        }}
-      />
-      <Tabs.Screen
-        name="leads"
-        options={{
-          title: 'Leads',
-          tabBarIcon: ({ color, size }) => <NavgrahLogo size={size} color={String(color)} />,
         }}
       />
       <Tabs.Screen

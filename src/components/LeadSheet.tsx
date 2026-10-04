@@ -1,7 +1,7 @@
 // ============================================================================
 // VEBOSSO EMS — One Navgrah lead: view, add, edit
 // Opens to read (call, save to phone, edit); "Edit" switches to the form. New
-// leads open straight in the form. Delete is in the form.
+// leads open straight in the form. Delete sits next to Edit, and in the form.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -119,10 +119,15 @@ export function LeadSheet({
                 </Pressable>
               </View>
             ) : null}
-            <Pressable style={[styles.btn, styles.btnDark]} onPress={() => setViewing(false)}>
-              <Feather name="edit-2" size={16} color={T.white} />
-              <Text style={styles.btnDarkText}>Edit</Text>
-            </Pressable>
+            <View style={styles.row}>
+              <Pressable style={[styles.btn, styles.deleteBtn]} onPress={remove} accessibilityLabel="Delete lead">
+                <Feather name="trash-2" size={16} color={T.coral} />
+              </Pressable>
+              <Pressable style={[styles.btn, styles.btnDark, { flex: 1 }]} onPress={() => setViewing(false)}>
+                <Feather name="edit-2" size={16} color={T.white} />
+                <Text style={styles.btnDarkText}>Edit</Text>
+              </Pressable>
+            </View>
           </View>
         }
       >
@@ -153,7 +158,7 @@ export function LeadSheet({
           <View style={styles.row}>
             {lead ? (
               <Pressable style={[styles.btn, styles.deleteBtn]} onPress={remove} accessibilityLabel="Delete lead">
-                <Feather name="trash-2" size={16} color={T.inkSoft} />
+                <Feather name="trash-2" size={16} color={T.coral} />
               </Pressable>
             ) : null}
             <Pressable style={[styles.btn, styles.btnDark, { flex: 1 }]} onPress={() => void save()} disabled={saving}>
@@ -242,5 +247,5 @@ const styles = StyleSheet.create({
   btnSoftText: { fontFamily: 'Inter_600SemiBold', fontSize: 14.5, color: T.ink },
   btnDark: { backgroundColor: T.charcoal },
   btnDarkText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: T.white },
-  deleteBtn: { flex: 0, width: 56, backgroundColor: T.soft },
+  deleteBtn: { flex: 0, width: 56, backgroundColor: T.coralSoft },
 });
