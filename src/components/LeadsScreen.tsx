@@ -7,7 +7,7 @@
 // One shared list (migration 042).
 // ============================================================================
 
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -18,7 +18,7 @@ import { Alert } from '../lib/alert';
 import { addBanquet, contactName, deleteBanquet, fetchBanquets, fetchLeads } from '../lib/leads';
 import { exportLeads, saveLeadsToPhone } from '../lib/leadsFile';
 import { supabase } from '../lib/supabase';
-import { telUrl } from '../lib/venues';
+import { telUrl, whatsappUrl } from '../lib/venues';
 import { Lead, LeadBanquet } from '../types/database';
 import { Chevron, DropdownBody } from './Dropdown';
 import { LeadSheet } from './LeadSheet';
@@ -26,6 +26,8 @@ import { LeadsImportSheet } from './LeadsImportSheet';
 import { NavgrahLogo } from './NavgrahLogo';
 import { PaperOutlinedField } from './PaperOutlinedField';
 import { SmoothTextInput as TextInput } from './SmoothTextInput';
+
+const WHATSAPP_GREEN = '#1FA855';
 
 const loadAll = async () => {
   const [leads, banquets] = await Promise.all([fetchLeads(), fetchBanquets()]);
@@ -427,14 +429,24 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
                             ) : null}
                           </View>
                           {l.contact ? (
-                            <Pressable
-                              onPress={() => void saveOne(l)}
-                              style={styles.saveBtn}
-                              hitSlop={6}
-                              accessibilityLabel={`Save ${l.name ?? 'this lead'} to phone`}
-                            >
-                              <Feather name="user-plus" size={16} color={T.ink} />
-                            </Pressable>
+                            <View style={styles.rowBtns}>
+                              <Pressable
+                                onPress={() => Linking.openURL(whatsappUrl(l.contact!)).catch(() => setSnack('Could not open WhatsApp'))}
+                                style={styles.saveBtn}
+                                hitSlop={4}
+                                accessibilityLabel={`WhatsApp ${l.name ?? 'this lead'}`}
+                              >
+                                <MaterialCommunityIcons name="whatsapp" size={18} color={WHATSAPP_GREEN} />
+                              </Pressable>
+                              <Pressable
+                                onPress={() => void saveOne(l)}
+                                style={styles.saveBtn}
+                                hitSlop={4}
+                                accessibilityLabel={`Save ${l.name ?? 'this lead'} to phone`}
+                              >
+                                <Feather name="user-plus" size={16} color={T.ink} />
+                              </Pressable>
+                            </View>
                           ) : null}
                         </Pressable>
                       ))}
@@ -476,7 +488,7 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
         ) : null}
 
         {!isLoading && leads.length > 0 ? (
-          <Text style={styles.hint}>Tap a number to call · the person icon saves a lead to your phone · tap a lead for details</Text>
+          <Text style={styles.hint}>Tap a number to call · the green icon opens WhatsApp · the person icon saves a lead to your phone · tap a lead for details</Text>
         ) : null}
       </ScrollView>
 
@@ -573,6 +585,7 @@ const styles = StyleSheet.create({
   leadFn: { fontFamily: 'Inter_500Medium', color: T.inkSoft },
   leadPhone: { fontFamily: 'Inter_600SemiBold', fontSize: 13.5, color: T.blue, marginTop: 3 },
   leadRemarks: { fontFamily: 'Inter_400Regular', fontSize: 13, color: T.inkSoft, marginTop: 3, lineHeight: 18 },
+  rowBtns: { flexDirection: 'row', gap: 6 },
   saveBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: T.soft, alignItems: 'center', justifyContent: 'center' },
   addBtn: {
     flexDirection: 'row',

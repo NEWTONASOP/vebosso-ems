@@ -4,7 +4,7 @@
 // leads open straight in the form. Delete sits next to Edit, and in the form.
 // ============================================================================
 
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
@@ -12,11 +12,13 @@ import { AppTheme as T } from '../constants/theme';
 import { Alert } from '../lib/alert';
 import { addLead, contactName, deleteLead, leadDate, updateLead } from '../lib/leads';
 import { saveLeadsToPhone } from '../lib/leadsFile';
-import { telUrl } from '../lib/venues';
+import { telUrl, whatsappUrl } from '../lib/venues';
 import { Lead, LeadBanquet, LeadInput } from '../types/database';
 import { DateField } from './DateTimeFields';
 import { PaperOutlinedField } from './PaperOutlinedField';
 import { SheetFrame } from './SheetFrame';
+
+const WHATSAPP_GREEN = '#1FA855';
 
 const FUNCTIONS = ['Wedding', 'Engagement', 'Reception', 'Cocktail', 'Haldi', 'Mehndi', 'Birthday'];
 
@@ -83,6 +85,15 @@ export function LeadSheet({
     ]);
   };
 
+  const openWhatsApp = async () => {
+    if (!lead?.contact) return;
+    try {
+      await Linking.openURL(whatsappUrl(lead.contact));
+    } catch {
+      setError('Could not open WhatsApp');
+    }
+  };
+
   const saveToPhone = async () => {
     if (!lead) return;
     try {
@@ -105,39 +116,49 @@ export function LeadSheet({
         iconColor={T.ink}
         iconBg={T.soft}
         footer={
-          <View style={{ gap: 8 }}>
+          <View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            {lead.contact ? (
-              <View style={styles.row}>
-                <Pressable style={[styles.btn, styles.btnSoft]} onPress={() => Linking.openURL(telUrl(lead.contact!))}>
-                  <Feather name="phone" size={16} color={T.ink} />
-                  <Text style={styles.btnSoftText}>Call</Text>
-                </Pressable>
-                <Pressable style={[styles.btn, styles.btnSoft]} onPress={() => void saveToPhone()}>
-                  <Feather name="user-plus" size={16} color={T.ink} />
-                  <Text style={styles.btnSoftText}>Save to phone</Text>
-                </Pressable>
-              </View>
-            ) : null}
-            <View style={styles.row}>
+            <View style={styles.footerRow}>
               <Pressable style={[styles.btn, styles.deleteBtn]} onPress={remove} accessibilityLabel="Delete lead">
                 <Feather name="trash-2" size={16} color={T.coral} />
               </Pressable>
-              <Pressable style={[styles.btn, styles.btnDark, { flex: 1 }]} onPress={() => setViewing(false)}>
-                <Feather name="edit-2" size={16} color={T.white} />
-                <Text style={styles.btnDarkText}>Edit</Text>
+              <Pressable style={[styles.btn, styles.saveBtn]} onPress={() => setViewing(false)} accessibilityLabel="Edit lead">
+                <Text style={styles.saveText}>Edit</Text>
               </Pressable>
             </View>
           </View>
         }
       >
-        <Field label="Date of function" value={leadDate(lead.dof) || '—'} />
-        <Field label="Function" value={lead.function || '—'} />
-        <Field label="Contact" value={lead.contact || '—'} link={!!lead.contact} onPress={lead.contact ? () => Linking.openURL(telUrl(lead.contact!)) : undefined} />
-        <Field label="Remarks" value={lead.remarks || '—'} />
+        <Text style={styles.label}>Date of function</Text>
+        <Text style={styles.viewValue}>{leadDate(lead.dof) || '—'}</Text>
+
+        <Text style={styles.label}>Function</Text>
+        <Text style={styles.viewValue}>{lead.function || '—'}</Text>
+
+        <Text style={styles.label}>Contact</Text>
         {lead.contact ? (
-          <Text style={styles.saveAs}>Saves to your phone as “{contactName(lead, bq)}”</Text>
-        ) : null}
+          <>
+            <Text style={[styles.viewValue, { color: T.blue }]} onPress={() => Linking.openURL(telUrl(lead.contact!))}>
+              <Feather name="phone" size={14} color={T.blue} /> {lead.contact}
+            </Text>
+            <View style={styles.contactActions}>
+              <Pressable style={styles.softBtn} onPress={() => void openWhatsApp()} accessibilityLabel="WhatsApp">
+                <MaterialCommunityIcons name="whatsapp" size={16} color={WHATSAPP_GREEN} />
+                <Text style={[styles.softBtnText, { color: WHATSAPP_GREEN }]}>WhatsApp</Text>
+              </Pressable>
+              <Pressable style={styles.softBtn} onPress={() => void saveToPhone()} accessibilityLabel="Save to phone">
+                <Feather name="user-plus" size={14} color={T.ink} />
+                <Text style={styles.softBtnText}>Save to phone</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.saveAs}>Saves to your phone as “{contactName(lead, bq)}”</Text>
+          </>
+        ) : (
+          <Text style={styles.viewValue}>—</Text>
+        )}
+
+        <Text style={styles.label}>Remarks</Text>
+        <Text style={styles.viewValue}>{lead.remarks || '—'}</Text>
       </SheetFrame>
     );
   }
@@ -155,14 +176,14 @@ export function LeadSheet({
       footer={
         <View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
-          <View style={styles.row}>
+          <View style={styles.footerRow}>
             {lead ? (
               <Pressable style={[styles.btn, styles.deleteBtn]} onPress={remove} accessibilityLabel="Delete lead">
                 <Feather name="trash-2" size={16} color={T.coral} />
               </Pressable>
             ) : null}
-            <Pressable style={[styles.btn, styles.btnDark, { flex: 1 }]} onPress={() => void save()} disabled={saving}>
-              {saving ? <ActivityIndicator color={T.white} /> : <Text style={styles.btnDarkText}>{lead ? 'Save' : 'Add lead'}</Text>}
+            <Pressable style={[styles.btn, styles.saveBtn]} onPress={() => void save()} disabled={saving}>
+              {saving ? <ActivityIndicator color={T.white} /> : <Text style={styles.saveText}>{lead ? 'Save' : 'Add lead'}</Text>}
             </Pressable>
           </View>
         </View>
@@ -216,19 +237,20 @@ export function LeadSheet({
   );
 }
 
-function Field({ label, value, link, onPress }: { label: string; value: string; link?: boolean; onPress?: () => void }) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <Text style={[styles.fieldValue, link && { color: T.blue }]} onPress={onPress} selectable>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  label: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft, marginBottom: 8 },
+  label: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft, marginBottom: 6, marginTop: 12 },
+  viewValue: { fontFamily: 'Inter_500Medium', fontSize: 16, color: T.ink },
+  contactActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  softBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: T.soft,
+  },
+  softBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.ink },
   hint: { fontFamily: 'Inter_400Regular', fontSize: 12.5, color: T.mute, marginTop: 6 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingHorizontal: 14, height: 36, borderRadius: 18, backgroundColor: T.soft, justifyContent: 'center' },
@@ -236,16 +258,12 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: T.charcoal },
   chipText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
   chipTextOn: { color: T.white },
-  field: { paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: T.hairline },
-  fieldLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: T.mute, marginBottom: 3 },
-  fieldValue: { fontFamily: 'Inter_500Medium', fontSize: 15, color: T.ink },
-  saveAs: { fontFamily: 'Inter_400Regular', fontSize: 12.5, color: T.mute, marginTop: 12 },
+  saveAs: { fontFamily: 'Inter_400Regular', fontSize: 12, color: T.mute, marginTop: 6 },
   error: { fontFamily: 'Inter_500Medium', fontSize: 13, color: T.coral, marginBottom: 8 },
-  row: { flexDirection: 'row', gap: 8 },
-  btn: { flex: 1, height: 48, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  btnSoft: { backgroundColor: T.soft },
-  btnSoftText: { fontFamily: 'Inter_600SemiBold', fontSize: 14.5, color: T.ink },
-  btnDark: { backgroundColor: T.charcoal },
-  btnDarkText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: T.white },
-  deleteBtn: { flex: 0, width: 56, backgroundColor: T.coralSoft },
+  // Same as an account entry's footer (AccountTxnSheet).
+  footerRow: { flexDirection: 'row', gap: 8 },
+  btn: { height: 48, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  deleteBtn: { width: 56, backgroundColor: T.coralSoft },
+  saveBtn: { flex: 1, backgroundColor: T.charcoal },
+  saveText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: T.white },
 });
