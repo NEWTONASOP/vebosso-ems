@@ -9,6 +9,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AppTheme as T, appSoftShadow } from '../constants/theme';
 import { useHasFeature } from '../lib/featureAccess';
+import { NavgrahLogo } from './NavgrahLogo';
 
 const CONFIG = {
   bills: {
@@ -25,9 +26,16 @@ const CONFIG = {
     color: T.green,
     soft: T.greenSoft,
   },
+  leads: {
+    title: 'Navgrah Leads',
+    hint: 'Leads by banquet',
+    icon: 'users' as const,
+    color: T.ink,
+    soft: T.soft,
+  },
 };
 
-export function FeatureShortcut({ feature, role }: { feature: 'bills' | 'accounts'; role: 'manager' | 'member' }) {
+export function FeatureShortcut({ feature, role }: { feature: 'bills' | 'accounts' | 'leads'; role: 'manager' | 'member' }) {
   const router = useRouter();
   const allowed = useHasFeature(feature);
   if (!allowed) return null;
@@ -43,7 +51,7 @@ export function FeatureShortcut({ feature, role }: { feature: 'bills' | 'account
       accessibilityLabel={c.title}
     >
       <View style={[styles.icon, { backgroundColor: c.soft }]}>
-        <Feather name={c.icon} size={17} color={c.color} />
+        {feature === 'leads' ? <NavgrahLogo size={20} color={c.color} /> : <Feather name={c.icon} size={17} color={c.color} />}
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.title}>{c.title}</Text>

@@ -193,6 +193,8 @@ export interface SalaryRequest {
   received_at: string | null;
   /** Rupees paid for this month, set by the owner when marking it paid. */
   amount: number | string | null;
+  /** The day the owner says it will be paid, "yyyy-MM-dd" (041). */
+  expected_on?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -271,6 +273,32 @@ export interface Venue {
   updated_at: string;
 }
 
+/** A banquet hall that Navgrah leads come from (042). */
+export interface LeadBanquet {
+  id: string;
+  name: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+/** A Navgrah lead: someone with a function coming up at a banquet (042). */
+export interface Lead {
+  id: string;
+  banquet_id: string | null;
+  /** Date of function, "yyyy-MM-dd". */
+  dof: string | null;
+  name: string | null;
+  /** Function type: wedding, engagement, cocktail… */
+  function: string | null;
+  contact: string | null;
+  remarks: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type LeadInput = Pick<Lead, 'banquet_id' | 'dof' | 'name' | 'function' | 'contact' | 'remarks'>;
+
 /** One person met at a venue. */
 export interface VenueContact {
   role?: string | null;
@@ -303,6 +331,8 @@ export interface ExpenseClaim {
   /** Paths in the private `expenses` bucket. */
   photos: string[];
   status: ExpenseStatus;
+  /** The day the owner says it will be paid, "yyyy-MM-dd" (041). */
+  expected_on?: string | null;
   paid_at: string | null;
   paid_by: string | null;
   received_at: string | null;

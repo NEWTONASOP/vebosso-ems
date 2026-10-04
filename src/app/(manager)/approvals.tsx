@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View, Pressable } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
+import { ReasonSheet } from '../../components/ReasonSheet';
 import { Alert } from '../../lib/alert';
 import { ApprovalCard } from '../../components/ApprovalCard';
 import { LeaveCard } from '../../components/LeaveCard';
@@ -67,14 +68,25 @@ export default function ManagerApprovalsScreen() {
     else { setSnackMessage(result.error || 'Failed to approve. Please try again.'); }
   }, [profile, approveCheckIn]);
 
-  const handleReject = useCallback(async (workLogId: string) => {
-    if (!profile) return;
-    setRejectingId(workLogId);
-    const result = await rejectCheckIn(workLogId, profile.id, 'Please revise');
-    setRejectingId(null);
-    if (result.success) { setSnackMessage('Rejected'); } 
-    else { setSnackMessage(result.error || 'Failed to reject. Please try again.'); }
-  }, [profile, rejectCheckIn]);
+  // Sending a request back asks what needs to change; the person sees it.
+  const [reasonFor, setReasonFor] = useState<string | null>(null);
+  const handleReject = useCallback((workLogId: string) => {
+    setReasonFor(workLogId);
+  }, []);
+  const sendBack = useCallback(
+    async (workLogId: string, reason: string) => {
+      if (!profile) return;
+      setRejectingId(workLogId);
+      const result = await rejectCheckIn(workLogId, profile.id, reason);
+      setRejectingId(null);
+      if (result.success) {
+        setSnackMessage('Sent back');
+      } else {
+        setSnackMessage(result.error || 'Could not send it back. Please try again.');
+      }
+    },
+    [profile, rejectCheckIn]
+  );
 
   /** Leave approvals */
   const handleApproveLeave = useCallback(async (id: string) => {
@@ -89,19 +101,19 @@ export default function ManagerApprovalsScreen() {
   const handleRejectLeave = useCallback((id: string) => {
     if (!profile) return;
     Alert.alert(
-      'Reject Leave Request',
-      'Are you sure you want to reject this leave request?',
+      'Decline leave request',
+      'Are you sure you want to decline this leave request?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Reject',
+          text: 'Decline',
           style: 'destructive',
           onPress: async () => {
             setRejectingLeaveId(id);
             const res = await rejectLeaveRequest(id, profile.id);
             setRejectingLeaveId(null);
-            if (res.success) { setSnackMessage('Leave request rejected ❌'); }
-            else { setSnackMessage(res.error || 'Failed to reject.'); }
+            if (res.success) { setSnackMessage('Leave request declined'); }
+            else { setSnackMessage(res.error || 'Could not decline.'); }
           }
         }
       ]
@@ -287,6 +299,15 @@ export default function ManagerApprovalsScreen() {
           onSubmit={handleAssignModalSubmit}
           targetMember={assignTargetMember}
           isLoading={isAssigning}
+        />
+      ) : null}
+
+      {reasonFor ? (
+        <ReasonSheet
+          title="Send back"
+          hint="They will see this and can change it."
+          onConfirm={(reason) => sendBack(reasonFor, reason)}
+          onDismiss={() => setReasonFor(null)}
         />
       ) : null}
 

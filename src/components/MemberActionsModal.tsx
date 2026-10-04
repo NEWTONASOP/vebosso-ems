@@ -13,6 +13,7 @@ import { Modal, Portal, Switch, Text } from 'react-native-paper';
 import { AppTheme, RoleAccent, appSoftShadow } from '../constants/theme';
 import { ROLE_LABELS } from '../constants/roles';
 import { Feature, FEATURES } from '../lib/featureAccess';
+import { NavgrahLogo } from './NavgrahLogo';
 import { useSheetLift } from '../lib/useKeyboardHeight';
 import { useSheetEntrance } from '../lib/useSheetEntrance';
 import { Profile } from '../types/database';
@@ -239,7 +240,11 @@ export function MemberActionsModal({
                         accessibilityLabel={`${f.label} access`}
                       >
                         <View style={[styles.navIcon, { backgroundColor: AppTheme.violetSoft }]}>
-                          <Feather name={f.icon} size={16} color={AppTheme.violet} />
+                          {f.key === 'leads' ? (
+                            <NavgrahLogo size={18} color={AppTheme.violet} />
+                          ) : (
+                            <Feather name={f.icon} size={16} color={AppTheme.violet} />
+                          )}
                         </View>
                         <View style={[styles.navText, styles.navTextDivider]}>
                           <View style={{ flex: 1, minWidth: 0 }}>

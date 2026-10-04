@@ -11,6 +11,7 @@ import { PaperOutlinedField } from './PaperOutlinedField';
 import { Divider, Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { TaskStatus } from '../types/database';
+import { Alert } from '../lib/alert';
 import { AnimatedPressable } from './AnimatedPressable';
 import { UserAvatar } from './UserAvatar';
 
@@ -19,6 +20,8 @@ export interface TaskManage {
   onSave: (changes: { title: string; description: string | null; due_date: string | null }) => Promise<string | null>;
   onApprove: () => Promise<string | null>;
   onReject: (reason: string) => Promise<string | null>;
+  /** Open a finished task again. */
+  onReopen: () => Promise<string | null>;
 }
 
 interface TaskDetailModalProps {
@@ -210,9 +213,9 @@ export function TaskDetailModal({
           {task.rejection_reason && task.status !== 'done' ? (
             <View style={styles.rejectBox}>
               <View style={styles.sectionHeader}>
-                <Feather name="corner-up-left" size={16} color={AppTheme.coral} />
-                <Text style={[styles.sectionLabel, { color: AppTheme.coral }]}>
-                  {task.status === 'review' ? 'Earlier rejection' : 'Rejected — do it again'}
+                <Feather name="corner-up-left" size={16} color={AppTheme.amber} />
+                <Text style={[styles.sectionLabel, { color: AppTheme.amber }]}>
+                  {task.status === 'review' ? 'Earlier note' : 'Please change this'}
                 </Text>
               </View>
               <Text style={styles.rejectText}>{task.rejection_reason}</Text>
@@ -346,7 +349,7 @@ export function TaskDetailModal({
               {mode === 'reject' ? (
                 <View>
                   <PaperOutlinedField
-                    label="Why is it rejected?"
+                    label="What needs to change?"
                     defaultValue=""
                     onChangeText={(t) => {
                       reasonRef.current = t;
@@ -356,7 +359,7 @@ export function TaskDetailModal({
                     multiline
                     maxLength={1000}
                     autoFocus
-                    placeholder="What needs to be redone"
+                    placeholder="Say what to fix, so they know"
                   />
                   <View style={styles.btnRow}>
                     <AnimatedPressable scaleTo={0.96} style={[styles.btn, styles.btnSoft]} onPress={() => setMode('view')} disabled={busy}>
@@ -368,7 +371,7 @@ export function TaskDetailModal({
                       onPress={() => run(() => manage.onReject(reasonRef.current))}
                       disabled={busy || !hasReason}
                     >
-                      {busy ? <ActivityIndicator color={AppTheme.white} size="small" /> : <Text style={styles.btnDarkText}>Reject task</Text>}
+                      {busy ? <ActivityIndicator color={AppTheme.white} size="small" /> : <Text style={styles.btnDarkText}>Send back</Text>}
                     </AnimatedPressable>
                   </View>
                 </View>
@@ -395,12 +398,32 @@ export function TaskDetailModal({
                   {task.status === 'review' ? (
                     <View style={styles.btnRow}>
                       <AnimatedPressable scaleTo={0.96} style={[styles.btn, styles.btnRejectSoft]} onPress={() => { setError(''); reasonRef.current = ''; setHasReason(false); setMode('reject'); }} disabled={busy}>
-                        <Text style={styles.btnRejectSoftText}>Reject</Text>
+                        <Text style={styles.btnRejectSoftText}>Send back</Text>
                       </AnimatedPressable>
                       <AnimatedPressable scaleTo={0.96} style={[styles.btn, styles.btnApprove]} onPress={() => run(manage.onApprove)} disabled={busy}>
                         {busy ? <ActivityIndicator color={AppTheme.white} size="small" /> : <Text style={styles.btnDarkText}>Approve</Text>}
                       </AnimatedPressable>
                     </View>
+                  ) : null}
+                  {task.status === 'done' ? (
+                    <AnimatedPressable
+                      scaleTo={0.96}
+                      style={[styles.btn, styles.btnDark]}
+                      onPress={() =>
+                        Alert.alert('Open this task again?', 'It goes back to the person as a pending task, and they are told.', [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Open again', onPress: () => void run(manage.onReopen) },
+                        ])
+                      }
+                      disabled={busy}
+                    >
+                      {busy ? <ActivityIndicator color={AppTheme.white} size="small" /> : (
+                        <>
+                          <Feather name="rotate-ccw" size={16} color={AppTheme.white} />
+                          <Text style={styles.btnDarkText}>Open again</Text>
+                        </>
+                      )}
+                    </AnimatedPressable>
                   ) : null}
                   <AnimatedPressable scaleTo={0.96} style={[styles.btn, styles.btnSoft]} onPress={startEdit} disabled={busy}>
                     <Feather name="edit-2" size={16} color={AppTheme.ink} />
@@ -573,11 +596,11 @@ const styles = StyleSheet.create({
   },
   inputMulti: { minHeight: 120, maxHeight: 320, textAlignVertical: 'top' },
   rejectBox: {
-    backgroundColor: AppTheme.coralSoft,
+    backgroundColor: AppTheme.amberSoft,
     borderRadius: 14,
     padding: 14,
     borderLeftWidth: 3,
-    borderLeftColor: AppTheme.coral,
+    borderLeftColor: AppTheme.amber,
     marginBottom: 16,
   },
   rejectText: {
@@ -602,9 +625,9 @@ const styles = StyleSheet.create({
   btnDark: { backgroundColor: AppTheme.charcoal },
   btnDarkText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: AppTheme.white },
   btnApprove: { backgroundColor: AppTheme.green },
-  btnReject: { backgroundColor: AppTheme.coral },
-  btnRejectSoft: { backgroundColor: AppTheme.coralSoft },
-  btnRejectSoftText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: AppTheme.coral },
+  btnReject: { backgroundColor: AppTheme.charcoal },
+  btnRejectSoft: { backgroundColor: AppTheme.soft },
+  btnRejectSoftText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: AppTheme.ink },
   reassignButton: {
     backgroundColor: AppTheme.charcoal,
     borderRadius: 14,

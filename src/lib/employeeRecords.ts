@@ -204,7 +204,7 @@ export async function reviewDocument(
 
   sendPushNotification(
     doc.user_id,
-    decision === 'approved' ? 'Document Approved ✅' : 'Document Rejected ❌',
+    decision === 'approved' ? 'Document Approved ✅' : 'Document needs a change',
     decision === 'approved'
       ? `"${doc.name}" has been approved.`
       : `"${doc.name}" was not accepted. Please upload it again.`,
@@ -316,6 +316,28 @@ export async function requestSalary(userId: string, month: string): Promise<Resu
     [userId],
   );
 
+  return { success: true, data: undefined };
+}
+
+/**
+ * Owner only. Tells the person when their salary will be cleared. Works on a
+ * request, or records a month nobody asked for yet.
+ * @param date "yyyy-MM-dd"
+ */
+export async function setSalaryExpectedDate(userId: string, month: string, date: string): Promise<Result> {
+  const { error } = await supabase
+    .from('salary_requests')
+    .update({ expected_on: date })
+    .eq('user_id', userId)
+    .eq('month', month);
+  if (error) return fail(error);
+
+  sendPushNotification(
+    userId,
+    'Salary date 📅',
+    `Your ${salaryMonthLabel(month)} salary will be cleared by ${format(parseISO(date), 'd MMM yyyy')}.`,
+    { type: 'salary_date', month },
+  );
   return { success: true, data: undefined };
 }
 

@@ -136,6 +136,12 @@ export default function ManagerLayout() {
         }}
       />
       <Tabs.Screen
+        name="leads"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="notifications"
         options={{
           href: null,

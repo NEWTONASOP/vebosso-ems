@@ -9,7 +9,7 @@
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
-import { addMonths, format, isAfter, startOfMonth, subMonths } from 'date-fns';
+import { addMonths, format, isAfter, parseISO, startOfMonth, subMonths } from 'date-fns';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SmoothTextInput as TextInput } from './SmoothTextInput';
@@ -187,6 +187,9 @@ export function SalarySheet({ visible, onDismiss, userId, userName, mode, ownerI
             <Text style={[styles.monthState, { color: STATUS[selectedStatus].color }]}>
               {STATUS[selectedStatus].label}
               {paidAmount && selectedStatus !== 'requested' ? ` · ${paidAmount}` : ''}
+              {selectedStatus === 'requested' && selectedRecord?.expected_on
+                ? ` · will be paid by ${format(parseISO(selectedRecord.expected_on), 'd MMM')}`
+                : ''}
             </Text>
           ) : (
             <Text style={styles.monthStateMute}>Nothing yet</Text>
@@ -322,7 +325,7 @@ export function SalarySheet({ visible, onDismiss, userId, userName, mode, ownerI
               : r.status === 'paid' && r.paid_at
                 ? `Paid ${format(new Date(r.paid_at), 'd MMM')}`
                 : r.requested_at
-                  ? `Asked ${format(new Date(r.requested_at), 'd MMM, h:mm a')}`
+                  ? `Asked ${format(new Date(r.requested_at), 'd MMM, h:mm a')}${r.expected_on ? ` · will be paid by ${format(parseISO(r.expected_on), 'd MMM')}` : ''}`
                   : '';
           return (
             <Pressable

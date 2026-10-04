@@ -1,13 +1,13 @@
 // ============================================================================
 // VEBOSSO EMS — Venues Screen (shared by owner, manager, member)
 // Every venue onboarded to VEBOSSO as a table: when it was met, who met it,
-// the venue, where, and the person met there. Everyone can add; the owner can
+// the venue, where, and the person met there. Everyone with access can add,
 // edit and delete (tap a row). Venues in business with VEBOSSO show green —
-// anyone can mark one, only the owner can take the mark off. Venues are
+// anyone can mark or unmark one (043). Only the owner removes cities. Venues are
 // grouped city by city (collapsible), venues without a city last.
 // ============================================================================
 
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -36,6 +36,7 @@ import {
   setVenueInBusiness,
   telUrl,
   venueContacts,
+  whatsappUrl,
 } from '../lib/venues';
 import { Venue, VenueCity, VenueContact } from '../types/database';
 import { Chevron, DropdownBody } from './Dropdown';
@@ -56,6 +57,7 @@ const COLUMNS: { key: string; label: string; width: number }[] = [
 const TABLE_WIDTH = COLUMNS.reduce((w, c) => w + c.width, 0);
 
 const dash = (v: string | null | undefined) => (v && v.trim() ? v : '—');
+const WHATSAPP_GREEN = '#1FA855';
 
 const loadAll = async () => {
   const [venues, cities] = await Promise.all([fetchVenues(), fetchCities()]);
@@ -63,7 +65,7 @@ const loadAll = async () => {
 };
 
 interface VenuesScreenProps {
-  /** Owner: edit and delete. */
+  /** Owner: remove cities. */
   canManage: boolean;
   /** Pushed screens (manager / member) get a back button. */
   showBack?: boolean;
@@ -188,6 +190,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
     Linking.openURL(url).catch(() => setSnack(fail));
   };
   const call = (phone: string) => open(telUrl(phone), 'Could not open the phone app');
+  const whatsapp = (phone: string) => open(whatsappUrl(phone), 'Could not open WhatsApp');
 
 
   /** Owner only. Venues in it move to "No city"; nothing is deleted. */
@@ -239,16 +242,26 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
           }
           if (key === 'phone') {
             return (
-              <Text
-                key={i}
-                style={[styles.cell, styles.link]}
-                numberOfLines={1}
-                onPress={() => call(value)}
-                accessibilityRole="link"
-                accessibilityLabel={`Call ${value}`}
-              >
-                <Feather name="phone" size={12} color={T.blue} /> {value}
-              </Text>
+              <View key={i} style={styles.phoneLine}>
+                <Text
+                  style={[styles.cell, styles.link, styles.phoneText]}
+                  numberOfLines={1}
+                  onPress={() => call(value)}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Call ${value}`}
+                >
+                  <Feather name="phone" size={12} color={T.blue} /> {value}
+                </Text>
+                <Pressable
+                  onPress={() => whatsapp(value)}
+                  hitSlop={6}
+                  style={styles.waBtn}
+                  accessibilityRole="link"
+                  accessibilityLabel={`WhatsApp ${value}`}
+                >
+                  <MaterialCommunityIcons name="whatsapp" size={16} color={WHATSAPP_GREEN} />
+                </Pressable>
+              </View>
             );
           }
           if (key === 'email') {
@@ -312,7 +325,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
     Alert.alert(
       next ? 'In business with VEBOSSO?' : 'Remove the mark?',
       next
-        ? `Mark ${v.venue_name} as a venue that has given permission and works with VEBOSSO. Only the owner can undo this.`
+        ? `Mark ${v.venue_name} as a venue that has given permission and works with VEBOSSO.`
         : `${v.venue_name} will no longer show as in business.`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -602,29 +615,26 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
           iconBg={T.blueSoft}
           footer={
             <View style={{ gap: 8 }}>
-              {!detail.in_business || canManage ? (
-                <Pressable
-                  style={[styles.markBtn, detail.in_business && styles.unmarkBtn]}
-                  onPress={() => toggleInBusiness(detail)}
-                  disabled={marking}
-                >
-                  {marking ? (
-                    <ActivityIndicator color={detail.in_business ? T.inkSoft : T.white} />
-                  ) : (
-                    <>
-                      <Feather
-                        name={detail.in_business ? 'x-circle' : 'check-circle'}
-                        size={15}
-                        color={detail.in_business ? T.inkSoft : T.white}
-                      />
-                      <Text style={[styles.detailBtnText, { color: detail.in_business ? T.inkSoft : T.white }]}>
-                        {detail.in_business ? 'Remove in-business mark' : 'Mark in business with VEBOSSO'}
-                      </Text>
-                    </>
-                  )}
-                </Pressable>
-              ) : null}
-              {canManage ? (
+              <Pressable
+                style={[styles.markBtn, detail.in_business && styles.unmarkBtn]}
+                onPress={() => toggleInBusiness(detail)}
+                disabled={marking}
+              >
+                {marking ? (
+                  <ActivityIndicator color={detail.in_business ? T.inkSoft : T.white} />
+                ) : (
+                  <>
+                    <Feather
+                      name={detail.in_business ? 'x-circle' : 'check-circle'}
+                      size={15}
+                      color={detail.in_business ? T.inkSoft : T.white}
+                    />
+                    <Text style={[styles.detailBtnText, { color: detail.in_business ? T.inkSoft : T.white }]}>
+                      {detail.in_business ? 'Remove in-business mark' : 'Mark in business with VEBOSSO'}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
               <View style={styles.detailActions}>
                 <Pressable style={[styles.detailBtn, styles.deleteBtn]} onPress={() => confirmDelete(detail)}>
                   <Feather name="trash-2" size={15} color={T.coral} />
@@ -641,7 +651,6 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
                   <Text style={[styles.detailBtnText, { color: T.white }]}>Edit</Text>
                 </Pressable>
               </View>
-              ) : null}
             </View>
           }
         >
@@ -673,6 +682,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
                 title={people.length > 1 ? `Person ${i + 1}` : 'Person met'}
                 person={p}
                 onCall={call}
+                onWhatsApp={whatsapp}
                 onEmail={(e) => open(mailtoUrl([e]), 'Could not open an email app')}
               />
             ));
@@ -726,11 +736,13 @@ function PersonBlock({
   title,
   person,
   onCall,
+  onWhatsApp,
   onEmail,
 }: {
   title: string;
   person: VenueContact;
   onCall: (phone: string) => void;
+  onWhatsApp: (phone: string) => void;
   onEmail: (email: string) => void;
 }) {
   return (
@@ -745,6 +757,11 @@ function PersonBlock({
       {person.phone ? (
         <Text style={[styles.detailValue, styles.link, styles.contactLine]} onPress={() => onCall(person.phone!)}>
           <Feather name="phone" size={14} color={T.blue} /> {person.phone}
+        </Text>
+      ) : null}
+      {person.phone ? (
+        <Text style={[styles.detailValue, styles.contactLine, { color: WHATSAPP_GREEN }]} onPress={() => onWhatsApp(person.phone!)}>
+          <MaterialCommunityIcons name="whatsapp" size={15} color={WHATSAPP_GREEN} /> WhatsApp
         </Text>
       ) : null}
       {person.email ? (
@@ -787,6 +804,9 @@ const styles = StyleSheet.create({
   },
   emailPillText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: T.ink },
   contactLine: { marginTop: 4 },
+  phoneLine: { flexDirection: 'row', alignItems: 'center', paddingRight: 8 },
+  phoneText: { flexShrink: 1, paddingRight: 6 },
+  waBtn: { paddingHorizontal: 2 },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',

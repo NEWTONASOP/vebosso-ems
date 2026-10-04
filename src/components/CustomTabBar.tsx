@@ -20,6 +20,7 @@ const ICON_MAP: Record<string, string> = {
   team: 'users', approvals: 'check-circle', settings: 'settings',
   'my-team': 'users', 'my-work': 'briefcase',
   leaves: 'umbrella', venues: 'map-pin', accounts: 'book-open', bills: 'file-text',
+  leads: 'users',
 };
 
 // Map route names to user-friendly labels
@@ -28,7 +29,7 @@ const LABEL_MAP: Record<string, string> = {
   announcements: 'News', profile: 'Profile', dashboard: 'Dashboard',
   team: 'Team', approvals: 'Approvals', settings: 'Settings',
   'my-team': 'My Team', 'my-work': 'My Work', leaves: 'Leaves',
-  venues: 'Venues', accounts: 'Accounts', bills: 'Bills',
+  venues: 'Venues', accounts: 'Accounts', bills: 'Bills', leads: 'Leads',
 };
 
 const ROLE_LABEL: Record<Role, string> = {

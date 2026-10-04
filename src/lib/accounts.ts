@@ -1,5 +1,7 @@
 // ============================================================================
-// VEBOSSO EMS — Accounts ledger (owner only; RLS in migration 026)
+// VEBOSSO EMS — Accounts ledger (RLS in 026, 036, 044)
+// Each person keeps their own books; owners share theirs and can view
+// everyone else's, without changing them.
 // Balance convention everywhere: balance = credit − debit.
 // Entries can carry receipt photos (private `account-receipts` bucket, 030).
 // ============================================================================
@@ -57,6 +59,55 @@ export async function fetchAccounts(): Promise<Result<Account[]>> {
   const { data, error } = await supabase.from('accounts').select('*').order('name');
   if (error) return fail(error);
   return { success: true, data: (data || []) as Account[] };
+}
+
+/** One person's books, as an owner sees them (view only, 044). */
+export interface AccountBook {
+  userId: string;
+  name: string;
+  accounts: Account[];
+}
+
+/**
+ * Owner: splits every visible account into the owners' own books and each
+ * person's (everyone given Accounts, even with nothing in it yet). An account
+ * with no recorded creator, or one an owner made, is the owners'.
+ */
+export async function splitBooks(accounts: Account[]): Promise<{ mine: Account[]; people: AccountBook[] }> {
+  const { data: access } = await supabase.from('feature_access').select('user_id').eq('feature', 'accounts');
+  const ids = [
+    ...new Set([
+      ...accounts.map((a) => a.created_by),
+      ...((access || []) as { user_id: string }[]).map((r) => r.user_id),
+    ].filter((v): v is string => !!v)),
+  ];
+  const { data: profiles } = ids.length
+    ? await supabase.from('profiles').select('id, full_name, role').in('id', ids)
+    : { data: [] };
+
+  const people = new Map<string, AccountBook>();
+  for (const p of (profiles || []) as { id: string; full_name: string; role: string }[]) {
+    if (p.role !== 'owner') people.set(p.id, { userId: p.id, name: p.full_name, accounts: [] });
+  }
+
+  const mine: Account[] = [];
+  for (const a of accounts) {
+    const book = a.created_by ? people.get(a.created_by) : undefined;
+    if (book) book.accounts.push(a);
+    else mine.push(a);
+  }
+  return { mine, people: [...people.values()].sort((a, b) => a.name.localeCompare(b.name)) };
+}
+
+/**
+ * Whose books an account is in, for an owner: null when it is the owners'
+ * own (editable), otherwise the person's name (view only).
+ */
+export async function viewOnlyOwner(account: Account, myId: string | undefined): Promise<string | null> {
+  if (!account.created_by || account.created_by === myId) return null;
+  const { data } = await supabase.from('profiles').select('full_name, role').eq('id', account.created_by).single();
+  if (!data || data.role === 'owner') return null;
+  return data.full_name as string;
 }
 
 export async function fetchAccount(id: string): Promise<Result<Account>> {

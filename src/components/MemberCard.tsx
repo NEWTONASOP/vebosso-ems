@@ -56,7 +56,7 @@ function getStatusDisplay(status: WorkLogStatus | 'offline' | 'on_leave') {
     working: { color: AppTheme.green, bg: AppTheme.greenSoft },
     pending_checkout: { color: AppTheme.violet, bg: AppTheme.violetSoft },
     done: { color: AppTheme.inkSoft, bg: AppTheme.soft },
-    rejected: { color: AppTheme.coral, bg: AppTheme.coralSoft },
+    rejected: { color: AppTheme.amber, bg: AppTheme.amberSoft },
   };
   const theme = statusTheme[status];
   return {

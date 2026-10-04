@@ -25,6 +25,7 @@ import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { DepartmentsSheet } from '../../components/DepartmentsSheet';
 import { Chevron, DropdownBody } from '../../components/Dropdown';
 import { InboxKind, NeedsYouCard, OwnerInboxSheet, useOwnerInbox } from '../../components/OwnerInbox';
+import { ReasonSheet } from '../../components/ReasonSheet';
 import { InlineError } from '../../components/InlineError';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { MemberCard } from '../../components/MemberCard';
@@ -157,9 +158,12 @@ export default function OwnerDashboard() {
       return next;
     });
 
+  // Same rule as the "Working" count at the top: checked in (or waiting for the
+  // check-in to be approved). Someone who has checked out and is only waiting
+  // for that checkout to be approved has stopped working.
   const isWorking = (id: string) => {
     const st = memberLiveStatus[id]?.status;
-    return st === 'working' || st === 'pending_approval' || st === 'pending_checkout';
+    return st === 'working' || st === 'pending_approval';
   };
   const waitingIn = (people: Profile[]) => people.filter((m) => pendingByUser[m.id]).length;
 
@@ -218,13 +222,16 @@ export default function OwnerDashboard() {
     }
   };
 
-  const handleReject = async (workLogId: string) => {
+  // Sending a check-in back asks what needs to change; the person sees it.
+  const [reasonFor, setReasonFor] = React.useState<string | null>(null);
+  const handleReject = (workLogId: string) => setReasonFor(workLogId);
+  const sendBack = async (workLogId: string, reason: string) => {
     if (!profile?.id) return;
     setRejectingId(workLogId);
-    const result = await rejectCheckIn(workLogId, profile.id, 'Please revise your plan');
+    const result = await rejectCheckIn(workLogId, profile.id, reason);
     setRejectingId(null);
     if (!result.success) {
-      setSnackMessage(result.error || 'Failed to reject check-in. Please try again.');
+      setSnackMessage(result.error || 'Could not send it back. Please try again.');
     }
   };
 
@@ -467,6 +474,15 @@ export default function OwnerDashboard() {
         onMessage={setSnackMessage}
       />
 
+      {reasonFor ? (
+        <ReasonSheet
+          title="Send back"
+          hint="They will see this and can change it."
+          onConfirm={(reason) => sendBack(reasonFor, reason)}
+          onDismiss={() => setReasonFor(null)}
+        />
+      ) : null}
+
       <Snackbar
         visible={!!snackMessage}
         onDismiss={() => setSnackMessage('')}
@@ -587,9 +603,9 @@ function ApprovalActions({
           style={[styles.approvalBtn, styles.rejectBtn]}
         >
           {isRejecting ? (
-            <ActivityIndicator size="small" color={T.coral} />
+            <ActivityIndicator size="small" color={T.inkSoft} />
           ) : (
-            <Text style={styles.rejectText}>Reject</Text>
+            <Text style={styles.rejectText}>Send back</Text>
           )}
         </AnimatedPressable>
         <AnimatedPressable
@@ -843,7 +859,7 @@ const styles = StyleSheet.create({
   rejectText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
-    color: T.coral,
+    color: T.ink,
   },
   approveBtn: {
     backgroundColor: T.charcoal,

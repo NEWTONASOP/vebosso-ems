@@ -39,7 +39,7 @@ interface TaskWithAssignee extends Task {
 export default function OwnerTaskTrackingScreen() {
   const router = useRouter();
   const { profile } = useAuthStore();
-  const { reassignTask, updateTask, approveTask, rejectTask } = useWorkStore();
+  const { reassignTask, updateTask, approveTask, rejectTask, reopenTask } = useWorkStore();
   const [tasks, setTasks] = useState<TaskWithAssignee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -147,8 +147,15 @@ export default function OwnerTaskTrackingScreen() {
         },
         onReject: async (reason) => {
           const res = await rejectTask(selectedTask.id, profile.id, reason);
-          if (!res.success) return res.error || 'Could not reject';
+          if (!res.success) return res.error || 'Could not send it back';
           setSnackMessage('Task sent back');
+          fetchAssignedTasks(true);
+          return null;
+        },
+        onReopen: async () => {
+          const res = await reopenTask(selectedTask.id, profile.id);
+          if (!res.success) return res.error || 'Could not open it again';
+          setSnackMessage('Task opened again');
           fetchAssignedTasks(true);
           return null;
         },

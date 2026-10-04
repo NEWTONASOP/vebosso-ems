@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 import { CustomTabBar } from '../../components/CustomTabBar';
+import { NavgrahLogo } from '../../components/NavgrahLogo';
 import { SIDEBAR_WIDTH } from '../../constants/theme';
 import { useResponsive } from '../../lib/responsive';
 
@@ -53,6 +54,13 @@ export default function OwnerLayout() {
           tabBarIcon: ({ color, size }) => (
             <Feather name="book-open" color={color} size={size} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="leads"
+        options={{
+          title: 'Leads',
+          tabBarIcon: ({ color, size }) => <NavgrahLogo size={size} color={String(color)} />,
         }}
       />
       <Tabs.Screen

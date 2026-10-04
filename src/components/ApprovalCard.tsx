@@ -285,9 +285,9 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
             }}
             disabled={isApproving || isRejecting}
           >
-            <Feather name="x" size={14} color={AppTheme.coral} />
+            <Feather name="corner-up-left" size={14} color={AppTheme.inkSoft} />
             <Text style={styles.rejectBtnText}>
-              {isRejecting ? 'Rejecting...' : 'Reject'}
+              {isRejecting ? 'Sending...' : 'Send back'}
             </Text>
           </AnimatedPressable>
 
@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: AppTheme.coralSoft,
+    backgroundColor: AppTheme.soft,
     borderRadius: 20,
     height: 40,
     gap: 6,
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
   rejectBtnText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 13,
-    color: AppTheme.coral,
+    color: AppTheme.ink,
   },
   approveBtn: {
     flex: 1,

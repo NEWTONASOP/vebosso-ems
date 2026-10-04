@@ -289,7 +289,7 @@ export function WorkLogDetail({
           ) : null}
 
           {workLog.rejection_reason ? (
-            <Section label="Why this was rejected">
+            <Section label="What to change">
               <View style={styles.alertBox}>
                 <Text style={styles.alertText}>{workLog.rejection_reason}</Text>
               </View>
@@ -541,10 +541,10 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     fontFamily: 'Inter_400Regular',
   },
-  // The one tinted block in the sheet, because a rejection is the only thing
-  // here that needs to interrupt someone reading.
+  // The one tinted block in the sheet, because a request for a change is the
+  // only thing here that needs to catch someone reading.
   alertBox: {
-    backgroundColor: AppTheme.coralSoft,
+    backgroundColor: AppTheme.amberSoft,
     borderRadius: 12,
     padding: 13,
   },

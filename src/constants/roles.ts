@@ -52,10 +52,10 @@ export const WORK_LOG_STATUS_CONFIG = {
     icon: 'check-circle-outline',
   },
   rejected: {
-    label: 'Rejected',
-    color: AppTheme.coral,
-    backgroundColor: AppTheme.coralSoft,
-    icon: 'close-circle-outline',
+    label: 'Needs changes',
+    color: AppTheme.amber,
+    backgroundColor: AppTheme.amberSoft,
+    icon: 'pencil-circle-outline',
   },
 } as const;
 
@@ -92,9 +92,9 @@ export const LEAVE_STATUS_CONFIG = {
     backgroundColor: AppTheme.greenSoft,
   },
   rejected: {
-    label: 'Rejected',
-    color: AppTheme.coral,
-    backgroundColor: AppTheme.coralSoft,
+    label: 'Declined',
+    color: AppTheme.inkSoft,
+    backgroundColor: AppTheme.soft,
   },
 } as const;
 

@@ -3,7 +3,7 @@
 // One person's documents — photos, PDFs and Word files. The owner can add,
 // rename and delete anyone's; everyone else can only view and add their own
 // (enforced by RLS). Images preview in place; PDF/Word open in the phone's app.
-// Uploads by members/managers wait for the owner to approve or reject them.
+// Uploads by members/managers wait for the owner to approve them or send them back.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -55,7 +55,7 @@ const KIND_BADGE: Record<Exclude<DocumentKind, 'image'>, { label: string; color:
 const STATUS_CHIP: Record<DocumentStatus, { label: string; color: string; bg: string }> = {
   pending: { label: 'Pending', color: T.amber, bg: T.amberSoft },
   approved: { label: 'Approved', color: T.green, bg: T.greenSoft },
-  rejected: { label: 'Rejected', color: T.coral, bg: T.coralSoft },
+  rejected: { label: 'Needs a change', color: T.amber, bg: T.amberSoft },
 };
 
 interface PendingFile {
@@ -478,9 +478,9 @@ export function DocumentsSheet({
                   onPress={() => handleReview(doc, 'rejected')}
                   disabled={reviewingId === doc.id}
                   accessibilityRole="button"
-                  accessibilityLabel={`Reject ${doc.name}`}
+                  accessibilityLabel={`Send back ${doc.name}`}
                 >
-                  <Text style={styles.rejectText}>Reject</Text>
+                  <Text style={styles.rejectText}>Send back</Text>
                 </Pressable>
                 <Pressable
                   style={[styles.reviewBtn, styles.approveBtn]}
@@ -578,7 +578,7 @@ const styles = StyleSheet.create({
   rejectText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
-    color: T.coral,
+    color: T.ink,
   },
   approveBtn: {
     backgroundColor: T.charcoal,

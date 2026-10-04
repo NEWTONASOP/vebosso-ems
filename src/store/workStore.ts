@@ -123,6 +123,8 @@ interface WorkState {
   approveTask: (taskId: string, reviewerId: string) => Promise<{ success: boolean; error?: string }>;
   /** Send finished work back with a reason; it has to be done again. */
   rejectTask: (taskId: string, reviewerId: string, reason: string) => Promise<{ success: boolean; error?: string }>;
+  /** Open a finished task again; the assignee is told. */
+  reopenTask: (taskId: string, reviewerId: string) => Promise<{ success: boolean; error?: string }>;
 
   // Actions — Announcements
   fetchAnnouncements: (role: string, userId: string) => Promise<{ success: boolean; error?: string }>;
@@ -696,7 +698,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
             sendPushNotification(
               task.assigned_by,
               'Task Ready to Review 🔎',
-              `${assigneeName} finished: "${task.title}". Approve or reject it.`,
+              `${assigneeName} finished: "${task.title}". Approve it or send it back.`,
               { type: 'task_completed', task_id: taskId }
             );
           }
@@ -892,19 +894,19 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         if (isCheckout) {
           sendPushNotification(
             data.user_id,
-            'Checkout Rejected ❌',
+            'Checkout needs a change',
             dateWhen
-              ? `Your checkout for ${dateWhen} was rejected: ${reason}. Please update your report and check out again.`
-              : `Your checkout was rejected: ${reason}. Please update your report and check out again.`,
+              ? `Your checkout for ${dateWhen} needs a change: ${reason}. Please update your report and check out again.`
+              : `Your checkout needs a change: ${reason}. Please update your report and check out again.`,
             { type: 'check_out_rejected', work_log_id: workLogId }
           );
         } else {
           sendPushNotification(
             data.user_id,
-            'Check-in Rejected ❌',
+            'Check-in needs a change',
             dateWhen
-              ? `Your check-in for ${dateWhen} was rejected: ${reason}`
-              : `Your check-in was rejected: ${reason}`,
+              ? `Your check-in for ${dateWhen} needs a change: ${reason}`
+              : `Your check-in needs a change: ${reason}`,
             { type: 'check_in_rejected', work_log_id: workLogId }
           );
         }
@@ -1229,7 +1231,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
   rejectTask: async (taskId, reviewerId, reason) => {
     try {
       const why = reason.trim();
-      if (!why) return { success: false, error: 'Write why it is rejected' };
+      if (!why) return { success: false, error: 'Write what needs to change' };
 
       const { data: task, error } = await supabase
         .from('tasks')
@@ -1248,10 +1250,37 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
       sendPushNotification(
         task.assigned_to,
-        'Task Needs Redoing ↩️',
-        `"${task.title}" was rejected: ${why.slice(0, 120)}`,
+        'Task needs a change',
+        `"${task.title}" — please change: ${why.slice(0, 120)}`,
         { type: 'task_rejected', task_id: taskId },
       );
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  reopenTask: async (taskId, reviewerId) => {
+    try {
+      const { data: task, error } = await supabase
+        .from('tasks')
+        .update({
+          status: 'pending',
+          completed_at: null,
+          rejection_reason: null,
+          reviewed_by: reviewerId,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', taskId)
+        .select('assigned_to, title')
+        .single();
+
+      if (error) return { success: false, error: error.message };
+
+      sendPushNotification(task.assigned_to, 'Task opened again', `"${task.title}" is open again.`, {
+        type: 'task_reopened',
+        task_id: taskId,
+      });
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -1865,8 +1894,8 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       if (data) {
         sendPushNotification(
           data.user_id,
-          'Leave Rejected ❌',
-          `Your leave request for ${data.date} was rejected.`,
+          'Leave request declined',
+          `Your leave request for ${data.date} was declined.`,
           { type: 'leave_rejected', leave_id: leaveId }
         );
       }

@@ -25,6 +25,7 @@ import { FeatureShortcut } from '../../components/FeatureShortcut';
 import { VenuesShortcut } from '../../components/VenuesShortcut';
 import { NotificationBell } from '../../components/NotificationBell';
 import { QuickActionCard } from '../../components/QuickActionCard';
+import { ReasonSheet } from '../../components/ReasonSheet';
 import { TaskCard } from '../../components/TaskCard';
 import {
   AppTheme as T,
@@ -133,13 +134,16 @@ export default function ManagerDashboard() {
     }
   };
 
-  const handleReject = async (workLogId: string) => {
+  // Sending a check-in back asks what needs to change; the person sees it.
+  const [reasonFor, setReasonFor] = useState<string | null>(null);
+  const handleReject = (workLogId: string) => setReasonFor(workLogId);
+  const sendBack = async (workLogId: string, reason: string) => {
     if (!profile?.id) return;
     setRejectingId(workLogId);
-    const result = await rejectCheckIn(workLogId, profile.id, 'Please revise your plan');
+    const result = await rejectCheckIn(workLogId, profile.id, reason);
     setRejectingId(null);
     if (!result.success) {
-      setSnackMessage(result.error || 'Failed to reject check-in. Please try again.');
+      setSnackMessage(result.error || 'Could not send it back. Please try again.');
     }
   };
 
@@ -517,6 +521,7 @@ export default function ManagerDashboard() {
         <VenuesShortcut role="manager" />
         <FeatureShortcut feature="bills" role="manager" />
         <FeatureShortcut feature="accounts" role="manager" />
+        <FeatureShortcut feature="leads" role="manager" />
       </View>
 
       {todayTasks.length > 0 && (
@@ -633,6 +638,15 @@ export default function ManagerDashboard() {
         isLoading={checkOutLoading}
       />
     ) : null}
+    {reasonFor ? (
+      <ReasonSheet
+        title="Send back"
+        hint="They will see this and can change it."
+        onConfirm={(reason) => sendBack(reasonFor, reason)}
+        onDismiss={() => setReasonFor(null)}
+      />
+    ) : null}
+
     <Snackbar
       visible={!!snackMessage}
       onDismiss={() => setSnackMessage('')}

@@ -187,7 +187,7 @@ export function ExpensesSheet({ onDismiss, userId, userName, mode, ownerId, inli
               ? `Received ${format(new Date(c.received_at), 'd MMM')}`
               : c.status === 'paid' && c.paid_at
                 ? `Paid ${format(new Date(c.paid_at), 'd MMM')}`
-                : `Sent ${format(new Date(c.created_at), 'd MMM, h:mm a')}`;
+                : `Sent ${format(new Date(c.created_at), 'd MMM, h:mm a')}${c.expected_on ? ` · will be paid by ${format(parseISO(c.expected_on), 'd MMM')}` : ''}`;
           return (
             <View key={c.id} style={styles.claim}>
               <View style={styles.claimHead}>

@@ -1,7 +1,8 @@
 // ============================================================================
 // VEBOSSO EMS — Owner Accounts (list)
 // Master credit / debit / balance across every account, a month filter, and
-// the accounts themselves. Owner only (RLS).
+// the accounts themselves. Owners can also look through each person's
+// books (view only, 044) from the people button in the header.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -10,20 +11,30 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SmoothTextInput as TextInput } from '../../../components/SmoothTextInput';
-import { Snackbar, Text } from 'react-native-paper';
+import { Menu, Snackbar, Text } from 'react-native-paper';
 import { AccountExportSheet } from '../../../components/AccountExportSheet';
 import { AccountFormSheet } from '../../../components/AccountFormSheet';
 import { AccountImportSheet } from '../../../components/AccountImportSheet';
 import { AccountPeriodFilter } from '../../../components/AccountPeriodFilter';
 import { AppTheme as T, appShadow, appSoftShadow, screenChrome } from '../../../constants/theme';
-import { fetchAccounts, fetchSummaries, num, Period, periodLabel, rupees } from '../../../lib/accounts';
+import {
+  AccountBook,
+  fetchAccounts,
+  fetchSummaries,
+  num,
+  Period,
+  periodLabel,
+  rupees,
+  splitBooks,
+} from '../../../lib/accounts';
 import { useFeatureBase } from '../../../lib/featureAccess';
 import { useAuthStore } from '../../../store/authStore';
 import { Account, AccountSummary } from '../../../types/database';
 
-const loadAll = async (period: Period) => {
+const loadAll = async (period: Period, isOwner: boolean) => {
   const [accounts, summaries] = await Promise.all([fetchAccounts(), fetchSummaries(period)]);
-  return { accounts, summaries };
+  const books = isOwner && accounts.success ? await splitBooks(accounts.data) : null;
+  return { accounts, summaries, books };
 };
 
 export default function AccountsScreen() {
@@ -32,7 +43,12 @@ export default function AccountsScreen() {
   const base = useFeatureBase('accounts');
   const isOwner = useAuthStore((s) => s.profile?.role === 'owner');
   const [period, setPeriod] = useState<Period>(null);
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [allAccounts, setAllAccounts] = useState<Account[]>([]);
+  // Owner: the owners' own books and each person's; null for everyone else.
+  const [books, setBooks] = useState<{ mine: Account[]; people: AccountBook[] } | null>(null);
+  /** Owner: whose books are open — null for the owners' own. */
+  const [bookOf, setBookOf] = useState<string | null>(null);
+  const [booksMenu, setBooksMenu] = useState(false);
   const [summaries, setSummaries] = useState<Record<string, AccountSummary>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -42,23 +58,24 @@ export default function AccountsScreen() {
   const [snack, setSnack] = useState('');
 
   const apply = useCallback((res: Awaited<ReturnType<typeof loadAll>>) => {
-    if (res.accounts.success) setAccounts(res.accounts.data);
+    if (res.accounts.success) setAllAccounts(res.accounts.data);
+    setBooks(res.books);
     if (res.summaries.success) setSummaries(res.summaries.data);
     const err = !res.accounts.success ? res.accounts.error : !res.summaries.success ? res.summaries.error : '';
     setError(err);
     setIsLoading(false);
   }, []);
 
-  const load = useCallback(async () => apply(await loadAll(period)), [apply, period]);
+  const load = useCallback(async () => apply(await loadAll(period, isOwner)), [apply, period, isOwner]);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      loadAll(period).then((res) => active && apply(res));
+      loadAll(period, isOwner).then((res) => active && apply(res));
       return () => {
         active = false;
       };
-    }, [apply, period])
+    }, [apply, period, isOwner])
   );
 
   const onRefresh = async () => {
@@ -67,19 +84,29 @@ export default function AccountsScreen() {
     setRefreshing(false);
   };
 
+  const person = bookOf ? books?.people.find((p) => p.userId === bookOf) ?? null : null;
+  // Someone else's books: look, export, nothing else.
+  const viewOnly = !!person;
+  const accounts = useMemo(
+    () => (books ? (person ? person.accounts : books.mine) : allAccounts),
+    [books, person, allAccounts]
+  );
+
   const master = useMemo(() => {
     let credit = 0;
     let debit = 0;
     let allCredit = 0;
     let allDebit = 0;
-    for (const s of Object.values(summaries)) {
+    for (const a of accounts) {
+      const s = summaries[a.id];
+      if (!s) continue;
       credit += num(s.period_credit);
       debit += num(s.period_debit);
       allCredit += num(s.total_credit);
       allDebit += num(s.total_debit);
     }
     return { credit, debit, balance: credit - debit, allBalance: allCredit - allDebit };
-  }, [summaries]);
+  }, [accounts, summaries]);
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -103,16 +130,54 @@ export default function AccountsScreen() {
             </Pressable>
           ) : null}
           <View style={{ flexShrink: 1 }}>
-            <Text style={screenChrome.title}>Accounts</Text>
-            <Text style={screenChrome.subtitle}>
-              {isLoading ? 'Loading…' : `${accounts.length} account${accounts.length === 1 ? '' : 's'}`}
+            <Text style={screenChrome.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+              Accounts
+            </Text>
+            <Text style={screenChrome.subtitle} numberOfLines={1}>
+              {isLoading
+                ? 'Loading…'
+                : `${person ? `${person.name}'s books · view only · ` : ''}${accounts.length} account${accounts.length === 1 ? '' : 's'}`}
             </Text>
           </View>
         </View>
         <View style={styles.headerActions}>
-          <Pressable style={styles.iconBtn} onPress={() => setSheet('import')} accessibilityLabel="Import">
-            <Feather name="download" size={17} color={T.ink} />
-          </Pressable>
+          {books && books.people.length ? (
+            <Menu
+              visible={booksMenu}
+              onDismiss={() => setBooksMenu(false)}
+              anchor={
+                <Pressable
+                  style={[styles.iconBtn, viewOnly && styles.iconBtnOn]}
+                  onPress={() => setBooksMenu(true)}
+                  accessibilityLabel="Whose books"
+                >
+                  <Feather name="users" size={17} color={viewOnly ? T.white : T.ink} />
+                </Pressable>
+              }
+              contentStyle={{ backgroundColor: T.card }}
+            >
+              {[{ id: null as string | null, label: 'My books' }, ...books.people.map((p) => ({ id: p.userId as string | null, label: p.name }))].map(
+                (b) => (
+                  <Menu.Item
+                    key={b.id ?? 'mine'}
+                    leadingIcon={bookOf === b.id ? 'check' : b.id ? 'eye-outline' : 'book-outline'}
+                    title={b.label}
+                    titleStyle={bookOf === b.id ? { fontFamily: 'Inter_700Bold' } : undefined}
+                    onPress={() => {
+                      setBooksMenu(false);
+                      setBookOf(b.id);
+                      setQuery('');
+                    }}
+                  />
+                )
+              )}
+            </Menu>
+          ) : null}
+          {!viewOnly ? (
+            <Pressable style={styles.iconBtn} onPress={() => setSheet('import')} accessibilityLabel="Import">
+              <Feather name="download" size={17} color={T.ink} />
+            </Pressable>
+          ) : null}
           <Pressable
             style={[styles.iconBtn, accounts.length === 0 && { opacity: 0.4 }]}
             onPress={() => accounts.length && setSheet('export')}
@@ -120,9 +185,11 @@ export default function AccountsScreen() {
           >
             <Feather name="share" size={17} color={T.ink} />
           </Pressable>
-          <Pressable style={styles.addBtn} onPress={() => setSheet('new')} accessibilityLabel="New account">
-            <Feather name="plus" size={18} color={T.white} />
-          </Pressable>
+          {!viewOnly ? (
+            <Pressable style={styles.addBtn} onPress={() => setSheet('new')} accessibilityLabel="New account">
+              <Feather name="plus" size={18} color={T.white} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -136,7 +203,9 @@ export default function AccountsScreen() {
         {/* Master balance */}
         <View style={styles.master}>
           <View style={styles.masterGlow} />
-          <Text style={styles.masterEyebrow}>{periodLabel(period)} · all accounts</Text>
+          <Text style={styles.masterEyebrow}>
+            {periodLabel(period)} · {person ? `all of ${person.name}'s accounts` : 'all accounts'}
+          </Text>
           <Text style={[styles.masterBalance, master.balance < 0 && { color: T.onDarkAccent }]}>
             {rupees(master.balance)}
           </Text>
@@ -178,7 +247,12 @@ export default function AccountsScreen() {
           <View style={styles.empty}>
             <Feather name="book-open" size={26} color={T.mute} />
             <Text style={styles.emptyTitle}>No accounts yet</Text>
-            <Text style={styles.emptySub}>Create one, or import your existing books from Excel.</Text>
+            <Text style={styles.emptySub}>
+              {person
+                ? `${person.name} hasn't made any accounts yet.`
+                : 'Create one, or import your existing books from Excel.'}
+            </Text>
+            {!viewOnly ? (
             <View style={styles.emptyActions}>
               <Pressable style={styles.emptyBtn} onPress={() => setSheet('import')}>
                 <Text style={styles.emptyBtnText}>Import</Text>
@@ -187,6 +261,7 @@ export default function AccountsScreen() {
                 <Text style={[styles.emptyBtnText, { color: T.white }]}>New account</Text>
               </Pressable>
             </View>
+            ) : null}
           </View>
         ) : (
           <View style={styles.list}>
@@ -247,7 +322,7 @@ export default function AccountsScreen() {
       {sheet === 'export' ? (
         <AccountExportSheet accounts={list.length ? list : accounts} period={period} onDismiss={() => setSheet(null)} />
       ) : null}
-      {sheet === 'import' ? (
+      {sheet === 'import' && !viewOnly ? (
         <AccountImportSheet
           accounts={accounts}
           onDismiss={() => setSheet(null)}
@@ -268,19 +343,20 @@ export default function AccountsScreen() {
 const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
   back: { width: 32, height: 40, justifyContent: 'center', marginLeft: -8 },
-  headerActions: { flexDirection: 'row', gap: 8 },
+  headerActions: { flexDirection: 'row', gap: 6, flexShrink: 0 },
   iconBtn: {
-    width: 42,
-    height: 42,
+    width: 38,
+    height: 38,
     borderRadius: 14,
     backgroundColor: T.card,
     alignItems: 'center',
     justifyContent: 'center',
     ...appSoftShadow,
   },
+  iconBtnOn: { backgroundColor: T.charcoal },
   addBtn: {
-    width: 42,
-    height: 42,
+    width: 38,
+    height: 38,
     borderRadius: 14,
     backgroundColor: T.charcoal,
     alignItems: 'center',

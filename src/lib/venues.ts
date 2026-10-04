@@ -1,8 +1,8 @@
 // ============================================================================
 // VEBOSSO EMS — Venues
-// Anyone can add a venue and read the list; only the owner can edit or delete
-// (RLS, migration 024). The adder's name is filled in by the database.
-// Anyone can mark a venue "in business"; only the owner can unmark it (029).
+// Anyone with access can add, edit and delete venues, and mark or unmark them
+// "in business" (RLS, migrations 024, 029, 043). The adder's name is filled in
+// by the database.
 // Since 033 all of it needs Venues access; venues sit under cities, which
 // anyone with access can add.
 // ============================================================================
@@ -64,6 +64,17 @@ export function venueContacts(v: Venue): VenueContact[] {
 /** A phone number as the dialler wants it: digits and a leading +. */
 export const telUrl = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`;
 
+/**
+ * A WhatsApp chat with this number. A 10-digit Indian number gets +91; a
+ * number already with a country code is kept as it is.
+ */
+export const whatsappUrl = (phone: string) => {
+  let n = phone.replace(/[^\d]/g, '');
+  if (n.length === 11 && n.startsWith('0')) n = n.slice(1);
+  if (n.length === 10) n = `91${n}`;
+  return `https://wa.me/${n}`;
+};
+
 /** One email to several people at once. */
 export const mailtoUrl = (emails: string[]) => `mailto:${emails.map((e) => e.trim()).join(',')}`;
 
@@ -104,7 +115,7 @@ export async function addVenue(input: VenueInput, adderId: string, isOwner: bool
   return { success: true, data: undefined };
 }
 
-/** Owner only (RLS). */
+/** Anyone with Venues access (RLS, 043). */
 export async function updateVenue(id: string, input: VenueInput): Promise<Result> {
   const { error } = await supabase.from('venues').update(clean(input)).eq('id', id);
   if (error) return fail(error);
@@ -128,14 +139,14 @@ export async function addCity(name: string): Promise<Result<VenueCity>> {
   return { success: true, data: data as VenueCity };
 }
 
-/** Anyone can mark; only the owner can unmark (checked by the database). */
+/** Anyone with Venues access can mark and unmark (043). */
 export async function setVenueInBusiness(id: string, value: boolean): Promise<Result> {
   const { error } = await supabase.rpc('set_venue_in_business', { p_venue_id: id, p_value: value });
   if (error) return fail(error);
   return { success: true, data: undefined };
 }
 
-/** Owner only (RLS). */
+/** Anyone with Venues access (RLS, 043). */
 export async function deleteVenue(id: string): Promise<Result> {
   const { error } = await supabase.from('venues').delete().eq('id', id);
   if (error) return fail(error);

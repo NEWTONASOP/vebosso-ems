@@ -54,6 +54,7 @@ export function MemberTasksSheet({
   const updateTask = useWorkStore((s) => s.updateTask);
   const approveTask = useWorkStore((s) => s.approveTask);
   const rejectTask = useWorkStore((s) => s.rejectTask);
+  const reopenTask = useWorkStore((s) => s.reopenTask);
   const [selected, setSelected] = useState<Task | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -140,8 +141,15 @@ export function MemberTasksSheet({
         },
         onReject: async (reason) => {
           const res = await rejectTask(selected.id, assignerId, reason);
-          if (!res.success) return res.error || 'Could not reject';
+          if (!res.success) return res.error || 'Could not send it back';
           onMessage?.('Task sent back');
+          await load();
+          return null;
+        },
+        onReopen: async () => {
+          const res = await reopenTask(selected.id, assignerId);
+          if (!res.success) return res.error || 'Could not open it again';
+          onMessage?.('Task opened again');
           await load();
           return null;
         },
@@ -282,7 +290,7 @@ function TaskLine({ task, onPress }: { task: Task; onPress: () => void }) {
           <Text style={styles.note}>“{task.completion_note}”</Text>
         ) : null}
         {task.rejection_reason && !isDone && !inReview ? (
-          <Text style={styles.rejected}>Rejected: {task.rejection_reason}</Text>
+          <Text style={styles.rejected}>Please change: {task.rejection_reason}</Text>
         ) : null}
         <Text style={styles.lineMeta}>
           {inReview && task.completed_at
@@ -357,7 +365,7 @@ const styles = StyleSheet.create({
   rejected: {
     fontFamily: 'Inter_500Medium',
     fontSize: 13,
-    color: T.coral,
+    color: T.amber,
     marginTop: 3,
   },
   lineMeta: {

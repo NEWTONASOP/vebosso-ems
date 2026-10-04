@@ -3,6 +3,7 @@
 // Newest first, with totals, a month filter and + to add an entry. On a phone
 // each entry is a card (particular, date, signed amount); on a wide screen it
 // is the Date | Particular | Credit | Debit table. Tap an entry to edit it.
+// An owner looking at someone else's books (044) can only view and export.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -36,18 +37,21 @@ import {
   Period,
   periodLabel,
   rupees,
+  viewOnlyOwner,
 } from '../../../lib/accounts';
 import { useFeatureBase } from '../../../lib/featureAccess';
+import { useAuthStore } from '../../../store/authStore';
 import { Account, AccountSummary, AccountTransaction } from '../../../types/database';
 
-const load = async (id: string, period: Period) => {
+const load = async (id: string, period: Period, owner: { id: string } | null) => {
   const [account, txns, summaries, accounts] = await Promise.all([
     fetchAccount(id),
     fetchTransactions(id, period),
     fetchSummaries(period),
     fetchAccounts(),
   ]);
-  return { account, txns, summaries, accounts };
+  const viewOnlyOf = owner && account.success ? await viewOnlyOwner(account.data, owner.id) : null;
+  return { account, txns, summaries, accounts, viewOnlyOf };
 };
 
 export default function AccountLedgerScreen() {
@@ -76,10 +80,17 @@ export default function AccountLedgerScreen() {
   const [sheet, setSheet] = useState<'add' | 'edit-account' | 'export' | 'import' | null>(null);
   const [editing, setEditing] = useState<AccountTransaction | null>(null);
   const [snack, setSnack] = useState('');
+  const me = useAuthStore((s) => s.profile);
+  /** Whose books this is when it isn't the viewer's own — view only. */
+  const [viewOnlyOf, setViewOnlyOf] = useState<string | null>(null);
+  const viewOnly = !!viewOnlyOf;
+  // Only an owner can be looking at someone else's books.
+  const owner = useMemo(() => (me?.role === 'owner' ? { id: me.id } : null), [me?.id, me?.role]);
 
   const apply = useCallback(
     (res: Awaited<ReturnType<typeof load>>) => {
       if (res.account.success) setAccount(res.account.data);
+      setViewOnlyOf(res.viewOnlyOf);
       if (res.txns.success) setTxns(res.txns.data);
       if (res.summaries.success) setSummary(res.summaries.data[id] ?? null);
       if (res.accounts.success) setAllAccounts(res.accounts.data);
@@ -90,18 +101,18 @@ export default function AccountLedgerScreen() {
   );
 
   const reload = useCallback(async () => {
-    if (id) apply(await load(id, period));
-  }, [apply, id, period]);
+    if (id) apply(await load(id, period, owner));
+  }, [apply, id, period, owner]);
 
   useFocusEffect(
     useCallback(() => {
       if (!id) return;
       let active = true;
-      load(id, period).then((res) => active && apply(res));
+      load(id, period, owner).then((res) => active && apply(res));
       return () => {
         active = false;
       };
-    }, [apply, id, period])
+    }, [apply, id, period, owner])
   );
 
   const onRefresh = async () => {
@@ -195,20 +206,26 @@ export default function AccountLedgerScreen() {
           <View style={{ flexShrink: 1 }}>
             <Text style={styles.title} numberOfLines={1}>{account?.name ?? ' '}</Text>
             <Text style={styles.subtitle} numberOfLines={1}>
-              {account?.note || `${txns.length} entr${txns.length === 1 ? 'y' : 'ies'} · ${periodLabel(period)}`}
+              {viewOnly
+                ? `${viewOnlyOf}'s books · view only`
+                : account?.note || `${txns.length} entr${txns.length === 1 ? 'y' : 'ies'} · ${periodLabel(period)}`}
             </Text>
           </View>
         </View>
         <View style={styles.headerActions}>
-          <Pressable style={styles.iconBtn} onPress={() => setSheet('import')} accessibilityLabel="Import into this account">
-            <Feather name="download" size={16} color={T.ink} />
-          </Pressable>
+          {!viewOnly ? (
+            <Pressable style={styles.iconBtn} onPress={() => setSheet('import')} accessibilityLabel="Import into this account">
+              <Feather name="download" size={16} color={T.ink} />
+            </Pressable>
+          ) : null}
           <Pressable style={styles.iconBtn} onPress={() => account && setSheet('export')} accessibilityLabel="Export">
             <Feather name="share" size={16} color={T.ink} />
           </Pressable>
-          <Pressable style={styles.iconBtn} onPress={() => account && setSheet('edit-account')} accessibilityLabel="Edit account">
-            <Feather name="more-horizontal" size={16} color={T.ink} />
-          </Pressable>
+          {!viewOnly ? (
+            <Pressable style={styles.iconBtn} onPress={() => account && setSheet('edit-account')} accessibilityLabel="Edit account">
+              <Feather name="more-horizontal" size={16} color={T.ink} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -225,7 +242,11 @@ export default function AccountLedgerScreen() {
           ListEmptyComponent={
             <View style={[styles.empty, !wide && styles.emptyCard]}>
               <Text style={styles.emptyText}>
-                {period ? `No entries in ${periodLabel(period)}` : 'No entries yet — tap + to add one'}
+                {period
+                  ? `No entries in ${periodLabel(period)}`
+                  : viewOnly
+                    ? 'No entries yet'
+                    : 'No entries yet — tap + to add one'}
               </Text>
             </View>
           }
@@ -286,20 +307,23 @@ export default function AccountLedgerScreen() {
         />
       )}
 
-      <Pressable
-        style={[styles.fab, { bottom: 100 + insets.bottom }]}
-        onPress={() => setSheet('add')}
-        accessibilityRole="button"
-        accessibilityLabel="Add entry"
-      >
-        <Feather name="plus" size={24} color={T.white} />
-      </Pressable>
+      {!viewOnly ? (
+        <Pressable
+          style={[styles.fab, { bottom: 100 + insets.bottom }]}
+          onPress={() => setSheet('add')}
+          accessibilityRole="button"
+          accessibilityLabel="Add entry"
+        >
+          <Feather name="plus" size={24} color={T.white} />
+        </Pressable>
+      ) : null}
 
       {account && (sheet === 'add' || editing) ? (
         <AccountTxnSheet
           accountId={account.id}
           accountName={account.name}
           txn={editing}
+          viewOnly={viewOnly}
           onDismiss={() => {
             setSheet(null);
             setEditing(null);
@@ -307,7 +331,7 @@ export default function AccountLedgerScreen() {
           onSaved={onSaved}
         />
       ) : null}
-      {account && sheet === 'edit-account' ? (
+      {account && sheet === 'edit-account' && !viewOnly ? (
         <AccountFormSheet
           account={account}
           onDismiss={() => setSheet(null)}
@@ -321,7 +345,7 @@ export default function AccountLedgerScreen() {
       {account && sheet === 'export' ? (
         <AccountExportSheet accounts={[account]} period={period} onDismiss={() => setSheet(null)} />
       ) : null}
-      {account && sheet === 'import' ? (
+      {account && sheet === 'import' && !viewOnly ? (
         <AccountImportSheet
           accounts={allAccounts}
           target={account}

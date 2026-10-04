@@ -127,7 +127,7 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
               {/* Sent back by whoever gave the task: say why, so it can be redone. */}
               {task.rejection_reason && task.status !== 'done' && task.status !== 'review' ? (
                 <Text style={styles.rejected} numberOfLines={3}>
-                  Rejected: {task.rejection_reason}
+                  Please change: {task.rejection_reason}
                 </Text>
               ) : null}
               {/* The title and description are cut short here; say so, so it is clear the row opens. */}
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
   rejected: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 12.5,
-    color: AppTheme.coral,
+    color: AppTheme.amber,
     marginTop: 6,
     lineHeight: 18,
   },

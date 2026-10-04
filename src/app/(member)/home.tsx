@@ -299,17 +299,17 @@ export default function MemberHomeScreen() {
       );
     }
 
-    // Rejected
+    // Sent back for a change
     if (todayLog.status === 'rejected') {
       return (
         <View style={styles.statusCard}>
-          <View style={[styles.statusIconCircle, { backgroundColor: T.coralSoft }]}>
-            <Feather name="x-circle" size={28} color={T.coral} />
+          <View style={[styles.statusIconCircle, { backgroundColor: T.amberSoft }]}>
+            <Feather name="edit-3" size={28} color={T.amber} />
           </View>
-          <View style={[styles.stateChip, { backgroundColor: T.coralSoft }]}>
-            <Text style={[styles.stateChipText, { color: T.coral }]}>Rejected</Text>
+          <View style={[styles.stateChip, { backgroundColor: T.amberSoft }]}>
+            <Text style={[styles.stateChipText, { color: T.amber }]}>Needs a change</Text>
           </View>
-          <Text style={styles.heroValue}>Try again</Text>
+          <Text style={styles.heroValue}>Please update</Text>
           {todayLog.rejection_reason ? (
             <Text style={styles.rejectionReason}>{todayLog.rejection_reason}</Text>
           ) : null}
@@ -430,6 +430,7 @@ export default function MemberHomeScreen() {
             <VenuesShortcut role="member" />
             <FeatureShortcut feature="bills" role="member" />
             <FeatureShortcut feature="accounts" role="member" />
+            <FeatureShortcut feature="leads" role="member" />
           </View>
 
           {todayTasks.length > 0 && (
@@ -655,8 +656,8 @@ const styles = StyleSheet.create({
   rejectionReason: {
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
-    color: T.coral,
-    backgroundColor: T.coralSoft,
+    color: T.ink,
+    backgroundColor: T.amberSoft,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,

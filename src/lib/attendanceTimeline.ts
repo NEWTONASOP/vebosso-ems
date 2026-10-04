@@ -38,7 +38,7 @@ export interface DayTimeline {
 
 function checkInAccent(workLog: WorkLog): { color: string; soft: string } {
   if (workLog.status === 'rejected') {
-    return { color: AppTheme.coral, soft: AppTheme.coralSoft };
+    return { color: AppTheme.amber, soft: AppTheme.amberSoft };
   }
   if (!workLog.check_in_approved) {
     return { color: AppTheme.amber, soft: AppTheme.amberSoft };
@@ -47,7 +47,7 @@ function checkInAccent(workLog: WorkLog): { color: string; soft: string } {
 }
 
 function checkInLabel(workLog: WorkLog): string {
-  if (workLog.status === 'rejected') return 'Check-in rejected';
+  if (workLog.status === 'rejected') return 'Check-in needs a change';
   if (!workLog.check_in_approved) return 'Check-in awaiting approval';
   return 'Checked in';
 }
@@ -226,7 +226,7 @@ export const DAY_STATUS_COLOR: Record<DayStatus, string | null> = {
   working: AppTheme.green,
   pending: AppTheme.amber,
   done: AppTheme.inkSoft,
-  rejected: AppTheme.coral,
+  rejected: AppTheme.amber,
   leave: AppTheme.violet,
 };
 
@@ -235,6 +235,6 @@ export const DAY_STATUS_LABEL: Record<DayStatus, string> = {
   working: 'Working',
   pending: 'Awaiting approval',
   done: 'Complete',
-  rejected: 'Rejected',
+  rejected: 'Needs changes',
   leave: 'On leave',
 };

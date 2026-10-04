@@ -125,11 +125,11 @@ export function LeaveCard({
               }}
             >
               {isRejecting ? (
-                <ActivityIndicator size="small" color={AppTheme.coral} />
+                <ActivityIndicator size="small" color={AppTheme.inkSoft} />
               ) : (
                 <>
-                  <Feather name="x" size={14} color={AppTheme.coral} />
-                  <Text style={styles.rejectBtnText}>Reject</Text>
+                  <Feather name="x" size={14} color={AppTheme.inkSoft} />
+                  <Text style={styles.rejectBtnText}>Decline</Text>
                 </>
               )}
             </AnimatedPressable>
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: AppTheme.coralSoft,
+    backgroundColor: AppTheme.soft,
     borderRadius: 20,
     height: 40,
     gap: 6,
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   rejectBtnText: {
     fontFamily: 'Inter_700Bold',
     fontSize: 13,
-    color: AppTheme.coral,
+    color: AppTheme.ink,
   },
   approveBtn: {
     flex: 1,

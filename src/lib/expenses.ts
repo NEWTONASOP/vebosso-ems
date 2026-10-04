@@ -4,6 +4,7 @@
 // Who may do what is enforced by RLS + a trigger (migration 025).
 // ============================================================================
 
+import { format, parseISO } from 'date-fns';
 import { uploadCheckoutPhoto } from '../store/workStore';
 import { ExpenseClaim } from '../types/database';
 import { parseSupabaseError } from './errors';
@@ -102,6 +103,20 @@ export async function submitExpense(params: {
     if (uploaded.length) await supabase.storage.from(BUCKET).remove(uploaded);
     return fail(err);
   }
+}
+
+/** Owner only (RLS). Tells the person when this expense will be paid. */
+export async function setExpenseExpectedDate(claim: ExpenseClaim, date: string): Promise<Result> {
+  const { error } = await supabase.from('expense_claims').update({ expected_on: date }).eq('id', claim.id);
+  if (error) return fail(error);
+
+  sendPushNotification(
+    claim.user_id,
+    'Expense date 📅',
+    `${claimLabel(claim)} will be paid by ${format(parseISO(date), 'd MMM yyyy')}.`,
+    { type: 'expense_date' },
+  );
+  return { success: true, data: undefined };
 }
 
 /** Owner only (RLS). */

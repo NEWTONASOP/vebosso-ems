@@ -13,12 +13,14 @@ import { parseSupabaseError } from './errors';
 import { sendPushNotification } from './notifications';
 import { supabase } from './supabase';
 
-export type Feature = 'bills' | 'venues' | 'accounts';
+export type Feature = 'bills' | 'venues' | 'accounts' | 'leads';
 
-export const FEATURES: { key: Feature; label: string; hint: string; icon: 'file-text' | 'map-pin' | 'book' }[] = [
+/** `icon` is a Feather icon; Leads shows its "N" logo instead (NavgrahLogo). */
+export const FEATURES: { key: Feature; label: string; hint: string; icon: 'file-text' | 'map-pin' | 'book' | 'users' }[] = [
   { key: 'bills', label: 'Bills', hint: 'Create and manage bills', icon: 'file-text' },
   { key: 'venues', label: 'Venues', hint: 'See and add venues', icon: 'map-pin' },
   { key: 'accounts', label: 'Accounts', hint: 'Manage the account books', icon: 'book' },
+  { key: 'leads', label: 'Navgrah Leads', hint: 'See and add leads', icon: 'users' },
 ];
 
 type Result = { success: true } | { success: false; error: string };
@@ -27,7 +29,7 @@ type Result = { success: true } | { success: false; error: string };
 export async function fetchFeatureAccess(userId: string): Promise<Record<Feature, boolean>> {
   const { data } = await supabase.from('feature_access').select('feature').eq('user_id', userId);
   const has = new Set(((data || []) as { feature: Feature }[]).map((r) => r.feature));
-  return { bills: has.has('bills'), venues: has.has('venues'), accounts: has.has('accounts') };
+  return { bills: has.has('bills'), venues: has.has('venues'), accounts: has.has('accounts'), leads: has.has('leads') };
 }
 
 /** Owner only (RLS). Tells the person when a feature is given to them. */

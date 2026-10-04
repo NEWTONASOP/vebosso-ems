@@ -23,6 +23,7 @@ import {
   fetchAllSalaryRequests,
   fetchMonthlySalary,
   markSalaryPaid,
+  setSalaryExpectedDate,
   openDocumentFile,
   PendingDocument,
   reviewDocument,
@@ -30,7 +31,13 @@ import {
   WaitingSalaryRequest,
 } from '../lib/employeeRecords';
 import { fetchUnreadChats, markChatRead, UnreadChat } from '../lib/chat';
-import { fetchAllSubmittedExpenses, formatAmount, markExpensePaid, WaitingExpense } from '../lib/expenses';
+import {
+  fetchAllSubmittedExpenses,
+  formatAmount,
+  markExpensePaid,
+  setExpenseExpectedDate,
+  WaitingExpense,
+} from '../lib/expenses';
 import { supabase } from '../lib/supabase';
 import { formatWorkLogDateForMessage } from '../lib/workLogDates';
 import { useAuthStore } from '../store/authStore';
@@ -39,6 +46,8 @@ import { LeaveRequestWithProfile, Task, WorkLogWithProfile } from '../types/data
 import { AnimatedPressable } from './AnimatedPressable';
 import { ImageViewerModal } from './ImageViewerModal';
 import { PaperOutlinedField } from './PaperOutlinedField';
+import { PayDateSheet } from './PayDateSheet';
+import { ReasonSheet } from './ReasonSheet';
 import { SheetFrame } from './SheetFrame';
 import { UserAvatar } from './UserAvatar';
 import { VOICE_TASK_TITLE } from './MemberTasksSheet';
@@ -279,19 +288,25 @@ export function OwnerInboxSheet({
     onMessage(res.success ? done : res.error || 'Something went wrong');
   };
 
-  // A task being rejected: the reason is asked for. The text lives in the box
-  // itself (not fed back on every key), kept here only for sending.
-  const [rejectingTask, setRejectingTask] = useState<TaskToReview | null>(null);
-  const rejectReason = useRef('');
-  const [hasRejectReason, setHasRejectReason] = useState(false);
+  // Sending something back asks what needs to change, and the person sees it.
+  const [sendingBack, setSendingBack] = useState<{
+    id: string;
+    title: string;
+    who?: string | null;
+    action: (reason: string) => Promise<{ success: boolean; error?: string }>;
+    done: string;
+    refresh?: boolean;
+  } | null>(null);
 
-  const confirmTaskReject = () => {
-    const t = rejectingTask;
-    const reason = rejectReason.current.trim();
-    if (!t || !reason) return;
-    setRejectingTask(null);
-    void run(t.id, () => rejectTask(t.id, ownerId!, reason), 'Task sent back');
-  };
+  // Pick the day a salary / expense will be paid, and tell the person.
+  const [dating, setDating] = useState<{
+    id: string;
+    title: string;
+    subtitle?: string;
+    who: string;
+    initial?: string | null;
+    action: (date: string) => Promise<{ success: boolean; error?: string }>;
+  } | null>(null);
 
   // Salary being paid: the amount is asked for, starting at their monthly salary.
   const [paying, setPaying] = useState<WaitingSalaryRequest | null>(null);
@@ -344,10 +359,17 @@ export function OwnerInboxSheet({
       busy={busy === w.id}
       actions={[
         {
-          label: 'Reject',
+          label: 'Send back',
           tone: 'reject',
           onPress: () =>
-            run(w.id, () => rejectCheckIn(w.id, ownerId, 'Please revise your plan'), 'Rejected', false),
+            setSendingBack({
+              id: w.id,
+              title: isCheckout ? 'Send checkout back' : 'Send check-in back',
+              who: w.profiles?.full_name,
+              action: (reason) => rejectCheckIn(w.id, ownerId, reason),
+              done: 'Sent back',
+              refresh: false,
+            }),
         },
         {
           label: 'Approve',
@@ -413,9 +435,9 @@ export function OwnerInboxSheet({
               busy={busy === l.id}
               actions={[
                 {
-                  label: 'Reject',
+                  label: 'Decline',
                   tone: 'reject',
-                  onPress: () => run(l.id, () => rejectLeaveRequest(l.id, ownerId), 'Leave rejected', false),
+                  onPress: () => run(l.id, () => rejectLeaveRequest(l.id, ownerId), 'Leave declined', false),
                 },
                 {
                   label: 'Approve',
@@ -440,9 +462,9 @@ export function OwnerInboxSheet({
               busy={busy === d.id}
               actions={[
                 {
-                  label: 'Reject',
+                  label: 'Send back',
                   tone: 'reject',
-                  onPress: () => run(d.id, () => reviewDocument(d, 'rejected', ownerId), 'Document rejected'),
+                  onPress: () => run(d.id, () => reviewDocument(d, 'rejected', ownerId), 'Document sent back'),
                 },
                 {
                   label: 'Approve',
@@ -461,10 +483,23 @@ export function OwnerInboxSheet({
               key={r.id}
               name={r.person?.full_name}
               avatar={r.person?.avatar_url}
-              meta={r.requested_at ? `Asked ${formatDistanceToNow(new Date(r.requested_at), { addSuffix: true })}` : 'Salary'}
+              meta={`${r.requested_at ? `Asked ${formatDistanceToNow(new Date(r.requested_at), { addSuffix: true })}` : 'Salary'}${r.expected_on ? ` · to be paid by ${format(parseISO(r.expected_on), 'd MMM')}` : ''}`}
               body={`Salary for ${salaryMonthLabel(r.month)}`}
               busy={busy === r.id}
               actions={[
+                {
+                  label: r.expected_on ? `Pay date · ${format(parseISO(r.expected_on), 'd MMM')}` : 'Set pay date',
+                  tone: 'plain',
+                  onPress: () =>
+                    setDating({
+                      id: r.id,
+                      title: 'Salary pay date',
+                      subtitle: `${r.person?.full_name ?? 'Employee'} · ${salaryMonthLabel(r.month)}`,
+                      who: r.person?.full_name?.split(' ')[0] ?? 'them',
+                      initial: r.expected_on,
+                      action: (date) => setSalaryExpectedDate(r.user_id, r.month, date),
+                    }),
+                },
                 {
                   label: 'Mark as paid',
                   tone: 'approve',
@@ -501,13 +536,16 @@ export function OwnerInboxSheet({
               busy={busy === t.id}
               actions={[
                 {
-                  label: 'Reject',
+                  label: 'Send back',
                   tone: 'reject',
-                  onPress: () => {
-                    rejectReason.current = '';
-                    setHasRejectReason(false);
-                    setRejectingTask(t);
-                  },
+                  onPress: () =>
+                    setSendingBack({
+                      id: t.id,
+                      title: 'Send task back',
+                      who: t.person?.full_name,
+                      action: (reason) => rejectTask(t.id, ownerId, reason),
+                      done: 'Task sent back',
+                    }),
                 },
                 {
                   label: 'Approve',
@@ -526,7 +564,7 @@ export function OwnerInboxSheet({
               key={x.id}
               name={x.person?.full_name}
               avatar={x.person?.avatar_url}
-              meta={`Spent ${format(parseISO(x.spent_on), 'd MMM')}`}
+              meta={`Spent ${format(parseISO(x.spent_on), 'd MMM')}${x.expected_on ? ` · to be paid by ${format(parseISO(x.expected_on), 'd MMM')}` : ''}`}
               amount={formatAmount(x.amount) ?? 'No amount'}
               body={x.description || (x.photos?.length ? 'Receipt photos only' : null)}
               extra={
@@ -534,6 +572,19 @@ export function OwnerInboxSheet({
               }
               busy={busy === x.id}
               actions={[
+                {
+                  label: x.expected_on ? `Pay date · ${format(parseISO(x.expected_on), 'd MMM')}` : 'Set pay date',
+                  tone: 'plain',
+                  onPress: () =>
+                    setDating({
+                      id: x.id,
+                      title: 'Expense pay date',
+                      subtitle: `${x.person?.full_name ?? 'Employee'} · ${formatAmount(x.amount) ?? 'expense'}`,
+                      who: x.person?.full_name?.split(' ')[0] ?? 'them',
+                      initial: x.expected_on,
+                      action: (date) => setExpenseExpectedDate(x, date),
+                    }),
+                },
                 {
                   label: 'Mark as paid',
                   tone: 'approve',
@@ -588,42 +639,25 @@ export function OwnerInboxSheet({
         : null}
     </SheetFrame>
 
-    {rejectingTask ? (
-      <SheetFrame
-        visible
-        onDismiss={() => setRejectingTask(null)}
-        title="Reject task"
-        subtitle={rejectingTask.person?.full_name ?? undefined}
-        icon="corner-up-left"
-        iconColor={T.coral}
-        iconBg={T.coralSoft}
-        footer={
-          <Pressable
-            style={[styles.payBtn, { backgroundColor: T.coral }, !hasRejectReason && { opacity: 0.45 }]}
-            onPress={confirmTaskReject}
-            disabled={!hasRejectReason}
-            accessibilityRole="button"
-          >
-            <Text style={styles.payBtnText}>Send back to redo</Text>
-          </Pressable>
-        }
-      >
-        <PaperOutlinedField
-          label="Why is it rejected?"
-          defaultValue=""
-          onChangeText={(t) => {
-            rejectReason.current = t;
-            setHasRejectReason(!!t.trim());
-          }}
-          multiline
-          maxLength={1000}
-          autoFocus
-          placeholder="What needs to be redone"
-        />
-        <Text style={styles.amountHint}>
-          {rejectingTask.person?.full_name ?? 'They'} will see this reason and have to do the task again.
-        </Text>
-      </SheetFrame>
+    {sendingBack ? (
+      <ReasonSheet
+        title={sendingBack.title}
+        subtitle={sendingBack.who ?? undefined}
+        hint={`${sendingBack.who?.split(' ')[0] ?? 'They'} will see this and can change it.`}
+        onConfirm={(reason) => run(sendingBack.id, () => sendingBack.action(reason), sendingBack.done, sendingBack.refresh)}
+        onDismiss={() => setSendingBack(null)}
+      />
+    ) : null}
+
+    {dating ? (
+      <PayDateSheet
+        title={dating.title}
+        subtitle={dating.subtitle}
+        who={dating.who}
+        initial={dating.initial}
+        onConfirm={(date) => run(dating.id, () => dating.action(date), 'They have been told')}
+        onDismiss={() => setDating(null)}
+      />
     ) : null}
 
     {paying ? (
@@ -910,7 +944,7 @@ function InboxItem({
               <Text
                 style={[
                   styles.itemBtnText,
-                  a.tone === 'approve' ? { color: T.white } : a.tone === 'reject' ? { color: T.coral } : { color: T.ink },
+                  a.tone === 'approve' ? { color: T.white } : { color: T.ink },
                 ]}
               >
                 {a.label}

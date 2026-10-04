@@ -4,6 +4,7 @@
 // An existing entry opens read-only; Edit switches to the form, and Delete is
 // on both. Photos upload as they are added; ones added and
 // then abandoned (sheet closed without saving) are removed again.
+// viewOnly (an owner looking at someone else's books): no Edit, no Delete.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -41,6 +42,7 @@ export function AccountTxnSheet({
   accountId,
   accountName,
   txn,
+  viewOnly = false,
   onDismiss,
   onSaved,
 }: {
@@ -48,6 +50,8 @@ export function AccountTxnSheet({
   accountName: string;
   /** Present when editing. */
   txn?: AccountTransaction | null;
+  /** Someone else's books: show the entry, change nothing. */
+  viewOnly?: boolean;
   onDismiss: () => void;
   onSaved: (message: string) => void;
 }) {
@@ -165,6 +169,7 @@ export function AccountTxnSheet({
       iconColor={kind === 'credit' ? T.green : T.coral}
       iconBg={kind === 'credit' ? T.greenSoft : T.coralSoft}
       footer={
+        viewOnly ? undefined : (
         <View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <View style={styles.footerRow}>
@@ -184,6 +189,7 @@ export function AccountTxnSheet({
             )}
           </View>
         </View>
+        )
       }
     >
       {viewing && txn ? (

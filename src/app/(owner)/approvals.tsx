@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
+import { ReasonSheet } from '../../components/ReasonSheet';
 import { ApprovalCard } from '../../components/ApprovalCard';
 import { AssignTaskModal } from '../../components/AssignTaskModal';
 import { EmptyState } from '../../components/EmptyState';
@@ -64,28 +65,23 @@ export default function OwnerApprovalsScreen() {
     }
   }, [profile, approveCheckIn]);
 
+  // Sending a request back asks what needs to change; the person sees it.
+  const [reasonFor, setReasonFor] = useState<string | null>(null);
   const handleReject = useCallback((workLogId: string) => {
-    if (!profile) return;
-    Alert.alert(
-      'Reject Request',
-      'Are you sure you want to reject this request?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reject',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await rejectCheckIn(workLogId, profile.id, 'Please revise your plan and check in again.');
-              setSnackMessage('Check-in rejected');
-            } catch {
-              setSnackMessage('Failed to reject. Please try again.');
-            }
-          }
-        }
-      ]
-    );
-  }, [profile, rejectCheckIn]);
+    setReasonFor(workLogId);
+  }, []);
+  const sendBack = useCallback(
+    async (workLogId: string, reason: string) => {
+      if (!profile) return;
+      try {
+        await rejectCheckIn(workLogId, profile.id, reason);
+        setSnackMessage('Sent back');
+      } catch {
+        setSnackMessage('Could not send it back. Please try again.');
+      }
+    },
+    [profile, rejectCheckIn]
+  );
 
   /** Leave approvals */
   const handleApproveLeave = useCallback(async (id: string) => {
@@ -103,21 +99,21 @@ export default function OwnerApprovalsScreen() {
   const handleRejectLeave = useCallback((id: string) => {
     if (!profile) return;
     Alert.alert(
-      'Reject Leave Request',
-      'Are you sure you want to reject this leave request?',
+      'Decline leave request',
+      'Are you sure you want to decline this leave request?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Reject',
+          text: 'Decline',
           style: 'destructive',
           onPress: async () => {
             setRejectingLeaveId(id);
             const res = await rejectLeaveRequest(id, profile.id);
             setRejectingLeaveId(null);
             if (res.success) {
-              setSnackMessage('Leave request rejected');
+              setSnackMessage('Leave request declined');
             } else {
-              setSnackMessage(res.error || 'Failed to reject leave request.');
+              setSnackMessage(res.error || 'Could not decline the leave request.');
             }
           }
         }
@@ -308,6 +304,15 @@ export default function OwnerApprovalsScreen() {
           onSubmit={handleAssignModalSubmit}
           targetMember={assignTargetMember}
           isLoading={isAssigning}
+        />
+      ) : null}
+
+      {reasonFor ? (
+        <ReasonSheet
+          title="Send back"
+          hint="They will see this and can change it."
+          onConfirm={(reason) => sendBack(reasonFor, reason)}
+          onDismiss={() => setReasonFor(null)}
         />
       ) : null}
 
