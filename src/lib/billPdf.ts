@@ -407,16 +407,8 @@ export async function sendBillOnWhatsApp(b: Bill, s: BillSettings, phone: string
   if (!app) return;
 
   const uri = await renderPdf(b, s);
-  const t = billTotals(b);
-  const message = [
-    `Hello${b.client_name ? ` ${b.client_name}` : ''},`,
-    `Here are the details from ${s.business_name}${b.venue ? ` for ${b.venue}` : ''}${
-      b.function_date ? ` on ${format(parseISO(b.function_date), 'd MMM yyyy')}` : ''
-    }${b.number ? ` (${b.number})` : ''}.`,
-    `Total ₹${money(t.total)} · Advance ₹${money(t.advance)} · Balance ₹${money(t.balance)}`,
-  ].join('\n');
 
-  // WhatsApp needs a content:// link it is allowed to read.
+  // WhatsApp needs a content:// link it is allowed to read. Just the PDF, no message.
   const contentUri = await FileSystem.getContentUriAsync(uri);
-  await WhatsApp.sendFile(app, to, contentUri, 'application/pdf', message);
+  await WhatsApp.sendFile(app, to, contentUri, 'application/pdf');
 }

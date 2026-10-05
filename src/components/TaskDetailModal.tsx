@@ -14,6 +14,8 @@ import { TaskStatus } from '../types/database';
 import { Alert } from '../lib/alert';
 import { AnimatedPressable } from './AnimatedPressable';
 import { UserAvatar } from './UserAvatar';
+import { FieldChainScope } from './FieldChain';
+import { useDialogLift } from '../lib/useKeyboardHeight';
 
 /** What the owner or manager can do with a task. Each returns an error message, or null on success. */
 export interface TaskManage {
@@ -65,6 +67,8 @@ export function TaskDetailModal({
   onReassign,
   manage,
 }: TaskDetailModalProps) {
+  // Above the keyboard on Android too (KeyboardAvoidingView only works on iOS here).
+  const lifted = useDialogLift();
   const [mode, setMode] = useState<'view' | 'edit' | 'reject'>('view');
   // The task text and reject reason are uncontrolled (kept in refs, not fed
   // back into the box on every key) — feeding them back made some Android
@@ -161,8 +165,9 @@ export function TaskDetailModal({
       <Modal
         visible={visible}
         onDismiss={onDismiss}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, lifted]}
       >
+        <FieldChainScope>
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View style={styles.header}>
@@ -452,6 +457,7 @@ export function TaskDetailModal({
             </>
           )}
         </ScrollView>
+        </FieldChainScope>
       </Modal>
     </Portal>
   );

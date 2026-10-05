@@ -1,7 +1,7 @@
 // ============================================================================
 // VEBOSSO EMS — Owner Member Menu
 // The sheet an owner gets when tapping a team member. Tasks by Boss,
-// Messages, Salary, Travel expenses, Documents and Assign Manager open as
+// Messages, Employee details, Salary, Travel expenses, Documents and Assign Manager open as
 // dialogs on top, with the member sheet still open underneath.
 // Shared by the Dashboard and Team screens.
 // ============================================================================
@@ -19,6 +19,7 @@ import { Profile } from '../types/database';
 import { AssignManagerModal } from './AssignManagerModal';
 import { ChatSheet } from './ChatPanel';
 import { DocumentsSheet } from './DocumentsSheet';
+import { EmployeeDetailsSheet } from './EmployeeDetailsSheet';
 import { ExpensesSheet } from './ExpensesSheet';
 import { MemberActionsModal, MemberDialog } from './MemberActionsModal';
 import { MemberTasksSheet } from './MemberTasksSheet';
@@ -169,6 +170,16 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
           memberId={member.id}
           memberName={member.full_name}
           assignerId={profile.id}
+          onMessage={onMessage}
+        />
+      ) : null}
+
+      {dialog === 'details' && profile?.id ? (
+        <EmployeeDetailsSheet
+          onDismiss={() => setDialog(null)}
+          userId={member.id}
+          userName={member.full_name}
+          mode="owner"
           onMessage={onMessage}
         />
       ) : null}

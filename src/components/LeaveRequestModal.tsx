@@ -10,6 +10,8 @@ import { Button, HelperText, Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/theme';
 import { DateField } from './DateTimeFields';
 import { PaperOutlinedField } from './PaperOutlinedField';
+import { FieldChainScope } from './FieldChain';
+import { useDialogLift } from '../lib/useKeyboardHeight';
 
 interface LeaveRequestModalProps {
   visible: boolean;
@@ -24,6 +26,8 @@ export function LeaveRequestModal({
   onSubmit,
   isLoading,
 }: LeaveRequestModalProps) {
+  // Above the keyboard on Android too (KeyboardAvoidingView only works on iOS here).
+  const lifted = useDialogLift();
   const dateRef = useRef('');
   const reasonRef = useRef('');
   const [dateStr, setDateStr] = useState('');
@@ -86,8 +90,9 @@ export function LeaveRequestModal({
       <Modal
         visible
         onDismiss={onDismiss}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, lifted]}
       >
+        <FieldChainScope>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.header}>
             <View style={styles.iconCircle}>
@@ -162,6 +167,7 @@ export function LeaveRequestModal({
             </Button>
           </View>
         </KeyboardAvoidingView>
+        </FieldChainScope>
       </Modal>
     </Portal>
   );

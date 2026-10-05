@@ -15,8 +15,11 @@ import {
   screenChrome,
 } from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
+import { useKeyboardOverlap } from '../../lib/useKeyboardHeight';
 
 export default function ChangePasswordScreen() {
+  // Shrink to the space above the keyboard so the focused box stays in sight.
+  const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -70,137 +73,139 @@ export default function ChangePasswordScreen() {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-      keyboardShouldPersistTaps="handled"
-    >
-      {/* Back Button */}
-      <View style={styles.headerRow}>
-        <IconButton
-          icon="arrow-left"
-          size={24}
-          iconColor={AppTheme.ink}
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityLabel="Go back"
-        />
-        <Text style={styles.headerTitle}>Change Password</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
-      <View style={styles.header}>
-        <View style={styles.iconCircle}>
-          <Feather name="lock" size={28} color={AppTheme.charcoal} />
-        </View>
-        <Text style={styles.title}>Update Your Password</Text>
-        <Text style={styles.subtitle}>
-          Choose a strong password to keep your account secure
-        </Text>
-      </View>
-
-      <View style={styles.formSection}>
-        <TextInput
-          mode="outlined"
-          label="New Password"
-          value={newPassword}
-          onChangeText={setNewPassword}
-          secureTextEntry={!showPassword}
-          style={styles.input}
-          outlineColor={AppTheme.soft2}
-          activeOutlineColor={AppTheme.charcoal}
-          textColor={AppTheme.ink}
-          right={
-            <TextInput.Icon
-              icon={showPassword ? 'eye-off' : 'eye'}
-              color={AppTheme.inkSoft}
-              onPress={() => setShowPassword(!showPassword)}
-            />
-          }
-          theme={{
-            colors: {
-              onSurfaceVariant: AppTheme.mute,
-              surface: AppTheme.card,
-            },
-          }}
-        />
-
-        {newPassword.length > 0 && (
-          <View style={styles.strengthSection}>
-            <ProgressBar
-              progress={strength.score}
-              color={strength.color}
-              style={styles.strengthBar}
-            />
-            <Text style={[styles.strengthLabel, { color: strength.color }]}>
-              {strength.label}
-            </Text>
-          </View>
-        )}
-
-        <TextInput
-          mode="outlined"
-          label="Confirm Password"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry={!showPassword}
-          style={styles.input}
-          outlineColor={AppTheme.soft2}
-          activeOutlineColor={AppTheme.charcoal}
-          textColor={AppTheme.ink}
-          theme={{
-            colors: {
-              onSurfaceVariant: AppTheme.mute,
-              surface: AppTheme.card,
-            },
-          }}
-        />
-
-        {confirmPassword.length > 0 && newPassword !== confirmPassword && (
-          <Text style={styles.mismatchText}>Passwords do not match</Text>
-        )}
-
-        <View style={styles.requirements}>
-          <Text style={styles.reqTitle}>Password requirements:</Text>
-          <Requirement met={newPassword.length >= 8} text="At least 8 characters" />
-          <Requirement met={/[A-Z]/.test(newPassword)} text="At least one uppercase letter" />
-          <Requirement met={/[0-9]/.test(newPassword)} text="At least one number" />
-          <Requirement met={/[^A-Za-z0-9]/.test(newPassword)} text="At least one special character" />
-        </View>
-
-        <Button
-          mode="contained"
-          onPress={handleChange}
-          loading={isChanging}
-          disabled={isChanging || newPassword.length < 8 || newPassword !== confirmPassword}
-          style={styles.button}
-          contentStyle={styles.buttonContent}
-          buttonColor={AppTheme.charcoal}
-          textColor={AppTheme.white}
-          labelStyle={styles.buttonLabel}
-        >
-          Update Password
-        </Button>
-
-        <Button
-          mode="text"
-          onPress={() => router.back()}
-          disabled={isChanging}
-          style={styles.cancelButton}
-          textColor={AppTheme.mute}
-        >
-          Cancel
-        </Button>
-      </View>
-
-      <Snackbar
-        visible={!!snackMessage}
-        onDismiss={() => setSnackMessage('')}
-        duration={4000}
+    <View ref={keyboardRef} style={{ flex: 1, paddingBottom: keyboardInset }}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
-        {snackMessage}
-      </Snackbar>
-    </ScrollView>
+        {/* Back Button */}
+        <View style={styles.headerRow}>
+          <IconButton
+            icon="arrow-left"
+            size={24}
+            iconColor={AppTheme.ink}
+            onPress={() => router.back()}
+            style={styles.backButton}
+            accessibilityLabel="Go back"
+          />
+          <Text style={styles.headerTitle}>Change Password</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <View style={styles.header}>
+          <View style={styles.iconCircle}>
+            <Feather name="lock" size={28} color={AppTheme.charcoal} />
+          </View>
+          <Text style={styles.title}>Update Your Password</Text>
+          <Text style={styles.subtitle}>
+            Choose a strong password to keep your account secure
+          </Text>
+        </View>
+
+        <View style={styles.formSection}>
+          <TextInput
+            mode="outlined"
+            label="New Password"
+            value={newPassword}
+            onChangeText={setNewPassword}
+            secureTextEntry={!showPassword}
+            style={styles.input}
+            outlineColor={AppTheme.soft2}
+            activeOutlineColor={AppTheme.charcoal}
+            textColor={AppTheme.ink}
+            right={
+              <TextInput.Icon
+                icon={showPassword ? 'eye-off' : 'eye'}
+                color={AppTheme.inkSoft}
+                onPress={() => setShowPassword(!showPassword)}
+              />
+            }
+            theme={{
+              colors: {
+                onSurfaceVariant: AppTheme.mute,
+                surface: AppTheme.card,
+              },
+            }}
+          />
+
+          {newPassword.length > 0 && (
+            <View style={styles.strengthSection}>
+              <ProgressBar
+                progress={strength.score}
+                color={strength.color}
+                style={styles.strengthBar}
+              />
+              <Text style={[styles.strengthLabel, { color: strength.color }]}>
+                {strength.label}
+              </Text>
+            </View>
+          )}
+
+          <TextInput
+            mode="outlined"
+            label="Confirm Password"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry={!showPassword}
+            style={styles.input}
+            outlineColor={AppTheme.soft2}
+            activeOutlineColor={AppTheme.charcoal}
+            textColor={AppTheme.ink}
+            theme={{
+              colors: {
+                onSurfaceVariant: AppTheme.mute,
+                surface: AppTheme.card,
+              },
+            }}
+          />
+
+          {confirmPassword.length > 0 && newPassword !== confirmPassword && (
+            <Text style={styles.mismatchText}>Passwords do not match</Text>
+          )}
+
+          <View style={styles.requirements}>
+            <Text style={styles.reqTitle}>Password requirements:</Text>
+            <Requirement met={newPassword.length >= 8} text="At least 8 characters" />
+            <Requirement met={/[A-Z]/.test(newPassword)} text="At least one uppercase letter" />
+            <Requirement met={/[0-9]/.test(newPassword)} text="At least one number" />
+            <Requirement met={/[^A-Za-z0-9]/.test(newPassword)} text="At least one special character" />
+          </View>
+
+          <Button
+            mode="contained"
+            onPress={handleChange}
+            loading={isChanging}
+            disabled={isChanging || newPassword.length < 8 || newPassword !== confirmPassword}
+            style={styles.button}
+            contentStyle={styles.buttonContent}
+            buttonColor={AppTheme.charcoal}
+            textColor={AppTheme.white}
+            labelStyle={styles.buttonLabel}
+          >
+            Update Password
+          </Button>
+
+          <Button
+            mode="text"
+            onPress={() => router.back()}
+            disabled={isChanging}
+            style={styles.cancelButton}
+            textColor={AppTheme.mute}
+          >
+            Cancel
+          </Button>
+        </View>
+
+        <Snackbar
+          visible={!!snackMessage}
+          onDismiss={() => setSnackMessage('')}
+          duration={4000}
+        >
+          {snackMessage}
+        </Snackbar>
+      </ScrollView>
+    </View>
   );
 }
 

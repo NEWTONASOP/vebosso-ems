@@ -10,12 +10,12 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Menu, Snackbar, Text } from 'react-native-paper';
 import { AppTheme as T, screenChrome } from '../constants/theme';
 import { Alert } from '../lib/alert';
-import { addBanquet, contactName, deleteBanquet, fetchBanquets, fetchLeads } from '../lib/leads';
+import { addBanquet, contactName, deleteBanquet, fetchBanquets, fetchLeads, leadPhones } from '../lib/leads';
 import { exportLeads, saveLeadsToPhone } from '../lib/leadsFile';
 import { supabase } from '../lib/supabase';
 import { telUrl, whatsappUrl } from '../lib/venues';
@@ -23,11 +23,15 @@ import { Lead, LeadBanquet } from '../types/database';
 import { Chevron, DropdownBody } from './Dropdown';
 import { LeadSheet } from './LeadSheet';
 import { LeadsImportSheet } from './LeadsImportSheet';
+import { MoveLeadsSheet } from './MoveLeadsSheet';
 import { NavgrahLogo } from './NavgrahLogo';
 import { PaperOutlinedField } from './PaperOutlinedField';
 import { SmoothTextInput as TextInput } from './SmoothTextInput';
+import { useKeyboardOverlap } from '../lib/useKeyboardHeight';
 
 const WHATSAPP_GREEN = '#1FA855';
+/** Leads drawn per banquet at first; "Show more" adds this many again. */
+const PAGE = 30;
 
 const loadAll = async () => {
   const [leads, banquets] = await Promise.all([fetchLeads(), fetchBanquets()]);
@@ -37,6 +41,8 @@ const loadAll = async () => {
 type Group = { id: string; name: string; banquet: LeadBanquet | null; leads: Lead[] };
 
 export function LeadsScreen({ showBack }: { showBack?: boolean }) {
+  // Shrink to the space above the keyboard so the focused box stays in sight.
+  const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
   const router = useRouter();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [banquets, setBanquets] = useState<LeadBanquet[]>([]);
@@ -45,12 +51,16 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
+  // How many leads each open banquet shows (PAGE to start).
+  const [shown, setShown] = useState<Record<string, number>>({});
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [snack, setSnack] = useState('');
   // The lead popup: a lead to view, or 'new' (optionally in a banquet).
   const [sheet, setSheet] = useState<{ lead: Lead | null; banquetId: string | null } | null>(null);
   // Import: from the top (null target) or into one banquet.
   const [importing, setImporting] = useState<{ target: LeadBanquet | null } | null>(null);
+  // Move every lead in a group to a banquet (⋮ → Move all).
+  const [moving, setMoving] = useState<Group | null>(null);
   const [newBanquet, setNewBanquet] = useState<string | null>(null);
   const [addingBanquet, setAddingBanquet] = useState(false);
 
@@ -102,11 +112,14 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
 
   const banquetName = (id: string | null) => banquets.find((b) => b.id === id)?.name ?? null;
 
+  // A new search starts every banquet at one page again.
+  useEffect(() => setShown({}), [query]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return leads;
     return leads.filter((l) =>
-      [l.name, l.function, l.contact, l.remarks, banquetName(l.banquet_id), l.dof ? format(parseISO(l.dof), 'd MMM yyyy') : '']
+      [l.name, l.function, l.contact, l.remarks, l.created_by_name, banquetName(l.banquet_id), l.dof ? format(parseISO(l.dof), 'd MMM yyyy') : '']
         .some((f) => f?.toLowerCase().includes(q))
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -186,13 +199,22 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
     }
   };
 
-  const saveOne = async (lead: Lead) => {
-    try {
-      await saveLeadsToPhone([{ lead, banquetName: banquetName(lead.banquet_id) }], contactName(lead, banquetName(lead.banquet_id)));
-    } catch (e: any) {
-      setSnack(e?.message || 'Could not open Contacts');
-    }
-  };
+  const saveOne = useCallback(
+    async (lead: Lead) => {
+      const bq = banquets.find((b) => b.id === lead.banquet_id)?.name ?? null;
+      try {
+        await saveLeadsToPhone([{ lead, banquetName: bq }], contactName(lead, bq));
+      } catch (e: any) {
+        setSnack(e?.message || 'Could not open Contacts');
+      }
+    },
+    [banquets]
+  );
+  const openLead = useCallback((lead: Lead) => setSheet({ lead, banquetId: lead.banquet_id }), []);
+  const openWhatsApp = useCallback(
+    (phone: string) => void Linking.openURL(whatsappUrl(phone)).catch(() => setSnack('Could not open WhatsApp')),
+    []
+  );
 
   const nextDate = (g: Group) => {
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -201,7 +223,7 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
   };
 
   return (
-    <View style={screenChrome.root}>
+    <View ref={keyboardRef} style={[screenChrome.root, { paddingBottom: keyboardInset }]}>
       <View style={screenChrome.headerRow}>
         <View style={styles.titleRow}>
           {showBack ? (
@@ -363,6 +385,16 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
                     ) : null}
                     {g.leads.length ? (
                       <Menu.Item
+                        leadingIcon="arrow-right-bold-box-outline"
+                        title={query.trim() ? `Move these ${g.leads.length} to a banquet` : 'Move all to a banquet'}
+                        onPress={() => {
+                          setMenuFor(null);
+                          setMoving(g);
+                        }}
+                      />
+                    ) : null}
+                    {g.leads.length ? (
+                      <Menu.Item
                         leadingIcon="tray-arrow-up"
                         title="Export"
                         onPress={() => {
@@ -388,68 +420,27 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
                 {open && g.leads.length > 0 ? (
                   <DropdownBody>
                     <View style={styles.listCard}>
-                      {g.leads.map((l, i) => (
-                        <Pressable
+                      {g.leads.slice(0, shown[g.id] ?? PAGE).map((l, i) => (
+                        <LeadRow
                           key={l.id}
-                          onPress={() => setSheet({ lead: l, banquetId: l.banquet_id })}
-                          style={({ pressed }) => [styles.lead, i > 0 && styles.leadDivided, pressed && { backgroundColor: T.soft }]}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${l.name ?? 'Lead'}${l.function ? `, ${l.function}` : ''}`}
-                        >
-                          <View style={styles.dateBox}>
-                            {l.dof ? (
-                              <>
-                                <Text style={styles.dateDay}>{format(parseISO(l.dof), 'd')}</Text>
-                                <Text style={styles.dateMon}>{format(parseISO(l.dof), 'MMM')}</Text>
-                              </>
-                            ) : (
-                              <Text style={styles.dateMon}>—</Text>
-                            )}
-                          </View>
-                          <View style={{ flex: 1, minWidth: 0 }}>
-                            <Text style={styles.leadName} numberOfLines={1}>
-                              {l.name || 'No name'}
-                              {l.function ? <Text style={styles.leadFn}>{`  ·  ${l.function}`}</Text> : null}
-                            </Text>
-                            {l.contact ? (
-                              <Text
-                                style={styles.leadPhone}
-                                numberOfLines={1}
-                                onPress={() => Linking.openURL(telUrl(l.contact!))}
-                                accessibilityRole="link"
-                                accessibilityLabel={`Call ${l.contact}`}
-                              >
-                                <Feather name="phone" size={12} color={T.blue} /> {l.contact}
-                              </Text>
-                            ) : null}
-                            {l.remarks ? (
-                              <Text style={styles.leadRemarks} numberOfLines={2}>
-                                {l.remarks}
-                              </Text>
-                            ) : null}
-                          </View>
-                          {l.contact ? (
-                            <View style={styles.rowBtns}>
-                              <Pressable
-                                onPress={() => Linking.openURL(whatsappUrl(l.contact!)).catch(() => setSnack('Could not open WhatsApp'))}
-                                style={styles.saveBtn}
-                                hitSlop={4}
-                                accessibilityLabel={`WhatsApp ${l.name ?? 'this lead'}`}
-                              >
-                                <MaterialCommunityIcons name="whatsapp" size={18} color={WHATSAPP_GREEN} />
-                              </Pressable>
-                              <Pressable
-                                onPress={() => void saveOne(l)}
-                                style={styles.saveBtn}
-                                hitSlop={4}
-                                accessibilityLabel={`Save ${l.name ?? 'this lead'} to phone`}
-                              >
-                                <Feather name="user-plus" size={16} color={T.ink} />
-                              </Pressable>
-                            </View>
-                          ) : null}
-                        </Pressable>
+                          lead={l}
+                          divided={i > 0}
+                          onOpen={openLead}
+                          onSave={saveOne}
+                          onWhatsApp={openWhatsApp}
+                        />
                       ))}
+                      {g.leads.length > (shown[g.id] ?? PAGE) ? (
+                        <Pressable
+                          style={({ pressed }) => [styles.more, pressed && { backgroundColor: T.soft }]}
+                          onPress={() => setShown((m) => ({ ...m, [g.id]: (m[g.id] ?? PAGE) + PAGE * 2 }))}
+                          accessibilityRole="button"
+                        >
+                          <Text style={styles.moreText}>
+                            Show more · {g.leads.length - (shown[g.id] ?? PAGE)} left
+                          </Text>
+                        </Pressable>
+                      ) : null}
                     </View>
                   </DropdownBody>
                 ) : null}
@@ -505,6 +496,20 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
         />
       ) : null}
 
+      {moving ? (
+        <MoveLeadsSheet
+          fromName={moving.name}
+          fromId={moving.banquet?.id ?? null}
+          leadIds={moving.leads.map((l) => l.id)}
+          banquets={banquets}
+          onDismiss={() => setMoving(null)}
+          onDone={(m) => {
+            setSnack(m);
+            void load();
+          }}
+        />
+      ) : null}
+
       {importing ? (
         <LeadsImportSheet
           banquets={banquets}
@@ -523,6 +528,92 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
     </View>
   );
 }
+
+/**
+ * One lead. Memoised: with hundreds of leads, typing in search or opening a
+ * banquet would otherwise redraw every row.
+ */
+const LeadRow = memo(function LeadRow({
+  lead: l,
+  divided,
+  onOpen,
+  onSave,
+  onWhatsApp,
+}: {
+  lead: Lead;
+  divided: boolean;
+  onOpen: (lead: Lead) => void;
+  onSave: (lead: Lead) => void;
+  onWhatsApp: (phone: string) => void;
+}) {
+  const phones = leadPhones(l.contact);
+  return (
+    <Pressable
+      onPress={() => onOpen(l)}
+      style={({ pressed }) => [styles.lead, divided && styles.leadDivided, pressed && { backgroundColor: T.soft }]}
+      accessibilityRole="button"
+      accessibilityLabel={`${l.name ?? 'Lead'}${l.function ? `, ${l.function}` : ''}`}
+    >
+      <View style={styles.dateBox}>
+        {l.dof ? (
+          <>
+            <Text style={styles.dateDay}>{format(parseISO(l.dof), 'd')}</Text>
+            <Text style={styles.dateMon}>{format(parseISO(l.dof), 'MMM')}</Text>
+          </>
+        ) : (
+          <Text style={styles.dateMon}>—</Text>
+        )}
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={styles.leadName} numberOfLines={1}>
+          {l.name || 'No name'}
+          {l.function ? <Text style={styles.leadFn}>{`  ·  ${l.function}`}</Text> : null}
+        </Text>
+        {phones.length ? (
+          <Text style={styles.leadPhone} numberOfLines={2}>
+            <Feather name="phone" size={12} color={T.blue} />{' '}
+            {phones.map((p, i) => (
+              <Text key={i}>
+                {i > 0 ? <Text style={styles.leadPhoneSep}>{'  ·  '}</Text> : null}
+                <Text onPress={() => Linking.openURL(telUrl(p))} accessibilityRole="link" accessibilityLabel={`Call ${p}`}>
+                  {p}
+                </Text>
+              </Text>
+            ))}
+          </Text>
+        ) : null}
+        {l.remarks ? (
+          <Text style={styles.leadRemarks} numberOfLines={2}>
+            {l.remarks}
+          </Text>
+        ) : null}
+        <Text style={styles.leadBy} numberOfLines={1}>
+          Added by {l.created_by_name || 'someone'} · {format(parseISO(l.created_at), 'd MMM')}
+        </Text>
+      </View>
+      {phones.length ? (
+        <View style={styles.rowBtns}>
+          <Pressable
+            onPress={() => onWhatsApp(phones[0])}
+            style={styles.saveBtn}
+            hitSlop={4}
+            accessibilityLabel={`WhatsApp ${l.name ?? 'this lead'}`}
+          >
+            <MaterialCommunityIcons name="whatsapp" size={18} color={WHATSAPP_GREEN} />
+          </Pressable>
+          <Pressable
+            onPress={() => onSave(l)}
+            style={styles.saveBtn}
+            hitSlop={4}
+            accessibilityLabel={`Save ${l.name ?? 'this lead'} to phone`}
+          >
+            <Feather name="user-plus" size={16} color={T.ink} />
+          </Pressable>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+});
 
 const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 10 },
@@ -584,6 +675,15 @@ const styles = StyleSheet.create({
   leadName: { fontFamily: 'Inter_700Bold', fontSize: 14.5, color: T.ink },
   leadFn: { fontFamily: 'Inter_500Medium', color: T.inkSoft },
   leadPhone: { fontFamily: 'Inter_600SemiBold', fontSize: 13.5, color: T.blue, marginTop: 3 },
+  leadPhoneSep: { color: T.mute },
+  leadBy: { fontFamily: 'Inter_400Regular', fontSize: 11.5, color: T.mute, marginTop: 3 },
+  more: {
+    paddingVertical: 13,
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: T.hairline,
+  },
+  moreText: { fontFamily: 'Inter_600SemiBold', fontSize: 13.5, color: T.ink },
   leadRemarks: { fontFamily: 'Inter_400Regular', fontSize: 13, color: T.inkSoft, marginTop: 3, lineHeight: 18 },
   rowBtns: { flexDirection: 'row', gap: 6 },
   saveBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: T.soft, alignItems: 'center', justifyContent: 'center' },

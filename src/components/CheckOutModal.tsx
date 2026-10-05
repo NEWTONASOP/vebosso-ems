@@ -9,6 +9,8 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/theme';
 import { PaperOutlinedField } from './PaperOutlinedField';
+import { FieldChainScope } from './FieldChain';
+import { useDialogLift } from '../lib/useKeyboardHeight';
 
 interface CheckOutModalProps {
   visible: boolean;
@@ -18,6 +20,8 @@ interface CheckOutModalProps {
 }
 
 export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: CheckOutModalProps) {
+  // Above the keyboard on Android too (KeyboardAvoidingView only works on iOS here).
+  const lifted = useDialogLift();
   const reportRef = useRef('');
   const [charCount, setCharCount] = useState(0);
   const [photos, setPhotos] = useState<string[]>([]);
@@ -101,8 +105,9 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
       <Modal
         visible
         onDismiss={onDismiss}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, lifted]}
       >
+        <FieldChainScope>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={styles.scroll}>
             <View style={styles.header}>
@@ -206,6 +211,7 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+        </FieldChainScope>
       </Modal>
     </Portal>
   );

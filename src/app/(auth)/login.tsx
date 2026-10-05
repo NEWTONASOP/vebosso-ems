@@ -17,8 +17,11 @@ import {
   screenChrome,
 } from '../../constants/theme';
 import Constants from 'expo-constants';
+import { useKeyboardOverlap } from '../../lib/useKeyboardHeight';
 
 export default function LoginScreen() {
+  // Shrink to the space above the keyboard so the focused box stays in sight.
+  const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -44,10 +47,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View ref={keyboardRef} style={[styles.container, { paddingBottom: keyboardInset }]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -173,7 +173,7 @@ export default function LoginScreen() {
       >
         {snackError}
       </Snackbar>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

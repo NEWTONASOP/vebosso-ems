@@ -10,6 +10,8 @@ import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/them
 import { format, parse } from 'date-fns';
 import { TimeField } from './DateTimeFields';
 import { PaperOutlinedField } from './PaperOutlinedField';
+import { FieldChainScope } from './FieldChain';
+import { useDialogLift } from '../lib/useKeyboardHeight';
 
 interface BackfillModalProps {
   visible: boolean;
@@ -46,6 +48,8 @@ export function BackfillModal({
   initialCheckOutTime = '18:00',
   initialDayReport = '',
 }: BackfillModalProps) {
+  // Above the keyboard on Android too (KeyboardAvoidingView only works on iOS here).
+  const lifted = useDialogLift();
   const [inTime, setInTime] = useState(formatTimeToHHMM(initialCheckInTime) || '09:00');
   const [outTime, setOutTime] = useState(formatTimeToHHMM(initialCheckOutTime) || '18:00');
   const planRef = useRef(initialCheckInPlan);
@@ -105,7 +109,8 @@ export function BackfillModal({
 
   return (
     <Portal>
-      <Modal visible onDismiss={onDismiss} contentContainerStyle={styles.container}>
+      <Modal visible onDismiss={onDismiss} contentContainerStyle={[styles.container, lifted]}>
+        <FieldChainScope>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.header}>
@@ -204,6 +209,7 @@ export function BackfillModal({
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+        </FieldChainScope>
       </Modal>
     </Portal>
   );

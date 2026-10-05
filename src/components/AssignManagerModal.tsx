@@ -10,6 +10,7 @@ import { useSheetEntrance } from '../lib/useSheetEntrance';
 import { AppTheme, appShadow, appSoftShadow } from '../constants/theme';
 import { Profile } from '../types/database';
 import { AnimatedPressable } from './AnimatedPressable';
+import { FieldChainScope } from './FieldChain';
 
 interface AssignManagerModalProps {
   visible: boolean;
@@ -58,6 +59,7 @@ export function AssignManagerModal({
         onDismiss={onDismiss}
         contentContainerStyle={[styles.modal, entrance]}
       >
+        <FieldChainScope>
         <View style={styles.header}>
           <View style={styles.headerTop}>
             <View style={styles.headerIcon}>
@@ -165,6 +167,7 @@ export function AssignManagerModal({
             Assign
           </Button>
         </View>
+        </FieldChainScope>
       </Modal>
     </Portal>
   );

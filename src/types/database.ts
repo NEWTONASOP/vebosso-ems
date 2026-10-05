@@ -200,6 +200,46 @@ export interface SalaryRequest {
 }
 
 /** The person's monthly salary, set by the owner. */
+/** One person in an employee's family (employee_details.family). */
+export interface FamilyMember {
+  name?: string;
+  relation?: string;
+  phone?: string;
+  occupation?: string;
+}
+
+/** Filled in once by the person, then owner-only (migration 045). */
+export interface EmployeeDetails {
+  user_id: string;
+  date_of_birth: string | null;
+  gender: string | null;
+  blood_group: string | null;
+  marital_status: string | null;
+  phone: string | null;
+  alt_phone: string | null;
+  personal_email: string | null;
+  current_address: string | null;
+  permanent_address: string | null;
+  emergency_name: string | null;
+  emergency_relation: string | null;
+  emergency_phone: string | null;
+  family: FamilyMember[];
+  joining_date: string | null;
+  /** "HH:mm" */
+  work_start: string | null;
+  /** "HH:mm" */
+  work_end: string | null;
+  /** e.g. ['Sun'] */
+  weekly_off: string[];
+  qualification: string | null;
+  experience: string | null;
+  submitted_at: string;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+export type EmployeeDetailsInput = Omit<EmployeeDetails, 'user_id' | 'submitted_at' | 'updated_by' | 'updated_at'>;
+
 export interface SalarySetting {
   user_id: string;
   monthly_amount: number | string;
@@ -293,6 +333,8 @@ export interface Lead {
   contact: string | null;
   remarks: string | null;
   created_by: string | null;
+  /** Who added it, filled in by the database (047). */
+  created_by_name?: string | null;
   created_at: string;
   updated_at: string;
 }

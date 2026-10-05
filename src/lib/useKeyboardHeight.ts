@@ -43,6 +43,23 @@ export function useSheetLift() {
 }
 
 /**
+ * Like useSheetLift, for a centred dialog (Paper Modal content with `margin`
+ * all round): moves it up above the keyboard and keeps it within the space
+ * left. null while the keyboard is closed. Android only: those dialogs keep
+ * a KeyboardAvoidingView for iOS, which already does this there.
+ */
+export function useDialogLift(margin = 20) {
+  const keyboard = useKeyboardHeight();
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  if (keyboard <= 0 || Platform.OS !== 'android') return null;
+  return {
+    marginBottom: margin + keyboard,
+    maxHeight: height - insets.top - insets.bottom - keyboard - margin * 2,
+  };
+}
+
+/**
  * For full-screen forms: how much of the view in `ref` the keyboard covers.
  * Give that view `paddingBottom: overlap` and its ScrollView shrinks to the
  * space above the keyboard, keeping the focused field in sight.

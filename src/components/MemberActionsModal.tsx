@@ -23,7 +23,7 @@ import { MemberAttendancePanel } from './MemberAttendancePanel';
 import { MemberLocationSection } from './MemberLocationSection';
 import { UserAvatar } from './UserAvatar';
 
-export type MemberDialog = 'tasks' | 'chat' | 'salary' | 'expenses' | 'documents';
+export type MemberDialog = 'tasks' | 'chat' | 'details' | 'salary' | 'expenses' | 'documents';
 
 interface MemberActionsModalProps {
   visible: boolean;
@@ -208,6 +208,14 @@ export function MemberActionsModal({
                     iconColor={AppTheme.violet}
                     iconBg={AppTheme.violetSoft}
                     onPress={() => onOpenDialog('documents')}
+                  />
+                  <NavRow
+                    label="Employee details"
+                    hint="Phone, address, family, work hours"
+                    icon="user"
+                    iconColor={AppTheme.blue}
+                    iconBg={AppTheme.blueSoft}
+                    onPress={() => onOpenDialog('details')}
                     isLast
                   />
                 </View>

@@ -9,6 +9,7 @@ import { PaperOutlinedField } from './PaperOutlinedField';
 import { Button, Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/theme';
 import { useKeyboardHeight } from '../lib/useKeyboardHeight';
+import { FieldChainScope } from './FieldChain';
 
 interface TaskCompleteModalProps {
   visible: boolean;
@@ -56,6 +57,7 @@ export function TaskCompleteModal({
         onDismiss={onDismiss}
         contentContainerStyle={[styles.modalContainer, keyboard > 0 && { marginBottom: keyboard }]}
       >
+        <FieldChainScope>
         <View style={styles.keyboardView}>
           <View style={styles.container}>
             <View style={styles.header}>
@@ -116,6 +118,7 @@ export function TaskCompleteModal({
             </View>
           </View>
         </View>
+        </FieldChainScope>
       </Modal>
     </Portal>
   );

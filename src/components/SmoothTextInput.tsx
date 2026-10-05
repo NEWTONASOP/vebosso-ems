@@ -14,18 +14,61 @@
 // Number / phone keyboards stay plain controlled inputs: those screens often
 // reshape what is typed (e.g. strip letters from an amount), and they have no
 // word suggestions, which is where the problem comes from.
+//
+// Every box also joins the nearest FieldChainScope, so Enter / Next moves on
+// to the next box (see FieldChain).
 // ============================================================================
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { NavigationContext } from 'expo-router/build/react-navigation/core/NavigationContext';
+import { forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { TextInput, TextInputProps } from 'react-native';
+import { newFieldId, useFieldChainScope } from './FieldChain';
 
 const NUMERIC_KEYBOARDS = new Set(['numeric', 'number-pad', 'decimal-pad', 'phone-pad']);
 
 export const SmoothTextInput = forwardRef<TextInput, TextInputProps>(function SmoothTextInput(props, ref) {
+  // Enter / Next to the next box (FieldChain): for single-line boxes that
+  // don't already do something of their own on Enter.
+  const chain = useFieldChainScope();
+  const [id] = useState(newFieldId);
+  const inner = useRef<TextInput | null>(null);
+  const editable = props.editable !== false;
+  // The screen this box is on; none inside a popup (always in front).
+  const navigation = useContext(NavigationContext);
+
+  useEffect(() => {
+    if (!chain) return;
+    chain.register(id, {
+      input: () => inner.current,
+      editable,
+      active: () => (navigation ? navigation.isFocused() : true),
+    });
+    return () => chain.register(id, null);
+  }, [chain, id, editable, navigation]);
+
+  const setRef = useCallback(
+    (el: TextInput | null) => {
+      inner.current = el;
+      if (typeof ref === 'function') ref(el);
+      else if (ref) ref.current = el;
+    },
+    [ref],
+  );
+
+  const auto = !!chain && !props.multiline && !props.onSubmitEditing;
+  const chained: TextInputProps = auto
+    ? {
+        returnKeyType: props.returnKeyType ?? 'next',
+        submitBehavior: 'submit',
+        blurOnSubmit: false,
+        onSubmitEditing: () => chain!.next(id),
+      }
+    : {};
+
   if (props.keyboardType && NUMERIC_KEYBOARDS.has(props.keyboardType)) {
-    return <TextInput ref={ref} {...props} />;
+    return <TextInput ref={setRef} {...props} {...chained} />;
   }
-  return <UncontrolledTextInput ref={ref} {...props} />;
+  return <UncontrolledTextInput ref={setRef} {...props} {...chained} />;
 });
 
 /**

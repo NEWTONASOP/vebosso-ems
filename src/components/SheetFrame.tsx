@@ -12,6 +12,7 @@ import { Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { useSheetLift } from '../lib/useKeyboardHeight';
 import { useSheetEntrance } from '../lib/useSheetEntrance';
+import { FieldChainScope } from './FieldChain';
 
 interface SheetFrameProps {
   visible: boolean;
@@ -60,6 +61,7 @@ export function SheetFrame({
   return (
     <Portal>
       <Modal visible onDismiss={onDismiss} contentContainerStyle={[styles.container, lifted, entrance]}>
+        <FieldChainScope>
         <View style={styles.inner}>
           <View style={styles.header}>
             {icon ? (
@@ -96,6 +98,7 @@ export function SheetFrame({
 
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </View>
+        </FieldChainScope>
       </Modal>
     </Portal>
   );

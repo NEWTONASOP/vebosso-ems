@@ -20,8 +20,11 @@ import {
 import { useAuthStore } from '../../../store/authStore';
 import { useWorkStore } from '../../../store/workStore';
 import { Alert } from '../../../lib/alert';
+import { useKeyboardOverlap } from '../../../lib/useKeyboardHeight';
 
 export default function AnnouncementsScreen() {
+  // Shrink to the space above the keyboard so the focused box stays in sight.
+  const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
   const router = useRouter();
   const { profile } = useAuthStore();
   const { announcements, fetchAnnouncements, createAnnouncement, deleteAnnouncement } = useWorkStore();
@@ -98,7 +101,7 @@ export default function AnnouncementsScreen() {
   };
 
   return (
-    <View style={screenChrome.root}>
+    <View ref={keyboardRef} style={[screenChrome.root, { paddingBottom: keyboardInset }]}>
       <View style={styles.header}>
         <Pressable
           style={({ pressed }) => [

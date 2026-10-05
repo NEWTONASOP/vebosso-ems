@@ -13,6 +13,7 @@ import { configureFonts, MD3LightTheme, PaperProvider } from 'react-native-paper
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { FieldChainScope } from '../components/FieldChain';
 import { LoadingScreen } from '../components/LoadingScreen';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { UpdateChecker } from '../components/UpdateChecker';
@@ -278,13 +279,17 @@ export default function RootLayout() {
                 {!isInitialized ? (
                   <LoadingScreen />
                 ) : (
-                  <Stack
-                    screenOptions={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: AppTheme.bg },
-                      animation: 'slide_from_right',
-                    }}
-                  />
+                  // Enter / Next moves to the next box on full screens; each
+                  // sheet and popup has its own scope.
+                  <FieldChainScope>
+                    <Stack
+                      screenOptions={{
+                        headerShown: false,
+                        contentStyle: { backgroundColor: AppTheme.bg },
+                        animation: 'slide_from_right',
+                      }}
+                    />
+                  </FieldChainScope>
                 )}
               </>
             )}

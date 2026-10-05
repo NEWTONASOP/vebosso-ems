@@ -22,6 +22,27 @@ const opt = (v: string | null | undefined) => {
   return t ? t : null;
 };
 
+/**
+ * Every number in a lead's contact. Several are kept together as
+ * "98xxxxxxxx, 97xxxxxxxx"; imported sheets may use / ; | or a new line, or
+ * just spaces between two full numbers.
+ */
+export function leadPhones(contact: string | null | undefined): string[] {
+  return (contact ?? '').split(/[,;/|\n]+/).flatMap((part) => {
+    const t = part.trim();
+    if (!t) return [];
+    // "98373 07364" is one number; "9837307364 9412345678" is two.
+    return t.replace(/\D/g, '').length >= 20 ? t.split(/\s+/).filter(Boolean) : [t];
+  });
+}
+
+/** Back into one contact string. */
+export const joinPhones = (phones: string[]) =>
+  phones
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .join(', ');
+
 /** Trimmed, empties to null, lengths within the database limits. */
 export function cleanLead(input: LeadInput): LeadInput {
   return {
@@ -29,7 +50,7 @@ export function cleanLead(input: LeadInput): LeadInput {
     dof: input.dof || null,
     name: opt(input.name)?.slice(0, 200) ?? null,
     function: opt(input.function)?.slice(0, 120) ?? null,
-    contact: opt(input.contact)?.slice(0, 40) ?? null,
+    contact: opt(joinPhones(leadPhones(input.contact)))?.slice(0, 300) ?? null,
     remarks: opt(input.remarks)?.slice(0, 2000) ?? null,
   };
 }
@@ -92,6 +113,24 @@ export async function updateLead(id: string, input: LeadInput): Promise<Result<L
   const { data, error } = await supabase.from('leads').update(cleanLead(input)).eq('id', id).select().single();
   if (error) return fail(error);
   return { success: true, data: data as Lead };
+}
+
+/** Move many leads into one banquet (null = no banquet), in chunks. Returns how many moved. */
+export async function moveLeads(ids: string[], banquetId: string | null): Promise<Result<number>> {
+  const CHUNK = 200;
+  let done = 0;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const part = ids.slice(i, i + CHUNK);
+    const { error } = await supabase.from('leads').update({ banquet_id: banquetId }).in('id', part);
+    if (error) {
+      return {
+        success: false,
+        error: done ? `${done} moved, then: ${parseSupabaseError(error)}` : parseSupabaseError(error),
+      };
+    }
+    done += part.length;
+  }
+  return { success: true, data: done };
 }
 
 export async function deleteLead(id: string): Promise<Result> {

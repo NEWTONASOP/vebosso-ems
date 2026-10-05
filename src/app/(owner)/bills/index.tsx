@@ -97,6 +97,7 @@ export default function BillsScreen() {
     return c;
   }, [ofKind]);
 
+  const today = format(new Date(), 'yyyy-MM-dd');
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     return ofKind
@@ -106,16 +107,22 @@ export default function BillsScreen() {
           !q ||
           [b.number, b.client_name, b.venue, b.phone, b.event_type].some((f) => f?.toLowerCase().includes(q))
       )
-      // Latest function date first; bills without a date after those, newest edit first.
+      // Nearest upcoming function first (today included); then past functions,
+      // most recent first; bills without a date last, newest edit first.
       .sort((a, b) => {
         if (a.function_date && b.function_date) {
-          if (a.function_date !== b.function_date) return a.function_date < b.function_date ? 1 : -1;
+          const aUp = a.function_date >= today;
+          const bUp = b.function_date >= today;
+          if (aUp !== bUp) return aUp ? -1 : 1;
+          if (a.function_date !== b.function_date) {
+            return (a.function_date < b.function_date) === aUp ? -1 : 1;
+          }
         } else if (a.function_date || b.function_date) {
           return a.function_date ? -1 : 1;
         }
         return a.updated_at < b.updated_at ? 1 : -1;
       });
-  }, [ofKind, filter, query]);
+  }, [ofKind, filter, query, today]);
 
   const switchKind = (k: BillKind) => {
     setKind(k);
@@ -391,8 +398,11 @@ const styles = StyleSheet.create({
   segActive: { backgroundColor: T.card, ...appSoftShadow },
   segText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: T.inkSoft },
   segTextActive: { color: T.ink },
-  chipsWrap: { flexGrow: 0, marginTop: 12 },
-  chips: { gap: 8, paddingHorizontal: 20 },
+  // Room above and below inside the strip, or it clips the chips' shadow
+  // (it falls lower than it rises, and is softer on web). The search box
+  // below is pulled up by the extra, so the spacing looks the same.
+  chipsWrap: { flexGrow: 0, marginTop: 4 },
+  chips: { gap: 8, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
   chip: {
     height: 34,
     paddingHorizontal: 14,
@@ -411,7 +421,7 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 44,
     marginHorizontal: 20,
-    marginTop: 12,
+    marginTop: -4,
     borderRadius: 14,
     paddingHorizontal: 14,
     backgroundColor: T.card,

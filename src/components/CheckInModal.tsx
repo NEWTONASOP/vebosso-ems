@@ -17,6 +17,8 @@ import {
 import { Button, HelperText, Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/theme';
 import { PaperOutlinedField } from './PaperOutlinedField';
+import { FieldChainScope } from './FieldChain';
+import { useDialogLift } from '../lib/useKeyboardHeight';
 
 const MAX_PHOTOS = 3;
 
@@ -40,6 +42,8 @@ export function CheckInModal({
   initialPlan = '',
   mode = 'checkin',
 }: CheckInModalProps) {
+  // Above the keyboard on Android too (KeyboardAvoidingView only works on iOS here).
+  const lifted = useDialogLift();
   const planRef = useRef('');
   const [charCount, setCharCount] = useState(0);
   const [photos, setPhotos] = useState<string[]>([]);
@@ -133,8 +137,9 @@ export function CheckInModal({
       <Modal
         visible
         onDismiss={onDismiss}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, lifted]}
       >
+        <FieldChainScope>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -263,6 +268,7 @@ export function CheckInModal({
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+        </FieldChainScope>
       </Modal>
     </Portal>
   );

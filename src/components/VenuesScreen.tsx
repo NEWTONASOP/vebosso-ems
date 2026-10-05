@@ -43,6 +43,7 @@ import { Chevron, DropdownBody } from './Dropdown';
 import { SheetFrame } from './SheetFrame';
 import { EmailPeopleSheet } from './EmailPeopleSheet';
 import { VenueFormSheet } from './VenueFormSheet';
+import { useKeyboardOverlap } from '../lib/useKeyboardHeight';
 
 const COLUMNS: { key: string; label: string; width: number }[] = [
   { key: 'date', label: 'Date', width: 96 },
@@ -72,6 +73,8 @@ interface VenuesScreenProps {
 }
 
 export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
+  // Shrink to the space above the keyboard so the focused box stays in sight.
+  const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
   const router = useRouter();
   // "?add=1" (from the home shortcut) opens straight into the add form.
   const { add } = useLocalSearchParams<{ add?: string }>();
@@ -410,7 +413,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
   );
 
   return (
-    <View style={screenChrome.root}>
+    <View ref={keyboardRef} style={[screenChrome.root, { paddingBottom: keyboardInset }]}>
       <View style={screenChrome.headerRow}>
         <View style={styles.titleRow}>
           {showBack ? (

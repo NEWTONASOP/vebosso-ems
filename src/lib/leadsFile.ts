@@ -17,7 +17,7 @@ import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import * as XLSX from 'xlsx';
 import { Lead, LeadInput } from '../types/database';
-import { contactName } from './leads';
+import { contactName, leadPhones } from './leads';
 
 // ---------------------------------------------------------------------------
 // Export
@@ -232,7 +232,7 @@ function buildVcf(leads: { lead: Lead; banquetName: string | null }[]): string {
         'VERSION:3.0',
         `FN:${vEscape(full)}`,
         `N:;${vEscape(full)};;;`,
-        `TEL;TYPE=CELL:${(lead.contact ?? '').replace(/[^\d+]/g, '')}`,
+        ...leadPhones(lead.contact).map((p) => `TEL;TYPE=CELL:${p.replace(/[^\d+]/g, '')}`),
       ];
       if (lead.remarks?.trim()) lines.push(`NOTE:${vEscape(lead.remarks.trim())}`);
       lines.push('END:VCARD');

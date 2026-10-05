@@ -10,6 +10,7 @@ import { Profile } from '../types/database';
 import { ROLE_LABELS } from '../constants/roles';
 import { AnimatedPressable } from './AnimatedPressable';
 import { UserAvatar } from './UserAvatar';
+import { FieldChainScope } from './FieldChain';
 
 interface MemberPickerModalProps {
   visible: boolean;
@@ -67,6 +68,7 @@ export function MemberPickerModal({
         onDismiss={handleDismiss}
         contentContainerStyle={styles.container}
       >
+        <FieldChainScope>
         <View style={styles.header}>
           <Text style={styles.title}>Select Team Member</Text>
           <IconButton
@@ -156,6 +158,7 @@ export function MemberPickerModal({
             }}
           />
         </View>
+        </FieldChainScope>
       </Modal>
     </Portal>
   );

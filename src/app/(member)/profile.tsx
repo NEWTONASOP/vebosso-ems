@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Switch, Text } from 'react-native-paper';
 import { DocumentsSheet } from '../../components/DocumentsSheet';
+import { EmployeeDetailsSheet } from '../../components/EmployeeDetailsSheet';
 import { ExpensesSheet } from '../../components/ExpensesSheet';
 import { InfoRow } from '../../components/InfoRow';
 import { PageTransition } from '../../components/PageTransition';
@@ -54,7 +55,7 @@ function SundayReminderRow() {
 export default function MemberProfileScreen() {
   const router = useRouter();
   const { profile, signOut } = useAuthStore();
-  const [openSheet, setOpenSheet] = useState<'documents' | 'salary' | 'expenses' | null>(null);
+  const [openSheet, setOpenSheet] = useState<'details' | 'documents' | 'salary' | 'expenses' | null>(null);
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -118,6 +119,15 @@ export default function MemberProfileScreen() {
 
         <Text style={styles.sectionLabel}>Work & pay</Text>
         <View style={styles.groupedCard}>
+          <ActionRow
+            label="My details"
+            subtitle="Phone, address, family — fill in once"
+            icon="user"
+            iconColor={AppTheme.blue}
+            iconBg={AppTheme.blueSoft}
+            onPress={() => setOpenSheet('details')}
+          />
+          <View style={styles.separator} />
           <ActionRow
             label="My Documents"
             subtitle="Upload ID, certificates and other papers"
@@ -192,6 +202,14 @@ export default function MemberProfileScreen() {
           <Text style={styles.appVersion}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
         </View>
       </ScrollView>
+      {openSheet === 'details' ? (
+        <EmployeeDetailsSheet
+          onDismiss={() => setOpenSheet(null)}
+          userId={profile.id}
+          userName={profile.full_name}
+          mode="self"
+        />
+      ) : null}
       {openSheet === 'documents' ? (
         <DocumentsSheet
           visible
