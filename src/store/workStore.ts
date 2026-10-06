@@ -349,20 +349,46 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         }
       }
 
-      const { data, error } = await supabase
+      // A check-in sent back today is reset and sent again (048) — there can be
+      // only one log per day, so adding a new one would fail as a duplicate.
+      const { data: existing } = await supabase
         .from('work_logs')
-        .insert({
-          user_id: user.id,
-          date: today,
-          check_in_time: new Date().toISOString(),
-          check_in_plan: plan,
-          check_in_photos: uploadedPaths.length > 0 ? uploadedPaths : null,
-          status: 'pending_approval' as WorkLogStatus,
-        })
-        .select()
-        .single();
+        .select('id, status')
+        .eq('user_id', user.id)
+        .eq('date', today)
+        .maybeSingle();
+      if (existing && existing.status !== 'rejected') {
+        return { success: false, error: 'You have already checked in today.' };
+      }
 
-      if (error) return { success: false, error: error.message };
+      const { data, error } = existing
+        ? await supabase
+            .rpc('redo_check_in', {
+              p_date: today,
+              p_plan: plan,
+              p_photos: uploadedPaths.length > 0 ? uploadedPaths : null,
+            })
+            .single()
+        : await supabase
+            .from('work_logs')
+            .insert({
+              user_id: user.id,
+              date: today,
+              check_in_time: new Date().toISOString(),
+              check_in_plan: plan,
+              check_in_photos: uploadedPaths.length > 0 ? uploadedPaths : null,
+              status: 'pending_approval' as WorkLogStatus,
+            })
+            .select()
+            .single();
+
+      if (error) {
+        const msg = error.message || '';
+        if (/redo_check_in/.test(msg) && /function|schema cache/i.test(msg)) {
+          return { success: false, error: 'Checking in again needs a database update (048). Ask the owner to run it.' };
+        }
+        return { success: false, error: msg };
+      }
 
       set({ todayLog: data as WorkLog });
 
