@@ -614,7 +614,10 @@ export function OwnerInboxSheet({
               name={m.person?.full_name}
               avatar={m.person?.avatar_url}
               meta={`${m.count > 1 ? `${m.count} new · ` : ''}${formatDistanceToNow(new Date(m.latest.created_at), { addSuffix: true })}`}
-              body={m.latest.body ?? '🎤 Voice message'}
+              body={m.latest.body ?? (m.latest.audio_path ? null : '🎤 Voice message')}
+              extra={
+                m.latest.audio_path ? <VoiceNote path={m.latest.audio_path} durationMs={m.latest.audio_ms} /> : undefined
+              }
               busy={busy === m.memberId}
               actions={[
                 {
