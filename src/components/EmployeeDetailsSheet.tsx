@@ -230,25 +230,6 @@ export function EmployeeDetailsSheet({
           </View>
         </View>
       );
-    } else if (!isOwner && details) {
-      footer = (
-        <View>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          {details.edit_unlocked ? (
-            <Pressable style={[styles.btn, styles.saveBtn]} onPress={() => startEditing(details)}>
-              <Text style={styles.saveText}>Edit my details</Text>
-            </Pressable>
-          ) : details.edit_requested_at ? (
-            <View style={[styles.btn, styles.softBtn]}>
-              <Text style={styles.softText}>Request sent · waiting for the boss</Text>
-            </View>
-          ) : (
-            <Pressable style={[styles.btn, styles.saveBtn]} onPress={() => void request()} disabled={saving}>
-              {saving ? <ActivityIndicator color={T.white} /> : <Text style={styles.saveText}>Request to edit</Text>}
-            </Pressable>
-          )}
-        </View>
-      );
     } else if (isOwner) {
       footer = (
         <View>
@@ -310,15 +291,37 @@ export function EmployeeDetailsSheet({
     return (
       <View>
         {!isOwner ? (
-          <View style={styles.lockNote}>
-            <Feather name={d.edit_unlocked ? 'unlock' : 'lock'} size={14} color={T.inkSoft} />
-            <Text style={styles.lockText}>
-              {d.edit_unlocked
-                ? 'The boss approved your edit. You can change your details once — it locks again when you save.'
-                : d.edit_requested_at
-                  ? 'You asked to edit your details. You’ll be able to once the boss approves.'
-                  : 'Submitted. To change anything, tap Request to edit below.'}
-            </Text>
+          // The person's action sits up here, not in the footer, so it's the
+          // first thing they see when the sheet opens.
+          <View>
+            <View style={styles.lockNote}>
+              <Feather name={d.edit_unlocked ? 'unlock' : 'lock'} size={14} color={T.inkSoft} />
+              <Text style={styles.lockText}>
+                {d.edit_unlocked
+                  ? 'The boss approved your edit. You can change your details once — it locks again when you save.'
+                  : d.edit_requested_at
+                    ? 'You asked to edit your details. You’ll be able to once the boss approves.'
+                    : 'Submitted. To change anything, tap Request to edit.'}
+              </Text>
+            </View>
+            {error ? <Text style={[styles.error, styles.topAction]}>{error}</Text> : null}
+            {d.edit_unlocked ? (
+              <Pressable style={[styles.btn, styles.saveBtn, styles.topAction]} onPress={() => startEditing(d)}>
+                <Text style={styles.saveText}>Edit my details</Text>
+              </Pressable>
+            ) : d.edit_requested_at ? (
+              <View style={[styles.btn, styles.softBtn, styles.topAction]}>
+                <Text style={styles.softText}>Request sent · waiting for the boss</Text>
+              </View>
+            ) : (
+              <Pressable
+                style={[styles.btn, styles.saveBtn, styles.topAction]}
+                onPress={() => void request()}
+                disabled={saving}
+              >
+                {saving ? <ActivityIndicator color={T.white} /> : <Text style={styles.saveText}>Request to edit</Text>}
+              </Pressable>
+            )}
           </View>
         ) : (
           <>
@@ -641,4 +644,6 @@ const styles = StyleSheet.create({
   softText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: T.ink },
   saveBtn: { flex: 1, backgroundColor: T.charcoal },
   saveText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: T.white },
+  // In the scrolling body (not a footer row), so no flex: keep the 48 height.
+  topAction: { flex: 0, marginTop: 10, marginBottom: 0 },
 });

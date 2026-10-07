@@ -20,6 +20,9 @@ import {
 } from '../lib/attendanceTimeline';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 
+/** Only the first few cards animate in — a long list would otherwise crawl. */
+const ANIMATED_ITEMS = 8;
+
 const KIND_ICON: Record<TimelineEventKind, React.ComponentProps<typeof Feather>['name']> = {
   'check-in': 'log-in',
   task: 'check-circle',
@@ -135,7 +138,7 @@ function TimelineRow({
 
   return (
     <Animated.View
-      entering={FadeInDown.delay(index * 55).duration(360)}
+      entering={index < ANIMATED_ITEMS ? FadeInDown.delay(index * 55).duration(360) : undefined}
       style={styles.row}
     >
       <View style={styles.gutter}>

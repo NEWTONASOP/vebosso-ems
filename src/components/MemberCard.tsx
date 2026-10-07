@@ -14,6 +14,9 @@ import { Profile, WorkLogStatus } from '../types/database';
 import { AnimatedPressable } from './AnimatedPressable';
 import { UserAvatar } from './UserAvatar';
 
+/** Only the first few cards animate in — a long list would otherwise crawl. */
+const ANIMATED_ITEMS = 8;
+
 export type MemberActiveTask = {
   title: string;
   description: string | null;
@@ -138,8 +141,8 @@ export function MemberCard({
 
   return (
     <Animated.View
-      entering={FadeInDown.delay(index * 40).springify()}
-      layout={LinearTransition.springify()}
+      entering={index < ANIMATED_ITEMS ? FadeInDown.delay(index * 40).springify() : undefined}
+      layout={index < ANIMATED_ITEMS ? LinearTransition.springify() : undefined}
       style={styles.cardContainer}
     >
       <CardWrapper {...cardProps}>

@@ -1,10 +1,9 @@
 // ============================================================================
 // VEBOSSO EMS — Venues
-// Anyone with access can add, edit and delete venues, and mark or unmark them
-// "in business" (RLS, migrations 024, 029, 043). The adder's name is filled in
-// by the database.
-// Since 033 all of it needs Venues access; venues sit under cities, which
-// anyone with access can add.
+// People with Venues access see, edit, delete and mark "in business" only the
+// venues they added; the owner sees and does everything (RLS, 024, 029, 051).
+// The adder's name is filled in by the database. Venues sit under cities —
+// one shared list anyone with access can add to; only the owner removes one.
 // ============================================================================
 
 import { Platform } from 'react-native';

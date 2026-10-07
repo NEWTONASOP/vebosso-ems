@@ -22,6 +22,7 @@ import { BILL_STATUS_TONE, billTotals, fetchBills, STATUS_LABEL } from '../../..
 import { useFeatureBase } from '../../../lib/featureAccess';
 import { useAuthStore } from '../../../store/authStore';
 import { Bill, BillBrand, BillKind, BillStatus } from '../../../types/database';
+import { ShowMore, usePaged } from '../../../components/ShowMore';
 
 type Filter = 'all' | BillStatus;
 
@@ -123,6 +124,8 @@ export default function BillsScreen() {
         return a.updated_at < b.updated_at ? 1 : -1;
       });
   }, [ofKind, filter, query, today]);
+  // A page at a time — a year of bills was slow to draw.
+  const billPage = usePaged(shown, `${brand}-${kind}-${filter}-${query}`);
 
   const switchKind = (k: BillKind) => {
     setKind(k);
@@ -263,7 +266,8 @@ export default function BillsScreen() {
             </Text>
           </View>
         ) : (
-          shown.map((b) => {
+          <>
+          {billPage.items.map((b) => {
             const t = billTotals(b);
             const tone = BILL_STATUS_TONE[b.status];
             return (
@@ -308,7 +312,9 @@ export default function BillsScreen() {
                 </View>
               </Pressable>
             );
-          })
+          })}
+          <ShowMore page={billPage} />
+          </>
         )}
       </ScrollView>
 

@@ -1,8 +1,8 @@
 // ============================================================================
 // VEBOSSO EMS — Venue Form Sheet
-// Add a venue (anyone with Venues access) or edit one (owner). Pick the city
-// it is in, or add a new city. Warns when a venue with the same name is
-// already on the list, so two people don't pitch the same place.
+// Add a venue (anyone with Venues access) or edit one (its adder, or the
+// owner). Pick the city it is in. Two people may onboard the same place —
+// each keeps their own (051).
 // ============================================================================
 import { Feather } from '@expo/vector-icons';
 
@@ -78,10 +78,6 @@ export function VenueFormSheet({
     if (error) setError('');
   };
 
-  const nameKey = form.venue_name.trim().toLowerCase();
-  const duplicate = nameKey
-    ? existing.find((v) => v.id !== venue?.id && v.venue_name.trim().toLowerCase() === nameKey)
-    : undefined;
 
   const handleSave = async () => {
     if (!profile) return;
@@ -136,12 +132,6 @@ export function VenueFormSheet({
     >
       <Text style={styles.group}>Venue</Text>
       <Field label="Venue name *" value={form.venue_name} onChange={set('venue_name')} placeholder="Hotel, banquet hall or farmhouse" inputRef={chain.reg('venue_name')} onNext={chain.next('location')} />
-      {duplicate ? (
-        <Text style={styles.warn}>
-          Already on the list — added by {duplicate.added_by_name ?? 'someone'} on{' '}
-          {format(parseISO(duplicate.met_on), 'd MMM yyyy')}.
-        </Text>
-      ) : null}
       <Field label="Location" value={form.location ?? ''} onChange={set('location')} placeholder="Area or address" inputRef={chain.reg('location')} onNext={chain.next('p0-role')} />
 
       <View style={styles.field}>

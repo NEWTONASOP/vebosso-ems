@@ -1,10 +1,11 @@
 // ============================================================================
 // VEBOSSO EMS — Venues Screen (shared by owner, manager, member)
 // Every venue onboarded to VEBOSSO as a table: when it was met, who met it,
-// the venue, where, and the person met there. Everyone with access can add,
-// edit and delete (tap a row). Venues in business with VEBOSSO show green —
-// anyone can mark or unmark one (043). Only the owner removes cities. Venues are
-// grouped city by city (collapsible), venues without a city last.
+// the venue, where, and the person met there. Each person sees and works on
+// only the venues they added; the owner sees all of them (051). Venues in
+// business with VEBOSSO show green. Venues are grouped city by city
+// (collapsible), venues without a city last. Cities are one shared list
+// everyone sees and can add to; only the owner removes a city.
 // ============================================================================
 
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -44,6 +45,7 @@ import { SheetFrame } from './SheetFrame';
 import { EmailPeopleSheet } from './EmailPeopleSheet';
 import { VenueFormSheet } from './VenueFormSheet';
 import { useKeyboardOverlap } from '../lib/useKeyboardHeight';
+import { PAGE, ShowMore } from './ShowMore';
 
 const COLUMNS: { key: string; label: string; width: number }[] = [
   { key: 'date', label: 'Date', width: 96 },
@@ -81,6 +83,9 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [cities, setCities] = useState<VenueCity[]>([]);
   const [openCities, setOpenCities] = useState<Set<string>>(() => new Set());
+  // How many venues each open city shows (PAGE to start) — a city full of
+  // venues was slow to open.
+  const [shownVenues, setShownVenues] = useState<Record<string, number>>({});
   // City preselected in the add form (when adding from inside a city).
   const [formCity, setFormCity] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -150,6 +155,8 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
     await load();
     setRefreshing(false);
   };
+
+  useEffect(() => setShownVenues({}), [query]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -360,7 +367,10 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
     }
   };
 
-  const renderTable = (list: Venue[]) => (
+  const renderTable = (all: Venue[], key: string) => {
+    const limit = shownVenues[key] ?? PAGE;
+    const list = all.length > limit ? all.slice(0, limit) : all;
+    return (
     <View style={styles.tableCard}>
       <ScrollView horizontal showsHorizontalScrollIndicator>
         <View style={{ width: TABLE_WIDTH }}>
@@ -409,8 +419,13 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
           ))}
         </View>
       </ScrollView>
+      <ShowMore
+        page={{ left: all.length - list.length, more: () => setShownVenues((m) => ({ ...m, [key]: limit + PAGE * 2 })) }}
+        style={{ margin: 10 }}
+      />
     </View>
-  );
+    );
+  };
 
   return (
     <View ref={keyboardRef} style={[screenChrome.root, { paddingBottom: keyboardInset }]}>
@@ -432,7 +447,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
             <Text style={screenChrome.subtitle}>
               {isLoading
                 ? 'Loading…'
-                : `${venues.length} onboarded · ${cities.length} ${cities.length === 1 ? 'city' : 'cities'}`}
+                : `${venues.length} onboarded${canManage ? '' : ' by you'} · ${cities.length} ${cities.length === 1 ? 'city' : 'cities'}`}
             </Text>
           </View>
         </View>
@@ -560,7 +575,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
                   ) : null}
                   <Chevron open={open} color={T.mute} />
                 </Pressable>
-                {open && g.venues.length > 0 ? <DropdownBody>{renderTable(g.venues)}</DropdownBody> : null}
+                {open && g.venues.length > 0 ? <DropdownBody>{renderTable(g.venues, g.id)}</DropdownBody> : null}
               </View>
             );
           })

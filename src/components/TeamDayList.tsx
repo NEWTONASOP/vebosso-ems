@@ -20,6 +20,9 @@ import {
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { LeaveRequest, Profile, WorkLogWithProfile } from '../types/database';
 
+/** Only the first few cards animate in — a long list would otherwise crawl. */
+const ANIMATED_ITEMS = 8;
+
 export interface TeamDayRow {
   userId: string;
   name: string;
@@ -221,7 +224,7 @@ function TeamRow({
   );
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 40).duration(320)}>
+    <Animated.View entering={index < ANIMATED_ITEMS ? FadeInDown.delay(index * 40).duration(320) : undefined}>
       {onPress ? (
         <AnimatedPressable scaleTo={0.98} onPress={onPress} style={styles.row}>
           {content}

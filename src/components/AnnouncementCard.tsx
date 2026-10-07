@@ -12,6 +12,9 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import { AnnouncementWithCreator } from '../types/database';
 import { AppTheme, AppRadius, appSoftShadow } from '../constants/theme';
 
+/** Only the first few cards animate in — a long list would otherwise crawl. */
+const ANIMATED_ITEMS = 8;
+
 interface AnnouncementCardProps {
   announcement: AnnouncementWithCreator;
   index?: number;
@@ -28,8 +31,8 @@ export function AnnouncementCard({ announcement, index = 0, canDelete = false, o
 
   return (
     <Animated.View
-      entering={FadeInDown.delay(index * 50).springify()}
-      layout={LinearTransition.springify()}
+      entering={index < ANIMATED_ITEMS ? FadeInDown.delay(index * 50).springify() : undefined}
+      layout={index < ANIMATED_ITEMS ? LinearTransition.springify() : undefined}
       style={styles.card}
     >
       <View style={styles.header}>

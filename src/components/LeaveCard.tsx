@@ -15,6 +15,9 @@ import { LeaveRequestWithProfile } from '../types/database';
 import { LEAVE_STATUS_CONFIG } from '../constants/roles';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 
+/** Only the first few cards animate in — a long list would otherwise crawl. */
+const ANIMATED_ITEMS = 8;
+
 interface LeaveCardProps {
   leave: LeaveRequestWithProfile;
   onApprove?: (id: string) => void;
@@ -59,8 +62,8 @@ export function LeaveCard({
 
   return (
     <Animated.View
-      entering={FadeInDown.delay(index * 50).springify()}
-      layout={LinearTransition.springify()}
+      entering={index < ANIMATED_ITEMS ? FadeInDown.delay(index * 50).springify() : undefined}
+      layout={index < ANIMATED_ITEMS ? LinearTransition.springify() : undefined}
       style={styles.card}
     >
       {/* Header Info */}

@@ -25,6 +25,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Task, TaskStatus } from '../../types/database';
 import { UserAvatar } from '../../components/UserAvatar';
+import { ShowMore, usePaged } from '../../components/ShowMore';
 
 interface TaskWithAssignee extends Task {
   assignee: {
@@ -167,6 +168,8 @@ export default function ManagerTaskTrackingScreen() {
   const filteredTasks = filter === 'all'
     ? tasks
     : tasks.filter((t) => t.status === filter);
+  // A page at a time — a long history of tasks was slow to draw.
+  const taskPage = usePaged(filteredTasks, filter);
 
   const stats = {
     total: tasks.length,
@@ -314,7 +317,7 @@ export default function ManagerTaskTrackingScreen() {
               <ListSkeleton count={4} variant="task-row" />
             ) : filteredTasks.length > 0 ? (
               <View style={styles.tasksList}>
-                {filteredTasks.map((task) => {
+                {taskPage.items.map((task) => {
                   const statusConfig = getStatusConfig(task.status);
                   const dueDate = getFormattedDate(task.due_date);
                   
@@ -373,6 +376,7 @@ export default function ManagerTaskTrackingScreen() {
                     </Pressable>
                   );
                 })}
+                <ShowMore page={taskPage} />
               </View>
             ) : (
               <EmptyState
