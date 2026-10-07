@@ -7,6 +7,7 @@
 // anyone with access can add.
 // ============================================================================
 
+import { Platform } from 'react-native';
 import { Venue, VenueCity, VenueContact, VenueInput } from '../types/database';
 import { parseSupabaseError } from './errors';
 import { sendPushNotificationToRole } from './notifications';
@@ -75,8 +76,17 @@ export const whatsappUrl = (phone: string) => {
   return `https://wa.me/${n}`;
 };
 
-/** One email to several people at once. */
-export const mailtoUrl = (emails: string[]) => `mailto:${emails.map((e) => e.trim()).join(',')}`;
+/**
+ * One email to several people at once. On a phone: the mail app (mailto).
+ * On the web: Gmail's compose window in a new tab — mailto there opens
+ * whatever desktop app the computer has set up (often Outlook).
+ */
+export const mailtoUrl = (emails: string[]) => {
+  const to = emails.map((e) => e.trim()).filter(Boolean).join(',');
+  return Platform.OS === 'web'
+    ? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}`
+    : `mailto:${to}`;
+};
 
 /** Owner only (RLS). Venues in it stay, with no city (ON DELETE SET NULL). */
 export async function deleteCity(id: string): Promise<Result> {

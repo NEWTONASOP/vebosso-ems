@@ -1,12 +1,13 @@
 // ============================================================================
 // VEBOSSO EMS — Employee details (migration 045)
-// The person fills theirs in once; after that only the owner can change it
-// (checked by the database — there is no update policy for the person).
+// The person fills theirs in once; after that only the owner can change it,
+// unless the person asks to edit and the owner approves — then they get one
+// edit, and it locks again (049). All checked by the database.
 // ============================================================================
 
 import { EmployeeDetails, EmployeeDetailsInput, FamilyMember } from '../types/database';
 import { parseSupabaseError } from './errors';
-import { sendPushNotificationToRole } from './notifications';
+import { sendPushNotification, sendPushNotificationToRole } from './notifications';
 import { supabase } from './supabase';
 
 type Result<T = undefined> = { success: true; data: T } | { success: false; error: string };
@@ -108,6 +109,63 @@ export async function submitOwnDetails(userId: string, userName: string, input: 
     'owner',
     'Employee details 🪪',
     `${userName} filled in their details`,
+    { type: 'employee_details', user_id: userId },
+    [userId],
+  );
+  return { success: true, data: undefined };
+}
+
+/** The person asks to edit their submitted details again (049). Tells the owners. */
+export async function requestDetailsEdit(userId: string, userName: string): Promise<Result> {
+  const { error } = await supabase.rpc('request_details_edit');
+  if (error) {
+    const text = parseSupabaseError(error);
+    return {
+      success: false,
+      error: /request_details_edit/.test(text) ? 'Asking to edit needs a database update (049). Tell the boss.' : text,
+    };
+  }
+  sendPushNotificationToRole(
+    'owner',
+    'Edit request 🪪',
+    `${userName} wants to edit their employee details`,
+    { type: 'employee_details_edit_request', user_id: userId },
+    [userId],
+  );
+  return { success: true, data: undefined };
+}
+
+/** Owner: approve (the person can edit once) or turn down a request. */
+export async function answerDetailsEdit(userId: string, approve: boolean): Promise<Result> {
+  const { error } = await supabase
+    .from('employee_details')
+    .update({ edit_unlocked: approve, edit_requested_at: null })
+    .eq('user_id', userId);
+  if (error) return fail(error);
+  sendPushNotification(
+    userId,
+    approve ? 'You can edit your details' : 'Edit request',
+    approve
+      ? 'The boss approved — open Profile → My details to make your changes.'
+      : 'The boss kept your details as they are for now.',
+    { type: 'employee_details_edit_answer' },
+  );
+  return { success: true, data: undefined };
+}
+
+/** The person's one approved edit; locks again once saved (049). Tells the owners. */
+export async function updateOwnDetails(userId: string, userName: string, input: EmployeeDetailsInput): Promise<Result> {
+  const { data, error } = await supabase
+    .from('employee_details')
+    .update(cleanDetails(input))
+    .eq('user_id', userId)
+    .select('user_id');
+  if (error) return fail(error);
+  if (!data?.length) return { success: false, error: 'Editing is locked again. Ask the boss to approve another edit.' };
+  sendPushNotificationToRole(
+    'owner',
+    'Employee details 🪪',
+    `${userName} updated their details`,
     { type: 'employee_details', user_id: userId },
     [userId],
   );

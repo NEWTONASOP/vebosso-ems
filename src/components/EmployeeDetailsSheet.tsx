@@ -1,9 +1,10 @@
 // ============================================================================
 // VEBOSSO EMS — Employee details sheet
 // Personal, contact, emergency contact, family, work, education. The person
-// fills it in once ("self"); after that it is read-only for them. The owner
-// can fill in, change or clear anyone's ("owner"). ID papers and bank proof
-// live in Documents, pay in Salary — not repeated here.
+// fills it in once ("self"); after that it is read-only for them — they can
+// tap "Request to edit", and once the owner approves they get one edit (049).
+// The owner can fill in, change or clear anyone's ("owner"). ID papers and
+// bank proof live in Documents, pay in Salary — not repeated here.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -14,6 +15,7 @@ import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { Alert } from '../lib/alert';
 import {
+  answerDetailsEdit,
   BLOOD_GROUPS,
   clearDetails,
   emptyDetails,
@@ -21,8 +23,10 @@ import {
   GENDERS,
   MARITAL,
   RELATIONS,
+  requestDetailsEdit,
   saveDetailsAsOwner,
   submitOwnDetails,
+  updateOwnDetails,
   WEEK_DAYS,
 } from '../lib/employeeDetails';
 import { telUrl } from '../lib/venues';
@@ -36,7 +40,7 @@ type TextKey = {
 }[keyof EmployeeDetailsInput];
 
 const toInput = (d: EmployeeDetails): EmployeeDetailsInput => {
-  const { user_id, submitted_at, updated_by, updated_at, ...rest } = d;
+  const { user_id, submitted_at, updated_by, updated_at, edit_requested_at, edit_unlocked, ...rest } = d;
   return { ...rest, family: rest.family ?? [], weekly_off: rest.weekly_off ?? [] };
 };
 
@@ -68,6 +72,26 @@ export function EmployeeDetailsSheet({
   const [form, setForm] = useState<EmployeeDetailsInput>(emptyDetails);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // The person's one approved edit (049): editing what's already saved.
+  const unlockedEdit = !isOwner && !!details?.edit_unlocked;
+
+  const request = async () => {
+    setSaving(true);
+    const res = await requestDetailsEdit(userId, userName);
+    setSaving(false);
+    if (!res.success) return setError(res.error);
+    onMessage?.('Request sent to the boss');
+    await load();
+  };
+
+  const answer = async (approve: boolean) => {
+    setSaving(true);
+    const res = await answerDetailsEdit(userId, approve);
+    setSaving(false);
+    if (!res.success) return setError(res.error);
+    onMessage?.(approve ? `${userName.split(' ')[0]} can edit their details once` : 'Request turned down');
+    await load();
+  };
 
   const load = async () => {
     const d = await fetchEmployeeDetails(userId);
@@ -118,6 +142,16 @@ export function EmployeeDetailsSheet({
     }
 
     if (!(form.phone ?? '').trim()) return setError('Add your phone number');
+    if (unlockedEdit) {
+      setSaving(true);
+      const res = await updateOwnDetails(userId, userName, form);
+      setSaving(false);
+      if (!res.success) return setError(res.error);
+      onMessage?.('Details updated');
+      setEditing(false);
+      await load();
+      return;
+    }
     Alert.alert(
       'Submit your details?',
       'Check everything once more. After you submit, you can’t change it yourself — only the boss can.',
@@ -167,7 +201,7 @@ export function EmployeeDetailsSheet({
         <View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <View style={styles.footerRow}>
-            {isOwner ? (
+            {isOwner || unlockedEdit ? (
               <Pressable style={[styles.btn, styles.softBtn]} onPress={() => setEditing(false)} accessibilityLabel="Cancel">
                 <Text style={styles.softText}>Cancel</Text>
               </Pressable>
@@ -176,10 +210,43 @@ export function EmployeeDetailsSheet({
               {saving ? (
                 <ActivityIndicator color={T.white} />
               ) : (
-                <Text style={styles.saveText}>{isOwner ? 'Save' : 'Submit details'}</Text>
+                <Text style={styles.saveText}>{isOwner || unlockedEdit ? 'Save' : 'Submit details'}</Text>
               )}
             </Pressable>
           </View>
+        </View>
+      );
+    } else if (isOwner && details?.edit_requested_at) {
+      footer = (
+        <View>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          <View style={styles.footerRow}>
+            <Pressable style={[styles.btn, styles.softBtn]} onPress={() => void answer(false)} disabled={saving}>
+              <Text style={styles.softText}>Not now</Text>
+            </Pressable>
+            <Pressable style={[styles.btn, styles.saveBtn]} onPress={() => void answer(true)} disabled={saving}>
+              {saving ? <ActivityIndicator color={T.white} /> : <Text style={styles.saveText}>Approve edit</Text>}
+            </Pressable>
+          </View>
+        </View>
+      );
+    } else if (!isOwner && details) {
+      footer = (
+        <View>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {details.edit_unlocked ? (
+            <Pressable style={[styles.btn, styles.saveBtn]} onPress={() => startEditing(details)}>
+              <Text style={styles.saveText}>Edit my details</Text>
+            </Pressable>
+          ) : details.edit_requested_at ? (
+            <View style={[styles.btn, styles.softBtn]}>
+              <Text style={styles.softText}>Request sent · waiting for the boss</Text>
+            </View>
+          ) : (
+            <Pressable style={[styles.btn, styles.saveBtn]} onPress={() => void request()} disabled={saving}>
+              {saving ? <ActivityIndicator color={T.white} /> : <Text style={styles.saveText}>Request to edit</Text>}
+            </Pressable>
+          )}
         </View>
       );
     } else if (isOwner) {
@@ -206,7 +273,15 @@ export function EmployeeDetailsSheet({
       visible
       onDismiss={onDismiss}
       title={isOwner ? userName : 'My details'}
-      subtitle={editing ? (isOwner ? 'Editing employee details' : 'Fill this in once') : 'Employee details'}
+      subtitle={
+        editing
+          ? isOwner
+            ? 'Editing employee details'
+            : unlockedEdit
+              ? 'Your one approved edit'
+              : 'Fill this in once'
+          : 'Employee details'
+      }
       icon="user"
       iconColor={T.blue}
       iconBg={T.blueSoft}
@@ -236,11 +311,33 @@ export function EmployeeDetailsSheet({
       <View>
         {!isOwner ? (
           <View style={styles.lockNote}>
-            <Feather name="lock" size={14} color={T.inkSoft} />
-            <Text style={styles.lockText}>Submitted. To change anything, ask the boss.</Text>
+            <Feather name={d.edit_unlocked ? 'unlock' : 'lock'} size={14} color={T.inkSoft} />
+            <Text style={styles.lockText}>
+              {d.edit_unlocked
+                ? 'The boss approved your edit. You can change your details once — it locks again when you save.'
+                : d.edit_requested_at
+                  ? 'You asked to edit your details. You’ll be able to once the boss approves.'
+                  : 'Submitted. To change anything, tap Request to edit below.'}
+            </Text>
           </View>
         ) : (
-          <Text style={styles.meta}>Filled in {format(parseISO(d.submitted_at), 'd MMM yyyy')}</Text>
+          <>
+            {d.edit_requested_at ? (
+              <View style={[styles.lockNote, { backgroundColor: T.amberSoft, marginBottom: 8 }]}>
+                <Feather name="edit-3" size={14} color={T.amber} />
+                <Text style={styles.lockText}>
+                  {userName.split(' ')[0]} asked to edit their details on{' '}
+                  {format(parseISO(d.edit_requested_at), 'd MMM, h:mm a')}.
+                </Text>
+              </View>
+            ) : d.edit_unlocked ? (
+              <View style={[styles.lockNote, { marginBottom: 8 }]}>
+                <Feather name="unlock" size={14} color={T.inkSoft} />
+                <Text style={styles.lockText}>{userName.split(' ')[0]} can edit these once. It locks again when they save.</Text>
+              </View>
+            ) : null}
+            <Text style={styles.meta}>Filled in {format(parseISO(d.submitted_at), 'd MMM yyyy')}</Text>
+          </>
         )}
 
         <Section title="Personal">
@@ -332,7 +429,11 @@ export function EmployeeDetailsSheet({
         {!isOwner ? (
           <View style={styles.lockNote}>
             <Feather name="info" size={14} color={T.inkSoft} />
-            <Text style={styles.lockText}>You can fill this in only once. After you submit, only the boss can change it.</Text>
+            <Text style={styles.lockText}>
+              {unlockedEdit
+                ? 'Make your changes and save. After that it locks again.'
+                : 'You can fill this in only once. After you submit, only the boss can change it.'}
+            </Text>
           </View>
         ) : null}
 

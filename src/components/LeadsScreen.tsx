@@ -15,7 +15,7 @@ import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, Styl
 import { Menu, Snackbar, Text } from 'react-native-paper';
 import { AppTheme as T, screenChrome } from '../constants/theme';
 import { Alert } from '../lib/alert';
-import { addBanquet, contactName, deleteBanquet, fetchBanquets, fetchLeads, leadPhones } from '../lib/leads';
+import { addBanquet, contactName, deleteBanquet, fetchBanquets, fetchLeads, leadPhones, markLeadsTouched } from '../lib/leads';
 import { exportLeads, saveLeadsToPhone } from '../lib/leadsFile';
 import { supabase } from '../lib/supabase';
 import { telUrl, whatsappUrl } from '../lib/venues';
@@ -177,7 +177,16 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
     );
   };
 
+  /** Called, WhatsApped or saved: no longer new (050). */
+  const touch = useCallback((ids: string[]) => {
+    const now = new Date().toISOString();
+    const set = new Set(ids);
+    setLeads((list) => list.map((l) => (set.has(l.id) && !l.touched_at ? { ...l, touched_at: now } : l)));
+    void markLeadsTouched(ids);
+  }, []);
+
   const saveAllToPhone = async (g: Group) => {
+    touch(g.leads.filter((l) => l.contact).map((l) => l.id));
     try {
       const n = await saveLeadsToPhone(
         g.leads.map((lead) => ({ lead, banquetName: banquetName(lead.banquet_id) })),
@@ -202,18 +211,29 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
   const saveOne = useCallback(
     async (lead: Lead) => {
       const bq = banquets.find((b) => b.id === lead.banquet_id)?.name ?? null;
+      touch([lead.id]);
       try {
         await saveLeadsToPhone([{ lead, banquetName: bq }], contactName(lead, bq));
       } catch (e: any) {
         setSnack(e?.message || 'Could not open Contacts');
       }
     },
-    [banquets]
+    [banquets, touch]
   );
   const openLead = useCallback((lead: Lead) => setSheet({ lead, banquetId: lead.banquet_id }), []);
   const openWhatsApp = useCallback(
-    (phone: string) => void Linking.openURL(whatsappUrl(phone)).catch(() => setSnack('Could not open WhatsApp')),
-    []
+    (lead: Lead, phone: string) => {
+      touch([lead.id]);
+      void Linking.openURL(whatsappUrl(phone)).catch(() => setSnack('Could not open WhatsApp'));
+    },
+    [touch]
+  );
+  const call = useCallback(
+    (lead: Lead, phone: string) => {
+      touch([lead.id]);
+      void Linking.openURL(telUrl(phone)).catch(() => setSnack('Could not open the phone app'));
+    },
+    [touch]
   );
 
   const nextDate = (g: Group) => {
@@ -341,6 +361,9 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
                       {g.leads.length === 0
                         ? 'No leads yet'
                         : `${g.leads.length} ${g.leads.length === 1 ? 'lead' : 'leads'}${next ? ` · next ${next}` : ''}`}
+                      {g.leads.some((l) => !l.touched_at) ? (
+                        <Text style={styles.groupNew}>{`  ·  ${g.leads.filter((l) => !l.touched_at).length} new`}</Text>
+                      ) : null}
                     </Text>
                   </View>
                   <Menu
@@ -428,6 +451,7 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
                           onOpen={openLead}
                           onSave={saveOne}
                           onWhatsApp={openWhatsApp}
+                          onCall={call}
                         />
                       ))}
                       {g.leads.length > (shown[g.id] ?? PAGE) ? (
@@ -479,7 +503,7 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
         ) : null}
 
         {!isLoading && leads.length > 0 ? (
-          <Text style={styles.hint}>Tap a number to call · the green icon opens WhatsApp · the person icon saves a lead to your phone · tap a lead for details</Text>
+          <Text style={styles.hint}>Blue “NEW” leads haven’t been called, messaged or edited yet · Tap a number to call · the green icon opens WhatsApp · the person icon saves a lead to your phone · tap a lead for details</Text>
         ) : null}
       </ScrollView>
 
@@ -539,22 +563,32 @@ const LeadRow = memo(function LeadRow({
   onOpen,
   onSave,
   onWhatsApp,
+  onCall,
 }: {
   lead: Lead;
   divided: boolean;
   onOpen: (lead: Lead) => void;
   onSave: (lead: Lead) => void;
-  onWhatsApp: (phone: string) => void;
+  onWhatsApp: (lead: Lead, phone: string) => void;
+  onCall: (lead: Lead, phone: string) => void;
 }) {
   const phones = leadPhones(l.contact);
+  // Nobody has called, WhatsApped, saved or edited it yet.
+  const isNew = !l.touched_at;
   return (
     <Pressable
       onPress={() => onOpen(l)}
-      style={({ pressed }) => [styles.lead, divided && styles.leadDivided, pressed && { backgroundColor: T.soft }]}
+      style={({ pressed }) => [
+        styles.lead,
+        divided && styles.leadDivided,
+        isNew && styles.leadNew,
+        pressed && { backgroundColor: T.soft },
+      ]}
       accessibilityRole="button"
       accessibilityLabel={`${l.name ?? 'Lead'}${l.function ? `, ${l.function}` : ''}`}
     >
-      <View style={styles.dateBox}>
+      {isNew ? <View style={styles.newBar} /> : null}
+      <View style={[styles.dateBox, isNew && styles.dateBoxNew]}>
         {l.dof ? (
           <>
             <Text style={styles.dateDay}>{format(parseISO(l.dof), 'd')}</Text>
@@ -565,17 +599,24 @@ const LeadRow = memo(function LeadRow({
         )}
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={styles.leadName} numberOfLines={1}>
-          {l.name || 'No name'}
-          {l.function ? <Text style={styles.leadFn}>{`  ·  ${l.function}`}</Text> : null}
-        </Text>
+        <View style={styles.nameLine}>
+          {isNew ? (
+            <View style={styles.newPill}>
+              <Text style={styles.newPillText}>NEW</Text>
+            </View>
+          ) : null}
+          <Text style={[styles.leadName, { flexShrink: 1 }]} numberOfLines={1}>
+            {l.name || 'No name'}
+            {l.function ? <Text style={styles.leadFn}>{`  ·  ${l.function}`}</Text> : null}
+          </Text>
+        </View>
         {phones.length ? (
           <Text style={styles.leadPhone} numberOfLines={2}>
             <Feather name="phone" size={12} color={T.blue} />{' '}
             {phones.map((p, i) => (
               <Text key={i}>
                 {i > 0 ? <Text style={styles.leadPhoneSep}>{'  ·  '}</Text> : null}
-                <Text onPress={() => Linking.openURL(telUrl(p))} accessibilityRole="link" accessibilityLabel={`Call ${p}`}>
+                <Text onPress={() => onCall(l, p)} accessibilityRole="link" accessibilityLabel={`Call ${p}`}>
                   {p}
                 </Text>
               </Text>
@@ -594,7 +635,7 @@ const LeadRow = memo(function LeadRow({
       {phones.length ? (
         <View style={styles.rowBtns}>
           <Pressable
-            onPress={() => onWhatsApp(phones[0])}
+            onPress={() => onWhatsApp(l, phones[0])}
             style={styles.saveBtn}
             hitSlop={4}
             accessibilityLabel={`WhatsApp ${l.name ?? 'this lead'}`}
@@ -665,6 +706,14 @@ const styles = StyleSheet.create({
   groupIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: T.soft, alignItems: 'center', justifyContent: 'center' },
   groupName: { fontFamily: 'Inter_700Bold', fontSize: 15.5, color: T.ink },
   groupMeta: { fontFamily: 'Inter_400Regular', fontSize: 12.5, color: T.mute, marginTop: 1 },
+  groupNew: { fontFamily: 'Inter_600SemiBold', color: T.blue },
+  // A lead nobody has worked on yet (050).
+  leadNew: { backgroundColor: '#F3F7FF' },
+  newBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: T.blue },
+  dateBoxNew: { backgroundColor: T.blueSoft },
+  nameLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  newPill: { backgroundColor: T.blue, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
+  newPillText: { fontFamily: 'Inter_700Bold', fontSize: 10, color: T.white, letterSpacing: 0.4 },
   dots: { width: 36, height: 36, borderRadius: 12, backgroundColor: T.soft, alignItems: 'center', justifyContent: 'center' },
   listCard: { marginTop: 8, backgroundColor: T.card, borderRadius: 18, overflow: 'hidden', ...screenChrome.card },
   lead: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 12 },

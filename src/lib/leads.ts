@@ -115,6 +115,19 @@ export async function updateLead(id: string, input: LeadInput): Promise<Result<L
   return { success: true, data: data as Lead };
 }
 
+/**
+ * A lead has been worked on (called, WhatsApped, saved to a phone) — it stops
+ * showing as new (050). Only the first time is written; failures are ignored.
+ */
+export async function markLeadsTouched(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  try {
+    await supabase.from('leads').update({ touched_at: new Date().toISOString() }).in('id', ids).is('touched_at', null);
+  } catch {
+    // Not worth bothering anyone about.
+  }
+}
+
 /** Move many leads into one banquet (null = no banquet), in chunks. Returns how many moved. */
 export async function moveLeads(ids: string[], banquetId: string | null): Promise<Result<number>> {
   const CHUNK = 200;

@@ -399,10 +399,11 @@ const styles = StyleSheet.create({
   segText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: T.inkSoft },
   segTextActive: { color: T.ink },
   // Room above and below inside the strip, or it clips the chips' shadow
-  // (it falls lower than it rises, and is softer on web). The search box
-  // below is pulled up by the extra, so the spacing looks the same.
-  chipsWrap: { flexGrow: 0, marginTop: 4 },
-  chips: { gap: 8, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
+  // (it falls lower than it rises, and is softer on web). A fixed height —
+  // chip 34 + 8 above + 16 below — because on web the strip otherwise ignores
+  // that room and the search box (pulled up by the extra) covered the chips.
+  chipsWrap: { flexGrow: 0, flexShrink: 0, height: 58, marginTop: 4 },
+  chips: { gap: 8, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, alignItems: 'flex-start' },
   chip: {
     height: 34,
     paddingHorizontal: 14,

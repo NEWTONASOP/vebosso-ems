@@ -11,7 +11,7 @@ import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-n
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { Alert } from '../lib/alert';
-import { addLead, contactName, deleteLead, joinPhones, leadDate, leadPhones, updateLead } from '../lib/leads';
+import { addLead, contactName, deleteLead, joinPhones, leadDate, leadPhones, markLeadsTouched, updateLead } from '../lib/leads';
 import { saveLeadsToPhone } from '../lib/leadsFile';
 import { telUrl, whatsappUrl } from '../lib/venues';
 import { Lead, LeadBanquet, LeadInput } from '../types/database';
@@ -98,7 +98,13 @@ export function LeadSheet({
     ]);
   };
 
+  /** Called, WhatsApped or saved: no longer new (050). */
+  const touch = () => {
+    if (lead && !lead.touched_at) void markLeadsTouched([lead.id]);
+  };
+
   const openWhatsApp = async (phone: string) => {
+    touch();
     try {
       await Linking.openURL(whatsappUrl(phone));
     } catch {
@@ -108,6 +114,7 @@ export function LeadSheet({
 
   const saveToPhone = async () => {
     if (!lead) return;
+    touch();
     try {
       await saveLeadsToPhone([{ lead, banquetName: banquetName(lead.banquet_id) }], contactName(lead, banquetName(lead.banquet_id)));
     } catch (e: any) {
@@ -152,7 +159,10 @@ export function LeadSheet({
           <>
             {leadPhones(lead.contact).map((p, i) => (
               <View key={`${p}-${i}`} style={styles.phoneLine}>
-                <Text style={[styles.viewValue, styles.phoneText]} onPress={() => Linking.openURL(telUrl(p))}>
+                <Text style={[styles.viewValue, styles.phoneText]} onPress={() => {
+                    touch();
+                    void Linking.openURL(telUrl(p));
+                  }}>
                   <Feather name="phone" size={14} color={T.blue} /> {p}
                 </Text>
                 <Pressable style={styles.waBtn} onPress={() => void openWhatsApp(p)} hitSlop={6} accessibilityLabel={`WhatsApp ${p}`}>

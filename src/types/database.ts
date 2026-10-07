@@ -236,9 +236,16 @@ export interface EmployeeDetails {
   submitted_at: string;
   updated_by: string | null;
   updated_at: string;
+  /** The person asked to edit again (049); null = no request open. */
+  edit_requested_at?: string | null;
+  /** The owner approved: the person can edit once more (049). */
+  edit_unlocked?: boolean;
 }
 
-export type EmployeeDetailsInput = Omit<EmployeeDetails, 'user_id' | 'submitted_at' | 'updated_by' | 'updated_at'>;
+export type EmployeeDetailsInput = Omit<
+  EmployeeDetails,
+  'user_id' | 'submitted_at' | 'updated_by' | 'updated_at' | 'edit_requested_at' | 'edit_unlocked'
+>;
 
 export interface SalarySetting {
   user_id: string;
@@ -335,6 +342,8 @@ export interface Lead {
   created_by: string | null;
   /** Who added it, filled in by the database (047). */
   created_by_name?: string | null;
+  /** First time anyone called, WhatsApped, saved or edited it (050); null = new. */
+  touched_at?: string | null;
   created_at: string;
   updated_at: string;
 }
