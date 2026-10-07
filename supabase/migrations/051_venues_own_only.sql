@@ -12,7 +12,7 @@
 --   • Two people may onboard the same place — each keeps their own.
 -- Supersedes the venue policies of 033 and 043. Safe to run repeatedly.
 -- ============================================================================
-
+ 
 DROP POLICY IF EXISTS "venues_team_read" ON public.venues;
 DROP POLICY IF EXISTS "venues_team_add" ON public.venues;
 DROP POLICY IF EXISTS "venues_team_edit" ON public.venues;
