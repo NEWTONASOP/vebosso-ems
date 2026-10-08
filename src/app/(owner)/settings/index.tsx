@@ -31,6 +31,21 @@ export default function OwnerSettingsScreen() {
   const [snackMessage, setSnackMessage] = React.useState('');
 
   const requireCheckoutApproval = settings['require_checkout_approval'] === 'true';
+  // Venues (052): everyone sees everyone's venues, or each only their own.
+  const venuesShared = settings['venues_shared'] === 'true';
+
+  const handleToggleVenues = async () => {
+    const result = await updateSetting('venues_shared', venuesShared ? 'false' : 'true');
+    if (!result.success) {
+      setSnackMessage(result.error || 'Failed to update setting. Please try again.');
+    } else {
+      setSnackMessage(
+        venuesShared
+          ? 'Each person now sees only the venues they added'
+          : 'Everyone with Venues now sees all venues'
+      );
+    }
+  };
 
   const handleToggleCheckout = async () => {
     const result = await updateSetting('require_checkout_approval', requireCheckoutApproval ? 'false' : 'true');
@@ -119,6 +134,21 @@ export default function OwnerSettingsScreen() {
               onValueChange={handleToggleCheckout}
               color={AppTheme.charcoal}
             />
+          </View>
+          <View style={styles.separator} />
+          <View style={styles.toggleRow}>
+            <View style={[styles.iconContainer, { backgroundColor: AppTheme.greenSoft }]}>
+              <Feather name="map-pin" size={18} color={AppTheme.green} />
+            </View>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingTitle}>Share venues with everyone</Text>
+              <Text style={styles.settingSubtitle}>
+                {venuesShared
+                  ? 'On: everyone with Venues sees and works on all venues'
+                  : 'Off: each person sees only the venues they added'}
+              </Text>
+            </View>
+            <Switch value={venuesShared} onValueChange={handleToggleVenues} color={AppTheme.charcoal} />
           </View>
           <View style={styles.separator} />
           <SundaySummaryRow />

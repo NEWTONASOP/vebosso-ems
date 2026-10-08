@@ -2,7 +2,8 @@
 // VEBOSSO EMS — Venues Screen (shared by owner, manager, member)
 // Every venue onboarded to VEBOSSO as a table: when it was met, who met it,
 // the venue, where, and the person met there. Each person sees and works on
-// only the venues they added; the owner sees all of them (051). Venues in
+// only the venues they added — unless the owner turns on "Share venues with
+// everyone" in Settings (052); the owner always sees all of them. Venues in
 // business with VEBOSSO show green. Venues are grouped city by city
 // (collapsible), venues without a city last. Cities are one shared list
 // everyone sees and can add to; only the owner removes a city.
@@ -26,6 +27,7 @@ import { Menu, Snackbar, Text } from 'react-native-paper';
 import { PaperOutlinedField } from './PaperOutlinedField';
 import { AppTheme as T, screenChrome } from '../constants/theme';
 import { Alert } from '../lib/alert';
+import { useWorkStore } from '../store/workStore';
 import { supabase } from '../lib/supabase';
 import {
   addCity,
@@ -78,6 +80,9 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
   // Shrink to the space above the keyboard so the focused box stays in sight.
   const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
   const router = useRouter();
+  // Owner's "Share venues with everyone" (052) — only changes the wording here;
+  // the database decides what each person can see.
+  const shared = useWorkStore((s) => s.settings['venues_shared'] === 'true');
   // "?add=1" (from the home shortcut) opens straight into the add form.
   const { add } = useLocalSearchParams<{ add?: string }>();
   const [venues, setVenues] = useState<Venue[]>([]);
@@ -447,7 +452,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
             <Text style={screenChrome.subtitle}>
               {isLoading
                 ? 'Loading…'
-                : `${venues.length} onboarded${canManage ? '' : ' by you'} · ${cities.length} ${cities.length === 1 ? 'city' : 'cities'}`}
+                : `${venues.length} onboarded${canManage || shared ? '' : ' by you'} · ${cities.length} ${cities.length === 1 ? 'city' : 'cities'}`}
             </Text>
           </View>
         </View>
