@@ -2,6 +2,7 @@
 // VEBOSSO EMS — Leave Card Component (Premium Fintech Aesthetic)
 // ============================================================================
 
+import { leaveLabel } from '../lib/leaveDates';
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
@@ -44,9 +45,7 @@ export function LeaveCard({
     backgroundColor: AppTheme.soft,
   };
 
-  const formattedDate = leave.date
-    ? format(new Date(leave.date), 'EEEE, MMMM dd, yyyy')
-    : '--';
+  const formattedDate = leave.date ? leaveLabel(leave, 'EEEE, MMMM dd, yyyy') : '--';
 
   const getAvatarColors = () => {
     if (!profile) return { bg: AppTheme.soft, text: AppTheme.inkSoft };

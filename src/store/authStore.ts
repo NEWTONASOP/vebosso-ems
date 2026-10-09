@@ -4,6 +4,7 @@
 
 import { Session } from '@supabase/supabase-js';
 import { create } from 'zustand';
+import { Platform } from 'react-native';
 import { fetchProfileReliable, isRefreshTokenFatal } from '../lib/authProfile';
 import { registerAuthResumeHandler } from '../lib/authSessionLifecycle';
 import { supabase } from '../lib/supabase';
@@ -351,10 +352,17 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
         const userId = get().userId;
         if (userId) {
-          await supabase
-            .from('profiles')
-            .update({ expo_push_token: null } as any)
-            .eq('id', userId);
+          if (Platform.OS === 'web') {
+            // Only this browser stops getting notifications — the phone app
+            // stays signed in and keeps its token (057).
+            const { disableWebPush } = await import('../lib/webPush');
+            await disableWebPush();
+          } else {
+            await supabase
+              .from('profiles')
+              .update({ expo_push_token: null } as any)
+              .eq('id', userId);
+          }
 
           await supabase
             .from('sessions')

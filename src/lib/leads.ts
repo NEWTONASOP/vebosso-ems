@@ -146,6 +146,19 @@ export async function moveLeads(ids: string[], banquetId: string | null): Promis
   return { success: true, data: done };
 }
 
+/** The voice note with a lead's remarks (054); null clears it. */
+export async function setLeadVoice(id: string, path: string | null, ms: number | null): Promise<Result> {
+  const { error } = await supabase
+    .from('leads')
+    .update({ remarks_voice_path: path, remarks_voice_ms: path ? Math.round(ms ?? 0) : null })
+    .eq('id', id);
+  if (error) {
+    const text = parseSupabaseError(error);
+    return { success: false, error: /remarks_voice/.test(text) ? 'Voice notes on leads need a database update (054).' : text };
+  }
+  return { success: true, data: undefined };
+}
+
 export async function deleteLead(id: string): Promise<Result> {
   const { error } = await supabase.from('leads').delete().eq('id', id);
   if (error) return fail(error);

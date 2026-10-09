@@ -38,6 +38,7 @@ import {
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Profile } from '../../types/database';
+import { MyRemarksCard } from '../../components/MyRemarksCard';
 
 export default function ManagerDashboard() {
   const router = useRouter();
@@ -523,6 +524,9 @@ export default function ManagerDashboard() {
         <FeatureShortcut feature="accounts" role="manager" />
         <FeatureShortcut feature="leads" role="manager" />
       </View>
+
+      {/* Remarks from the boss on my check-ins / check-outs (053). */}
+      <MyRemarksCard style={{ marginHorizontal: 20, marginTop: 12 }} />
 
       {todayTasks.length > 0 && (
         <View style={styles.tasksSection}>

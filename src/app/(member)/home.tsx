@@ -29,6 +29,7 @@ import {
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { TaskStatus } from '../../types/database';
+import { MyRemarksCard } from '../../components/MyRemarksCard';
 
 const memberAccent = RoleAccent.member;
 
@@ -432,6 +433,9 @@ export default function MemberHomeScreen() {
             <FeatureShortcut feature="accounts" role="member" />
             <FeatureShortcut feature="leads" role="member" />
           </View>
+
+          {/* Remarks from the boss on my check-ins / check-outs (053). */}
+          <MyRemarksCard style={{ marginHorizontal: 20, marginTop: 12 }} />
 
           {todayTasks.length > 0 && (
             <View style={styles.sectionContainer}>

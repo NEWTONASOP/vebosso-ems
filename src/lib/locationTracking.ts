@@ -20,12 +20,17 @@ import { supabase } from './supabase';
 export const LOCATION_TASK = 'vebosso-location-tracking';
 
 /**
- * A fix every 3 minutes. No distance filter on Android: with one set, a phone
- * that isn't moving reports nothing at all, and a member sitting at a venue
- * showed up as hours of "tracking gap". iOS needs a small filter or it streams
- * continuously.
+ * A fix every 5 minutes (was 3 — low-end phones struggled with the wake-ups).
+ * No distance filter on Android: with one set, a phone that isn't moving
+ * reports nothing at all, and a member sitting at a venue showed up as hours
+ * of "tracking gap". iOS needs a small filter or it streams continuously.
  */
-const TIME_INTERVAL_MS = 3 * 60 * 1000;
+const TIME_INTERVAL_MS = 5 * 60 * 1000;
+/**
+ * Background fixes use Wi-Fi / cell / GPS as the phone sees fit (Balanced),
+ * so GPS isn't held on all day. The check-in fix stays High.
+ */
+const BACKGROUND_ACCURACY = Location.Accuracy.Balanced;
 const DISTANCE_INTERVAL_M = Platform.OS === 'android' ? 0 : 50;
 
 /**
@@ -369,7 +374,7 @@ export async function startLocationTracking(session: TrackingSession): Promise<b
 
   try {
     await Location.startLocationUpdatesAsync(LOCATION_TASK, {
-      accuracy: Location.Accuracy.High,
+      accuracy: BACKGROUND_ACCURACY,
       timeInterval: TIME_INTERVAL_MS,
       distanceInterval: DISTANCE_INTERVAL_M,
       // Standing still must not end the day's trail.

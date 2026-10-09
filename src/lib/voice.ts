@@ -2,7 +2,8 @@
 // VEBOSSO EMS — Voice notes
 // Recorded with expo-audio, stored in the private `voice-notes` bucket
 // (migration 033):  chat/<member_id>/…  for chats, task/<assignee_id>/…  for
-// tasks. Played back through short-lived signed links.
+// tasks, lead/<recorder_id>/…  for lead remarks (054). Played back through
+// short-lived signed links.
 // ============================================================================
 
 import { Platform } from 'react-native';
@@ -37,7 +38,7 @@ export function clipTime(ms: number | null | undefined): string {
 
 /** Upload a recorded clip; returns its path in the bucket. */
 export async function uploadVoiceNote(
-  kind: 'chat' | 'task',
+  kind: 'chat' | 'task' | 'lead',
   personId: string,
   clip: VoiceClip,
 ): Promise<Result<string>> {
@@ -52,6 +53,11 @@ export async function uploadVoiceNote(
   } catch (err) {
     return { success: false, error: parseSupabaseError(err) };
   }
+}
+
+/** Best effort: a voice note nobody points to any more. */
+export async function removeVoiceNote(path: string | null | undefined) {
+  if (path) await supabase.storage.from(VOICE_BUCKET).remove([path]).catch(() => {});
 }
 
 export async function signVoiceNote(path: string): Promise<string | null> {

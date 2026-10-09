@@ -5,6 +5,7 @@
 // The Supabase client is typed as SupabaseClient<any> to avoid codegen requirement.
 // Our own types (WorkLog, Task, etc.) are still enforced at the interface level.
 
+import { endsOnOrAfter, leaveLabel } from '../lib/leaveDates';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { format } from 'date-fns';
 import { create } from 'zustand';
@@ -157,7 +158,7 @@ interface WorkState {
 
   // Actions — Leave Requests
   fetchLeaveRequests: (role: string, userId: string) => Promise<{ success: boolean; error?: string }>;
-  submitLeaveRequest: (date: string, reason: string, userId: string) => Promise<{ success: boolean; error?: string }>;
+  submitLeaveRequest: (date: string, reason: string, userId: string, endDate?: string | null) => Promise<{ success: boolean; error?: string }>;
   approveLeaveRequest: (leaveId: string, approverId: string) => Promise<{ success: boolean; error?: string }>;
   rejectLeaveRequest: (leaveId: string, approverId: string) => Promise<{ success: boolean; error?: string }>;
 
@@ -1026,7 +1027,8 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         supabase
           .from('leave_requests')
           .select('user_id')
-          .eq('date', today)
+          .lte('date', today)
+          .or(endsOnOrAfter(today))
           .eq('status', 'approved')
           .in('user_id', memberIds),
       ]);
@@ -1118,7 +1120,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
 
       const { count: totalMembers } = await supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_active', true).neq('role', 'owner');
       const { count: activeNow } = await supabase.from('work_logs').select('id', { count: 'exact', head: true }).eq('date', today).in('status', ['working', 'pending_approval']);
-      const { count: onLeaveToday } = await supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('date', today).eq('status', 'approved');
+      const { count: onLeaveToday } = await supabase.from('leave_requests').select('id', { count: 'exact', head: true }).lte('date', today).or(endsOnOrAfter(today)).eq('status', 'approved');
       const { count: pendingApprovals } = await supabase.from('work_logs').select('id', { count: 'exact', head: true }).eq('status', 'pending_approval');
 
       set({
@@ -1468,8 +1470,8 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         .from('leave_requests')
         .select('*')
         .eq('user_id', userId)
-        .gte('date', startDate)
-        .lte('date', endDate);
+        .lte('date', endDate)
+        .or(endsOnOrAfter(startDate));
 
       if (error) return { data: [], success: false, error: error.message };
       return { data: (data || []) as LeaveRequest[], success: true };
@@ -1792,15 +1794,19 @@ export const useWorkStore = create<WorkState>((set, get) => ({
     }
   },
 
-  submitLeaveRequest: async (date: string, reason: string, userId: string) => {
+  submitLeaveRequest: async (date: string, reason: string, userId: string, endDate?: string | null) => {
     try {
       set({ isLoadingLeaves: true, leavesError: null });
+      // Several days in one request (055); just one day when there's no later end.
+      const end = endDate && endDate > date ? endDate : null;
+      const when = leaveLabel({ date, end_date: end }, 'd MMM yyyy');
 
       const { data, error } = await supabase
         .from('leave_requests')
         .insert({
           user_id: userId,
           date,
+          ...(end ? { end_date: end } : {}),
           reason,
           status: 'pending',
         })
@@ -1824,7 +1830,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         sendPushNotification(
           profile.manager_id,
           'Leave Request',
-          `${profile.full_name} has requested leave for ${date}`,
+          `${profile.full_name} has requested leave for ${when}`,
           { type: 'leave_request', leave_id: data.id }
         );
       }
@@ -1834,7 +1840,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       sendPushNotificationToRole(
         'owner',
         'Leave Request',
-        `${profile?.full_name} has requested leave for ${date}`,
+        `${profile?.full_name} has requested leave for ${when}`,
         { type: 'leave_request', leave_id: data.id },
         [userId, profile?.manager_id].filter(Boolean) as string[]
       );
@@ -1862,7 +1868,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
           reviewed_at: new Date().toISOString(),
         })
         .eq('id', leaveId)
-        .select('user_id, date')
+        .select('user_id, date, end_date')
         .single();
 
       if (error) {
@@ -1875,7 +1881,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         sendPushNotification(
           data.user_id,
           'Leave Approved! 🎉',
-          `Your leave request for ${data.date} has been approved.`,
+          `Your leave request for ${leaveLabel(data, 'd MMM yyyy')} has been approved.`,
           { type: 'leave_approved', leave_id: leaveId }
         );
       }
@@ -1908,7 +1914,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
           reviewed_at: new Date().toISOString(),
         })
         .eq('id', leaveId)
-        .select('user_id, date')
+        .select('user_id, date, end_date')
         .single();
 
       if (error) {
@@ -1921,7 +1927,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         sendPushNotification(
           data.user_id,
           'Leave request declined',
-          `Your leave request for ${data.date} was declined.`,
+          `Your leave request for ${leaveLabel(data, 'd MMM yyyy')} was declined.`,
           { type: 'leave_rejected', leave_id: leaveId }
         );
       }

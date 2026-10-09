@@ -55,6 +55,7 @@ export function MemberAttendanceModal({
         >
           <MemberAttendancePanel
             memberId={member.id}
+            memberName={member.full_name}
             accentColor={accentColor}
             enableDetailSheet={false}
             showLocation

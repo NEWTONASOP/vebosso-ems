@@ -5,6 +5,7 @@
 // can be reviewed without leaving for the Attendance tab.
 // ============================================================================
 
+import { leaveCovers } from '../lib/leaveDates';
 import { format, isSameDay, startOfMonth } from 'date-fns';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -28,6 +29,8 @@ const KEY = (d: Date) => format(d, 'yyyy-MM-dd');
 
 interface MemberAttendancePanelProps {
   memberId: string;
+  /** For remarks on their check-ins / check-outs (owner / manager views). */
+  memberName?: string;
   /** Role accent used to mark today on the rail. */
   accentColor?: string;
   /**
@@ -53,6 +56,7 @@ const WORKED_STATUSES = new Set(['pending_approval', 'working', 'pending_checkou
 
 export function MemberAttendancePanel({
   memberId,
+  memberName,
   accentColor,
   enableDetailSheet = true,
   showLocation = false,
@@ -118,7 +122,7 @@ export function MemberAttendancePanel({
     [workLogs]
   );
   const leaveFor = useCallback(
-    (date: Date) => leaves.find((l) => l.date === KEY(date)) ?? null,
+    (date: Date) => leaves.find((l) => leaveCovers(l, KEY(date))) ?? null,
     [leaves]
   );
 
@@ -209,6 +213,7 @@ export function MemberAttendancePanel({
           ) : null}
 
           <DayTimeline
+            remarks={{ mode: 'review', personId: memberId, personName: memberName }}
             timeline={timeline}
             onPressEvent={(event) => {
               if (

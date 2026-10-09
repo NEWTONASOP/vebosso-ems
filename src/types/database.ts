@@ -137,7 +137,10 @@ export interface Announcement {
 export interface LeaveRequest {
   id: string;
   user_id: string;
+  /** First day of the leave. */
   date: string;
+  /** Last day (055); null = just `date`. */
+  end_date?: string | null;
   reason: string;
   status: LeaveStatus;
   reviewed_by: string | null;
@@ -344,6 +347,9 @@ export interface Lead {
   created_by_name?: string | null;
   /** First time anyone called, WhatsApped, saved or edited it (050); null = new. */
   touched_at?: string | null;
+  /** A voice note with the remarks (054), in the voice-notes bucket. */
+  remarks_voice_path?: string | null;
+  remarks_voice_ms?: number | null;
   created_at: string;
   updated_at: string;
 }

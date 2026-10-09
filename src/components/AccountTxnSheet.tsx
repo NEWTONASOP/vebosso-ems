@@ -147,7 +147,10 @@ export function AccountTxnSheet({
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          const res = await deleteTransaction(txn.id, [...(txn.receipts ?? []), ...fresh.current]);
+          const res = await deleteTransaction(
+            txn.id,
+            fresh.current.filter((p) => !(txn.receipts ?? []).includes(p)),
+          );
           if (!res.success) return setError(res.error);
           fresh.current = [];
           onSaved('Entry deleted');

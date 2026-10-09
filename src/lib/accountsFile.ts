@@ -2,12 +2,14 @@
 // VEBOSSO EMS — Accounts export / import
 // Export: PDF, Excel (.xlsx) or CSV → the system share sheet (or a download on
 // web). Columns: Date · Particular · Credit · Debit.
-// Import: Excel (.xlsx / .xls) or CSV. The header row is
-// found by name, dates are read day-first (India), and every sheet that looks
-// like a ledger becomes one importable account.
+// Import: Excel (.xlsx / .xls), CSV, or a bank statement PDF — password-
+// protected Excel and PDF files too (the password is asked for and used only
+// on the device). The header row is found by name, dates are read day-first
+// (India), and every sheet that looks like a ledger becomes one importable
+// account; a PDF statement becomes one, named after the bank ("SBI 5602").
 // ============================================================================
 
-import { format, isValid, parse, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
@@ -16,6 +18,9 @@ import { Platform } from 'react-native';
 import * as XLSX from 'xlsx';
 import { Account, AccountTransaction } from '../types/database';
 import { money, num, Period, periodLabel, TxnInput } from './accounts';
+import { parseAmount, parseDate } from './ledgerValues';
+import { decryptOffice, isEncryptedOffice, PasswordNeededError } from './officeCrypto';
+import { parsePdfStatement, statementName, type PdfItem } from './statementPdf';
 import { printHtmlOnWeb } from './webPrint';
 
 export type ExportFormat = 'pdf' | 'xlsx' | 'csv';
@@ -270,14 +275,38 @@ const IMPORT_TYPES = [
   'text/csv',
   'text/comma-separated-values',
   'application/csv',
+  'application/pdf',
 ];
 
-/** Let the owner pick a file and read every ledger-looking sheet in it. */
-export async function pickAndParseLedgerFile(): Promise<
-  { fileName: string; ledgers: ParsedLedger[] } | null
-> {
+/** A file picked for import, read into memory. */
+export interface PickedFile {
+  name: string;
+  kind: 'pdf' | 'excel' | 'csv';
+  bytes: Uint8Array;
+  /** The same bytes as base64 (what the PDF reader takes on a phone). */
+  base64: string;
+}
+
+/** Reads a PDF's text (PDF.js — see PdfTextReader). */
+export type PdfReader = (file: PickedFile, password?: string) => Promise<PdfItem[][]>;
+
+function bytesToB64(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+function b64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+/** Let the person pick an Excel, CSV or PDF file. null when they cancel. */
+export async function pickLedgerFile(): Promise<PickedFile | null> {
   const res = await DocumentPicker.getDocumentAsync({
-    type: Platform.OS === 'web' ? ['.xlsx', '.xls', '.csv', ...IMPORT_TYPES] : ['*/*'],
+    type: Platform.OS === 'web' ? ['.xlsx', '.xls', '.csv', '.pdf', ...IMPORT_TYPES] : ['*/*'],
     copyToCacheDirectory: true,
     multiple: false,
   });
@@ -285,21 +314,52 @@ export async function pickAndParseLedgerFile(): Promise<
   if (!asset) return null;
 
   const lower = asset.name.toLowerCase();
-  if (!/\.(xlsx|xls|csv)$/.test(lower)) {
-    throw new Error('Choose an Excel (.xlsx, .xls) or CSV file');
+  const kind = lower.endsWith('.pdf') ? 'pdf' : lower.endsWith('.csv') ? 'csv' : /\.(xlsx|xls)$/.test(lower) ? 'excel' : null;
+  if (!kind) throw new Error('Choose an Excel (.xlsx, .xls), CSV or PDF file');
+
+  if (Platform.OS === 'web') {
+    const bytes = new Uint8Array(await (await fetch(asset.uri)).arrayBuffer());
+    return { name: asset.name, kind, bytes, base64: kind === 'pdf' ? '' : bytesToB64(bytes) };
   }
-  const isCsv = lower.endsWith('.csv');
+  const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+  return { name: asset.name, kind, bytes: b64ToBytes(base64), base64 };
+}
+
+/**
+ * Every ledger-looking sheet (or the PDF statement) in a picked file.
+ * Throws PasswordNeededError when the file is protected and no — or the
+ * wrong — password was given.
+ */
+export async function parseLedgerFile(
+  file: PickedFile,
+  opts: { password?: string; readPdf: PdfReader },
+): Promise<{ fileName: string; ledgers: ParsedLedger[] }> {
+  const baseName = cleanName(file.name.replace(/\.[^.]+$/, '').replace(/\.(pd|xl)$/i, ''));
+
+  if (file.kind === 'pdf') {
+    const pages = await opts.readPdf(file, opts.password);
+    return { fileName: file.name, ledgers: parsePdfStatement(pages, baseName) };
+  }
+
+  const isCsv = file.kind === 'csv';
+  let bytes = file.bytes;
+  // A password-protected Excel file: unlock it here, on the device.
+  if (!isCsv && isEncryptedOffice(bytes)) {
+    if (!opts.password) throw new PasswordNeededError(false);
+    bytes = decryptOffice(bytes, opts.password);
+  }
 
   let wb: XLSX.WorkBook;
-  if (Platform.OS === 'web') {
-    const buf = await (await fetch(asset.uri)).arrayBuffer();
-    wb = XLSX.read(buf, { type: 'array', cellDates: true, raw: isCsv });
-  } else {
-    const b64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
-    wb = XLSX.read(b64, { type: 'base64', cellDates: true, raw: isCsv });
+  try {
+    wb = XLSX.read(bytes, { type: 'array', cellDates: true, raw: isCsv });
+  } catch (e: any) {
+    // Older protection the unlock above doesn't cover.
+    if (/password/i.test(e?.message ?? '')) {
+      throw new Error('This Excel file uses an older kind of password the app can’t open. Save it again without a password, or as a newer Excel file.');
+    }
+    throw e;
   }
 
-  const baseName = cleanName(asset.name.replace(/\.[^.]+$/, ''));
   const ledgers: ParsedLedger[] = [];
   for (const sheetName of wb.SheetNames) {
     const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], {
@@ -310,11 +370,11 @@ export async function pickAndParseLedgerFile(): Promise<
     });
     // A CSV exported with an "Account" column holds several accounts.
     const sheet = cleanName(sheetName.replace(/\s+sheet$/i, ''));
-    const generic = !sheet || /^sheet\s*\d*$/i.test(sheet);
+    const generic = !sheet || /^(sheet\s*\d*|statement)$/i.test(sheet);
     const parsed = parseRows(rows, isCsv || generic ? baseName : sheet);
     ledgers.push(...parsed);
   }
-  return { fileName: asset.name, ledgers: ledgers.filter((l) => l.entries.length > 0) };
+  return { fileName: file.name, ledgers: ledgers.filter((l) => l.entries.length > 0) };
 }
 
 /** "Rahul_230926210620" → "Rahul" — drop export timestamps and stray separators. */
@@ -349,9 +409,18 @@ function parseRows(rows: unknown[][], fallbackName: string): ParsedLedger[] {
     const header = (rows[i] || []).map(norm);
     const type = findCol(header, TYPE_TESTS);
     const skip = type === -1 ? [] : [type];
-    const date = findCol(header, [/^date$/, /\bdate\b/]);
-    const credit = findCol(header, [/^credit/, /\bcredit\b/, /^cr$/, /\breceived\b/, /^in$/], skip);
-    const debit = findCol(header, [/^debit/, /\bdebit\b/, /^dr$/, /\bpaid\b/, /^out$/], skip);
+    // The transaction date first — bank statements also have a Value Date.
+    const date = findCol(header, [/^date$/, /^(txn|tran|trans|transaction|posting) ?date/, /\bdate\b/, /^dt$/]);
+    const credit = findCol(
+      header,
+      [/^credit/, /\bcredit\b/, /^cr$/, /^cr amount/, /\bcr amount\b/, /^deposit/, /\bdeposit/, /\breceived\b/, /^in$/],
+      skip,
+    );
+    const debit = findCol(
+      header,
+      [/^debit/, /\bdebit\b/, /^dr$/, /^dr amount/, /\bdr amount\b/, /^withdraw/, /\bwithdraw/, /\bpaid\b/, /^out$/],
+      skip,
+    );
     const amount = findCol(header, [/^amount/, /\bamount\b/], skip);
     if (date !== -1 && (credit !== -1 || debit !== -1 || amount !== -1)) {
       h = i;
@@ -368,6 +437,8 @@ function parseRows(rows: unknown[][], fallbackName: string): ParsedLedger[] {
     }
   }
   if (h === -1) return [];
+  const named = statementName(rows.slice(0, h).map((r) => (r || []).join(' ')).join('\n'));
+  if (named) fallbackName = named;
 
   const byAccount = new Map<string, ParsedLedger>();
   const bucket = (name: string) => {
@@ -430,44 +501,4 @@ function parseRows(rows: unknown[][], fallbackName: string): ParsedLedger[] {
     }
   }
   return [...byAccount.values()];
-}
-
-function parseAmount(v: unknown): number {
-  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
-  let s = String(v ?? '').trim();
-  if (!s) return 0;
-  const negative = /^\(.*\)$/.test(s) || /^-/.test(s);
-  s = s.replace(/[^0-9.]/g, '');
-  const n = parseFloat(s);
-  if (!Number.isFinite(n)) return 0;
-  return negative ? -n : n;
-}
-
-const DATE_FORMATS = [
-  'dd-MM-yyyy', 'd-M-yyyy', 'dd/MM/yyyy', 'd/M/yyyy', 'dd.MM.yyyy', 'd.M.yyyy',
-  'dd-MM-yy', 'dd/MM/yy', 'd/M/yy',
-  'yyyy-MM-dd', 'yyyy/MM/dd',
-  'd MMM yyyy', 'dd MMM yyyy', 'd-MMM-yyyy', 'dd-MMM-yyyy', 'd-MMM-yy', 'dd-MMM-yy',
-  'MMM d, yyyy', 'd MMMM yyyy', 'dd MMMM yyyy',
-];
-
-/** → "yyyy-MM-dd", day-first for ambiguous dates (Indian style). */
-function parseDate(v: unknown): string | null {
-  if (v instanceof Date) return isValid(v) ? format(v, 'yyyy-MM-dd') : null;
-  if (typeof v === 'number') {
-    // Excel serial date.
-    if (v < 20000 || v > 80000) return null;
-    const d = XLSX.SSF.parse_date_code(v);
-    if (!d) return null;
-    return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
-  }
-  const s = String(v ?? '').trim().replace(/\s+/g, ' ');
-  if (!s) return null;
-  // Drop a trailing time ("15-09-2026 10:32").
-  const datePart = s.replace(/[ T]\d{1,2}:\d{2}(:\d{2})?( ?[ap]m)?$/i, '');
-  for (const f of DATE_FORMATS) {
-    const d = parse(datePart, f, new Date(2000, 0, 1));
-    if (isValid(d) && d.getFullYear() >= 1990 && d.getFullYear() <= 2100) return format(d, 'yyyy-MM-dd');
-  }
-  return null;
 }

@@ -50,10 +50,10 @@ export default function LeavesScreen() {
     setRefreshing(false);
   };
 
-  const handleRequestSubmit = async (date: string, reason: string) => {
+  const handleRequestSubmit = async (date: string, reason: string, endDate?: string | null) => {
     if (!profile) return;
     setIsSubmitting(true);
-    const result = await submitLeaveRequest(date, reason, profile.id);
+    const result = await submitLeaveRequest(date, reason, profile.id, endDate);
     setIsSubmitting(false);
 
     if (result.success) {

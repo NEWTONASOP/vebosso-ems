@@ -32,7 +32,7 @@ import { LocationPing, MemberLocation } from '../types/database';
 /** How often the live marker is refreshed while the sheet stays open. */
 const LIVE_POLL_MS = 30_000;
 /** A fix older than this is history, not "live", however the flag reads. */
-const LIVE_STALE_MS = 12 * 60 * 1000;
+const LIVE_STALE_MS = 15 * 60 * 1000;
 
 /** "9:40 PM", or "12:30 AM (next day)" once past the reviewed day's midnight. */
 function timeOnDay(iso: string, dayKey: string): string {

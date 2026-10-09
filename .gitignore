@@ -55,3 +55,7 @@ graphify-out
 # Gradle cache/output inside local native modules (created by editors / local builds)
 modules/**/android/.gradle/
 modules/**/android/build/
+
+# Bank statements dropped in for testing the accounts import — never commit
+AccountStatement_*.pdf
+PNBONE_STMT_*

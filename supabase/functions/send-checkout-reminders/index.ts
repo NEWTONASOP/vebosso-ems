@@ -7,6 +7,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendWebPushForRows } from '../_shared/webPush.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -125,6 +126,8 @@ serve(async (req) => {
       } else {
         console.log(`Logged ${dbNotifications.length} notifications to database.`);
       }
+      // And to browsers with notifications on (057).
+      await sendWebPushForRows(adminClient, dbNotifications);
     }
 
     // 4. Batch send push notifications via Expo Push API

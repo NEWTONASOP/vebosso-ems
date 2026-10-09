@@ -144,16 +144,13 @@ export async function updateAccount(id: string, name: string, note?: string | nu
   return { success: true, data: undefined };
 }
 
-/** Deletes the account, every entry in it, and their receipt photos. */
+/**
+ * Deletes the account and every entry in it. Receipt photos are kept, so the
+ * owner can restore it all from the recycle bin (056).
+ */
 export async function deleteAccount(id: string): Promise<Result> {
-  const { data: withReceipts } = await supabase
-    .from('account_transactions')
-    .select('receipts')
-    .eq('account_id', id)
-    .neq('receipts', '{}');
   const { error } = await supabase.from('accounts').delete().eq('id', id);
   if (error) return fail(error);
-  await removeReceipts(((withReceipts || []) as { receipts: string[] }[]).flatMap((r) => r.receipts ?? []));
   return { success: true, data: undefined };
 }
 
@@ -216,11 +213,14 @@ export async function updateTransaction(id: string, t: TxnInput): Promise<Result
   return { success: true, data: undefined };
 }
 
-/** Removes the entry and its receipt photos. */
-export async function deleteTransaction(id: string, receipts: string[] = []): Promise<Result> {
+/**
+ * Removes the entry. Its saved receipts stay (the recycle bin can bring the
+ * entry back); `unsaved` are photos added in this edit and never saved.
+ */
+export async function deleteTransaction(id: string, unsaved: string[] = []): Promise<Result> {
   const { error } = await supabase.from('account_transactions').delete().eq('id', id);
   if (error) return fail(error);
-  await removeReceipts(receipts);
+  await removeReceipts(unsaved);
   return { success: true, data: undefined };
 }
 

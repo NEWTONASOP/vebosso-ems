@@ -122,6 +122,8 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     console.warn('Push notifications are not supported in Expo Go');
     return null;
   }
+  // Browsers use their own web push (lib/webPush, 057), not an Expo token.
+  if (Platform.OS === 'web') return null;
   let token: string | null = null;
 
   // Push notifications only work on physical devices

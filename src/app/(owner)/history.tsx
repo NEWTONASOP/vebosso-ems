@@ -3,6 +3,7 @@
 // Team day view + per-person month rail / sequential timeline.
 // ============================================================================
 
+import { leaveCovers } from '../../lib/leaveDates';
 import { Feather } from '@expo/vector-icons';
 import {
   addDays,
@@ -173,7 +174,7 @@ export default function OwnerHistoryScreen() {
     [workLogs]
   );
   const leaveFor = useCallback(
-    (date: Date) => leaves.find((l) => l.date === KEY(date)) ?? null,
+    (date: Date) => leaves.find((l) => leaveCovers(l, KEY(date))) ?? null,
     [leaves]
   );
 
@@ -490,6 +491,7 @@ export default function OwnerHistoryScreen() {
                   ) : null}
 
                   <DayTimeline
+                    remarks={selectedMember ? { mode: 'review', personId: selectedMember.id, personName: selectedMember.full_name } : undefined}
                     timeline={timeline}
                     onPressEvent={(event) => {
                       if (event.kind === 'check-in' || event.kind === 'check-out') {

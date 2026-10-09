@@ -1,11 +1,13 @@
 // ============================================================================
 // VEBOSSO EMS — Leave Request Modal
+// One day, or "from … till …" for several days in one request (055).
 // ============================================================================
 
+import { leaveLabel } from '../lib/leaveDates';
 import { Feather } from '@expo/vector-icons';
-import { addDays, format, isValid, parseISO } from 'date-fns';
+import { addDays, differenceInCalendarDays, format, isValid, parseISO } from 'date-fns';
 import { useCallback, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Button, HelperText, Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/theme';
 import { DateField } from './DateTimeFields';
@@ -16,7 +18,8 @@ import { useDialogLift } from '../lib/useKeyboardHeight';
 interface LeaveRequestModalProps {
   visible: boolean;
   onDismiss: () => void;
-  onSubmit: (date: string, reason: string) => Promise<void>;
+  /** `endDate`: the last day when it's more than one day. */
+  onSubmit: (date: string, reason: string, endDate?: string | null) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -31,6 +34,9 @@ export function LeaveRequestModal({
   const dateRef = useRef('');
   const reasonRef = useRef('');
   const [dateStr, setDateStr] = useState('');
+  // Several days: the last day (null = just the one day).
+  const [multi, setMulti] = useState(false);
+  const [endStr, setEndStr] = useState<string | null>(null);
   const [charCount, setCharCount] = useState(0);
   const [error, setError] = useState('');
 
@@ -71,13 +77,26 @@ export function LeaveRequestModal({
       setError('Leave date cannot be in the past');
       return;
     }
+    const end = multi ? endStr : null;
+    if (multi && !end) {
+      setError('Pick the last day of your leave');
+      return;
+    }
+    if (end && end < dateValue) {
+      setError('The last day can’t be before the first');
+      return;
+    }
+    if (end && differenceInCalendarDays(parseISO(end), parsed) > 59) {
+      setError('Up to 60 days in one request');
+      return;
+    }
     if (!reason.trim()) {
       setError('Please provide a reason for leave');
       return;
     }
 
     setError('');
-    await onSubmit(dateValue, reason.trim().slice(0, 500));
+    await onSubmit(dateValue, reason.trim().slice(0, 500), end && end > dateValue ? end : null);
     onDismiss();
   };
 
@@ -105,8 +124,24 @@ export function LeaveRequestModal({
           </View>
 
           <View style={styles.section}>
+            <View style={styles.modeRow}>
+              {([false, true] as const).map((m) => (
+                <Pressable
+                  key={String(m)}
+                  onPress={() => {
+                    setMulti(m);
+                    setError('');
+                  }}
+                  style={[styles.modeChip, multi === m && styles.modeChipOn]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: multi === m }}
+                >
+                  <Text style={[styles.modeText, multi === m && styles.modeTextOn]}>{m ? 'Several days' : 'One day'}</Text>
+                </Pressable>
+              ))}
+            </View>
             <DateField
-              label="Leave date"
+              label={multi ? 'From' : 'Leave date'}
               value={dateStr || null}
               onChange={handleQuickDateSelect}
               quick={[
@@ -117,6 +152,21 @@ export function LeaveRequestModal({
               allow="future"
               disabled={isLoading}
             />
+            {multi ? (
+              <DateField
+                label="Till (last day of leave)"
+                value={endStr}
+                onChange={(d) => {
+                  setEndStr(d);
+                  setError('');
+                }}
+                allow="future"
+                disabled={isLoading}
+              />
+            ) : null}
+            {multi && dateStr && endStr && endStr >= dateStr ? (
+              <Text style={styles.rangeNote}>{leaveLabel({ date: dateStr, end_date: endStr }, 'EEE, d MMM')}</Text>
+            ) : null}
           </View>
 
           <View style={[styles.section, { marginTop: 12 }]}>
@@ -174,6 +224,12 @@ export function LeaveRequestModal({
 }
 
 const styles = StyleSheet.create({
+  modeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  modeChip: { flex: 1, height: 38, borderRadius: 999, backgroundColor: AppTheme.soft, alignItems: 'center', justifyContent: 'center' },
+  modeChipOn: { backgroundColor: AppTheme.charcoal },
+  modeText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: AppTheme.inkSoft },
+  modeTextOn: { color: AppTheme.white },
+  rangeNote: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: AppTheme.ink, marginTop: 2 },
   container: {
     backgroundColor: AppTheme.card,
     margin: 20,

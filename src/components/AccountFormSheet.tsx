@@ -51,7 +51,7 @@ export function AccountFormSheet({
     if (!account) return;
     Alert.alert(
       'Delete account?',
-      `"${account.name}" and every entry in it will be deleted for good. Export it first if you want a copy.`,
+      `"${account.name}" and every entry in it will be deleted. Export it first if you want a copy.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {

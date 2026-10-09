@@ -19,6 +19,7 @@ import { addBanquet, contactName, deleteBanquet, fetchBanquets, fetchLeads, lead
 import { exportLeads, saveLeadsToPhone } from '../lib/leadsFile';
 import { supabase } from '../lib/supabase';
 import { telUrl, whatsappUrl } from '../lib/venues';
+import { clipTime } from '../lib/voice';
 import { Lead, LeadBanquet } from '../types/database';
 import { Chevron, DropdownBody } from './Dropdown';
 import { LeadSheet } from './LeadSheet';
@@ -628,6 +629,11 @@ const LeadRow = memo(function LeadRow({
             {l.remarks}
           </Text>
         ) : null}
+        {l.remarks_voice_path ? (
+          <Text style={styles.leadVoice}>
+            <Feather name="mic" size={11} color={T.inkSoft} /> Voice note{l.remarks_voice_ms ? ` · ${clipTime(l.remarks_voice_ms)}` : ''}
+          </Text>
+        ) : null}
         <Text style={styles.leadBy} numberOfLines={1}>
           Added by {l.created_by_name || 'someone'} · {format(parseISO(l.created_at), 'd MMM')}
         </Text>
@@ -725,6 +731,7 @@ const styles = StyleSheet.create({
   leadFn: { fontFamily: 'Inter_500Medium', color: T.inkSoft },
   leadPhone: { fontFamily: 'Inter_600SemiBold', fontSize: 13.5, color: T.blue, marginTop: 3 },
   leadPhoneSep: { color: T.mute },
+  leadVoice: { fontFamily: 'Inter_500Medium', fontSize: 12, color: T.inkSoft, marginTop: 3 },
   leadBy: { fontFamily: 'Inter_400Regular', fontSize: 11.5, color: T.mute, marginTop: 3 },
   more: {
     paddingVertical: 13,

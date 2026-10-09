@@ -1,6 +1,7 @@
 // ============================================================================
-// VEBOSSO EMS — Import accounts from Excel / CSV
-// Pick a file → preview what was found → import. From an account screen,
+// VEBOSSO EMS — Import accounts from Excel / CSV / bank statement PDF
+// Pick a file → (its password, if it has one) → preview what was found →
+// import. The password is used only on the device to open the file. From an account screen,
 // everything goes into that account; from the list, each sheet becomes an
 // account (merged into an existing one when the name matches). Entries that
 // are already there (same date, type, amount, particular) are skipped, so
@@ -15,7 +16,10 @@ import { SmoothTextInput as TextInput } from './SmoothTextInput';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { addTransactionsBulk, createAccount, fetchTransactions, money, num, TxnInput } from '../lib/accounts';
-import { ParsedLedger, pickAndParseLedgerFile } from '../lib/accountsFile';
+import { parseLedgerFile, ParsedLedger, PickedFile, pickLedgerFile } from '../lib/accountsFile';
+import { PasswordNeededError } from '../lib/officeCrypto';
+import { PaperOutlinedField } from './PaperOutlinedField';
+import { usePdfReader } from './PdfTextReader';
 import { Account } from '../types/database';
 import { SheetFrame } from './SheetFrame';
 
@@ -46,28 +50,51 @@ export function AccountImportSheet({
   const [reading, setReading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState('');
+  // A protected file waiting for its password.
+  const [locked, setLocked] = useState<PickedFile | null>(null);
+  const [password, setPassword] = useState('');
+  const pdf = usePdfReader();
 
   const byName = (name: string) =>
     accounts.find((a) => a.name.trim().toLowerCase() === name.trim().toLowerCase()) ?? null;
 
-  const choose = async () => {
+  /** Read a picked file; asks for its password when it has one. */
+  const open = async (file: PickedFile, pw?: string) => {
     setError('');
     setReading(true);
     try {
-      const res = await pickAndParseLedgerFile();
-      if (!res) return;
+      const res = await parseLedgerFile(file, { password: pw, readPdf: pdf.read });
+      setLocked(null);
+      setPassword('');
       if (res.ledgers.length === 0) {
         setError(
-          'No entries found. The file needs a Date column and Credit / Debit (or Amount) columns.',
+          file.kind === 'pdf'
+            ? 'No entries found in this PDF. It needs to be a bank statement with dates and amounts as text (a scanned photo won’t work).'
+            : 'No entries found. The file needs a Date column and Credit / Debit (or Amount) columns.',
         );
         return;
       }
       setFileName(res.fileName);
       setRows(res.ledgers.map((l) => ({ ...l, include: true, targetName: l.name })));
     } catch (e: any) {
+      if (e instanceof PasswordNeededError) {
+        setLocked(file);
+        if (e.wrong) setError('That password didn’t open the file. Try again.');
+        return;
+      }
       setError(e?.message || 'Could not read that file');
     } finally {
       setReading(false);
+    }
+  };
+
+  const choose = async () => {
+    setError('');
+    try {
+      const file = await pickLedgerFile();
+      if (file) await open(file);
+    } catch (e: any) {
+      setError(e?.message || 'Could not read that file');
     }
   };
 
@@ -144,7 +171,7 @@ export function AccountImportSheet({
       visible
       onDismiss={importing ? () => {} : onDismiss}
       title="Import"
-      subtitle={target ? `Into ${target.name}` : 'From an Excel or CSV file'}
+      subtitle={target ? `Into ${target.name}` : 'From Excel, CSV or a bank statement PDF'}
       icon="download"
       iconColor={T.blue}
       iconBg={T.blueSoft}
@@ -152,7 +179,28 @@ export function AccountImportSheet({
         <View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {progress ? <Text style={styles.progress}>{progress}</Text> : null}
-          {rows.length === 0 ? (
+          {locked ? (
+            <View style={styles.footerRow}>
+              <Pressable
+                style={styles.secondary}
+                onPress={() => {
+                  setLocked(null);
+                  setPassword('');
+                  setError('');
+                }}
+                disabled={reading}
+              >
+                <Text style={styles.secondaryText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.primary, { flex: 1 }, !password && { opacity: 0.5 }]}
+                onPress={() => void open(locked, password)}
+                disabled={reading || !password}
+              >
+                {reading ? <ActivityIndicator color={T.white} /> : <Text style={styles.primaryText}>Open file</Text>}
+              </Pressable>
+            </View>
+          ) : rows.length === 0 ? (
             <Pressable style={styles.primary} onPress={choose} disabled={reading}>
               {reading ? (
                 <ActivityIndicator color={T.white} />
@@ -191,10 +239,37 @@ export function AccountImportSheet({
         </View>
       }
     >
-      {rows.length === 0 ? (
+      {pdf.node}
+      {locked ? (
+        <View>
+          <View style={styles.lockRow}>
+            <Feather name="lock" size={16} color={T.ink} />
+            <Text style={styles.lockName} numberOfLines={1}>
+              {locked.name}
+            </Text>
+          </View>
+          <Text style={styles.helpLine}>
+            This file is protected. Type its password — banks often use your customer ID, account number or date of
+            birth. It’s only used here, to open the file.
+          </Text>
+          <PaperOutlinedField
+            label="File password"
+            value={password}
+            onChangeText={setPassword}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoFocus
+            style={{ marginTop: 12 }}
+            returnKeyType="done"
+            onSubmitEditing={() => password && void open(locked, password)}
+          />
+        </View>
+      ) : rows.length === 0 ? (
         <View style={styles.help}>
           <Text style={styles.helpTitle}>What works</Text>
           <Text style={styles.helpLine}>• Excel (.xlsx, .xls) or CSV files</Text>
+          <Text style={styles.helpLine}>• Bank statement PDFs (e.g. SBI, PNB) — as downloaded, not scanned</Text>
+          <Text style={styles.helpLine}>• Password-protected Excel and PDF files — you’ll be asked for the password</Text>
           <Text style={styles.helpLine}>• Columns named Date, Particular (or Description), Credit, Debit — or Date, Amount, Type</Text>
           <Text style={styles.helpLine}>• Dates like 15-09-2026, 15/09/26, 15 Sep 2026</Text>
           <Text style={styles.helpLine}>
@@ -272,6 +347,8 @@ const styles = StyleSheet.create({
   helpTitle: { fontFamily: 'Inter_700Bold', fontSize: 13, color: T.ink, marginBottom: 4 },
   helpLine: { fontFamily: 'Inter_400Regular', fontSize: 13, color: T.inkSoft, lineHeight: 19 },
   file: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.mute, marginBottom: 8 },
+  lockRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  lockName: { flex: 1, fontFamily: 'Inter_700Bold', fontSize: 14, color: T.ink },
   card: { backgroundColor: T.soft, borderRadius: 16, padding: 12, marginBottom: 8, gap: 6 },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   check: {

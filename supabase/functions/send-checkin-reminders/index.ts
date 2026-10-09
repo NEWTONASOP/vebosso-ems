@@ -11,6 +11,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendWebPushForRows } from '../_shared/webPush.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -152,6 +153,8 @@ serve(async (req) => {
     // 3. In-app log.
     const { error: dbInsertError } = await adminClient.from('notifications').insert(dbNotifications);
     if (dbInsertError) console.error('Error logging notifications to database:', dbInsertError);
+    // And to browsers with notifications on (057).
+    await sendWebPushForRows(adminClient, dbNotifications as any, 6 * 60 * 60);
 
     // 4. Push, in batches of 100 (Expo's limit per request).
     const results: unknown[] = [];

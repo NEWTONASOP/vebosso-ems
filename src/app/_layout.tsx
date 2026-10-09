@@ -7,7 +7,7 @@ import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-rout
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { AppState, StyleSheet } from 'react-native';
+import { AppState, Platform, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { configureFonts, MD3LightTheme, PaperProvider } from 'react-native-paper';
 import 'react-native-reanimated';
@@ -17,6 +17,7 @@ import { FieldChainScope } from '../components/FieldChain';
 import { LoadingScreen } from '../components/LoadingScreen';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { UpdateChecker } from '../components/UpdateChecker';
+import { WebNotificationGate } from '../components/WebNotificationGate';
 import { PaperThemeColors } from '../constants/colors';
 import { AppTheme } from '../constants/theme';
 import {
@@ -122,6 +123,11 @@ function AuthGuard() {
       };
 
       setupNotifications();
+      // Web: a browser that already allowed notifications keeps getting them,
+      // for whoever is signed in now (057).
+      if (Platform.OS === 'web') {
+        void import('../lib/webPush').then((m) => m.syncWebPush());
+      }
 
       return () => {
         active = false;
@@ -220,6 +226,16 @@ export default function RootLayout() {
     };
   }, [initialize]);
 
+  // Web: the browser's "Allow notifications?" pop-up on the first click (optional).
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    let stop: (() => void) | undefined;
+    void import('../lib/webPush').then((m) => {
+      stop = m.askWebPushOnFirstClick();
+    });
+    return () => stop?.();
+  }, []);
+
   useEffect(() => {
     if (!fontsLoaded) return;
 
@@ -282,13 +298,16 @@ export default function RootLayout() {
                   // Enter / Next moves to the next box on full screens; each
                   // sheet and popup has its own scope.
                   <FieldChainScope>
-                    <Stack
-                      screenOptions={{
-                        headerShown: false,
-                        contentStyle: { backgroundColor: AppTheme.bg },
-                        animation: 'slide_from_right',
-                      }}
-                    />
+                    {/* Web: notifications must be allowed first, like the phone app. */}
+                    <WebNotificationGate>
+                      <Stack
+                        screenOptions={{
+                          headerShown: false,
+                          contentStyle: { backgroundColor: AppTheme.bg },
+                          animation: 'slide_from_right',
+                        }}
+                      />
+                    </WebNotificationGate>
                   </FieldChainScope>
                 )}
               </>

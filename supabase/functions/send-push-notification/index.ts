@@ -16,6 +16,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendWebPush } from '../_shared/webPush.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -324,6 +325,13 @@ serve(async (req) => {
       console.error('Unexpected error logging notification(s) to database:', dbCatchErr);
     }
 
+    // Browsers with notifications on (057) — alongside the phone push.
+    const webSent = await sendWebPush(adminClient, targetUsers.map((u) => u.id), {
+      title,
+      body: messageBody,
+      data: data || {},
+    });
+
     // -------------------------------------------------------------------------
     // Build Expo push messages for users with valid tokens
     // -------------------------------------------------------------------------
@@ -361,8 +369,9 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
-          message: 'Notifications logged to DB — no valid push tokens available',
+          message: 'Notifications logged to DB — no valid phone push tokens',
           sent: 0,
+          web_sent: webSent,
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -417,7 +426,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, sent: pushMessages.length, tickets: pushResult.data }),
+      JSON.stringify({ success: true, sent: pushMessages.length, web_sent: webSent, tickets: pushResult.data }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

@@ -19,6 +19,7 @@ import {
   TimelineEventKind,
 } from '../lib/attendanceTimeline';
 import { AppTheme, appSoftShadow } from '../constants/theme';
+import { RemarksMode, WorkLogRemarks } from './WorkLogRemarks';
 
 /** Only the first few cards animate in — a long list would otherwise crawl. */
 const ANIMATED_ITEMS = 8;
@@ -71,13 +72,23 @@ const EMPTY_COPY: Record<EmptyDayReason, { title: string; body: string }> = {
   },
 };
 
+/** Remarks under the check-in / check-out cards (053). */
+export interface TimelineRemarks {
+  /** "review": owner or their manager; "answer": the person themselves. */
+  mode: RemarksMode;
+  /** Whose day it is. */
+  personId: string;
+  personName?: string | null;
+}
+
 interface DayTimelineProps {
   timeline: DayTimelineData;
   /** Optional tap-through, e.g. to open the full work log detail. */
   onPressEvent?: (event: TimelineEvent) => void;
+  remarks?: TimelineRemarks;
 }
 
-export function DayTimeline({ timeline, onPressEvent }: DayTimelineProps) {
+export function DayTimeline({ timeline, onPressEvent, remarks }: DayTimelineProps) {
   if (timeline.events.length === 0) {
     const copy = EMPTY_COPY[timeline.emptyReason ?? 'no-record'];
     return (
@@ -100,6 +111,7 @@ export function DayTimeline({ timeline, onPressEvent }: DayTimelineProps) {
           index={index}
           isLast={index === timeline.events.length - 1}
           onPress={onPressEvent}
+          remarks={remarks}
         />
       ))}
     </View>
@@ -111,11 +123,13 @@ function TimelineRow({
   index,
   isLast,
   onPress,
+  remarks,
 }: {
   event: TimelineEvent;
   index: number;
   isLast: boolean;
   onPress?: (event: TimelineEvent) => void;
+  remarks?: TimelineRemarks;
 }) {
   const [expanded, setExpanded] = useState(false);
   // Full (unclamped) line counts, reported by the hidden measuring copies.
@@ -210,6 +224,19 @@ function TimelineRow({
                 name={expanded ? 'chevron-up' : 'chevron-down'}
                 size={13}
                 color={event.color}
+              />
+            </View>
+          ) : null}
+          {remarks && event.workLogId && (event.kind === 'check-in' || event.kind === 'check-out') ? (
+            // Taps here stay here — they shouldn't also open the day's detail.
+            <View onStartShouldSetResponder={() => true}>
+              <WorkLogRemarks
+                workLogId={event.workLogId}
+                part={event.kind === 'check-in' ? 'check_in' : 'check_out'}
+                mode={remarks.mode}
+                personId={remarks.personId}
+                personName={remarks.personName}
+                date={event.date}
               />
             </View>
           ) : null}

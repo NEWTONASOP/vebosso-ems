@@ -7,6 +7,7 @@
 // summary; OwnerInboxSheet lists every item with its action.
 // ============================================================================
 
+import { leaveLabel } from '../lib/leaveDates';
 import { Feather } from '@expo/vector-icons';
 import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { useFocusEffect } from 'expo-router';
@@ -342,7 +343,15 @@ export function OwnerInboxSheet({
       key={w.id}
       name={w.profiles?.full_name}
       avatar={w.profiles?.avatar_url}
-      meta={`${isCheckout ? 'Checkout' : 'Check-in'} · ${whenLabel(w.date)}`}
+      meta={[
+        `${isCheckout ? 'Checkout' : 'Check-in'} · ${whenLabel(w.date)}`,
+        // Both times on a checkout (and how long); the check-in time on a check-in.
+        w.check_in_time ? `In ${format(parseISO(w.check_in_time), 'h:mm a')}` : null,
+        isCheckout && w.check_out_time ? `Out ${format(parseISO(w.check_out_time), 'h:mm a')}` : null,
+        isCheckout && w.total_hours ? `${Number(w.total_hours).toFixed(1)}h` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')}
       body={isCheckout ? w.day_report : w.check_in_plan}
       extra={
         <WorkLogPhotos
@@ -430,7 +439,7 @@ export function OwnerInboxSheet({
             <InboxItem
               key={l.id}
               name={l.profiles?.full_name}
-              meta={`Leave · ${format(parseISO(l.date), 'EEE, d MMM')}`}
+              meta={`Leave · ${leaveLabel(l)}`}
               body={l.reason}
               busy={busy === l.id}
               actions={[

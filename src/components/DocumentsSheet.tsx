@@ -252,7 +252,7 @@ export function DocumentsSheet({
   };
 
   const confirmDelete = (doc: EmployeeDocument) => {
-    Alert.alert('Delete document?', `"${doc.name}" will be removed for good.`, [
+    Alert.alert('Delete document?', `"${doc.name}" will be deleted. You can restore it from the recycle bin.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',

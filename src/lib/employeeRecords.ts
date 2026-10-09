@@ -234,11 +234,10 @@ export async function renameDocument(id: string, name: string): Promise<Result> 
   return { success: true, data: undefined };
 }
 
-/** Owner only (RLS). Removes the file and the row. */
+/** Owner only (RLS). The file stays, so the recycle bin can bring it back (056). */
 export async function deleteDocument(doc: EmployeeDocument): Promise<Result> {
   const { error } = await supabase.from('employee_documents').delete().eq('id', doc.id);
   if (error) return fail(error);
-  await supabase.storage.from('documents').remove([doc.file_path]);
   return { success: true, data: undefined };
 }
 

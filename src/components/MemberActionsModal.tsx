@@ -117,8 +117,6 @@ export function MemberActionsModal({
             <View style={styles.headerText}>
               <Text style={styles.name} numberOfLines={1}>{member.full_name}</Text>
               <Text style={styles.metaLine} numberOfLines={1}>
-                <Text style={styles.employeeId}>{member.employee_id}</Text>
-                <Text style={styles.metaSep}> · </Text>
                 <Text style={[styles.roleText, { color: roleMuted }]}>{ROLE_LABELS[member.role]}</Text>
                 {!!member.department && (
                   <>
@@ -150,6 +148,7 @@ export function MemberActionsModal({
           <Text style={styles.sectionTitle}>Attendance</Text>
           <MemberAttendancePanel
             memberId={member.id}
+            memberName={member.full_name}
             accentColor={RoleAccent.owner.color}
             enableDetailSheet={false}
             showDayHeader={false}
@@ -406,10 +405,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginTop: 2,
-  },
-  employeeId: {
-    fontFamily: 'Inter_600SemiBold',
-    color: AppTheme.inkSoft,
   },
   metaSep: {
     fontFamily: 'Inter_400Regular',

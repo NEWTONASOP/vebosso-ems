@@ -3,6 +3,7 @@
 // Month date rail + sequential day timeline.
 // ============================================================================
 
+import { leaveCovers } from '../../lib/leaveDates';
 import { Feather } from '@expo/vector-icons';
 import { addDays, format, isSameDay, parseISO, startOfMonth, startOfWeek } from 'date-fns';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -102,7 +103,7 @@ export default function MemberHistoryScreen() {
     [workLogs]
   );
   const leaveFor = useCallback(
-    (date: Date) => leaves.find((l) => l.date === KEY(date)) ?? null,
+    (date: Date) => leaves.find((l) => leaveCovers(l, KEY(date))) ?? null,
     [leaves]
   );
 
@@ -236,6 +237,7 @@ export default function MemberHistoryScreen() {
             />
 
             <DayTimeline
+              remarks={profile ? { mode: 'answer', personId: profile.id, personName: profile.full_name } : undefined}
               timeline={timeline}
               onPressEvent={(event) => {
                 if (event.kind === 'check-in' || event.kind === 'check-out') {

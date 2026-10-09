@@ -23,6 +23,10 @@ export interface TimelineEvent {
   soft: string;
   /** Shown on the right of the card, e.g. total hours. */
   trailing?: string | null;
+  /** Check-in / check-out: the work log, for remarks (053). */
+  workLogId?: string;
+  /** Check-in / check-out: the day, "yyyy-MM-dd". */
+  date?: string;
 }
 
 /** Why a day has no timeline, so the UI can explain rather than show nothing. */
@@ -110,6 +114,8 @@ export function buildDayTimeline({
     events.push({
       id: `check-in-${workLog.id}`,
       kind: 'check-in',
+      workLogId: workLog.id,
+      date: workLog.date,
       at: workLog.check_in_time,
       title: checkInLabel(workLog),
       subtitle: workLog.status === 'rejected'
@@ -139,6 +145,8 @@ export function buildDayTimeline({
     events.push({
       id: `check-out-${workLog.id}`,
       kind: 'check-out',
+      workLogId: workLog.id,
+      date: workLog.date,
       at: workLog.check_out_time,
       title: 'Checked out',
       subtitle: workLog.day_report,

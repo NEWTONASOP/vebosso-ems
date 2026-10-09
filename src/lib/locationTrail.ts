@@ -19,12 +19,12 @@ const MIN_STOP_MS = 8 * 60 * 1000;
  */
 const MAX_ACCURACY_M = 150;
 /**
- * Pings are expected roughly every 3 minutes. A gap several times that long
+ * Pings are expected roughly every 5 minutes. A gap several times that long
  * means tracking was actually interrupted — app killed, permission revoked,
  * phone died — not just normal network jitter. Drawing a straight line across
  * a gap like that would claim a journey nobody can vouch for.
  */
-const GAP_THRESHOLD_MS = 10 * 60 * 1000;
+const GAP_THRESHOLD_MS = 16 * 60 * 1000;
 /** Below this, a gap's most likely explanation is the battery running out. */
 const LOW_BATTERY_PCT = 15;
 /**

@@ -114,6 +114,15 @@ export default function OwnerSettingsScreen() {
             subtitle="View and manage active sessions"
             onPress={() => router.push('/(owner)/settings/session-management')}
           />
+          <View style={styles.separator} />
+          <SettingsRow
+            icon="trash-2"
+            iconColor={AppTheme.blue}
+            iconBg={AppTheme.blueSoft}
+            title="Recycle bin"
+            subtitle="Everything deleted in the app — restore it"
+            onPress={() => router.push('/(owner)/settings/recycle-bin')}
+          />
         </View>
 
         {/* App Settings */}

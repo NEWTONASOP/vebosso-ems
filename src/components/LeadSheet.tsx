@@ -11,7 +11,10 @@ import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-n
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { Alert } from '../lib/alert';
-import { addLead, contactName, deleteLead, joinPhones, leadDate, leadPhones, markLeadsTouched, updateLead } from '../lib/leads';
+import { addLead, contactName, deleteLead, joinPhones, leadDate, leadPhones, markLeadsTouched, setLeadVoice, updateLead } from '../lib/leads';
+import { clipTime, removeVoiceNote, uploadVoiceNote, VoiceClip } from '../lib/voice';
+import { useAuthStore } from '../store/authStore';
+import { RecordingBar, useVoiceRecorder, VoiceNote } from './VoiceNote';
 import { saveLeadsToPhone } from '../lib/leadsFile';
 import { telUrl, whatsappUrl } from '../lib/venues';
 import { Lead, LeadBanquet, LeadInput } from '../types/database';
@@ -54,6 +57,12 @@ export function LeadSheet({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const me = useAuthStore((s) => s.profile);
+  // Voice note with the remarks (054): the saved one, a new recording, or removed.
+  const recorder = useVoiceRecorder();
+  const [newClip, setNewClip] = useState<VoiceClip | null>(null);
+  const [voiceRemoved, setVoiceRemoved] = useState(false);
+  const savedVoice = voiceRemoved ? null : lead?.remarks_voice_path ?? null;
 
   const setPhone = (i: number, v: string) => {
     setPhones((list) => list.map((p, j) => (j === i ? v : p)));
@@ -75,8 +84,27 @@ export function LeadSheet({
     const input = { ...form, contact: contact || null };
     setSaving(true);
     const res = lead ? await updateLead(lead.id, input) : await addLead(input);
+    if (!res.success) {
+      setSaving(false);
+      return setError(res.error);
+    }
+    // The voice note goes on after the lead itself is saved.
+    const id = res.data.id;
+    const oldPath = lead?.remarks_voice_path ?? null;
+    if (newClip && me?.id) {
+      const up = await uploadVoiceNote('lead', me.id, newClip);
+      const set = up.success ? await setLeadVoice(id, up.data, newClip.durationMs) : up;
+      if (!set.success) {
+        setSaving(false);
+        onSaved(lead ? 'Lead updated' : 'Lead added');
+        return setError(`Saved, but the voice note didn’t: ${set.error}`);
+      }
+      void removeVoiceNote(oldPath);
+    } else if (voiceRemoved && oldPath) {
+      const set = await setLeadVoice(id, null, null);
+      if (set.success) void removeVoiceNote(oldPath);
+    }
     setSaving(false);
-    if (!res.success) return setError(res.error);
     onSaved(lead ? 'Lead updated' : 'Lead added');
     onDismiss();
   };
@@ -91,6 +119,7 @@ export function LeadSheet({
         onPress: async () => {
           const res = await deleteLead(lead.id);
           if (!res.success) return setError(res.error);
+          // The voice note stays: the owner can restore the lead (056).
           onSaved('Lead deleted');
           onDismiss();
         },
@@ -183,7 +212,12 @@ export function LeadSheet({
         )}
 
         <Text style={styles.label}>Remarks</Text>
-        <Text style={styles.viewValue}>{lead.remarks || '—'}</Text>
+        {lead.remarks || !lead.remarks_voice_path ? <Text style={styles.viewValue}>{lead.remarks || '—'}</Text> : null}
+        {lead.remarks_voice_path ? (
+          <View style={{ marginTop: lead.remarks ? 8 : 0 }}>
+            <VoiceNote path={lead.remarks_voice_path} durationMs={lead.remarks_voice_ms} />
+          </View>
+        ) : null}
 
         <Text style={styles.addedBy}>
           Added by {lead.created_by_name || 'someone'} on {format(parseISO(lead.created_at), 'd MMM yyyy, h:mm a')}
@@ -282,6 +316,51 @@ export function LeadSheet({
         </Pressable>
       </View>
       <PaperOutlinedField label="Remarks" value={form.remarks ?? ''} onChangeText={set('remarks')} multiline maxLength={2000} style={{ marginTop: 10 }} />
+      <View style={{ marginTop: 8 }}>
+        {recorder.recording ? (
+          <RecordingBar
+            durationMs={recorder.durationMs}
+            onCancel={() => void recorder.cancel()}
+            onSend={async () => {
+              const clip = await recorder.stop();
+              if (clip) setNewClip(clip);
+            }}
+          />
+        ) : newClip ? (
+          <View style={styles.voiceRow}>
+            <Feather name="mic" size={15} color={T.ink} />
+            <Text style={styles.voiceText}>New voice note · {clipTime(newClip.durationMs)} · saved with the lead</Text>
+            <Pressable onPress={() => setNewClip(null)} hitSlop={8} accessibilityLabel="Discard the new voice note">
+              <Feather name="x" size={16} color={T.inkSoft} />
+            </Pressable>
+          </View>
+        ) : savedVoice ? (
+          <View style={styles.voiceRow}>
+            <View style={{ flex: 1 }}>
+              <VoiceNote path={savedVoice} durationMs={lead?.remarks_voice_ms} />
+            </View>
+            <Pressable onPress={() => setVoiceRemoved(true)} hitSlop={8} accessibilityLabel="Remove the voice note">
+              <Feather name="trash-2" size={16} color={T.coral} />
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            style={styles.recordBtn}
+            // At the length limit, what was recorded is kept.
+            onPress={() =>
+              void recorder.start(async () => {
+                const clip = await recorder.stop();
+                if (clip) setNewClip(clip);
+              })
+            }
+            accessibilityRole="button"
+          >
+            <Feather name="mic" size={14} color={T.ink} />
+            <Text style={styles.recordText}>{lead?.remarks_voice_path ? 'Record a new voice note' : 'Add a voice note'}</Text>
+          </Pressable>
+        )}
+        {recorder.error ? <Text style={styles.error}>{recorder.error}</Text> : null}
+      </View>
     </SheetFrame>
   );
 }
@@ -289,6 +368,19 @@ export function LeadSheet({
 const styles = StyleSheet.create({
   label: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft, marginBottom: 6, marginTop: 12 },
   viewValue: { fontFamily: 'Inter_500Medium', fontSize: 16, color: T.ink },
+  voiceRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: T.soft, borderRadius: 14, padding: 10 },
+  voiceText: { flex: 1, fontFamily: 'Inter_500Medium', fontSize: 13, color: T.ink },
+  recordBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: T.soft,
+  },
+  recordText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.ink },
   addedBy: { fontFamily: 'Inter_400Regular', fontSize: 12.5, color: T.mute, marginTop: 18 },
   contactActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   phoneLine: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
