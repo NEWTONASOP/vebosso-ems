@@ -13,7 +13,9 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { addBanquet, addLeads, fetchBanquets } from '../lib/leads';
-import { ParsedLeadSheet, pickAndParseLeadsFile } from '../lib/leadsFile';
+import type { ParsedLeadSheet } from '../lib/leadsFile';
+// Loaded on first use: the spreadsheet code is big and slowed down app start.
+const leadsFile = () => import('../lib/leadsFile');
 import { LeadBanquet } from '../types/database';
 import { PaperOutlinedField } from './PaperOutlinedField';
 import { SheetFrame } from './SheetFrame';
@@ -46,7 +48,7 @@ export function LeadsImportSheet({
     setError('');
     setBusy('pick');
     try {
-      const res = await pickAndParseLeadsFile();
+      const res = await (await leadsFile()).pickAndParseLeadsFile();
       if (!res) return;
       if (!res.sheets.length) {
         setError('No leads found. The first row should name the columns: dof, name, function, contact, remarks.');

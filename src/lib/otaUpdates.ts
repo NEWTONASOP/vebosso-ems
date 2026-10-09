@@ -16,9 +16,14 @@ import { Platform } from 'react-native';
  * download starts — `fetchUpdateAsync()` is the step that can take a few
  * seconds, and a caller can use this moment to swap a frozen splash screen
  * for something that says "Updating…" instead of just looking hung.
+ *
+ * The splash waits at most `waitMs` for the server to answer. On slow mobile
+ * data the check alone took seconds and the app sat on the logo; past that,
+ * the app opens and a found update downloads quietly for the next start.
  */
 export async function applyOtaUpdateIfAvailable(
-  onUpdateAvailable?: () => void
+  onUpdateAvailable?: () => void,
+  waitMs = 1500
 ): Promise<boolean> {
   if (__DEV__ || isRunningInExpoGo() || Platform.OS === 'web') {
     return false;
@@ -31,7 +36,19 @@ export async function applyOtaUpdateIfAvailable(
       return false;
     }
 
-    const result = await Updates.checkForUpdateAsync();
+    const check = Updates.checkForUpdateAsync();
+    const result = await Promise.race([
+      check,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), waitMs)),
+    ]);
+    if (result === null) {
+      // Slow answer: don't hold the app. Fetch in the background — Expo uses
+      // a downloaded update the next time the app starts.
+      void check
+        .then((late) => (late.isAvailable ? Updates.fetchUpdateAsync() : null))
+        .catch(() => {});
+      return false;
+    }
     if (!result.isAvailable) {
       return false;
     }

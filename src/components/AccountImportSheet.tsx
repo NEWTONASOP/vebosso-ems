@@ -16,8 +16,10 @@ import { SmoothTextInput as TextInput } from './SmoothTextInput';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { addTransactionsBulk, createAccount, fetchTransactions, money, num, TxnInput } from '../lib/accounts';
-import { parseLedgerFile, ParsedLedger, PickedFile, pickLedgerFile } from '../lib/accountsFile';
-import { PasswordNeededError } from '../lib/officeCrypto';
+import type { ParsedLedger, PickedFile } from '../lib/accountsFile';
+import { PasswordNeededError } from '../lib/passwordError';
+// Loaded on first use: the spreadsheet code is big and slowed down app start.
+const accountsFile = () => import('../lib/accountsFile');
 import { PaperOutlinedField } from './PaperOutlinedField';
 import { usePdfReader } from './PdfTextReader';
 import { Account } from '../types/database';
@@ -63,7 +65,7 @@ export function AccountImportSheet({
     setError('');
     setReading(true);
     try {
-      const res = await parseLedgerFile(file, { password: pw, readPdf: pdf.read });
+      const res = await (await accountsFile()).parseLedgerFile(file, { password: pw, readPdf: pdf.read });
       setLocked(null);
       setPassword('');
       if (res.ledgers.length === 0) {
@@ -91,7 +93,7 @@ export function AccountImportSheet({
   const choose = async () => {
     setError('');
     try {
-      const file = await pickLedgerFile();
+      const file = await (await accountsFile()).pickLedgerFile();
       if (file) await open(file);
     } catch (e: any) {
       setError(e?.message || 'Could not read that file');

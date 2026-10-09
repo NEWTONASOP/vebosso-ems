@@ -14,7 +14,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import WebView, { WebViewMessageEvent } from 'react-native-webview';
 import type { PdfReader, PickedFile } from '../lib/accountsFile';
-import { PasswordNeededError } from '../lib/officeCrypto';
+import { PasswordNeededError } from '../lib/passwordError';
 import type { PdfItem } from '../lib/statementPdf';
 
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174';

@@ -19,7 +19,8 @@ import * as XLSX from 'xlsx';
 import { Account, AccountTransaction } from '../types/database';
 import { money, num, Period, periodLabel, TxnInput } from './accounts';
 import { parseAmount, parseDate } from './ledgerValues';
-import { decryptOffice, isEncryptedOffice, PasswordNeededError } from './officeCrypto';
+import { decryptOffice, isEncryptedOffice } from './officeCrypto';
+import { PasswordNeededError } from './passwordError';
 import { parsePdfStatement, statementName, type PdfItem } from './statementPdf';
 import { printHtmlOnWeb } from './webPrint';
 

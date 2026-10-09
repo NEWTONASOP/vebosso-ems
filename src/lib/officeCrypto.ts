@@ -13,15 +13,9 @@ import { cbc } from '@noble/ciphers/aes';
 import { sha1 } from '@noble/hashes/sha1';
 import { sha256, sha384, sha512 } from '@noble/hashes/sha2';
 import * as XLSX from 'xlsx';
+import { PasswordNeededError } from './passwordError';
 
-export class PasswordNeededError extends Error {
-  /** A password was given, and it was wrong. */
-  wrong: boolean;
-  constructor(wrong = false) {
-    super(wrong ? 'That password didn’t open the file' : 'This file is protected with a password');
-    this.wrong = wrong;
-  }
-}
+export { PasswordNeededError };
 
 const HASHES: Record<string, (b: Uint8Array) => Uint8Array> = {
   SHA1: sha1,

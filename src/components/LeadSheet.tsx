@@ -15,7 +15,8 @@ import { addLead, contactName, deleteLead, joinPhones, leadDate, leadPhones, mar
 import { clipTime, removeVoiceNote, uploadVoiceNote, VoiceClip } from '../lib/voice';
 import { useAuthStore } from '../store/authStore';
 import { RecordingBar, useVoiceRecorder, VoiceNote } from './VoiceNote';
-import { saveLeadsToPhone } from '../lib/leadsFile';
+// Loaded on first use: the spreadsheet code is big and slowed down app start.
+const leadsFile = () => import('../lib/leadsFile');
 import { telUrl, whatsappUrl } from '../lib/venues';
 import { Lead, LeadBanquet, LeadInput } from '../types/database';
 import { DateField } from './DateTimeFields';
@@ -145,7 +146,7 @@ export function LeadSheet({
     if (!lead) return;
     touch();
     try {
-      await saveLeadsToPhone([{ lead, banquetName: banquetName(lead.banquet_id) }], contactName(lead, banquetName(lead.banquet_id)));
+      await (await leadsFile()).saveLeadsToPhone([{ lead, banquetName: banquetName(lead.banquet_id) }], contactName(lead, banquetName(lead.banquet_id)));
     } catch (e: any) {
       setError(e?.message || 'Could not open Contacts');
     }

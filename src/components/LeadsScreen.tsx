@@ -16,7 +16,8 @@ import { Menu, Snackbar, Text } from 'react-native-paper';
 import { AppTheme as T, screenChrome } from '../constants/theme';
 import { Alert } from '../lib/alert';
 import { addBanquet, contactName, deleteBanquet, fetchBanquets, fetchLeads, leadPhones, markLeadsTouched } from '../lib/leads';
-import { exportLeads, saveLeadsToPhone } from '../lib/leadsFile';
+// Loaded on first use: the spreadsheet code is big and slowed down app start.
+const leadsFile = () => import('../lib/leadsFile');
 import { supabase } from '../lib/supabase';
 import { telUrl, whatsappUrl } from '../lib/venues';
 import { clipTime } from '../lib/voice';
@@ -189,7 +190,7 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
   const saveAllToPhone = async (g: Group) => {
     touch(g.leads.filter((l) => l.contact).map((l) => l.id));
     try {
-      const n = await saveLeadsToPhone(
+      const n = await (await leadsFile()).saveLeadsToPhone(
         g.leads.map((lead) => ({ lead, banquetName: banquetName(lead.banquet_id) })),
         `${g.name} leads`
       );
@@ -203,7 +204,7 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
     const withLeads = list.filter((g) => g.leads.length);
     if (!withLeads.length) return setSnack('No leads to export');
     try {
-      await exportLeads(withLeads.map((g) => ({ name: g.name, leads: g.leads })), base);
+      await (await leadsFile()).exportLeads(withLeads.map((g) => ({ name: g.name, leads: g.leads })), base);
     } catch (e: any) {
       setSnack(e?.message || 'Could not export');
     }
@@ -214,7 +215,7 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
       const bq = banquets.find((b) => b.id === lead.banquet_id)?.name ?? null;
       touch([lead.id]);
       try {
-        await saveLeadsToPhone([{ lead, banquetName: bq }], contactName(lead, bq));
+        await (await leadsFile()).saveLeadsToPhone([{ lead, banquetName: bq }], contactName(lead, bq));
       } catch (e: any) {
         setSnack(e?.message || 'Could not open Contacts');
       }

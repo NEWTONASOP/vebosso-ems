@@ -10,7 +10,9 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { fetchTransactions, Period, periodLabel } from '../lib/accounts';
-import { exportLedgers, ExportFormat, LedgerForExport } from '../lib/accountsFile';
+import type { ExportFormat, LedgerForExport } from '../lib/accountsFile';
+// Loaded on first use: the spreadsheet code is big and slowed down app start.
+const accountsFile = () => import('../lib/accountsFile');
 import { Account } from '../types/database';
 import { SheetFrame } from './SheetFrame';
 
@@ -43,7 +45,7 @@ export function AccountExportSheet({
         if (!res.success) throw new Error(res.error);
         ledgers.push({ account, txns: res.data });
       }
-      await exportLedgers(ledgers, period, fmt);
+      await (await accountsFile()).exportLedgers(ledgers, period, fmt);
     } catch (e: any) {
       setError(e?.message || 'Could not export');
     } finally {
