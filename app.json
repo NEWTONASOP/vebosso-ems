@@ -86,6 +86,7 @@
       ],
       "./plugins/withApkInstaller.js",
       "./plugins/withWhatsAppQueries.js",
+      "./plugins/withBackupOverride.js",
       [
         "expo-splash-screen",
         {
