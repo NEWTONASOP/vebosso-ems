@@ -11,7 +11,7 @@ import { format } from 'date-fns';
 import * as DocumentPicker from 'expo-document-picker';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SmoothTextInput as TextInput } from './SmoothTextInput';
 import { Menu, Text } from 'react-native-paper';
@@ -25,7 +25,9 @@ import {
   openDocumentFile,
   renameDocument,
   reviewDocument,
+  makeDocumentThumb,
   signDocumentUrls,
+  thumbPath,
   uploadDocument,
 } from '../lib/employeeRecords';
 import { DocumentStatus, EmployeeDocument } from '../types/database';
@@ -36,8 +38,13 @@ import { SheetFrame } from './SheetFrame';
 async function loadDocuments(userId: string) {
   const res = await fetchDocuments(userId);
   if (!res.success) return res;
-  const urls = await signDocumentUrls(res.data.map((d) => d.file_path));
-  return { success: true as const, data: { docs: res.data, urls } };
+  // Full files, plus the small previews of photos (missing ones are just left out).
+  const photos = res.data.filter((d) => documentKind(d.mime_type) === 'image');
+  const [urls, thumbs] = await Promise.all([
+    signDocumentUrls(res.data.map((d) => d.file_path)),
+    signDocumentUrls(photos.map((d) => thumbPath(d.file_path))),
+  ]);
+  return { success: true as const, data: { docs: res.data, urls, thumbs } };
 }
 
 const FILE_TYPES = [
@@ -90,7 +97,8 @@ interface DocumentsSheetProps {
   canManage: boolean;
 }
 
-export function DocumentsSheet({
+/** Memoised: screens behind it refresh often, and re-drawing it made scrolling stutter. */
+export const DocumentsSheet = memo(function DocumentsSheet({
   visible,
   onDismiss,
   userId,
@@ -101,6 +109,8 @@ export function DocumentsSheet({
 }: DocumentsSheetProps) {
   const [docs, setDocs] = useState<EmployeeDocument[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
+  // Small previews by document id (photos only).
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -123,6 +133,12 @@ export function DocumentsSheet({
     if (res.success) {
       setDocs(res.data.docs);
       setUrls(res.data.urls);
+      const byId: Record<string, string> = {};
+      for (const d of res.data.docs) {
+        const t = res.data.thumbs[thumbPath(d.file_path)];
+        if (t) byId[d.id] = t;
+      }
+      setThumbs(byId);
     } else {
       setError(res.error);
     }
@@ -130,6 +146,28 @@ export function DocumentsSheet({
   }, []);
 
   const load = useCallback(async () => apply(await loadDocuments(userId)), [apply, userId]);
+
+  // Photos from before previews existed: make each one's preview once, one
+  // at a time, by whoever may add to these documents (owner, or the person).
+  const canAdd = canManage || isOwnDocs;
+  useEffect(() => {
+    if (!canAdd) return;
+    const missing = docs.filter((d) => documentKind(d.mime_type) === 'image' && !thumbs[d.id] && urls[d.file_path]);
+    if (missing.length === 0) return;
+    let active = true;
+    void (async () => {
+      for (const d of missing) {
+        if (!active) return;
+        const t = await makeDocumentThumb(d.file_path, urls[d.file_path]);
+        if (t && active) setThumbs((prev) => ({ ...prev, [d.id]: t }));
+      }
+    })();
+    return () => {
+      active = false;
+    };
+    // Once per load — not again for each preview made.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docs, urls, canAdd]);
 
   // Mounted only while open, so this loads once on open.
   useEffect(() => {
@@ -361,6 +399,7 @@ export function DocumentsSheet({
           : docs
         ).map((doc) => {
           const url = urls[doc.file_path];
+          const thumb = thumbs[doc.id];
           const chip = STATUS_CHIP[doc.status] ?? STATUS_CHIP.pending;
           const needsReview = canManage && doc.status === 'pending';
           const kind = documentKind(doc.mime_type);
@@ -374,8 +413,15 @@ export function DocumentsSheet({
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${doc.name}`}
               >
-                {kind === 'image' && url ? (
-                  <Image source={{ uri: url }} style={styles.thumb} contentFit="cover" />
+                {kind === 'image' && thumb ? (
+                  // The small preview, never the full photo (that opens on tap).
+                  <Image
+                    source={{ uri: thumb, cacheKey: thumbPath(doc.file_path) }}
+                    style={styles.thumb}
+                    contentFit="cover"
+                    cachePolicy="disk"
+                    recyclingKey={doc.id}
+                  />
                 ) : kind === 'image' ? (
                   <View style={[styles.thumb, styles.thumbIcon]}>
                     <Feather name="image" size={18} color={T.mute} />
@@ -464,7 +510,7 @@ export function DocumentsSheet({
                 accessibilityLabel={`Open ${doc.name}`}
               >
                 {url ? (
-                  <Image source={{ uri: url }} style={styles.reviewImage} contentFit="cover" />
+                  <Image source={{ uri: url, cacheKey: doc.file_path }} style={styles.reviewImage} contentFit="cover" cachePolicy="disk" recyclingKey={doc.id} />
                 ) : (
                   <ActivityIndicator color={T.charcoal} />
                 )}
@@ -506,7 +552,7 @@ export function DocumentsSheet({
       )}
     </SheetFrame>
   );
-}
+});
 
 const styles = StyleSheet.create({
   error: {

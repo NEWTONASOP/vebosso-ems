@@ -187,8 +187,7 @@ export const uploadCheckoutPhoto = async (
   mimeType?: string,
 ) => {
   if (Platform.OS === 'web' && typeof document !== 'undefined') {
-    let iframe: HTMLIFrameElement | null = null;
-    try {
+    {
       // 1. Get binary data using parent window's fetch to support blob: URLs on web
       let arrayBuffer: ArrayBuffer;
       let contentType = 'image/jpeg';
@@ -210,33 +209,16 @@ export const uploadCheckoutPhoto = async (
         contentType = mimeType || blob.type || 'image/jpeg';
       }
 
-      // 2. Retrieve native window objects from clean iframe to bypass RN Web polyfills
-      iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-      const NativeBlob = (iframe.contentWindow as any).Blob;
-      const NativeFormData = (iframe.contentWindow as any).FormData;
+      // 2. Upload the bytes with their real type. (A FormData from a hidden
+      // iframe used to go first, but supabase-js didn't recognise it and sent
+      // it as text/plain, which Storage refuses — every web upload failed once
+      // before a retry. The phone-only path below can't read blob: links.)
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .upload(path, arrayBuffer, { contentType, upsert });
 
-      if (NativeBlob && NativeFormData) {
-        // 3. Create a native Blob and native FormData
-        const nativeBlob = new NativeBlob([arrayBuffer], { type: contentType });
-        const formData = new NativeFormData();
-        formData.append('file', nativeBlob, `photo.${ext}`);
-
-        // 4. Upload the FormData directly
-        const { data, error } = await supabase.storage
-          .from(bucket)
-          .upload(path, formData);
-
-        if (error) throw error;
-        return data;
-      }
-    } catch (e) {
-      console.warn('Web native upload failed, trying fallback:', e);
-    } finally {
-      if (iframe && iframe.parentNode) {
-        document.body.removeChild(iframe);
-      }
+      if (error) throw error;
+      return data;
     }
   }
 
@@ -1096,7 +1078,11 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         };
       }
 
-      set({ memberLiveStatus: liveStatus });
+      // The 15 s poll mostly finds nothing new; a fresh object anyway re-drew
+      // every screen and open sheet watching it (scrolling stuttered).
+      if (JSON.stringify(liveStatus) !== JSON.stringify(get().memberLiveStatus)) {
+        set({ memberLiveStatus: liveStatus });
+      }
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };

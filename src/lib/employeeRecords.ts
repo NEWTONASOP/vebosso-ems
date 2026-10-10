@@ -7,9 +7,10 @@
 
 import { format, parseISO } from 'date-fns';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as WebBrowser from 'expo-web-browser';
-import { Linking, Platform } from 'react-native';
+import { Image as RNImage, Linking, Platform } from 'react-native';
 import { uploadCheckoutPhoto } from '../store/workStore';
 import {
   BossMessageWithSender,
@@ -80,6 +81,71 @@ export function documentKind(mime: string | null | undefined): DocumentKind {
   return 'other';
 }
 
+/**
+ * The small preview in lists: a ~160 px JPEG saved next to the photo
+ * ("<file>.thumb.jpg"). Lists show this instead of the full photo, which can
+ * be megabytes. Supabase's free plan can't resize images itself.
+ */
+export const thumbPath = (filePath: string) => filePath.replace(/.[^./]+$/, '') + '.thumb.jpg';
+
+async function uploadThumb(filePath: string, localUri: string): Promise<boolean> {
+  try {
+    const small = await ImageManipulator.manipulateAsync(localUri, [{ resize: { width: 160 } }], {
+      compress: 0.5,
+      format: ImageManipulator.SaveFormat.JPEG,
+    });
+    await uploadCheckoutPhoto(thumbPath(filePath), small.uri, 'jpg', 'documents', false, 'image/jpeg');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * For a photo uploaded before previews existed: make its preview once, from
+ * the full photo (`fullUrl` — a signed link). Returns the preview's link.
+ * Only works for someone allowed to add to that person's documents.
+ */
+export async function makeDocumentThumb(filePath: string, fullUrl: string): Promise<string | null> {
+  try {
+    let local = fullUrl;
+    if (Platform.OS !== 'web') {
+      const tmp = `${FileSystem.cacheDirectory}doc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      local = (await FileSystem.downloadAsync(fullUrl, tmp)).uri;
+    }
+    const ok = await uploadThumb(filePath, local);
+    if (Platform.OS !== 'web') await FileSystem.deleteAsync(local, { idempotent: true }).catch(() => {});
+    if (!ok) return null;
+    return (await signDocumentUrls([thumbPath(filePath)]))[thumbPath(filePath)] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Photos wider than this are shrunk before upload — still sharp enough to read an ID. */
+const MAX_PHOTO_WIDTH = 2000;
+
+/**
+ * A big camera photo (often 4–8 MB) shrunk to MAX_PHOTO_WIDTH as a JPEG; it
+ * loaded slowly and made the documents list stutter. Smaller ones, and
+ * anything that fails, go up as they are.
+ */
+async function shrinkPhoto(uri: string): Promise<{ uri: string; shrunk: boolean }> {
+  try {
+    const width = await new Promise<number>((resolve, reject) =>
+      RNImage.getSize(uri, (w) => resolve(w), reject),
+    );
+    if (width <= MAX_PHOTO_WIDTH) return { uri, shrunk: false };
+    const small = await ImageManipulator.manipulateAsync(uri, [{ resize: { width: MAX_PHOTO_WIDTH } }], {
+      compress: 0.8,
+      format: ImageManipulator.SaveFormat.JPEG,
+    });
+    return { uri: small.uri, shrunk: true };
+  } catch {
+    return { uri, shrunk: false };
+  }
+}
+
 export async function uploadDocument(params: {
   /** Whose document this is. */
   userId: string;
@@ -95,11 +161,22 @@ export async function uploadDocument(params: {
   try {
     const source = fileName || uri;
     const rawExt = (source.split('.').pop()?.split('?')[0] || '').toLowerCase();
-    const ext = EXT_MIME[rawExt] ? rawExt : mimeType === 'application/pdf' ? 'pdf' : 'jpg';
-    const mime = mimeType && Object.values(EXT_MIME).includes(mimeType) ? mimeType : EXT_MIME[ext];
+    let ext = EXT_MIME[rawExt] ? rawExt : mimeType === 'application/pdf' ? 'pdf' : 'jpg';
+    let mime = mimeType && Object.values(EXT_MIME).includes(mimeType) ? mimeType : EXT_MIME[ext];
+    let fileUri = uri;
+    if (mime.startsWith('image/')) {
+      const photo = await shrinkPhoto(uri);
+      if (photo.shrunk) {
+        fileUri = photo.uri;
+        ext = 'jpg';
+        mime = 'image/jpeg';
+      }
+    }
     const path = `${userId}/${Date.now()}.${ext}`;
 
-    await uploadCheckoutPhoto(path, uri, ext, 'documents', false, mime);
+    await uploadCheckoutPhoto(path, fileUri, ext, 'documents', false, mime);
+    // Its small preview for lists (best effort — lists fall back to an icon).
+    if (mime.startsWith('image/')) await uploadThumb(path, fileUri);
 
     const { error } = await supabase.from('employee_documents').insert({
       user_id: userId,

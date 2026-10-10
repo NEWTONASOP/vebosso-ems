@@ -135,6 +135,24 @@ export async function requestDetailsEdit(userId: string, userName: string): Prom
   return { success: true, data: undefined };
 }
 
+/** Someone waiting to edit their details again (049), for the owner's inbox. */
+export interface DetailsEditRequest {
+  user_id: string;
+  edit_requested_at: string;
+  person: { full_name: string; avatar_url: string | null } | null;
+}
+
+/** Owner: everyone who asked to edit their details, oldest first. */
+export async function fetchDetailsEditRequests(): Promise<Result<DetailsEditRequest[]>> {
+  const { data, error } = await supabase
+    .from('employee_details')
+    .select('user_id, edit_requested_at, person:profiles!employee_details_user_id_fkey(full_name, avatar_url)')
+    .not('edit_requested_at', 'is', null)
+    .order('edit_requested_at', { ascending: true });
+  if (error) return fail(error);
+  return { success: true, data: (data || []) as unknown as DetailsEditRequest[] };
+}
+
 /** Owner: approve (the person can edit once) or turn down a request. */
 export async function answerDetailsEdit(userId: string, approve: boolean): Promise<Result> {
   const { error } = await supabase

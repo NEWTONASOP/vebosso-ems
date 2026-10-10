@@ -2,7 +2,8 @@
 // VEBOSSO EMS — Owner Inbox ("Needs you now")
 // Everything waiting on the owner, in one place:
 //   check-ins · checkouts (incl. backfilled days) · leave requests ·
-//   documents · salary requests · travel expenses · unread chat messages
+//   documents · employee details edit requests · salary requests ·
+//   travel expenses · unread chat messages
 // useOwnerInbox() gathers it and keeps it live; NeedsYouCard is the dashboard
 // summary; OwnerInboxSheet lists every item with its action.
 // ============================================================================
@@ -32,6 +33,7 @@ import {
   WaitingSalaryRequest,
 } from '../lib/employeeRecords';
 import { fetchUnreadChats, markChatRead, UnreadChat } from '../lib/chat';
+import { answerDetailsEdit, DetailsEditRequest, fetchDetailsEditRequests } from '../lib/employeeDetails';
 import {
   fetchAllSubmittedExpenses,
   formatAmount,
@@ -58,7 +60,16 @@ import { VoiceNote } from './VoiceNote';
 // Data
 // ============================================================================
 
-export type InboxKind = 'checkin' | 'checkout' | 'leave' | 'document' | 'salary' | 'expense' | 'task' | 'message';
+export type InboxKind =
+  | 'checkin'
+  | 'checkout'
+  | 'leave'
+  | 'document'
+  | 'details'
+  | 'salary'
+  | 'expense'
+  | 'task'
+  | 'message';
 
 /** A task its assignee finished, waiting for approval (status 'review'). */
 export type TaskToReview = Task & { person: { full_name: string; avatar_url: string | null } | null };
@@ -86,6 +97,7 @@ const KINDS: {
   { key: 'checkout', one: 'checkout', many: 'checkouts', icon: 'log-out', color: T.violet, soft: T.violetSoft },
   { key: 'leave', one: 'leave request', many: 'leave requests', icon: 'sun', color: T.blue, soft: T.blueSoft },
   { key: 'document', one: 'document', many: 'documents', icon: 'file-text', color: T.coral, soft: T.coralSoft },
+  { key: 'details', one: 'details edit request', many: 'details edit requests', icon: 'user', color: T.blue, soft: T.blueSoft },
   { key: 'salary', one: 'salary request', many: 'salary requests', icon: 'credit-card', color: T.green, soft: T.greenSoft },
   { key: 'expense', one: 'travel expense', many: 'travel expenses', icon: 'navigation', color: T.violet, soft: T.violetSoft },
   { key: 'task', one: 'task approval', many: 'task approvals', icon: 'check-square', color: T.violet, soft: T.violetSoft },
@@ -93,14 +105,15 @@ const KINDS: {
 ];
 
 const loadExtras = async () => {
-  const [docs, salary, expenses, tasks, messages] = await Promise.all([
+  const [docs, details, salary, expenses, tasks, messages] = await Promise.all([
     fetchAllPendingDocuments(),
+    fetchDetailsEditRequests(),
     fetchAllSalaryRequests(),
     fetchAllSubmittedExpenses(),
     fetchTasksToReview(),
     fetchUnreadChats(),
   ]);
-  return { docs, salary, expenses, tasks, messages };
+  return { docs, details, salary, expenses, tasks, messages };
 };
 
 export interface OwnerInbox {
@@ -108,6 +121,8 @@ export interface OwnerInbox {
   checkOuts: WorkLogWithProfile[];
   leaves: LeaveRequestWithProfile[];
   documents: PendingDocument[];
+  /** People asking to edit their employee details again. */
+  detailsEdits: DetailsEditRequest[];
   salary: WaitingSalaryRequest[];
   expenses: WaitingExpense[];
   /** Finished tasks waiting for approval. */
@@ -127,6 +142,7 @@ export function useOwnerInbox(): OwnerInbox {
   const fetchLeaveRequests = useWorkStore((s) => s.fetchLeaveRequests);
 
   const [documents, setDocuments] = useState<PendingDocument[]>([]);
+  const [detailsEdits, setDetailsEdits] = useState<DetailsEditRequest[]>([]);
   const [salary, setSalary] = useState<WaitingSalaryRequest[]>([]);
   const [expenses, setExpenses] = useState<WaitingExpense[]>([]);
   const [tasks, setTasks] = useState<TaskToReview[]>([]);
@@ -134,6 +150,7 @@ export function useOwnerInbox(): OwnerInbox {
 
   const applyExtras = useCallback((res: Awaited<ReturnType<typeof loadExtras>>) => {
     if (res.docs.success) setDocuments(res.docs.data);
+    if (res.details.success) setDetailsEdits(res.details.data);
     if (res.salary.success) setSalary(res.salary.data);
     if (res.expenses.success) setExpenses(res.expenses.data);
     if (res.tasks.success) setTasks(res.tasks.data);
@@ -167,7 +184,7 @@ export function useOwnerInbox(): OwnerInbox {
       timer = setTimeout(() => void refresh(), 400);
     };
     const channel = supabase.channel(`owner_inbox_${Math.random().toString(36).slice(2, 8)}`);
-    for (const table of ['employee_documents', 'salary_requests', 'expense_claims', 'tasks', 'chat_messages', 'leave_requests']) {
+    for (const table of ['employee_documents', 'employee_details', 'salary_requests', 'expense_claims', 'tasks', 'chat_messages', 'leave_requests']) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, soon);
     }
     channel.subscribe();
@@ -186,14 +203,15 @@ export function useOwnerInbox(): OwnerInbox {
       checkout: checkOuts.length,
       leave: leaves.length,
       document: documents.length,
+      details: detailsEdits.length,
       salary: salary.length,
       expense: expenses.length,
       task: tasks.length,
       message: messages.reduce((n, m) => n + m.count, 0),
     };
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    return { checkIns, checkOuts, leaves, documents, salary, expenses, tasks, messages, counts, total, refresh };
-  }, [pendingApprovals, leaveRequests, documents, salary, expenses, tasks, messages, refresh]);
+    return { checkIns, checkOuts, leaves, documents, detailsEdits, salary, expenses, tasks, messages, counts, total, refresh };
+  }, [pendingApprovals, leaveRequests, documents, detailsEdits, salary, expenses, tasks, messages, refresh]);
 }
 
 // ============================================================================
@@ -479,6 +497,34 @@ export function OwnerInboxSheet({
                   label: 'Approve',
                   tone: 'approve',
                   onPress: () => run(d.id, () => reviewDocument(d, 'approved', ownerId), 'Document approved'),
+                },
+              ]}
+            />
+          ))
+        : null}
+
+      {show('details') ? <Section kind="details" /> : null}
+      {show('details')
+        ? inbox.detailsEdits.map((r) => (
+            <InboxItem
+              key={`details-${r.user_id}`}
+              name={r.person?.full_name}
+              avatar={r.person?.avatar_url}
+              meta={`Employee details · asked ${format(parseISO(r.edit_requested_at), 'd MMM, h:mm a')}`}
+              body="Wants to edit their employee details. Approving lets them make one edit; it locks again once saved."
+              busy={busy === `details-${r.user_id}`}
+              actions={[
+                {
+                  label: 'Keep as is',
+                  tone: 'reject',
+                  onPress: () =>
+                    run(`details-${r.user_id}`, () => answerDetailsEdit(r.user_id, false), 'Kept as it is'),
+                },
+                {
+                  label: 'Approve',
+                  tone: 'approve',
+                  onPress: () =>
+                    run(`details-${r.user_id}`, () => answerDetailsEdit(r.user_id, true), 'They can edit their details now'),
                 },
               ]}
             />
@@ -803,7 +849,7 @@ function DocumentPreview({ doc, onMessage }: { doc: PendingDocument; onMessage: 
       >
         {isImage ? (
           url ? (
-            <Image source={{ uri: url }} style={styles.docPreviewImage} contentFit="cover" />
+            <Image source={{ uri: url, cacheKey: doc.file_path }} style={styles.docPreviewImage} contentFit="cover" cachePolicy="disk" />
           ) : failed ? (
             <Feather name="alert-circle" size={20} color={T.mute} />
           ) : (

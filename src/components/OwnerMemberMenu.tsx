@@ -7,7 +7,7 @@
 // ============================================================================
 
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Feature, FEATURES, fetchFeatureAccess, setFeatureAccess } from '../lib/featureAccess';
 import { countUnreadFrom } from '../lib/chat';
 import { countPendingDocuments } from '../lib/employeeRecords';
@@ -38,12 +38,17 @@ interface OwnerMemberMenuProps {
 
 export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = null }: OwnerMemberMenuProps) {
   const router = useRouter();
-  const { profile } = useAuthStore();
+  const profile = useAuthStore((s) => s.profile);
   const teamMembers = useWorkStore((s) => s.teamMembers);
   const memberLiveStatus = useWorkStore((s) => s.memberLiveStatus);
   const fetchTeamMembers = useWorkStore((s) => s.fetchTeamMembers);
 
   const [dialog, setDialog] = useState<MemberDialog | null>(initialDialog);
+  // Stable, so the memoised sheets below don't re-draw when this menu does.
+  const closeDialog = useCallback(() => setDialog(null), []);
+  const onMessageRef = useRef(onMessage);
+  onMessageRef.current = onMessage;
+  const stableMessage = useCallback((m: string) => onMessageRef.current(m), []);
   const [assigning, setAssigning] = useState(false);
   const [isAssigningManager, setIsAssigningManager] = useState(false);
   const [pendingDocs, setPendingDocs] = useState(0);
@@ -176,11 +181,11 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
 
       {dialog === 'details' && profile?.id ? (
         <EmployeeDetailsSheet
-          onDismiss={() => setDialog(null)}
+          onDismiss={closeDialog}
           userId={member.id}
           userName={member.full_name}
           mode="owner"
-          onMessage={onMessage}
+          onMessage={stableMessage}
         />
       ) : null}
 
@@ -208,7 +213,7 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
       {dialog === 'documents' && profile?.id ? (
         <DocumentsSheet
           visible
-          onDismiss={() => setDialog(null)}
+          onDismiss={closeDialog}
           userId={member.id}
           userName={member.full_name}
           currentUserId={profile.id}

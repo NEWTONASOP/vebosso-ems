@@ -10,7 +10,7 @@
 
 import { Feather } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
@@ -53,7 +53,8 @@ const time = (v: string | null) => {
   return format(new Date(2000, 0, 1, h, m), 'h:mm a');
 };
 
-export function EmployeeDetailsSheet({
+/** Memoised: screens behind it refresh often, and re-drawing it made scrolling stutter. */
+export const EmployeeDetailsSheet = memo(function EmployeeDetailsSheet({
   userId,
   userName,
   mode,
@@ -623,7 +624,7 @@ export function EmployeeDetailsSheet({
       </View>
     );
   }
-}
+});
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
