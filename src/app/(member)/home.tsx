@@ -28,7 +28,7 @@ import {
 } from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
-import { TaskStatus } from '../../types/database';
+import { TaskStatus, WorkFile } from '../../types/database';
 import { MyRemarksCard } from '../../components/MyRemarksCard';
 
 const memberAccent = RoleAccent.member;
@@ -104,9 +104,9 @@ export default function MemberHomeScreen() {
     }
   };
 
-  const handleCheckIn = useCallback(async (plan: string, photoUris?: string[]) => {
+  const handleCheckIn = useCallback(async (plan: string, photoUris?: string[], files?: WorkFile[]) => {
     setCheckInLoading(true);
-    const result = await checkIn(plan, photoUris);
+    const result = await checkIn(plan, photoUris, files);
     setCheckInLoading(false);
     if (result.success) {
       setShowCheckIn(false);
@@ -132,9 +132,9 @@ export default function MemberHomeScreen() {
     }
   }, [updateCheckInPlan]);
 
-  const handleCheckOut = useCallback(async (report: string, photoUris: string[]) => {
+  const handleCheckOut = useCallback(async (report: string, photoUris: string[], files?: WorkFile[]) => {
     setCheckOutLoading(true);
-    const result = await checkOut(report, photoUris);
+    const result = await checkOut(report, photoUris, files);
     setCheckOutLoading(false);
     if (result.success) {
       setShowCheckOut(false);

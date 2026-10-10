@@ -5,7 +5,7 @@
 
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   ActivityIndicator,
@@ -31,6 +31,7 @@ import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { MemberCard } from '../../components/MemberCard';
 import { MemberDialog } from '../../components/MemberActionsModal';
 import { OwnerMemberMenu } from '../../components/OwnerMemberMenu';
+import { isAppVisible } from '../../lib/appActive';
 import { DepartmentData, fetchDepartments } from '../../lib/departments';
 import { sortMembersByLiveStatus } from '../../lib/teamSort';
 import { useAuthStore } from '../../store/authStore';
@@ -78,6 +79,13 @@ export default function OwnerDashboard() {
   const [snackMessage, setSnackMessage] = React.useState('');
   const inbox = useOwnerInbox();
   const [inboxFilter, setInboxFilter] = React.useState<InboxKind | 'all' | null>(null);
+  // A tapped notification opens "Needs you now" on its kind (?inbox=…); `ts` makes a repeat tap count.
+  const { inbox: inboxParam, ts: inboxTs } = useLocalSearchParams<{ inbox?: string; ts?: string }>();
+  const [seenInboxTs, setSeenInboxTs] = React.useState<string | undefined>();
+  if (inboxTs && inboxTs !== seenInboxTs) {
+    setSeenInboxTs(inboxTs);
+    if (inboxParam) setInboxFilter(inboxParam as InboxKind);
+  }
 
   const loadData = useCallback(async () => {
     await Promise.all([
@@ -116,9 +124,11 @@ export default function OwnerDashboard() {
   // Keep live status fresh while the dashboard is focused (realtime + poll fallback)
   useFocusEffect(
     useCallback(() => {
+      // Realtime does the instant updates; this is only the safety net, and it
+      // sits out while nobody is looking.
       const pollId = setInterval(() => {
-        refreshMemberLiveStatus();
-      }, 15000);
+        if (isAppVisible()) refreshMemberLiveStatus();
+      }, 60000);
       return () => clearInterval(pollId);
     }, [refreshMemberLiveStatus])
   );

@@ -9,8 +9,9 @@ import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-
 import { Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
+import { fetchWorkLogFiles, openDocumentFile, signDocumentUrls } from '../lib/employeeRecords';
 import { supabase } from '../lib/supabase';
-import { Task, WorkLog } from '../types/database';
+import { EmployeeDocument, Task, WorkLog } from '../types/database';
 import { ImageViewerModal } from './ImageViewerModal';
 
 interface WorkLogDetailProps {
@@ -51,6 +52,11 @@ export function WorkLogDetail({
   const [checkOutPhotoUrls, setCheckOutPhotoUrls] = useState<string[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [expandedTasks, setExpandedTasks] = useState<string[]>([]);
+  // PDF / Word files attached at check-in or check-out.
+  const [workFiles, setWorkFiles] = useState<EmployeeDocument[]>([]);
+  const [fileUrls, setFileUrls] = useState<Record<string, string>>({});
+  const [openingFile, setOpeningFile] = useState<string | null>(null);
+  const [fileError, setFileError] = useState('');
 
   const toggleTask = (id: string) =>
     setExpandedTasks((open) =>
@@ -64,6 +70,9 @@ export function WorkLogDetail({
     setCheckInPhotoUrls([]);
     setCheckOutPhotoUrls([]);
     setExpandedTasks([]);
+    setWorkFiles([]);
+    setFileUrls({});
+    setFileError('');
   }
 
   useEffect(() => {
@@ -117,6 +126,37 @@ export function WorkLogDetail({
       isMounted = false;
     };
   }, [workLog?.check_out_photos]);
+
+  const workLogId = workLog?.id;
+  useEffect(() => {
+    if (!workLogId) return;
+    let isMounted = true;
+    void (async () => {
+      try {
+        const docs = await fetchWorkLogFiles(workLogId);
+        if (!isMounted || docs.length === 0) return;
+        const urls = await signDocumentUrls(docs.map((d) => d.file_path));
+        if (!isMounted) return;
+        setWorkFiles(docs);
+        setFileUrls(urls);
+      } catch (err) {
+        console.error('Failed to load attached files:', err);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [workLogId]);
+
+  const openFile = async (doc: EmployeeDocument) => {
+    const url = fileUrls[doc.file_path];
+    if (!url) return setFileError('Could not load this file');
+    setFileError('');
+    setOpeningFile(doc.id);
+    const res = await openDocumentFile(doc, url);
+    setOpeningFile(null);
+    if (!res.success) setFileError(res.error);
+  };
 
   if (!workLog) return null;
 
@@ -285,6 +325,28 @@ export function WorkLogDetail({
                   ))}
                 </View>
               </ScrollView>
+            </Section>
+          ) : null}
+
+          {workFiles.length > 0 ? (
+            <Section label={`Attached files · ${workFiles.length}`}>
+              {workFiles.map((d) => (
+                <Pressable
+                  key={d.id}
+                  onPress={() => void openFile(d)}
+                  disabled={openingFile === d.id}
+                  style={({ pressed }) => [styles.fileRow, pressed && { opacity: 0.85 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${d.name}`}
+                >
+                  <Feather name="file-text" size={16} color={AppTheme.inkSoft} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.fileName} numberOfLines={1}>{d.name}</Text>
+                    <Text style={styles.fileMeta}>{d.work_phase === 'check_out' ? 'End of day' : 'Start of day'} · tap to open</Text>
+                  </View>
+                </Pressable>
+              ))}
+              {fileError ? <Text style={styles.fileError}>{fileError}</Text> : null}
             </Section>
           ) : null}
 
@@ -644,6 +706,19 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 4,
   },
+  fileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: AppTheme.soft,
+    marginBottom: 6,
+  },
+  fileName: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: AppTheme.ink },
+  fileMeta: { fontSize: 12, fontFamily: 'Inter_400Regular', color: AppTheme.mute, marginTop: 1 },
+  fileError: { fontSize: 12.5, fontFamily: 'Inter_500Medium', color: AppTheme.coral, marginTop: 4 },
   photosContainer: {
     flexDirection: 'row',
     gap: 12,

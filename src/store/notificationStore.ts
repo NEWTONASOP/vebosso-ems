@@ -19,6 +19,11 @@ interface NotificationState {
   setupSubscription: (userId: string, onNewNotification?: () => void) => () => void;
 }
 
+/** The list shows the newest of these; older ones are never downloaded. */
+const PAGE = 50;
+/** Screens that open together (bell, list, dashboard) share one request. */
+let inFlight: Promise<void> | null = null;
+
 export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
   unreadCount: 0,
@@ -26,26 +31,41 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   error: null,
 
   fetchNotifications: async (userId: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+    if (inFlight) return inFlight;
+    inFlight = (async () => {
+      set({ isLoading: true, error: null });
+      try {
+        const [list, unread] = await Promise.all([
+          supabase
+            .from('notifications')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(PAGE),
+          // Counted by the database, so the badge is right beyond the newest PAGE.
+          supabase
+            .from('notifications')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('read', false),
+        ]);
 
-      if (error) throw error;
+        if (list.error) throw list.error;
 
-      const items = (data || []) as DbNotification[];
-      const unread = items.filter((n) => !n.read).length;
-
-      set({ notifications: items, unreadCount: unread });
-    } catch (err: any) {
-      if (__DEV__) console.error('Error fetching notifications:', err);
-      set({ error: err.message || 'Failed to load notifications' });
-    } finally {
-      set({ isLoading: false });
-    }
+        const items = (list.data || []) as DbNotification[];
+        set({
+          notifications: items,
+          unreadCount: unread.count ?? items.filter((n) => !n.read).length,
+        });
+      } catch (err: any) {
+        if (__DEV__) console.error('Error fetching notifications:', err);
+        set({ error: err.message || 'Failed to load notifications' });
+      } finally {
+        set({ isLoading: false });
+        inFlight = null;
+      }
+    })();
+    return inFlight;
   },
 
   markAsRead: async (notificationId: string) => {
@@ -149,6 +169,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
           filter: `user_id=eq.${userId}`,
         },
         async (payload) => {
+          // A read flag flipping is already applied on screen; only new or removed notifications need a fresh list.
+          if (payload.eventType === 'UPDATE') return;
           await get().fetchNotifications(userId);
           if (payload.eventType === 'INSERT' && onNewNotification) {
             onNewNotification();

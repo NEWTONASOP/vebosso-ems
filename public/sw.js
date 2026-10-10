@@ -27,12 +27,18 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const data = event.notification.data || {};
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((tabs) => {
       for (const tab of tabs) {
-        if (new URL(tab.url).origin === self.location.origin && 'focus' in tab) return tab.focus();
+        if (new URL(tab.url).origin === self.location.origin && 'focus' in tab) {
+          // The app is open: tell it which notification this was, so it can go there.
+          tab.postMessage({ kind: 'notification-click', data });
+          return tab.focus();
+        }
       }
-      return self.clients.openWindow('/');
+      // Closed: open it with the notification in the address; the app reads it once signed in.
+      return self.clients.openWindow('/?notif=' + encodeURIComponent(JSON.stringify(data)));
     }),
   );
 });

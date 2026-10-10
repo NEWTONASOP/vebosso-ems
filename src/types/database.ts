@@ -180,6 +180,19 @@ export interface EmployeeDocument {
   reviewed_by: string | null;
   reviewed_at: string | null;
   created_at: string;
+  /** Personal documents, or work files attached at check-in / check-out (059). */
+  category: DocumentCategory;
+  work_log_id: string | null;
+  work_phase: 'check_in' | 'check_out' | null;
+}
+
+export type DocumentCategory = 'personal' | 'work';
+
+/** A PDF / Word file picked in the check-in or check-out form. */
+export interface WorkFile {
+  uri: string;
+  name: string;
+  mimeType?: string | null;
 }
 
 export type SalaryStatus = 'requested' | 'paid' | 'received';
@@ -443,6 +456,17 @@ export interface BillItem {
   description: string;
 }
 
+/** One video on a bill; the file lives in Cloudinary. */
+export interface BillVideo {
+  url: string;
+  public_id: string;
+  name: string;
+  /** Size in bytes. */
+  bytes: number | null;
+  /** Length in seconds. */
+  duration: number | null;
+}
+
 export interface Bill {
   id: string;
   kind: BillKind;
@@ -472,6 +496,8 @@ export interface Bill {
   balance: number | string | null;
   terms: string | null;
   images: string[];
+  /** Cloudinary videos attached to the bill (058). */
+  videos: BillVideo[];
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -513,6 +539,7 @@ export type BillFields = Pick<
   | 'balance'
   | 'terms'
   | 'images'
+  | 'videos'
 >;
 
 export interface BillSettings {

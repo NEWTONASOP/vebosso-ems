@@ -13,6 +13,7 @@ import { ListSkeleton } from '../../../components/LoadingSkeleton';
 import { MemberCard } from '../../../components/MemberCard';
 import { OwnerMemberMenu } from '../../../components/OwnerMemberMenu';
 import { AppSpace, AppTheme, screenChrome } from '../../../constants/theme';
+import { isAppVisible } from '../../../lib/appActive';
 import { sortMembersByLiveStatus } from '../../../lib/teamSort';
 import { useAuthStore } from '../../../store/authStore';
 import { useWorkStore } from '../../../store/workStore';
@@ -48,9 +49,11 @@ export default function OwnerTeamScreen() {
       refreshMemberLiveStatus();
       subscribeToRealtime(profile.id, 'owner');
 
+      // Realtime does the instant updates; this is only the safety net, and it
+      // sits out while nobody is looking.
       const pollId = setInterval(() => {
-        refreshMemberLiveStatus();
-      }, 15000);
+        if (isAppVisible()) refreshMemberLiveStatus();
+      }, 60000);
 
       return () => {
         clearInterval(pollId);

@@ -30,7 +30,7 @@ import {
   thumbPath,
   uploadDocument,
 } from '../lib/employeeRecords';
-import { DocumentStatus, EmployeeDocument } from '../types/database';
+import { DocumentCategory, DocumentStatus, EmployeeDocument } from '../types/database';
 import { ImageViewerModal } from './ImageViewerModal';
 import { PaperOutlinedField } from './PaperOutlinedField';
 import { SheetFrame } from './SheetFrame';
@@ -128,6 +128,10 @@ export const DocumentsSheet = memo(function DocumentsSheet({
   const [renameText, setRenameText] = useState('');
 
   const isOwnDocs = userId === currentUserId;
+  // Personal documents, or work files attached at check-in / check-out.
+  const [tab, setTab] = useState<DocumentCategory>('personal');
+  const inTab = docs.filter((d) => (d.category ?? 'personal') === tab);
+  const workCount = docs.filter((d) => d.category === 'work').length;
 
   const apply = useCallback((res: Awaited<ReturnType<typeof loadDocuments>>) => {
     if (res.success) {
@@ -254,6 +258,7 @@ export const DocumentsSheet = memo(function DocumentsSheet({
     const res = await uploadDocument({
       userId,
       uploaderId: currentUserId,
+      category: tab,
       name: newName,
       uri: pending.uri,
       fileName: pending.fileName,
@@ -320,7 +325,7 @@ export const DocumentsSheet = memo(function DocumentsSheet({
           label="Document name"
           value={newName}
           onChangeText={setNewName}
-          placeholder="e.g. Aadhaar card"
+          placeholder={tab === 'work' ? 'e.g. Event brief' : 'e.g. Aadhaar card'}
           maxLength={120}
           editable={!isUploading}
           autoFocus
@@ -348,7 +353,7 @@ export const DocumentsSheet = memo(function DocumentsSheet({
     </View>
   ) : (
     <View>
-      <Text style={styles.addLabel}>Add a document</Text>
+      <Text style={styles.addLabel}>{tab === 'work' ? 'Add a work document' : 'Add a document'}</Text>
       <View style={styles.row}>
         <Pressable style={styles.addBtn} onPress={() => pick('library')} accessibilityLabel="Add from photos">
           <Feather name="image" size={17} color={T.ink} />
@@ -372,7 +377,13 @@ export const DocumentsSheet = memo(function DocumentsSheet({
       visible={visible}
       onDismiss={onDismiss}
       title={isOwnDocs ? 'My Documents' : 'Documents'}
-      subtitle={isOwnDocs ? 'The boss approves each upload; only the boss can change them' : userName}
+      subtitle={
+        isOwnDocs
+          ? tab === 'work'
+            ? 'Work files need no approval; only the boss can change them'
+            : 'The boss approves each upload; only the boss can change them'
+          : userName
+      }
       icon="file-text"
       iconColor={T.violet}
       iconBg={T.violetSoft}
@@ -386,17 +397,35 @@ export const DocumentsSheet = memo(function DocumentsSheet({
         onDismiss={() => setViewerDoc(null)}
       />
 
+      <View style={styles.tabs}>
+        {(['personal', 'work'] as const).map((t) => (
+          <Pressable
+            key={t}
+            style={[styles.tab, tab === t && styles.tabActive]}
+            onPress={() => setTab(t)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: tab === t }}
+          >
+            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
+              {t === 'personal' ? 'Personal' : `Work${workCount ? ` · ${workCount}` : ''}`}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       {isLoading ? (
         <ActivityIndicator color={T.charcoal} style={{ marginVertical: 24 }} />
-      ) : docs.length === 0 ? (
+      ) : inTab.length === 0 ? (
         <View style={styles.empty}>
           <Feather name="folder" size={22} color={T.mute} />
-          <Text style={styles.emptyText}>No documents yet</Text>
+          <Text style={styles.emptyText}>
+            {tab === 'work' ? 'No work documents yet — add one below, or attach files at check-in or check-out' : 'No documents yet'}
+          </Text>
         </View>
       ) : (
         (canManage
-          ? [...docs].sort((a, b) => Number(b.status === 'pending') - Number(a.status === 'pending'))
-          : docs
+          ? [...inTab].sort((a, b) => Number(b.status === 'pending') - Number(a.status === 'pending'))
+          : inTab
         ).map((doc) => {
           const url = urls[doc.file_path];
           const thumb = thumbs[doc.id];
@@ -444,9 +473,17 @@ export const DocumentsSheet = memo(function DocumentsSheet({
                     <Text style={styles.docName}>{doc.name}</Text>
                   )}
                   <View style={styles.statusRow}>
-                    <View style={[styles.statusChip, { backgroundColor: chip.bg }]}>
-                      <Text style={[styles.statusChipText, { color: chip.color }]}>{chip.label}</Text>
-                    </View>
+                    {doc.category === 'work' ? (
+                      <View style={[styles.statusChip, { backgroundColor: T.blueSoft }]}>
+                        <Text style={[styles.statusChipText, { color: T.blue }]}>
+                          {doc.work_phase === 'check_out' ? 'Check-out' : 'Check-in'}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.statusChip, { backgroundColor: chip.bg }]}>
+                        <Text style={[styles.statusChipText, { color: chip.color }]}>{chip.label}</Text>
+                      </View>
+                    )}
                     <Text style={[styles.docMeta, { marginTop: 0, flexShrink: 1 }]}>
                       {format(new Date(doc.created_at), 'd MMM yyyy')}
                       {kind !== 'image' ? ` · ${KIND_BADGE[kind].label} · tap to open` : ''}
@@ -555,6 +592,18 @@ export const DocumentsSheet = memo(function DocumentsSheet({
 });
 
 const styles = StyleSheet.create({
+  tabs: {
+    flexDirection: 'row',
+    gap: 6,
+    padding: 4,
+    marginBottom: 10,
+    borderRadius: 999,
+    backgroundColor: T.soft,
+  },
+  tab: { flex: 1, height: 34, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  tabActive: { backgroundColor: T.card },
+  tabText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
+  tabTextActive: { color: T.ink },
   error: {
     fontFamily: 'Inter_500Medium',
     fontSize: 13,

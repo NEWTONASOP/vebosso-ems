@@ -24,6 +24,7 @@ import {
   setupAuthSessionLifecycle,
   teardownAuthSessionLifecycle,
 } from '../lib/authSessionLifecycle';
+import { notificationHref } from '../lib/notificationRoutes';
 import { useAuthStore } from '../store/authStore';
 // Side-effect import: registers the background location task before the bundle
 // finishes evaluating, so a headless relaunch can deliver a fix to it.
@@ -70,6 +71,9 @@ const theme = {
   roundness: 16, // Softer curves for premium feel
 };
 
+/** Notifications already acted on, so a re-run of the setup never opens one twice. */
+const handledNotifications = new Set<string>();
+
 function AuthGuard() {
   const router = useRouter();
   const segments = useSegments();
@@ -89,7 +93,17 @@ function AuthGuard() {
             addPushTokenRefreshListener,
             addNotificationResponseListener,
             addNotificationReceivedListener,
+            getLastNotificationResponse,
           } = await import('../lib/notifications');
+
+          // A tapped notification opens the screen it is about.
+          const openNotification = (response: { notification: { request: { identifier: string; content: { data?: unknown } } } }) => {
+            const id = response.notification.request.identifier;
+            if (handledNotifications.has(id)) return;
+            handledNotifications.add(id);
+            const href = notificationHref(profile.role, response.notification.request.content.data as Record<string, unknown>);
+            if (href) router.push(href as any);
+          };
 
           if (active) {
             await syncPushTokenForUser(profile.id);
@@ -98,7 +112,11 @@ function AuthGuard() {
           if (active) {
             const responseSub = addNotificationResponseListener((response) => {
               if (__DEV__) console.log('Notification tapped:', response.notification.request.content.data);
+              openNotification(response);
             });
+            // The app was closed when it was tapped: give the screens a moment to mount.
+            const launchedBy = getLastNotificationResponse();
+            if (launchedBy) setTimeout(() => openNotification(launchedBy), 600);
             const receivedSub = addNotificationReceivedListener((notification) => {
               if (__DEV__) console.log('Notification received in foreground:', notification);
             });
@@ -134,7 +152,37 @@ function AuthGuard() {
         if (cleanup) cleanup();
       };
     }
-  }, [isAuthenticated, profile?.id]);
+  }, [isAuthenticated, profile?.id, profile?.role, router]);
+
+  // Web: the service worker tells us which notification was clicked — by message
+  // when the app is already open, or in the address (?notif=…) when it had to open it.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    if (!isAuthenticated || !profile?.role || !rootNavigationState?.key) return;
+    const role = profile.role;
+    const open = (data: Record<string, unknown>) => {
+      const href = notificationHref(role, data);
+      if (href) router.push(href as any);
+    };
+
+    try {
+      const url = new URL(window.location.href);
+      const raw = url.searchParams.get('notif');
+      if (raw) {
+        url.searchParams.delete('notif');
+        window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+        open(JSON.parse(raw));
+      }
+    } catch {
+      /* a bad link just opens the app */
+    }
+
+    const onMessage = (e: MessageEvent) => {
+      if (e.data?.kind === 'notification-click') open(e.data.data ?? {});
+    };
+    navigator.serviceWorker?.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
+  }, [isAuthenticated, profile?.role, rootNavigationState?.key, router]);
 
   useEffect(() => {
     if (!rootNavigationState?.key) return;

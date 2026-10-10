@@ -12,7 +12,7 @@
 
 import { Feather } from '@expo/vector-icons';
 import { format, formatDistanceToNow, isToday, isYesterday } from 'date-fns';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { LocationMap, MapGap, MapMarker } from './LocationMap';
@@ -25,12 +25,14 @@ import {
   TrailGap,
   TrailStop,
 } from '../lib/locationTrail';
+import { isAppVisible } from '../lib/appActive';
 import { reverseGeocodeStop } from '../lib/reverseGeocode';
+import { supabase } from '../lib/supabase';
 import { useWorkStore } from '../store/workStore';
 import { LocationPing, MemberLocation } from '../types/database';
 
 /** How often the live marker is refreshed while the sheet stays open. */
-const LIVE_POLL_MS = 30_000;
+const LIVE_POLL_MS = 60_000;
 /** A fix older than this is history, not "live", however the flag reads. */
 const LIVE_STALE_MS = 15 * 60 * 1000;
 
@@ -57,7 +59,7 @@ export function MemberLocationSection({
   date,
   accentColor = T.blue,
 }: MemberLocationSectionProps) {
-  const { fetchDayLocations, fetchLiveLocations } = useWorkStore();
+  const { fetchDayLocations } = useWorkStore();
 
   const [pings, setPings] = useState<LocationPing[]>([]);
   const [live, setLive] = useState<MemberLocation | null>(null);
@@ -89,12 +91,32 @@ export function MemberLocationSection({
     setIsLoading(false);
   }, [memberId, dayKey, fetchDayLocations]);
 
+  // Just this person's marker (not everyone's, then picking one out).
   const loadLive = useCallback(async () => {
-    const res = await fetchLiveLocations();
-    if (!res.success) return;
-    setLive(res.data.find((row) => row.user_id === memberId) ?? null);
+    const { data, error: liveError } = await supabase
+      .from('member_locations')
+      .select('*')
+      .eq('user_id', memberId)
+      .maybeSingle();
+    if (liveError) return;
+    setLive((data as MemberLocation | null) ?? null);
     setNowTs(Date.now());
-  }, [memberId, fetchLiveLocations]);
+  }, [memberId]);
+
+  // While the day is open, fetch only the pings recorded since the last one.
+  const pingsRef = useRef<LocationPing[]>([]);
+  useEffect(() => {
+    pingsRef.current = pings;
+  }, [pings]);
+  const loadNewPings = useCallback(async () => {
+    const after = pingsRef.current[pingsRef.current.length - 1]?.recorded_at;
+    const res = await fetchDayLocations(memberId, dayKey, after);
+    if (!res.success || res.data.length === 0) return;
+    setPings((prev) => {
+      const seen = new Set(prev.map((p) => p.id));
+      return [...prev, ...res.data.filter((p) => !seen.has(p.id))];
+    });
+  }, [memberId, dayKey, fetchDayLocations]);
 
   useEffect(() => {
     void loadDay();
@@ -107,12 +129,13 @@ export function MemberLocationSection({
     }
     void loadLive();
     const id = setInterval(() => {
+      if (!isAppVisible()) return;
       void loadLive();
       // The trail grows while the day is open, so the route follows along.
-      void loadDay();
+      void loadNewPings();
     }, LIVE_POLL_MS);
     return () => clearInterval(id);
-  }, [showLive, loadLive, loadDay]);
+  }, [showLive, loadLive, loadNewPings]);
 
   // Clipped to the reviewed day, so another day's movements never leak in.
   const trail = useMemo(() => buildDayTrail(pings, dayKey), [pings, dayKey]);

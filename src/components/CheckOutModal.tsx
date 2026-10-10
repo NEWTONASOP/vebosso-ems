@@ -11,11 +11,15 @@ import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/them
 import { PaperOutlinedField } from './PaperOutlinedField';
 import { FieldChainScope } from './FieldChain';
 import { useDialogLift } from '../lib/useKeyboardHeight';
+import { WorkFile } from '../types/database';
+import { WorkFilePicker } from './WorkFilePicker';
+
+const MAX_PHOTOS = 5;
 
 interface CheckOutModalProps {
   visible: boolean;
   onDismiss: () => void;
-  onSubmit: (report: string, photoUris: string[]) => Promise<void>;
+  onSubmit: (report: string, photoUris: string[], files?: WorkFile[]) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -25,6 +29,7 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
   const reportRef = useRef('');
   const [charCount, setCharCount] = useState(0);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [files, setFiles] = useState<WorkFile[]>([]);
   const [error, setError] = useState('');
 
   const handleChangeReport = useCallback((text: string) => {
@@ -34,8 +39,8 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
   }, []);
 
   const pickImage = async () => {
-    if (photos.length >= 3) {
-      setError('You can upload a maximum of 3 photos');
+    if (photos.length >= MAX_PHOTOS) {
+      setError(`You can upload a maximum of ${MAX_PHOTOS} photos`);
       return;
     }
     try {
@@ -59,8 +64,8 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
   };
 
   const takePhoto = async () => {
-    if (photos.length >= 3) {
-      setError('You can upload a maximum of 3 photos');
+    if (photos.length >= MAX_PHOTOS) {
+      setError(`You can upload a maximum of ${MAX_PHOTOS} photos`);
       return;
     }
     try {
@@ -95,7 +100,7 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
     }
 
     setError('');
-    await onSubmit(report.trim().slice(0, 1000), photos);
+    await onSubmit(report.trim().slice(0, 1000), photos, files);
   };
 
   if (!visible) return null;
@@ -140,12 +145,12 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
               )}
             </View>
 
-            <Text style={styles.sectionTitle}>Attach Photos (Optional, Max 3)</Text>
+            <Text style={styles.sectionTitle}>Attach Photos (Optional, Max {MAX_PHOTOS})</Text>
             <View style={styles.photoActions}>
               <Button
                 mode="contained"
                 onPress={takePhoto}
-                disabled={isLoading || photos.length >= 3}
+                disabled={isLoading || photos.length >= MAX_PHOTOS}
                 icon="camera"
                 style={styles.photoButton}
                 buttonColor={AppTheme.soft}
@@ -156,7 +161,7 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
               <Button
                 mode="contained"
                 onPress={pickImage}
-                disabled={isLoading || photos.length >= 3}
+                disabled={isLoading || photos.length >= MAX_PHOTOS}
                 icon="image"
                 style={styles.photoButton}
                 buttonColor={AppTheme.soft}
@@ -185,6 +190,8 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
                 </View>
               </ScrollView>
             )}
+
+            <WorkFilePicker files={files} onChange={setFiles} onError={setError} disabled={isLoading} />
 
             <View style={styles.actions}>
               <Button

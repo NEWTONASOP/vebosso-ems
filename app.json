@@ -2,7 +2,7 @@
   "expo": {
     "name": "VEBOSSO EMS",
     "slug": "vebosso-ems",
-    "version": "2.0.5",
+    "version": "2.0.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "vebossoems",
@@ -107,7 +107,9 @@
         {
           "microphonePermission": "VEBOSSO EMS uses the microphone to record voice messages."
         }
-      ]
+      ],
+      "expo-video",
+      "react-native-compressor"
     ],
     "experiments": {
       "typedRoutes": true

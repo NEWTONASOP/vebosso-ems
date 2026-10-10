@@ -11,6 +11,7 @@ import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { MemberAttendanceModal } from '../../components/MemberAttendanceModal';
 import { MemberCard } from '../../components/MemberCard';
 import { AppSpace, AppTheme, RoleAccent, screenChrome } from '../../constants/theme';
+import { isAppVisible } from '../../lib/appActive';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkStore } from '../../store/workStore';
 import { Profile } from '../../types/database';
@@ -40,9 +41,11 @@ export default function ManagerMyTeamScreen() {
       refreshMemberLiveStatus();
       subscribeToRealtime(profile.id, 'manager', profile.id);
 
+      // Realtime does the instant updates; this is only the safety net, and it
+      // sits out while nobody is looking.
       const pollId = setInterval(() => {
-        refreshMemberLiveStatus();
-      }, 15000);
+        if (isAppVisible()) refreshMemberLiveStatus();
+      }, 60000);
 
       return () => {
         clearInterval(pollId);

@@ -104,6 +104,7 @@ const EDIT_FIELD_LABEL: Record<string, string> = {
   terms: 'Terms',
   items: 'Services',
   images: 'Photos',
+  videos: 'Videos',
 };
 
 /** One changed field as a label and readable old / new values. */
@@ -117,6 +118,7 @@ export function describeEdit(change: BillEdit['changes'][number]): { label: stri
     if (change.field === 'status') return STATUS_LABEL[v as BillStatus] ?? String(v);
     if (change.field === 'kind') return KIND_LABEL[v as BillKind] ?? String(v);
     if (change.field === 'images') return `${v} photo${Number(v) === 1 ? '' : 's'}`;
+    if (change.field === 'videos') return `${v} video${Number(v) === 1 ? '' : 's'}`;
     return String(v);
   };
   return {
@@ -137,8 +139,8 @@ function cleanFields(f: Partial<BillFields>): Partial<BillFields> {
       out.items = ((v as BillItem[]) ?? [])
         .map((i) => ({ description: (i.description ?? '').trim() }))
         .filter((i) => i.description);
-    } else if (k === 'images') {
-      out.images = v;
+    } else if (k === 'images' || k === 'videos') {
+      out[k] = v;
     } else if (k === 'total' || k === 'advance' || k === 'balance') {
       out[k] = blank(v) ? null : num(v as number);
     } else if (typeof v === 'string') {

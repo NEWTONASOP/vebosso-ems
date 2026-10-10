@@ -5,7 +5,7 @@
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
@@ -21,6 +21,13 @@ export function MessageButtons({ onMessage }: { onMessage: (message: string) => 
   const profile = useAuthStore((s) => s.profile);
   const [open, setOpen] = useState<'boss' | 'team' | null>(null);
   const [unread, setUnread] = useState(0);
+  // A tapped chat notification opens the chat with the boss (?open=chat).
+  const { open: openParam, ts: openTs } = useLocalSearchParams<{ open?: string; ts?: string }>();
+  const [seenTs, setSeenTs] = useState<string | undefined>();
+  if (openTs && openTs !== seenTs) {
+    setSeenTs(openTs);
+    if (openParam === 'chat') setOpen('boss');
+  }
   const profileId = profile?.id;
 
   // Re-count on focus and whenever the chat closes.

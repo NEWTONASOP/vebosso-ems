@@ -19,14 +19,16 @@ import { AppTheme, AppRadius, appShadow, appSoftShadow } from '../constants/them
 import { PaperOutlinedField } from './PaperOutlinedField';
 import { FieldChainScope } from './FieldChain';
 import { useDialogLift } from '../lib/useKeyboardHeight';
+import { WorkFile } from '../types/database';
+import { WorkFilePicker } from './WorkFilePicker';
 
-const MAX_PHOTOS = 3;
+const MAX_PHOTOS = 5;
 
 interface CheckInModalProps {
   visible: boolean;
   onDismiss: () => void;
   /** Photos are only collected when starting the day, not when editing the plan. */
-  onSubmit: (plan: string, photoUris?: string[]) => Promise<void>;
+  onSubmit: (plan: string, photoUris?: string[], files?: WorkFile[]) => Promise<void>;
   isLoading?: boolean;
   /** Pre-fill the plan field (used when updating an existing plan) */
   initialPlan?: string;
@@ -47,6 +49,7 @@ export function CheckInModal({
   const planRef = useRef('');
   const [charCount, setCharCount] = useState(0);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [files, setFiles] = useState<WorkFile[]>([]);
   const [error, setError] = useState('');
   const isEditMode = mode === 'edit';
 
@@ -56,6 +59,7 @@ export function CheckInModal({
     planRef.current = seed;
     setCharCount(seed.length);
     setPhotos([]);
+    setFiles([]);
     setError('');
   }, [visible, isEditMode, initialPlan]);
 
@@ -127,8 +131,8 @@ export function CheckInModal({
     }
 
     setError('');
-    await onSubmit(plan.trim().slice(0, 1000), isEditMode ? undefined : photos);
-  }, [onSubmit, isEditMode, photos]);
+    await onSubmit(plan.trim().slice(0, 1000), isEditMode ? undefined : photos, isEditMode ? undefined : files);
+  }, [onSubmit, isEditMode, photos, files]);
 
   if (!visible) return null;
 
@@ -240,6 +244,8 @@ export function CheckInModal({
                     </View>
                   </ScrollView>
                 ) : null}
+
+                <WorkFilePicker files={files} onChange={setFiles} onError={setError} disabled={isLoading} />
               </>
             ) : null}
 

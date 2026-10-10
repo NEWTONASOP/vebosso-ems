@@ -329,6 +329,18 @@ export function addNotificationResponseListener(
 }
 
 /**
+ * The notification that opened the app from a closed state (tapped while the
+ * app wasn't running). null when the app was opened some other way.
+ */
+export function getLastNotificationResponse(): Notifications.NotificationResponse | null {
+  try {
+    return expoNotifications?.getLastNotificationResponse?.() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Add notification received listener (when notification arrives while app is open)
  */
 export function addNotificationReceivedListener(

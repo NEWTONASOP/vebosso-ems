@@ -5,7 +5,7 @@
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import Constants from 'expo-constants';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Switch, Text } from 'react-native-paper';
 import { InfoRow } from '../../components/InfoRow';
@@ -55,6 +55,15 @@ export default function ManagerSettingsScreen() {
   const router = useRouter();
   const { profile, signOut } = useAuthStore();
   const [openSheet, setOpenSheet] = useState<'details' | 'documents' | 'salary' | 'expenses' | null>(null);
+  // A tapped notification can ask for one of these sheets (?open=â€¦); `ts` makes a repeat tap count.
+  const { open: openParam, ts: openTs } = useLocalSearchParams<{ open?: string; ts?: string }>();
+  const [seenTs, setSeenTs] = useState<string | undefined>();
+  if (openTs && openTs !== seenTs) {
+    setSeenTs(openTs);
+    if (openParam === 'details' || openParam === 'documents' || openParam === 'salary' || openParam === 'expenses') {
+      setOpenSheet(openParam);
+    }
+  }
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [

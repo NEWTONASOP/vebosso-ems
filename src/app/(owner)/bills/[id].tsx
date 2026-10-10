@@ -30,7 +30,8 @@ import { money, num } from '../../../lib/accounts';
 import { Alert } from '../../../lib/alert';
 import { useFieldChain } from '../../../lib/useFieldChain';
 import { useKeyboardOverlap } from '../../../lib/useKeyboardHeight';
-import { sendBillOnWhatsApp, shareBillPdf, waNumber } from '../../../lib/billPdf';
+import { sendBillOnWhatsApp, sendBillVideoOnWhatsApp, shareBillPdf, waNumber } from '../../../lib/billPdf';
+import { uploadBillVideo } from '../../../lib/cloudinary';
 import {
   BILL_STATUS_TONE,
   billTotals,
@@ -50,11 +51,13 @@ import {
 } from '../../../lib/bills';
 import { BillHistorySheet } from '../../../components/BillHistorySheet';
 import { ImageViewerModal } from '../../../components/ImageViewerModal';
+import { BillVideoStrip } from '../../../components/BillVideoStrip';
+import { VideoPlayerModal } from '../../../components/VideoPlayerModal';
 import { BillPage, BillPreviewSheet } from '../../../components/BillPreviewSheet';
 import { HourPickerModal, hourLabel, PickerTheme } from '../../../components/DateTimeFields';
 import { useFeatureBase } from '../../../lib/featureAccess';
 import { useAuthStore } from '../../../store/authStore';
-import { Bill, BillBrand, BillFields, BillKind, BillSettings, BillStatus } from '../../../types/database';
+import { Bill, BillBrand, BillFields, BillKind, BillSettings, BillStatus, BillVideo } from '../../../types/database';
 import { BRANDS, brandOf } from '../../../lib/billBrands';
 
 registerTranslation('en-GB', enGB);
@@ -92,6 +95,7 @@ const emptyForm = (kind: BillKind, brand: BillBrand): BillFields => ({
   balance: null,
   terms: '',
   images: [],
+  videos: [],
 });
 
 const fromBill = (b: Bill): BillFields => ({
@@ -114,6 +118,7 @@ const fromBill = (b: Bill): BillFields => ({
   balance: b.balance,
   terms: b.terms ?? '',
   images: b.images ?? [],
+  videos: b.videos ?? [],
 });
 
 /** Has the owner typed anything worth keeping as a draft? */
@@ -122,6 +127,7 @@ const hasContent = (f: BillFields, defaults: BillFields) =>
     if (k === 'kind' || k === 'brand' || k === 'prepared_by' || k === 'terms') return false;
     if (k === 'items') return f.items.some((i) => i.description.trim());
     if (k === 'images') return f.images.length > 0;
+    if (k === 'videos') return f.videos.length > 0;
     return JSON.stringify(f[k] ?? '') !== JSON.stringify(defaults[k] ?? '');
   });
 
@@ -160,6 +166,10 @@ export default function BillEditorScreen() {
   const [showHistory, setShowHistory] = useState(false);
   // The bill image open in the big popup.
   const [viewImage, setViewImage] = useState<string | null>(null);
+  // The bill video playing in the popup, and the one being sent on WhatsApp.
+  const [playVideo, setPlayVideo] = useState<BillVideo | null>(null);
+  const [sendingVideo, setSendingVideo] = useState<string | null>(null);
+  const [videoStatus, setVideoStatus] = useState<'compressing' | 'uploading' | null>(null);
   // Photos uploaded to a saved bill but not saved yet — removed on discard.
   const newImages = useRef<string[]>([]);
   // A service row to focus once it has rendered (Enter adds the next one).
@@ -371,6 +381,43 @@ export default function BillEditorScreen() {
     ]);
   };
 
+  // ---- Videos (Cloudinary) -------------------------------------------------
+  const addVideos = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (perm.status !== 'granted') return setError('Permission is needed to add videos');
+      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'videos', allowsMultipleSelection: true });
+      if (res.canceled || !res.assets?.length) return;
+
+      setBusy('videos');
+      const added: BillVideo[] = [];
+      for (const a of res.assets) {
+        const up = await uploadBillVideo(a.uri, { name: a.fileName, bytes: a.fileSize, duration: a.duration }, setVideoStatus);
+        if (up.success) added.push(up.data);
+        else setError(up.error);
+      }
+      // Drafts autosave it; a saved bill changes only on Save.
+      if (added.length) set('videos', [...form.videos, ...added]);
+    } finally {
+      setBusy(null);
+      setVideoStatus(null);
+    }
+  };
+
+  const removeVideo = (v: BillVideo) =>
+    Alert.alert('Remove video?', 'It comes off this bill.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () =>
+          set(
+            'videos',
+            form.videos.filter((x) => x.public_id !== v.public_id)
+          ),
+      },
+    ]);
+
   // ---- Save & actions ------------------------------------------------------
   /** true when saved. After saving, the bill shows as itself again. */
   const save = useCallback(async (): Promise<boolean> => {
@@ -488,16 +535,35 @@ export default function BillEditorScreen() {
   const share = () =>
     !unsavedBeforeShare() && bill && settings && act('share', () => shareBillPdf({ ...bill, ...form, items: form.items }, settings));
 
-  const whatsapp = () => {
-    if (unsavedBeforeShare() || !bill || !settings) return;
+  /** The bill's phone number (asks when there are two), then runs send with it. */
+  const withNumber = (send: (phone: string) => void) => {
     const numbers = [form.phone, form.alt_phone].filter((p): p is string => !!p && !!waNumber(p));
     if (numbers.length === 0) return setError('Add a valid phone number to send on WhatsApp');
-    const send = (p: string) => act('wa', () => sendBillOnWhatsApp({ ...bill, ...form }, settings, p));
     if (numbers.length === 1) return send(numbers[0]);
     Alert.alert('Send to which number?', undefined, [
-      ...numbers.map((p) => ({ text: p, onPress: () => void send(p) })),
+      ...numbers.map((p) => ({ text: p, onPress: () => send(p) })),
       { text: 'Cancel', style: 'cancel' as const },
     ]);
+  };
+
+  const whatsapp = () => {
+    if (unsavedBeforeShare() || !bill || !settings) return;
+    withNumber((p) => void act('wa', () => sendBillOnWhatsApp({ ...bill, ...form }, settings, p)));
+  };
+
+  const sendVideo = (v: BillVideo) => {
+    if (unsavedBeforeShare() || !bill) return;
+    withNumber(
+      (p) =>
+        void act('wa', async () => {
+          setSendingVideo(v.public_id);
+          try {
+            await sendBillVideoOnWhatsApp(v, p);
+          } finally {
+            setSendingVideo(null);
+          }
+        })
+    );
   };
 
   const changeStatus = (s: BillStatus) =>
@@ -642,6 +708,14 @@ export default function BillEditorScreen() {
             </Pressable>
           ) : (
             <>
+              {form.videos.length ? (
+                <View>
+                  <Text style={styles.videosLabel}>Videos · {form.videos.length} — tap to play, green button sends on WhatsApp</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.videosRow}>
+                    <BillVideoStrip videos={form.videos} onPlay={setPlayVideo} onSend={sendVideo} sendingId={sendingVideo} />
+                  </ScrollView>
+                </View>
+              ) : null}
               <View style={styles.actionsRow}>
                 <ActionBtn icon="share-2" label="Share PDF" busy={busy === 'share'} onPress={share} />
                 <ActionBtn icon="message-circle" label="WhatsApp" busy={busy === 'wa'} onPress={whatsapp} tint={T.green} />
@@ -885,6 +959,23 @@ export default function BillEditorScreen() {
               </Pressable>
             </View>
           </Section>
+
+          <Section title={`Videos${form.videos.length ? ` · ${form.videos.length}` : ''}`}>
+            <View style={styles.images}>
+              <BillVideoStrip videos={form.videos} onPlay={setPlayVideo} onRemove={removeVideo} />
+              <Pressable style={styles.addImg} onPress={() => addVideos()} disabled={busy === 'videos'}>
+                {busy === 'videos' ? (
+                  <ActivityIndicator color={T.charcoal} />
+                ) : (
+                  <>
+                    <Feather name="film" size={18} color={T.inkSoft} />
+                    <Text style={styles.addImgText}>Videos</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+            {busy === 'videos' ? <Text style={styles.videosLabel}>{videoStatus === 'compressing' ? 'Shrinking the video…' : 'Uploading…'} keep the app open</Text> : null}
+          </Section>
         </ScrollView>
       </View>
 
@@ -896,6 +987,7 @@ export default function BillEditorScreen() {
         uri={viewImage ? imageUrls[viewImage] ?? null : null}
         onDismiss={() => setViewImage(null)}
       />
+      <VideoPlayerModal uri={playVideo?.url ?? null} title={playVideo?.name} onDismiss={() => setPlayVideo(null)} />
 
       {preview && settings ? (
         <BillPreviewSheet
@@ -1266,6 +1358,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
   },
+  videosRow: { flexDirection: 'row', gap: 10, paddingTop: 8, paddingRight: 8 },
+  videosLabel: { fontFamily: 'Inter_500Medium', fontSize: 12, color: T.inkSoft, marginTop: 6 },
   addImgText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: T.inkSoft },
   saveBar: {
     position: 'absolute',

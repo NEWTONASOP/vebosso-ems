@@ -13,7 +13,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
-import { Bill, BillBrand, BillSettings } from '../types/database';
+import { Bill, BillBrand, BillSettings, BillVideo } from '../types/database';
 import { money } from './accounts';
 import { Alert } from './alert';
 import { BRANDS, brandOf } from './billBrands';
@@ -396,6 +396,35 @@ const askWhich = () =>
  * Asks which app when both WhatsApp and WhatsApp Business are installed.
  */
 export async function sendBillOnWhatsApp(b: Bill, s: BillSettings, phone: string) {
+  const target = await pickWhatsApp(phone);
+  if (!target) return;
+
+  const uri = await renderPdf(b, s);
+
+  // WhatsApp needs a content:// link it is allowed to read. Just the PDF, no message.
+  const contentUri = await FileSystem.getContentUriAsync(uri);
+  await WhatsApp.sendFile(target.app, target.to, contentUri, 'application/pdf');
+}
+
+/**
+ * Open the client's WhatsApp chat with one bill video attached, ready to send.
+ * The video is fetched from Cloudinary onto the phone first, so it goes as the
+ * file itself — not a link.
+ */
+export async function sendBillVideoOnWhatsApp(video: BillVideo, phone: string) {
+  const target = await pickWhatsApp(phone);
+  if (!target) return;
+
+  const local = `${FileSystem.cacheDirectory}bill-video-${Date.now()}.mp4`;
+  const { status, uri } = await FileSystem.downloadAsync(video.url, local);
+  if (status !== 200) throw new Error('Could not fetch the video');
+
+  const contentUri = await FileSystem.getContentUriAsync(uri);
+  await WhatsApp.sendFile(target.app, target.to, contentUri, 'video/mp4');
+}
+
+/** Checks the number and the phone, and asks which WhatsApp when there are two. null = cancelled. */
+async function pickWhatsApp(phone: string): Promise<{ app: string; to: string } | null> {
   const to = waNumber(phone);
   if (!to) throw new Error('That phone number doesn’t look right');
   if (Platform.OS !== 'android') throw new Error('Sending to WhatsApp works from the Android app');
@@ -404,11 +433,5 @@ export async function sendBillOnWhatsApp(b: Bill, s: BillSettings, phone: string
   const apps = installedWhatsApps();
   if (apps.length === 0) throw new Error('WhatsApp isn’t installed on this phone');
   const app = apps.length === 1 ? apps[0] : await askWhich();
-  if (!app) return;
-
-  const uri = await renderPdf(b, s);
-
-  // WhatsApp needs a content:// link it is allowed to read. Just the PDF, no message.
-  const contentUri = await FileSystem.getContentUriAsync(uri);
-  await WhatsApp.sendFile(app, to, contentUri, 'application/pdf');
+  return app ? { app, to } : null;
 }

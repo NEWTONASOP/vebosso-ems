@@ -17,6 +17,8 @@ import {
   EmployeeDocument,
   SalaryRequest,
   SalarySetting,
+  WorkFile,
+  DocumentCategory,
 } from '../types/database';
 import { parseSupabaseError } from './errors';
 import { sendPushNotification, sendPushNotificationToRole } from './notifications';
@@ -146,6 +148,77 @@ async function shrinkPhoto(uri: string): Promise<{ uri: string; shrunk: boolean 
   }
 }
 
+/** What check-in / check-out may attach. */
+export const WORK_FILE_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
+export const MAX_WORK_FILES = 5;
+export const MAX_WORK_FILE_BYTES = 20 * 1024 * 1024;
+
+/** A work file already in storage, waiting for its work log to exist. */
+export interface StoredWorkFile {
+  path: string;
+  name: string;
+  mime: string;
+}
+
+/** Step 1 of attaching files at check-in / out: put them in the documents bucket. */
+export async function storeWorkFiles(userId: string, files: WorkFile[]): Promise<StoredWorkFile[]> {
+  const stored: StoredWorkFile[] = [];
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const rawExt = (f.name.split('.').pop() || '').toLowerCase();
+    const ext = EXT_MIME[rawExt] && !EXT_MIME[rawExt].startsWith('image/') ? rawExt : f.mimeType === 'application/pdf' ? 'pdf' : 'docx';
+    const mime = f.mimeType && WORK_FILE_TYPES.includes(f.mimeType) ? f.mimeType : EXT_MIME[ext];
+    const path = `${userId}/work_${Date.now()}_${i}.${ext}`;
+    try {
+      await uploadCheckoutPhoto(path, f.uri, ext, 'documents', false, mime);
+    } catch (e: any) {
+      // Don't leave the earlier ones behind.
+      if (stored.length) await supabase.storage.from('documents').remove(stored.map((s) => s.path));
+      throw new Error(`Failed to upload "${f.name}": ${e?.message || e}`);
+    }
+    stored.push({ path, name: f.name.replace(/\.[^.]+$/, '').slice(0, 120) || 'Work file', mime });
+  }
+  return stored;
+}
+
+/** Step 2: list them in the person's Documents under Work, tied to that day's log. */
+export async function linkWorkFiles(
+  userId: string,
+  workLogId: string,
+  phase: 'check_in' | 'check_out',
+  stored: StoredWorkFile[],
+): Promise<void> {
+  if (stored.length === 0) return;
+  const { error } = await supabase.from('employee_documents').insert(
+    stored.map((s) => ({
+      user_id: userId,
+      uploaded_by: userId,
+      name: s.name,
+      file_path: s.path,
+      mime_type: s.mime,
+      category: 'work',
+      work_log_id: workLogId,
+      work_phase: phase,
+    })),
+  );
+  if (error) throw error;
+}
+
+/** Work files attached to one work log (check-in and check-out). */
+export async function fetchWorkLogFiles(workLogId: string): Promise<EmployeeDocument[]> {
+  const { data } = await supabase
+    .from('employee_documents')
+    .select('*')
+    .eq('work_log_id', workLogId)
+    .eq('category', 'work')
+    .order('created_at', { ascending: true });
+  return (data ?? []) as EmployeeDocument[];
+}
+
 export async function uploadDocument(params: {
   /** Whose document this is. */
   userId: string;
@@ -156,8 +229,10 @@ export async function uploadDocument(params: {
   /** From the picker; for files, the original name tells us the type. */
   fileName?: string | null;
   mimeType?: string | null;
+  /** 'work' documents need no approval and are readable by managers (059). */
+  category?: DocumentCategory;
 }): Promise<Result> {
-  const { userId, uploaderId, name, uri, fileName, mimeType } = params;
+  const { userId, uploaderId, name, uri, fileName, mimeType, category = 'personal' } = params;
   try {
     const source = fileName || uri;
     const rawExt = (source.split('.').pop()?.split('?')[0] || '').toLowerCase();
@@ -172,7 +247,8 @@ export async function uploadDocument(params: {
         mime = 'image/jpeg';
       }
     }
-    const path = `${userId}/${Date.now()}.${ext}`;
+    // Work files are named work_… so managers can be allowed to read just those.
+    const path = `${userId}/${category === 'work' ? 'work_' : ''}${Date.now()}.${ext}`;
 
     await uploadCheckoutPhoto(path, fileUri, ext, 'documents', false, mime);
     // Its small preview for lists (best effort — lists fall back to an icon).
@@ -184,6 +260,7 @@ export async function uploadDocument(params: {
       name: name.trim().slice(0, 120),
       file_path: path,
       mime_type: mime,
+      category,
     });
 
     if (error) {
@@ -194,7 +271,15 @@ export async function uploadDocument(params: {
     }
 
     const docName = name.trim();
-    if (uploaderId === userId) {
+    if (category === 'work') {
+      // Work files need no approval, so nobody is asked for one.
+      if (uploaderId !== userId) {
+        sendPushNotification(userId, 'New Document 📄', `"${docName}" was added to your work documents`, {
+          type: 'document_uploaded',
+          user_id: userId,
+        });
+      }
+    } else if (uploaderId === userId) {
       const who = await currentUserName(userId);
       sendPushNotificationToRole(
         'owner',

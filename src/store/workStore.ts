@@ -27,9 +27,21 @@ import {
   Task,
   TaskInsert,
   WorkLog,
+  WorkFile,
   WorkLogStatus,
   WorkLogWithProfile
 } from '../types/database';
+import type { StoredWorkFile } from '../lib/employeeRecords';
+
+// employeeRecords imports uploadCheckoutPhoto from here, so it is loaded on use.
+const storeWorkFiles = async (userId: string, files: WorkFile[]) =>
+  (await import('../lib/employeeRecords')).storeWorkFiles(userId, files);
+const linkWorkFiles = async (
+  userId: string,
+  workLogId: string,
+  phase: 'check_in' | 'check_out',
+  stored: StoredWorkFile[],
+) => (await import('../lib/employeeRecords')).linkWorkFiles(userId, workLogId, phase, stored);
 
 interface WorkState {
   // Today's work state
@@ -98,9 +110,9 @@ interface WorkState {
   channels: RealtimeChannel[];
 
   // Actions — Member
-  checkIn: (plan: string, photoUris?: string[]) => Promise<{ success: boolean; error?: string }>;
+  checkIn: (plan: string, photoUris?: string[], files?: WorkFile[]) => Promise<{ success: boolean; error?: string }>;
   updateCheckInPlan: (plan: string) => Promise<{ success: boolean; error?: string }>;
-  checkOut: (report: string, photoUris?: string[]) => Promise<{ success: boolean; error?: string }>;
+  checkOut: (report: string, photoUris?: string[], files?: WorkFile[]) => Promise<{ success: boolean; error?: string }>;
   fetchTodayLog: (userId: string) => Promise<{ success: boolean; error?: string }>;
   fetchTodayTasks: (userId: string) => Promise<{ success: boolean; error?: string }>;
   updateTaskStatus: (taskId: string, status: 'pending' | 'in_progress' | 'review' | 'done', completionNote?: string) => Promise<{ success: boolean; error?: string }>;
@@ -147,7 +159,7 @@ interface WorkState {
 
   // Actions — Location
   /** One member's recorded positions for a single day, oldest first. */
-  fetchDayLocations: (userId: string, date: string) => Promise<{ data: LocationPing[], success: boolean; error?: string }>;
+  fetchDayLocations: (userId: string, date: string, after?: string) => Promise<{ data: LocationPing[], success: boolean; error?: string }>;
   /** Newest fix for everyone the caller may see, for the live team map. */
   fetchLiveLocations: () => Promise<{ data: MemberLocationWithProfile[], success: boolean; error?: string }>;
 
@@ -303,7 +315,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
   // MEMBER ACTIONS
   // ============================================================================
 
-  checkIn: async (plan: string, photoUris?: string[]) => {
+  checkIn: async (plan: string, photoUris?: string[], files?: WorkFile[]) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return { success: false, error: 'Not authenticated' };
@@ -331,6 +343,10 @@ export const useWorkStore = create<WorkState>((set, get) => ({
           uploadedPaths.push(path);
         }
       }
+
+      // PDF / Word files go to the documents bucket now; they are listed under
+      // the person's Work documents once the log exists.
+      const storedFiles = files && files.length > 0 ? await storeWorkFiles(user.id, files) : [];
 
       // A check-in sent back today is reset and sent again (048) — there can be
       // only one log per day, so adding a new one would fail as a duplicate.
@@ -374,6 +390,13 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       }
 
       set({ todayLog: data as WorkLog });
+
+      // The check-in itself is done; a hiccup listing the files must not undo it.
+      try {
+        await linkWorkFiles(user.id, (data as WorkLog).id, 'check_in', storedFiles);
+      } catch (linkErr) {
+        if (__DEV__) console.warn('Failed to list check-in files:', linkErr);
+      }
 
       // Location tracking runs only between check-in and check-out. A failure
       // here must not fail the check-in itself — the gate already made sure the
@@ -490,7 +513,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
     }
   },
 
-  checkOut: async (report: string, photoUris?: string[]) => {
+  checkOut: async (report: string, photoUris?: string[], files?: WorkFile[]) => {
     try {
       const todayLog = get().todayLog;
       if (!todayLog) return { success: false, error: 'No active check-in found' };
@@ -525,6 +548,14 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         }
       }
 
+      // 1b. PDF / Word files into the documents bucket (listed under Work below).
+      let storedFiles: StoredWorkFile[] = [];
+      if (files && files.length > 0) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { success: false, error: 'Authentication required' };
+        storedFiles = await storeWorkFiles(user.id, files);
+      }
+
       // 2. Save log update to DB
       const { data, error } = await supabase
         .from('work_logs')
@@ -541,6 +572,12 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       if (error) return { success: false, error: error.message };
 
       set({ todayLog: data as WorkLog });
+
+      try {
+        await linkWorkFiles(todayLog.user_id, todayLog.id, 'check_out', storedFiles);
+      } catch (linkErr) {
+        if (__DEV__) console.warn('Failed to list check-out files:', linkErr);
+      }
 
       // The day is over: stop the background task, flush anything the device
       // could not upload, and drop the live marker to "last seen".
@@ -1466,14 +1503,16 @@ export const useWorkStore = create<WorkState>((set, get) => ({
     }
   },
 
-  fetchDayLocations: async (userId: string, date: string) => {
+  fetchDayLocations: async (userId: string, date: string, after?: string) => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('location_pings')
         .select('*')
         .eq('user_id', userId)
-        .eq('date', date)
-        .order('recorded_at', { ascending: true });
+        .eq('date', date);
+      // Refreshing a day already on screen: only what was recorded since.
+      if (after) query = query.gt('recorded_at', after);
+      const { data, error } = await query.order('recorded_at', { ascending: true });
 
       if (error) return { data: [], success: false, error: error.message };
       return { data: (data || []) as LocationPing[], success: true };

@@ -22,6 +22,7 @@ import { useNotificationStore } from '../store/notificationStore';
 import { EmptyState } from './EmptyState';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { Alert } from '../lib/alert';
+import { notificationHref } from '../lib/notificationRoutes';
 import { PageTransition } from './PageTransition';
 
 export default function NotificationLogScreen() {
@@ -68,33 +69,9 @@ export default function NotificationLogScreen() {
         await markAsRead(item.id);
       }
 
-      // Navigate based on type
-      const type = item.data?.type || '';
-      const role = profile?.role;
-
-      if (type === 'check_in_request' || type === 'leave_request') {
-        if (role === 'owner') {
-          router.push('/(owner)/approvals' as any);
-        } else if (role === 'manager') {
-          router.push('/(manager)/approvals' as any);
-        }
-      } else if (
-        type === 'task_assigned' ||
-        type === 'task_completed' ||
-        type === 'task_reassigned'
-      ) {
-        if (role === 'owner') {
-          router.push('/(owner)/tasks' as any);
-        } else if (role === 'manager') {
-          router.push('/(manager)/tasks' as any);
-        } else if (role === 'member') {
-          router.push('/(member)/tasks' as any);
-        }
-      } else if (type === 'announcement') {
-        if (role === 'member') {
-          router.push('/(member)/announcements' as any);
-        }
-      }
+      // Open the screen it is about (same rules as tapping the push itself).
+      const href = notificationHref(profile?.role, item.data);
+      if (href) router.push(href as any);
     } catch (err) {
       if (__DEV__) console.error('Error handling notification tap:', err);
     }
@@ -244,7 +221,7 @@ export default function NotificationLogScreen() {
             renderItem={({ item }) => {
               const iconInfo = getNotificationIconInfo(item.title, item.data?.type as string);
               return (
-                <View style={[styles.card, !item.read && styles.unreadCard]}>
+                <View style={[styles.card, styles.readEdge, !item.read && styles.unreadCard]}>
                   <Pressable
                     style={styles.cardPressable}
                     onPress={() => handleNotificationPress(item)}
@@ -350,8 +327,13 @@ const styles = StyleSheet.create({
     position: 'relative',
     ...appSoftShadow,
   },
-  unreadCard: {
+  // The border is always there (clear once read): changing its width when a card
+  // is read made Android redraw the card blank.
+  readEdge: {
     borderLeftWidth: 4,
+    borderLeftColor: 'transparent',
+  },
+  unreadCard: {
     borderLeftColor: AppTheme.charcoal,
   },
   cardPressable: {

@@ -181,7 +181,7 @@ export function useOwnerInbox(): OwnerInbox {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const soon = () => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => void refresh(), 400);
+      timer = setTimeout(() => void refresh(), 1500);
     };
     const channel = supabase.channel(`owner_inbox_${Math.random().toString(36).slice(2, 8)}`);
     for (const table of ['employee_documents', 'employee_details', 'salary_requests', 'expense_claims', 'tasks', 'chat_messages', 'leave_requests']) {
@@ -363,10 +363,10 @@ export function OwnerInboxSheet({
       avatar={w.profiles?.avatar_url}
       meta={[
         `${isCheckout ? 'Checkout' : 'Check-in'} · ${whenLabel(w.date)}`,
-        // Both times on a checkout (and how long); the check-in time on a check-in.
-        w.check_in_time ? `In ${format(parseISO(w.check_in_time), 'h:mm a')}` : null,
-        isCheckout && w.check_out_time ? `Out ${format(parseISO(w.check_out_time), 'h:mm a')}` : null,
-        isCheckout && w.total_hours ? `${Number(w.total_hours).toFixed(1)}h` : null,
+        // A check-in shows its time in; a checkout shows its time out.
+        isCheckout
+          ? w.check_out_time ? `Out ${format(parseISO(w.check_out_time), 'h:mm a')}` : null
+          : w.check_in_time ? `In ${format(parseISO(w.check_in_time), 'h:mm a')}` : null,
       ]
         .filter(Boolean)
         .join(' · ')}
