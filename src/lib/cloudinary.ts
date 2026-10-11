@@ -52,16 +52,37 @@ export async function uploadBillVideo(
     }
     onStatus?.('uploading');
     const name = info.name || `video-${Date.now()}.mp4`;
-    const form = new FormData();
-    form.append('file', { uri: small, name, type: 'video/mp4' } as any);
-    form.append('upload_preset', UPLOAD_PRESET);
+    const endpoint = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`;
 
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`, {
-      method: 'POST',
-      body: form,
-    });
-    const json: any = await res.json().catch(() => ({}));
-    if (!res.ok || !json?.secure_url) {
+    let ok: boolean;
+    let json: any;
+    if (Platform.OS === 'web') {
+      // A browser file object (the picker's link is a blob: address).
+      const blob = await (await fetch(small)).blob();
+      const form = new FormData();
+      form.append('file', blob, name);
+      form.append('upload_preset', UPLOAD_PRESET);
+      const res = await fetch(endpoint, { method: 'POST', body: form });
+      ok = res.ok;
+      json = await res.json().catch(() => ({}));
+    } else {
+      // Streams the file from storage. (The old { uri, name, type } FormData part is
+      // refused by this Expo version's fetch: "unsupported FormDataPart".)
+      const res = await FileSystem.uploadAsync(endpoint, small, {
+        httpMethod: 'POST',
+        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+        fieldName: 'file',
+        mimeType: 'video/mp4',
+        parameters: { upload_preset: UPLOAD_PRESET },
+      });
+      ok = res.status >= 200 && res.status < 300;
+      try {
+        json = JSON.parse(res.body);
+      } catch {
+        json = {};
+      }
+    }
+    if (!ok || !json?.secure_url) {
       return { success: false, error: json?.error?.message || 'Could not upload the video' };
     }
     return {
