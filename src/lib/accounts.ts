@@ -279,3 +279,81 @@ export async function addTransactionsBulk(
   }
   return { success: true, data: done };
 }
+
+// ---------------------------------------------------------------------------
+// Moving entries between accounts
+
+/**
+ * Accounts the signed-in person can move entries INTO: their own books. An
+ * owner shares the owners' books, and can see (but not change) other people's
+ * — those are left out, since the database would refuse the move anyway.
+ */
+export async function fetchMoveTargets(fromAccountId: string, role: string | undefined): Promise<Result<Account[]>> {
+  const res = await fetchAccounts();
+  if (!res.success) return res;
+  const writable = role === 'owner' ? (await splitBooks(res.data)).mine : res.data;
+  return { success: true, data: writable.filter((a) => a.id !== fromAccountId) };
+}
+
+/**
+ * Moves entries to another account, with their receipt photos (the photos live
+ * in a folder per account, so they are moved too — otherwise deleting the old
+ * account later would cut them off). An entry whose photos can't all be moved
+ * stays where it was and is counted as `failed`.
+ */
+export async function moveTransactions(
+  txns: AccountTransaction[],
+  targetAccountId: string,
+): Promise<Result<{ moved: number; failed: number }>> {
+  let moved = 0;
+  let failed = 0;
+  const storage = supabase.storage.from(RECEIPTS_BUCKET);
+
+  // No photos: one update for many.
+  const plain = txns.filter((t) => !t.receipts?.length).map((t) => t.id);
+  for (let i = 0; i < plain.length; i += 200) {
+    const chunk = plain.slice(i, i + 200);
+    const { error } = await supabase.from('account_transactions').update({ account_id: targetAccountId }).in('id', chunk);
+    if (error) {
+      const text = parseSupabaseError(error);
+      return { success: false, error: moved ? `${text} (${moved} entries were moved before this)` : text };
+    }
+    moved += chunk.length;
+  }
+
+  // With photos: move the files first, then the entry.
+  for (const t of txns.filter((x) => x.receipts?.length)) {
+    const done: { from: string; to: string }[] = [];
+    const next: string[] = [];
+    let ok = true;
+    for (const path of t.receipts) {
+      if (path.startsWith(`${targetAccountId}/`)) {
+        next.push(path);
+        continue;
+      }
+      const to = `${targetAccountId}/${path.split('/').pop()}`;
+      const { error } = await storage.move(path, to);
+      if (error) {
+        ok = false;
+        break;
+      }
+      done.push({ from: path, to });
+      next.push(to);
+    }
+    if (ok) {
+      const { error } = await supabase
+        .from('account_transactions')
+        .update({ account_id: targetAccountId, receipts: next })
+        .eq('id', t.id);
+      ok = !error;
+    }
+    if (ok) {
+      moved += 1;
+    } else {
+      for (const m of done) await storage.move(m.to, m.from); // put the photos back
+      failed += 1;
+    }
+  }
+
+  return { success: true, data: { moved, failed } };
+}

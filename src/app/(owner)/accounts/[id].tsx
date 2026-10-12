@@ -24,15 +24,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AccountExportSheet } from '../../../components/AccountExportSheet';
 import { AccountFormSheet } from '../../../components/AccountFormSheet';
 import { AccountImportSheet } from '../../../components/AccountImportSheet';
+import { AccountMoveSheet } from '../../../components/AccountMoveSheet';
 import { AccountPeriodFilter } from '../../../components/AccountPeriodFilter';
 import { AccountTxnSheet } from '../../../components/AccountTxnSheet';
 import { AppTheme as T, appShadow, appSoftShadow, screenChrome } from '../../../constants/theme';
+import { Alert } from '../../../lib/alert';
 import {
   fetchAccount,
   fetchAccounts,
   fetchSummaries,
   fetchTransactions,
   money,
+  moveTransactions,
   num,
   Period,
   periodLabel,
@@ -77,7 +80,11 @@ export default function AccountLedgerScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [sheet, setSheet] = useState<'add' | 'edit-account' | 'export' | 'import' | null>(null);
+  const [sheet, setSheet] = useState<'add' | 'edit-account' | 'export' | 'import' | 'move' | null>(null);
+  // Picking entries to move: long-press one (or the tick button), then tap more.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [moving, setMoving] = useState(false);
   const [editing, setEditing] = useState<AccountTransaction | null>(null);
   const [snack, setSnack] = useState('');
   const me = useAuthStore((s) => s.profile);
@@ -130,6 +137,64 @@ export default function AccountLedgerScreen() {
     }
     return { credit, debit, balance: credit - debit };
   }, [txns]);
+
+  const toggle = (txnId: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(txnId)) next.delete(txnId);
+      else next.add(txnId);
+      return next;
+    });
+  const startSelecting = (txnId?: string) => {
+    setSelecting(true);
+    if (txnId) setSelected(new Set([txnId]));
+  };
+  const stopSelecting = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
+  const allSelected = txns.length > 0 && selected.size === txns.length;
+  /** A tap: pick / unpick while selecting, otherwise open the entry. */
+  const tapEntry = (t: AccountTransaction) => (selecting ? toggle(t.id) : setEditing(t));
+  /** A long press starts picking, with this entry already ticked. */
+  const holdEntry = (t: AccountTransaction) => {
+    if (!viewOnly && !selecting) startSelecting(t.id);
+  };
+
+  const confirmMove = (target: Account) => {
+    const chosen = txns.filter((t) => selected.has(t.id));
+    if (chosen.length === 0) return;
+    Alert.alert(
+      `Move ${chosen.length} entr${chosen.length === 1 ? 'y' : 'ies'}?`,
+      `They go to "${target.name}", with their receipt photos. Both accounts' totals change.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Move',
+          onPress: async () => {
+            setMoving(true);
+            const res = await moveTransactions(chosen, target.id);
+            setMoving(false);
+            if (!res.success) {
+              setError(res.error);
+              setSheet(null);
+              void reload();
+              return;
+            }
+            setSheet(null);
+            stopSelecting();
+            const { moved, failed } = res.data;
+            setSnack(
+              failed
+                ? `Moved ${moved} to ${target.name}; ${failed} couldn't be moved (receipt photos) and stayed here`
+                : `Moved ${moved} entr${moved === 1 ? 'y' : 'ies'} to ${target.name}`
+            );
+            void reload();
+          },
+        },
+      ]
+    );
+  };
 
   const allTimeBalance = summary ? num(summary.total_credit) - num(summary.total_debit) : null;
   const onSaved = (m: string) => {
@@ -213,6 +278,15 @@ export default function AccountLedgerScreen() {
           </View>
         </View>
         <View style={styles.headerActions}>
+          {!viewOnly && txns.length > 0 ? (
+            <Pressable
+              style={[styles.iconBtn, selecting && { backgroundColor: T.soft2 }]}
+              onPress={() => (selecting ? stopSelecting() : startSelecting())}
+              accessibilityLabel="Select entries to move"
+            >
+              <Feather name="check-square" size={16} color={T.ink} />
+            </Pressable>
+          ) : null}
           {!viewOnly ? (
             <Pressable style={styles.iconBtn} onPress={() => setSheet('import')} accessibilityLabel="Import into this account">
               <Feather name="download" size={16} color={T.ink} />
@@ -231,11 +305,39 @@ export default function AccountLedgerScreen() {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
+      {selecting ? (
+        <View style={styles.selBar}>
+          <Text style={styles.selCount}>
+            {selected.size ? `${selected.size} selected` : 'Tap entries to select'}
+          </Text>
+          <Pressable
+            style={styles.selBtn}
+            onPress={() => setSelected(allSelected ? new Set() : new Set(txns.map((t) => t.id)))}
+            accessibilityRole="button"
+          >
+            <Text style={styles.selBtnText}>{allSelected ? 'Clear' : 'Select all'}</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.selBtn, styles.selMove, !selected.size && { opacity: 0.4 }]}
+            onPress={() => setSheet('move')}
+            disabled={!selected.size}
+            accessibilityRole="button"
+          >
+            <Feather name="corner-up-right" size={14} color={T.white} />
+            <Text style={[styles.selBtnText, { color: T.white }]}>Move</Text>
+          </Pressable>
+          <Pressable style={styles.selClose} onPress={stopSelecting} hitSlop={8} accessibilityLabel="Cancel selecting">
+            <Feather name="x" size={18} color={T.inkSoft} />
+          </Pressable>
+        </View>
+      ) : null}
+
       {isLoading ? (
         <ActivityIndicator color={T.charcoal} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
           data={txns}
+          extraData={selected}
           keyExtractor={(t) => t.id}
           ListHeaderComponent={header}
           ListFooterComponent={footer}
@@ -255,18 +357,26 @@ export default function AccountLedgerScreen() {
           renderItem={({ item, index }) => {
             const color = item.kind === 'credit' ? T.green : T.coral;
             const photos = item.receipts?.length ?? 0;
+            const picked = selected.has(item.id);
             if (!wide) {
               const credit = item.kind === 'credit';
               return (
                 <Pressable
-                  onPress={() => setEditing(item)}
-                  style={({ pressed }) => [styles.entry, pressed && styles.tdPressed]}
+                  onPress={() => tapEntry(item)}
+                  onLongPress={() => holdEntry(item)}
+                  style={({ pressed }) => [styles.entry, picked && styles.picked, pressed && styles.tdPressed]}
                   accessibilityRole="button"
                   accessibilityLabel={`${item.kind} ${money(item.amount)} on ${item.txn_date}, ${item.particular ?? ''}`}
                 >
-                  <View style={[styles.entryIcon, { backgroundColor: credit ? T.greenSoft : T.coralSoft }]}>
-                    <Feather name={credit ? 'arrow-down-left' : 'arrow-up-right'} size={15} color={color} />
-                  </View>
+                  {selecting ? (
+                    <View style={[styles.entryIcon, { backgroundColor: picked ? T.charcoal : T.soft }]}>
+                      {picked ? <Feather name="check" size={16} color={T.white} /> : null}
+                    </View>
+                  ) : (
+                    <View style={[styles.entryIcon, { backgroundColor: credit ? T.greenSoft : T.coralSoft }]}>
+                      <Feather name={credit ? 'arrow-down-left' : 'arrow-up-right'} size={15} color={color} />
+                    </View>
+                  )}
                   <View style={styles.entryText}>
                     <Text style={styles.entryTitle} numberOfLines={2}>
                       {item.particular || (credit ? 'Credit' : 'Debit')}
@@ -289,12 +399,16 @@ export default function AccountLedgerScreen() {
             }
             return (
               <Pressable
-                onPress={() => setEditing(item)}
-                style={({ pressed }) => [styles.tr, styles.td, index % 2 === 1 && styles.tdAlt, pressed && styles.tdPressed]}
+                onPress={() => tapEntry(item)}
+                onLongPress={() => holdEntry(item)}
+                style={({ pressed }) => [styles.tr, styles.td, index % 2 === 1 && styles.tdAlt, picked && styles.picked, pressed && styles.tdPressed]}
                 accessibilityRole="button"
                 accessibilityLabel={`${item.kind} ${money(item.amount)} on ${item.txn_date}, ${item.particular ?? ''}`}
               >
-                <Text style={[styles.tdText, styles.cDate, { color }]}>{format(parseISO(item.txn_date), 'dd-MM-yyyy')}</Text>
+                <Text style={[styles.tdText, styles.cDate, { color }]}>
+                  {picked ? '✓ ' : ''}
+                  {format(parseISO(item.txn_date), 'dd-MM-yyyy')}
+                </Text>
                 <Text style={[styles.tdText, styles.cPart, { color }]}>
                   {item.particular || '—'}
                   {photos ? <Text style={styles.clip}>{`  📎${photos}`}</Text> : null}
@@ -307,7 +421,7 @@ export default function AccountLedgerScreen() {
         />
       )}
 
-      {!viewOnly ? (
+      {!viewOnly && !selecting ? (
         <Pressable
           style={[styles.fab, { bottom: 100 + insets.bottom }]}
           onPress={() => setSheet('add')}
@@ -340,6 +454,15 @@ export default function AccountLedgerScreen() {
             setSnack(m);
           }}
           onDeleted={backToList}
+        />
+      ) : null}
+      {account && sheet === 'move' && !viewOnly ? (
+        <AccountMoveSheet
+          fromAccountId={account.id}
+          count={selected.size}
+          busy={moving}
+          onPick={confirmMove}
+          onDismiss={() => setSheet(null)}
         />
       ) : null}
       {account && sheet === 'export' ? (
@@ -457,6 +580,32 @@ const styles = StyleSheet.create({
   entryMeta: { fontFamily: 'Inter_400Regular', fontSize: 12, color: T.mute },
   entryClip: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   entryAmount: { fontFamily: 'Inter_700Bold', fontSize: 15, flexShrink: 0 },
+  picked: { backgroundColor: T.blueSoft },
+  selBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: T.card,
+    ...appSoftShadow,
+  },
+  selCount: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 14, color: T.ink },
+  selBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: T.soft,
+  },
+  selMove: { backgroundColor: T.charcoal },
+  selBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.ink },
+  selClose: { width: 30, height: 34, alignItems: 'center', justifyContent: 'center' },
   fab: {
     position: 'absolute',
     right: 20,

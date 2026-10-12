@@ -19,6 +19,7 @@ import {
   SalarySetting,
   WorkFile,
   DocumentCategory,
+  DocumentFolder,
 } from '../types/database';
 import { parseSupabaseError } from './errors';
 import { sendPushNotification, sendPushNotificationToRole } from './notifications';
@@ -231,8 +232,10 @@ export async function uploadDocument(params: {
   mimeType?: string | null;
   /** 'work' documents need no approval and are readable by managers (059). */
   category?: DocumentCategory;
+  /** Work documents only: the folder to file it in (060). */
+  folderId?: string | null;
 }): Promise<Result> {
-  const { userId, uploaderId, name, uri, fileName, mimeType, category = 'personal' } = params;
+  const { userId, uploaderId, name, uri, fileName, mimeType, category = 'personal', folderId = null } = params;
   try {
     const source = fileName || uri;
     const rawExt = (source.split('.').pop()?.split('?')[0] || '').toLowerCase();
@@ -261,6 +264,7 @@ export async function uploadDocument(params: {
       file_path: path,
       mime_type: mime,
       category,
+      ...(category === 'work' && folderId ? { folder_id: folderId } : {}),
     });
 
     if (error) {
@@ -392,6 +396,51 @@ export async function renameDocument(id: string, name: string): Promise<Result> 
     .from('employee_documents')
     .update({ name: name.trim().slice(0, 120) })
     .eq('id', id);
+  if (error) return fail(error);
+  return { success: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------
+// Folders for work documents (060)
+
+export async function fetchFolders(userId: string): Promise<Result<DocumentFolder[]>> {
+  const { data, error } = await supabase
+    .from('document_folders')
+    .select('*')
+    .eq('user_id', userId)
+    .order('name');
+  if (error) return fail(error);
+  return { success: true, data: (data || []) as DocumentFolder[] };
+}
+
+/** The owner, or the person themselves, makes a folder in that person's documents. */
+export async function createFolder(userId: string, name: string): Promise<Result<DocumentFolder>> {
+  const { data, error } = await supabase
+    .from('document_folders')
+    .insert({ user_id: userId, name: name.trim().slice(0, 60) })
+    .select()
+    .single();
+  if (error) return fail(error);
+  return { success: true, data: data as DocumentFolder };
+}
+
+export async function renameFolder(id: string, name: string): Promise<Result> {
+  const { error } = await supabase.from('document_folders').update({ name: name.trim().slice(0, 60) }).eq('id', id);
+  if (error) return fail(error);
+  return { success: true, data: undefined };
+}
+
+/** Its documents are kept — they go back to "no folder". */
+export async function deleteFolder(id: string): Promise<Result> {
+  const { error } = await supabase.from('document_folders').delete().eq('id', id);
+  if (error) return fail(error);
+  return { success: true, data: undefined };
+}
+
+/** File documents in a folder (null = take them out of any folder). */
+export async function moveDocuments(ids: string[], folderId: string | null): Promise<Result> {
+  if (ids.length === 0) return { success: true, data: undefined };
+  const { error } = await supabase.from('employee_documents').update({ folder_id: folderId }).in('id', ids);
   if (error) return fail(error);
   return { success: true, data: undefined };
 }

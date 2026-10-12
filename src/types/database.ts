@@ -184,9 +184,20 @@ export interface EmployeeDocument {
   category: DocumentCategory;
   work_log_id: string | null;
   work_phase: 'check_in' | 'check_out' | null;
+  /** The folder a work document is filed in (060); null = no folder. */
+  folder_id: string | null;
 }
 
 export type DocumentCategory = 'personal' | 'work';
+
+/** A folder for one person's work documents (060). One level only. */
+export interface DocumentFolder {
+  id: string;
+  user_id: string;
+  name: string;
+  created_by: string | null;
+  created_at: string;
+}
 
 /** A PDF / Word file picked in the check-in or check-out form. */
 export interface WorkFile {

@@ -12,16 +12,21 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { memo, useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SmoothTextInput as TextInput } from './SmoothTextInput';
 import { Menu, Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { Alert } from '../lib/alert';
 import {
+  createFolder,
   deleteDocument,
+  deleteFolder,
   documentKind,
   DocumentKind,
   fetchDocuments,
+  fetchFolders,
+  moveDocuments,
+  renameFolder,
   openDocumentFile,
   renameDocument,
   reviewDocument,
@@ -30,9 +35,8 @@ import {
   thumbPath,
   uploadDocument,
 } from '../lib/employeeRecords';
-import { DocumentCategory, DocumentStatus, EmployeeDocument } from '../types/database';
+import { DocumentCategory, DocumentFolder, DocumentStatus, EmployeeDocument } from '../types/database';
 import { ImageViewerModal } from './ImageViewerModal';
-import { PaperOutlinedField } from './PaperOutlinedField';
 import { SheetFrame } from './SheetFrame';
 
 async function loadDocuments(userId: string) {
@@ -44,7 +48,12 @@ async function loadDocuments(userId: string) {
     signDocumentUrls(res.data.map((d) => d.file_path)),
     signDocumentUrls(photos.map((d) => thumbPath(d.file_path))),
   ]);
-  return { success: true as const, data: { docs: res.data, urls, thumbs } };
+  // Folders (060) — if that update isn't installed yet there are simply none.
+  const folders = await fetchFolders(userId);
+  return {
+    success: true as const,
+    data: { docs: res.data, urls, thumbs, folders: folders.success ? folders.data : [] },
+  };
 }
 
 const FILE_TYPES = [
@@ -65,7 +74,12 @@ const STATUS_CHIP: Record<DocumentStatus, { label: string; color: string; bg: st
   rejected: { label: 'Needs a change', color: T.amber, bg: T.amberSoft },
 };
 
+/** Most files that go up in one go. */
+const MAX_BATCH = 20;
+
 interface PendingFile {
+  /** What the document is called — starts as the file's own name; editable. */
+  name: string;
   uri: string;
   kind: DocumentKind;
   fileName?: string | null;
@@ -114,11 +128,20 @@ export const DocumentsSheet = memo(function DocumentsSheet({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [pending, setPending] = useState<PendingFile | null>(null);
+  const [pending, setPending] = useState<PendingFile[]>([]);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  // Work folders (060): the one open (null = the top level), plus the small
+  // forms for a new folder / renaming one / filing a document.
+  const [folders, setFolders] = useState<DocumentFolder[]>([]);
+  const [folderId, setFolderId] = useState<string | null>(null);
+  const [makingFolder, setMakingFolder] = useState(false);
+  const [folderName, setFolderName] = useState('');
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+  const [folderMenuFor, setFolderMenuFor] = useState<string | null>(null);
+  const [filing, setFiling] = useState<EmployeeDocument | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
-  const [newName, setNewName] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
+  const isUploading = progress !== null;
 
   // The photo open in the big popup.
   const [viewerDoc, setViewerDoc] = useState<EmployeeDocument | null>(null);
@@ -130,12 +153,22 @@ export const DocumentsSheet = memo(function DocumentsSheet({
   const isOwnDocs = userId === currentUserId;
   // Personal documents, or work files attached at check-in / check-out.
   const [tab, setTab] = useState<DocumentCategory>('personal');
-  const inTab = docs.filter((d) => (d.category ?? 'personal') === tab);
   const workCount = docs.filter((d) => d.category === 'work').length;
+  // The owner, or the person themselves, can organise their work documents.
+  const canOrganise = canManage || isOwnDocs;
+  const openFolder = folderId ? folders.find((f) => f.id === folderId) ?? null : null;
+  // In the Work tab: what is in the open folder, or what sits outside any folder.
+  const inTab = docs.filter((d) => {
+    if ((d.category ?? 'personal') !== tab) return false;
+    if (tab !== 'work') return true;
+    return openFolder ? d.folder_id === openFolder.id : !d.folder_id || !folders.some((f) => f.id === d.folder_id);
+  });
+  const countIn = (id: string) => docs.filter((d) => d.category === 'work' && d.folder_id === id).length;
 
   const apply = useCallback((res: Awaited<ReturnType<typeof loadDocuments>>) => {
     if (res.success) {
       setDocs(res.data.docs);
+      setFolders(res.data.folders);
       setUrls(res.data.urls);
       const byId: Record<string, string> = {};
       for (const d of res.data.docs) {
@@ -182,6 +215,18 @@ export const DocumentsSheet = memo(function DocumentsSheet({
     };
   }, [apply, userId]);
 
+  const baseName = (n: string | null | undefined, fallback: string) =>
+    (n ? n.replace(/\.[^.]+$/, '') : fallback).slice(0, 120) || fallback;
+
+  /** Adds picked files to the list waiting to upload (up to MAX_BATCH). */
+  const addPending = (files: PendingFile[]) => {
+    setPending((prev) => {
+      const room = MAX_BATCH - prev.length;
+      if (files.length > room) setError(`You can upload ${MAX_BATCH} files at a time — the first ${Math.max(room, 0)} were added`);
+      return [...prev, ...files.slice(0, Math.max(room, 0))];
+    });
+  };
+
   const pick = async (source: 'library' | 'camera') => {
     setError('');
     try {
@@ -196,10 +241,21 @@ export const DocumentsSheet = memo(function DocumentsSheet({
       const result =
         source === 'camera'
           ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
-          : await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.8 });
-      if (!result.canceled && result.assets?.[0]) {
-        setPending({ uri: result.assets[0].uri, kind: 'image', mimeType: result.assets[0].mimeType });
-      }
+          : await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: 'images',
+              quality: 0.8,
+              allowsMultipleSelection: true,
+              selectionLimit: MAX_BATCH,
+            });
+      if (result.canceled || !result.assets?.length) return;
+      addPending(
+        result.assets.map((a, i) => ({
+          name: baseName(a.fileName, `Photo ${pending.length + i + 1}`),
+          uri: a.uri,
+          kind: 'image' as const,
+          mimeType: a.mimeType,
+        }))
+      );
     } catch {
       setError('Could not open the picker');
     }
@@ -211,22 +267,24 @@ export const DocumentsSheet = memo(function DocumentsSheet({
       const result = await DocumentPicker.getDocumentAsync({
         type: FILE_TYPES,
         copyToCacheDirectory: true,
-        multiple: false,
+        multiple: true,
       });
-      const asset = result.canceled ? null : result.assets?.[0];
-      if (!asset) return;
-      if (asset.size && asset.size > 20 * 1024 * 1024) {
-        setError('That file is over 20 MB');
-        return;
+      if (result.canceled || !result.assets?.length) return;
+      const ok: PendingFile[] = [];
+      for (const asset of result.assets) {
+        if (asset.size && asset.size > 20 * 1024 * 1024) {
+          setError(`"${asset.name}" is over 20 MB`);
+          continue;
+        }
+        ok.push({
+          name: baseName(asset.name, 'Document'),
+          uri: asset.uri,
+          kind: documentKind(asset.mimeType),
+          fileName: asset.name,
+          mimeType: asset.mimeType,
+        });
       }
-      setPending({
-        uri: asset.uri,
-        kind: documentKind(asset.mimeType),
-        fileName: asset.name,
-        mimeType: asset.mimeType,
-      });
-      // Start with the file's own name; the uploader can tidy it up.
-      if (!newName.trim() && asset.name) setNewName(asset.name.replace(/\.[^.]+$/, '').slice(0, 120));
+      addPending(ok);
     } catch {
       setError('Could not open the file picker');
     }
@@ -249,29 +307,90 @@ export const DocumentsSheet = memo(function DocumentsSheet({
   };
 
   const handleUpload = async () => {
-    if (!pending) return;
-    if (!newName.trim()) {
-      setError('Give the document a name, e.g. "Aadhaar card"');
+    if (pending.length === 0) return;
+    if (pending.some((f) => !f.name.trim())) {
+      setError('Every file needs a name');
       return;
     }
-    setIsUploading(true);
-    const res = await uploadDocument({
-      userId,
-      uploaderId: currentUserId,
-      category: tab,
-      name: newName,
-      uri: pending.uri,
-      fileName: pending.fileName,
-      mimeType: pending.mimeType,
-    });
-    setIsUploading(false);
-    if (res.success) {
-      setPending(null);
-      setNewName('');
-      await load();
-    } else {
-      setError(res.error);
+    setError('');
+    const queue = pending;
+    const failed: PendingFile[] = [];
+    let lastError = '';
+    setProgress({ done: 0, total: queue.length });
+    for (let i = 0; i < queue.length; i++) {
+      const f = queue[i];
+      const res = await uploadDocument({
+        userId,
+        uploaderId: currentUserId,
+        category: tab,
+        folderId: tab === 'work' ? folderId : null,
+        name: f.name,
+        uri: f.uri,
+        fileName: f.fileName,
+        mimeType: f.mimeType,
+      });
+      if (!res.success) {
+        failed.push(f);
+        lastError = res.error;
+      }
+      setProgress({ done: i + 1, total: queue.length });
     }
+    setProgress(null);
+    // Whatever didn't go up stays in the list, ready to try again.
+    setPending(failed);
+    if (failed.length) {
+      setError(
+        `${queue.length - failed.length} of ${queue.length} uploaded. ${failed.length} didn't go up: ${lastError}`
+      );
+    }
+    await load();
+  };
+
+  // ---- Folders -----------------------------------------------------------------
+  const handleCreateFolder = async () => {
+    if (!folderName.trim()) return;
+    const res = await createFolder(userId, folderName);
+    if (!res.success) return setError(res.error);
+    setMakingFolder(false);
+    setFolderName('');
+    await load();
+  };
+
+  const handleRenameFolder = async (f: DocumentFolder) => {
+    if (!folderName.trim()) return;
+    const res = await renameFolder(f.id, folderName);
+    if (!res.success) return setError(res.error);
+    setRenamingFolderId(null);
+    setFolderName('');
+    await load();
+  };
+
+  const confirmDeleteFolder = (f: DocumentFolder) => {
+    const n = countIn(f.id);
+    Alert.alert(
+      'Delete folder?',
+      n ? `"${f.name}" is deleted. Its ${n} document${n === 1 ? '' : 's'} are kept, outside any folder.` : `"${f.name}" will be deleted.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const res = await deleteFolder(f.id);
+            if (!res.success) return setError(res.error);
+            if (folderId === f.id) setFolderId(null);
+            await load();
+          },
+        },
+      ]
+    );
+  };
+
+  const fileDoc = async (doc: EmployeeDocument, target: string | null) => {
+    setFiling(null);
+    const res = await moveDocuments([doc.id], target);
+    if (!res.success) return setError(res.error);
+    await load();
   };
 
   const handleReview = async (doc: EmployeeDocument, decision: 'approved' | 'rejected') => {
@@ -313,63 +432,103 @@ export const DocumentsSheet = memo(function DocumentsSheet({
     ]);
   };
 
-  const addSection = pending ? (
-    <View style={styles.addCard}>
-      {pending.kind === 'image' ? (
-        <Image source={{ uri: pending.uri }} style={styles.pendingImage} contentFit="cover" />
-      ) : (
-        <FileTile kind={pending.kind} size={styles.pendingImage} />
-      )}
-      <View style={{ flex: 1, gap: 8 }}>
-        <PaperOutlinedField
-          label="Document name"
-          value={newName}
-          onChangeText={setNewName}
-          placeholder={tab === 'work' ? 'e.g. Event brief' : 'e.g. Aadhaar card'}
-          maxLength={120}
-          editable={!isUploading}
-          autoFocus
-        />
+  const addSection =
+    pending.length > 0 ? (
+      <View style={{ gap: 10 }}>
+        <Text style={styles.addLabel}>
+          {pending.length} file{pending.length === 1 ? '' : 's'} to upload
+          {tab === 'work' ? (openFolder ? ` · into "${openFolder.name}"` : '') : ''}
+        </Text>
+        {/* Many files scroll here, so the buttons below stay on screen. */}
+        <ScrollView style={{ maxHeight: 250 }} contentContainerStyle={{ gap: 10 }} nestedScrollEnabled>
+        {pending.map((f, i) => (
+          <View key={`${f.uri}-${i}`} style={styles.addCard}>
+            {f.kind === 'image' ? (
+              <Image source={{ uri: f.uri }} style={styles.pendingImage} contentFit="cover" />
+            ) : (
+              <FileTile kind={f.kind} size={styles.pendingImage} />
+            )}
+            <TextInput
+              value={f.name}
+              onChangeText={(v) => setPending((prev) => prev.map((x, j) => (j === i ? { ...x, name: v } : x)))}
+              style={[styles.input, { flex: 1, height: 40 }]}
+              maxLength={120}
+              editable={!isUploading}
+              placeholder="Name"
+            />
+            <Pressable
+              style={styles.iconBtn}
+              onPress={() => setPending((prev) => prev.filter((_, j) => j !== i))}
+              disabled={isUploading}
+              hitSlop={6}
+              accessibilityLabel={`Remove ${f.name}`}
+            >
+              <Feather name="x" size={15} color={T.inkSoft} />
+            </Pressable>
+          </View>
+        ))}
+        </ScrollView>
+        {pending.length < MAX_BATCH && !isUploading ? (
+          <View style={styles.row}>
+            <Pressable style={styles.addBtn} onPress={() => pick('library')}>
+              <Feather name="image" size={16} color={T.ink} />
+              <Text style={styles.addBtnText}>More photos</Text>
+            </Pressable>
+            <Pressable style={styles.addBtn} onPress={pickFile}>
+              <Feather name="file-plus" size={16} color={T.ink} />
+              <Text style={styles.addBtnText}>More files</Text>
+            </Pressable>
+          </View>
+        ) : null}
         <View style={styles.row}>
           <Pressable
             style={[styles.btn, styles.btnGhost]}
-            onPress={() => {
-              setPending(null);
-              setNewName('');
-            }}
+            onPress={() => setPending([])}
             disabled={isUploading}
           >
             <Text style={styles.btnGhostText}>Cancel</Text>
           </Pressable>
           <Pressable style={[styles.btn, styles.btnDark]} onPress={handleUpload} disabled={isUploading}>
             {isUploading ? (
-              <ActivityIndicator size="small" color={T.white} />
+              <>
+                <ActivityIndicator size="small" color={T.white} />
+                <Text style={styles.btnDarkText}>
+                  {progress ? ` ${progress.done} / ${progress.total}` : ''}
+                </Text>
+              </>
             ) : (
-              <Text style={styles.btnDarkText}>Upload</Text>
+              <Text style={styles.btnDarkText}>
+                Upload {pending.length} file{pending.length === 1 ? '' : 's'}
+              </Text>
             )}
           </Pressable>
         </View>
       </View>
-    </View>
-  ) : (
-    <View>
-      <Text style={styles.addLabel}>{tab === 'work' ? 'Add a work document' : 'Add a document'}</Text>
-      <View style={styles.row}>
-        <Pressable style={styles.addBtn} onPress={() => pick('library')} accessibilityLabel="Add from photos">
-          <Feather name="image" size={17} color={T.ink} />
-          <Text style={styles.addBtnText}>Photos</Text>
-        </Pressable>
-        <Pressable style={styles.addBtn} onPress={() => pick('camera')} accessibilityLabel="Take a photo">
-          <Feather name="camera" size={17} color={T.ink} />
-          <Text style={styles.addBtnText}>Camera</Text>
-        </Pressable>
-        <Pressable style={styles.addBtn} onPress={pickFile} accessibilityLabel="Add a PDF or Word file">
-          <Feather name="file-plus" size={17} color={T.ink} />
-          <Text style={styles.addBtnText}>PDF / Word</Text>
-        </Pressable>
+    ) : (
+      <View>
+        <Text style={styles.addLabel}>
+          {tab === 'work'
+            ? openFolder
+              ? `Add to "${openFolder.name}"`
+              : 'Add work documents'
+            : 'Add documents'}
+        </Text>
+        <View style={styles.row}>
+          <Pressable style={styles.addBtn} onPress={() => pick('library')} accessibilityLabel="Add from photos">
+            <Feather name="image" size={17} color={T.ink} />
+            <Text style={styles.addBtnText}>Photos</Text>
+          </Pressable>
+          <Pressable style={styles.addBtn} onPress={() => pick('camera')} accessibilityLabel="Take a photo">
+            <Feather name="camera" size={17} color={T.ink} />
+            <Text style={styles.addBtnText}>Camera</Text>
+          </Pressable>
+          <Pressable style={styles.addBtn} onPress={pickFile} accessibilityLabel="Add PDF or Word files">
+            <Feather name="file-plus" size={17} color={T.ink} />
+            <Text style={styles.addBtnText}>PDF / Word</Text>
+          </Pressable>
+        </View>
       </View>
-    </View>
-  );
+    );
 
   return (
     <SheetFrame
@@ -402,7 +561,11 @@ export const DocumentsSheet = memo(function DocumentsSheet({
           <Pressable
             key={t}
             style={[styles.tab, tab === t && styles.tabActive]}
-            onPress={() => setTab(t)}
+            onPress={() => {
+              setTab(t);
+              setFolderId(null);
+              setFiling(null);
+            }}
             accessibilityRole="button"
             accessibilityState={{ selected: tab === t }}
           >
@@ -413,13 +576,181 @@ export const DocumentsSheet = memo(function DocumentsSheet({
         ))}
       </View>
 
+      {tab === 'work' && !isLoading ? (
+        <View style={styles.folderArea}>
+          {openFolder ? (
+            <Pressable style={styles.crumb} onPress={() => setFolderId(null)} accessibilityRole="button">
+              <Feather name="chevron-left" size={18} color={T.ink} />
+              <Text style={styles.crumbText} numberOfLines={1}>
+                Work · {openFolder.name}
+              </Text>
+            </Pressable>
+          ) : (
+            <>
+              {folders.map((f) => (
+                <View key={f.id} style={styles.folderRow}>
+                  {renamingFolderId === f.id ? (
+                    <>
+                      <TextInput
+                        value={folderName}
+                        onChangeText={setFolderName}
+                        style={[styles.input, { flex: 1, height: 38 }]}
+                        maxLength={60}
+                        autoFocus
+                        onSubmitEditing={() => handleRenameFolder(f)}
+                      />
+                      <Pressable style={styles.iconBtn} onPress={() => handleRenameFolder(f)} hitSlop={6}>
+                        <Feather name="check" size={16} color={T.green} />
+                      </Pressable>
+                      <Pressable
+                        style={styles.iconBtn}
+                        onPress={() => {
+                          setRenamingFolderId(null);
+                          setFolderName('');
+                        }}
+                        hitSlop={6}
+                      >
+                        <Feather name="x" size={16} color={T.inkSoft} />
+                      </Pressable>
+                    </>
+                  ) : (
+                    <>
+                      <Pressable
+                        style={styles.folderMain}
+                        onPress={() => setFolderId(f.id)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Open folder ${f.name}`}
+                      >
+                        <View style={styles.folderIcon}>
+                          <Feather name="folder" size={18} color={T.violet} />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.docName} numberOfLines={1}>{f.name}</Text>
+                          <Text style={styles.docMeta}>
+                            {countIn(f.id)} document{countIn(f.id) === 1 ? '' : 's'}
+                          </Text>
+                        </View>
+                        <Feather name="chevron-right" size={18} color={T.mute} />
+                      </Pressable>
+                      {canOrganise ? (
+                        <Menu
+                          visible={folderMenuFor === f.id}
+                          onDismiss={() => setFolderMenuFor(null)}
+                          anchor={
+                            <Pressable
+                              style={styles.iconBtn}
+                              onPress={() => setFolderMenuFor(f.id)}
+                              hitSlop={6}
+                              accessibilityLabel={`More for folder ${f.name}`}
+                            >
+                              <Feather name="more-vertical" size={16} color={T.inkSoft} />
+                            </Pressable>
+                          }
+                          contentStyle={styles.menu}
+                        >
+                          <Menu.Item
+                            leadingIcon="pencil-outline"
+                            title="Rename"
+                            onPress={() => {
+                              setFolderMenuFor(null);
+                              setRenamingFolderId(f.id);
+                              setFolderName(f.name);
+                            }}
+                          />
+                          <Menu.Item
+                            leadingIcon="trash-can-outline"
+                            title="Delete folder"
+                            titleStyle={{ color: T.coral }}
+                            onPress={() => {
+                              setFolderMenuFor(null);
+                              confirmDeleteFolder(f);
+                            }}
+                          />
+                        </Menu>
+                      ) : null}
+                    </>
+                  )}
+                </View>
+              ))}
+              {canOrganise ? (
+                makingFolder ? (
+                  <View style={styles.folderRow}>
+                    <TextInput
+                      value={folderName}
+                      onChangeText={setFolderName}
+                      style={[styles.input, { flex: 1, height: 38 }]}
+                      placeholder="Folder name"
+                      maxLength={60}
+                      autoFocus
+                      onSubmitEditing={handleCreateFolder}
+                    />
+                    <Pressable style={styles.iconBtn} onPress={handleCreateFolder} hitSlop={6} accessibilityLabel="Create folder">
+                      <Feather name="check" size={16} color={T.green} />
+                    </Pressable>
+                    <Pressable
+                      style={styles.iconBtn}
+                      onPress={() => {
+                        setMakingFolder(false);
+                        setFolderName('');
+                      }}
+                      hitSlop={6}
+                    >
+                      <Feather name="x" size={16} color={T.inkSoft} />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Pressable
+                    style={styles.newFolder}
+                    onPress={() => {
+                      setMakingFolder(true);
+                      setFolderName('');
+                    }}
+                    accessibilityRole="button"
+                  >
+                    <Feather name="folder-plus" size={16} color={T.ink} />
+                    <Text style={styles.addBtnText}>New folder</Text>
+                  </Pressable>
+                )
+              ) : null}
+            </>
+          )}
+        </View>
+      ) : null}
+
+      {filing ? (
+        <View style={styles.filePanel}>
+          <Text style={styles.addLabel} numberOfLines={2}>Move “{filing.name}” to</Text>
+          <Pressable style={styles.fileOption} onPress={() => fileDoc(filing, null)} accessibilityRole="button">
+            <Feather name="file-text" size={15} color={T.inkSoft} />
+            <Text style={styles.fileOptionText}>No folder</Text>
+            {!filing.folder_id ? <Feather name="check" size={15} color={T.green} /> : null}
+          </Pressable>
+          {folders.map((f) => (
+            <Pressable key={f.id} style={styles.fileOption} onPress={() => fileDoc(filing, f.id)} accessibilityRole="button">
+              <Feather name="folder" size={15} color={T.violet} />
+              <Text style={styles.fileOptionText} numberOfLines={1}>{f.name}</Text>
+              {filing.folder_id === f.id ? <Feather name="check" size={15} color={T.green} /> : null}
+            </Pressable>
+          ))}
+          <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => setFiling(null)}>
+            <Text style={styles.btnGhostText}>Cancel</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       {isLoading ? (
         <ActivityIndicator color={T.charcoal} style={{ marginVertical: 24 }} />
       ) : inTab.length === 0 ? (
         <View style={styles.empty}>
           <Feather name="folder" size={22} color={T.mute} />
           <Text style={styles.emptyText}>
-            {tab === 'work' ? 'No work documents yet — add one below, or attach files at check-in or check-out' : 'No documents yet'}
+            {tab === 'work'
+              ? openFolder
+                ? 'This folder is empty — add files below'
+                : folders.length
+                  ? 'No documents outside folders'
+                  : 'No work documents yet — add some below, or attach files at check-in or check-out'
+              : 'No documents yet'}
           </Text>
         </View>
       ) : (
@@ -493,7 +824,7 @@ export const DocumentsSheet = memo(function DocumentsSheet({
                 {openingId === doc.id ? <ActivityIndicator size="small" color={T.charcoal} /> : null}
               </Pressable>
 
-              {canManage ? (
+              {canManage || (doc.category === 'work' && canOrganise) ? (
                 renamingId === doc.id ? (
                   <Pressable style={styles.iconBtn} onPress={() => handleRename(doc)} hitSlop={6}>
                     <Feather name="check" size={16} color={T.green} />
@@ -514,24 +845,38 @@ export const DocumentsSheet = memo(function DocumentsSheet({
                     }
                     contentStyle={styles.menu}
                   >
-                    <Menu.Item
-                      leadingIcon="pencil-outline"
-                      title="Rename"
-                      onPress={() => {
-                        setMenuFor(null);
-                        setRenamingId(doc.id);
-                        setRenameText(doc.name);
-                      }}
-                    />
-                    <Menu.Item
-                      leadingIcon="trash-can-outline"
-                      title="Delete"
-                      titleStyle={{ color: T.coral }}
-                      onPress={() => {
-                        setMenuFor(null);
-                        confirmDelete(doc);
-                      }}
-                    />
+                    {doc.category === 'work' && canOrganise ? (
+                      <Menu.Item
+                        leadingIcon="folder-move-outline"
+                        title="Move to folder"
+                        onPress={() => {
+                          setMenuFor(null);
+                          setFiling(doc);
+                        }}
+                      />
+                    ) : null}
+                    {canManage ? (
+                      <Menu.Item
+                        leadingIcon="pencil-outline"
+                        title="Rename"
+                        onPress={() => {
+                          setMenuFor(null);
+                          setRenamingId(doc.id);
+                          setRenameText(doc.name);
+                        }}
+                      />
+                    ) : null}
+                    {canManage ? (
+                      <Menu.Item
+                        leadingIcon="trash-can-outline"
+                        title="Delete"
+                        titleStyle={{ color: T.coral }}
+                        onPress={() => {
+                          setMenuFor(null);
+                          confirmDelete(doc);
+                        }}
+                      />
+                    ) : null}
                   </Menu>
                 )
               ) : null}
@@ -592,6 +937,50 @@ export const DocumentsSheet = memo(function DocumentsSheet({
 });
 
 const styles = StyleSheet.create({
+  folderArea: { gap: 6, marginBottom: 10 },
+  folderRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  folderMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: T.soft,
+  },
+  folderIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: T.violetSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newFolder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    height: 40,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: T.hairline,
+    borderStyle: 'dashed',
+  },
+  crumb: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6 },
+  crumbText: { flex: 1, fontFamily: 'Inter_700Bold', fontSize: 15, color: T.ink },
+  filePanel: { gap: 4, padding: 12, borderRadius: 16, backgroundColor: T.soft, marginBottom: 10 },
+  fileOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: T.hairline,
+  },
+  fileOptionText: { flex: 1, fontFamily: 'Inter_500Medium', fontSize: 14, color: T.ink },
   tabs: {
     flexDirection: 'row',
     gap: 6,
@@ -791,12 +1180,12 @@ const styles = StyleSheet.create({
   },
   addCard: {
     flexDirection: 'row',
-    gap: 12,
-    alignItems: 'flex-start',
+    gap: 10,
+    alignItems: 'center',
   },
   pendingImage: {
-    width: 72,
-    height: 90,
+    width: 52,
+    height: 52,
     borderRadius: 12,
     backgroundColor: T.soft,
   },
