@@ -31,6 +31,7 @@ import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { MemberCard } from '../../components/MemberCard';
 import { MemberDialog } from '../../components/MemberActionsModal';
 import { OwnerMemberMenu } from '../../components/OwnerMemberMenu';
+import { DeactivatedPeople } from '../../components/DeactivatedPeople';
 import { isAppVisible } from '../../lib/appActive';
 import { DepartmentData, fetchDepartments } from '../../lib/departments';
 import { sortMembersByLiveStatus } from '../../lib/teamSort';
@@ -417,6 +418,17 @@ export default function OwnerDashboard() {
                 ) : null}
               </>
             )}
+
+            <DeactivatedPeople
+              onOpen={(member) => {
+                setMenuDialog(null);
+                setMenuMember(member);
+              }}
+              onChanged={(message) => {
+                setSnackMessage(message);
+                void loadData();
+              }}
+            />
 
             <View style={styles.bottomActions}>
               <AnimatedPressable
