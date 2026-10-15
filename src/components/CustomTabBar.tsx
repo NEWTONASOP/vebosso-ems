@@ -26,7 +26,7 @@ const ICON_MAP: Record<string, string> = {
 // Map route names to user-friendly labels
 const LABEL_MAP: Record<string, string> = {
   home: 'Home', tasks: 'Tasks', history: 'History',
-  announcements: 'News', profile: 'Profile', dashboard: 'Dashboard',
+  announcements: 'News', profile: 'Profile', dashboard: 'Home',
   team: 'Team', approvals: 'Approvals', settings: 'Settings',
   'my-team': 'My Team', 'my-work': 'My Work', leaves: 'Leaves',
   venues: 'Venues', accounts: 'Accounts', bills: 'Bills', leads: 'Leads',
@@ -219,6 +219,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
                 isSlim={isSlim}
                 activeColor={accent.color}
                 activeSoft={accent.soft}
+                showLabel={role === 'owner'}
               />
             );
           })}
@@ -318,9 +319,10 @@ interface TabItemProps {
   isSlim: boolean;
   activeColor: string;
   activeSoft: string;
+  showLabel?: boolean;
 }
 
-function TabItem({ isFocused, label, iconName, renderIcon, onPress, isSlim, activeColor, activeSoft }: TabItemProps) {
+function TabItem({ isFocused, label, iconName, renderIcon, onPress, isSlim, activeColor, activeSoft, showLabel = false }: TabItemProps) {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -329,7 +331,9 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress, isSlim, acti
   const handlePressOut = () => { (scale as any).value = withSpring(1,    { damping: 10, stiffness: 300 }); };
 
   const color    = isFocused ? activeColor : AppTheme.mute;
-  const iconSize = isSlim ? (isFocused ? 22 : 20) : (isFocused ? 28 : 26);
+  const iconSize = showLabel
+    ? (isSlim ? 18 : 20)
+    : (isSlim ? (isFocused ? 22 : 20) : (isFocused ? 28 : 26));
   const iconElement = renderIcon
     ? renderIcon({ focused: isFocused, color, size: iconSize })
     : <Feather name={iconName as any} size={iconSize} color={color} />;
@@ -353,6 +357,19 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress, isSlim, acti
         ]}
       >
         {iconElement}
+        {showLabel && (
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.tabLabel,
+              isSlim && styles.tabLabelSlim,
+              { color },
+              isFocused && styles.tabLabelActive,
+            ]}
+          >
+            {label}
+          </Text>
+        )}
       </Animated.View>
     </Pressable>
   );
@@ -411,15 +428,29 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 24,
     minHeight: 56,
+    gap: 3,
   },
   pillContainerSlim: {
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: 8,
     borderRadius: 20,
-    minHeight: 44,
+    minHeight: 48,
+    gap: 2,
+  },
+  tabLabel: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 10,
+    letterSpacing: 0.1,
+    textAlign: 'center',
+  },
+  tabLabelSlim: {
+    fontSize: 9,
+  },
+  tabLabelActive: {
+    fontFamily: 'Inter_600SemiBold',
   },
 });

@@ -23,7 +23,7 @@ export default function OwnerLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Dashboard',
+          title: 'Home',
           tabBarIcon: ({ color, size }) => (
             <Feather name="grid" color={color} size={size} />
           ),
