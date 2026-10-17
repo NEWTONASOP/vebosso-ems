@@ -10,7 +10,7 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Menu, Snackbar, Text } from 'react-native-paper';
 import { AppTheme as T, screenChrome } from '../constants/theme';
@@ -65,6 +65,14 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
   const [moving, setMoving] = useState<Group | null>(null);
   const [newBanquet, setNewBanquet] = useState<string | null>(null);
   const [addingBanquet, setAddingBanquet] = useState(false);
+  // The add-banquet box is at the end of the list: scroll it into view above the keyboard.
+  const scrollRef = useRef<ScrollView>(null);
+  const addingBanquetRow = newBanquet !== null;
+  useEffect(() => {
+    if (!addingBanquetRow) return;
+    const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
+    return () => clearTimeout(t);
+  }, [addingBanquetRow, keyboardInset]);
 
   const apply = useCallback((res: Awaited<ReturnType<typeof loadAll>>) => {
     if (res.leads.success) {
@@ -321,7 +329,9 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.charcoal} />}
       >
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -445,28 +455,59 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
                 {open && g.leads.length > 0 ? (
                   <DropdownBody>
                     <View style={styles.listCard}>
-                      {g.leads.slice(0, shown[g.id] ?? PAGE).map((l, i) => (
-                        <LeadRow
-                          key={l.id}
-                          lead={l}
-                          divided={i > 0}
-                          onOpen={openLead}
-                          onSave={saveOne}
-                          onWhatsApp={openWhatsApp}
-                          onCall={call}
-                        />
-                      ))}
-                      {g.leads.length > (shown[g.id] ?? PAGE) ? (
-                        <Pressable
-                          style={({ pressed }) => [styles.more, pressed && { backgroundColor: T.soft }]}
-                          onPress={() => setShown((m) => ({ ...m, [g.id]: (m[g.id] ?? PAGE) + PAGE * 2 }))}
-                          accessibilityRole="button"
-                        >
-                          <Text style={styles.moreText}>
-                            Show more · {g.leads.length - (shown[g.id] ?? PAGE)} left
-                          </Text>
-                        </Pressable>
-                      ) : null}
+                      {(() => {
+                        const today = format(new Date(), 'yyyy-MM-dd');
+                        const upcoming = g.leads.filter((l) => !l.dof || l.dof >= today);
+                        // Most recent function first.
+                        const past = g.leads.filter((l) => l.dof && l.dof < today).sort((a, b) => (a.dof! < b.dof! ? 1 : -1));
+                        const pastKey = `${g.id}:past`;
+                        const pastOpen = !!query.trim() || openIds.has(pastKey);
+                        const upLimit = shown[g.id] ?? PAGE;
+                        const pastLimit = shown[pastKey] ?? PAGE;
+                        const rowFor = (l: Lead, divided: boolean) => (
+                          <LeadRow
+                            key={l.id}
+                            lead={l}
+                            divided={divided}
+                            onOpen={openLead}
+                            onSave={saveOne}
+                            onWhatsApp={openWhatsApp}
+                            onCall={call}
+                          />
+                        );
+                        const moreBtn = (key: string, total: number, limit: number) =>
+                          total > limit ? (
+                            <Pressable
+                              style={({ pressed }) => [styles.more, pressed && { backgroundColor: T.soft }]}
+                              onPress={() => setShown((m) => ({ ...m, [key]: (m[key] ?? PAGE) + PAGE * 2 }))}
+                              accessibilityRole="button"
+                            >
+                              <Text style={styles.moreText}>Show more · {total - limit} left</Text>
+                            </Pressable>
+                          ) : null;
+                        return (
+                          <>
+                            {past.length > 0 ? (
+                              <>
+                                <Pressable
+                                  style={({ pressed }) => [styles.more, pressed && { backgroundColor: T.soft }]}
+                                  onPress={() => toggle(pastKey)}
+                                  accessibilityRole="button"
+                                  accessibilityState={{ expanded: pastOpen }}
+                                >
+                                  <Text style={styles.moreText}>
+                                    {pastOpen ? 'Hide' : 'Show'} past leads · {past.length}
+                                  </Text>
+                                </Pressable>
+                                {pastOpen ? past.slice(0, pastLimit).map((l, i) => rowFor(l, true)) : null}
+                                {pastOpen ? moreBtn(pastKey, past.length, pastLimit) : null}
+                              </>
+                            ) : null}
+                            {upcoming.slice(0, upLimit).map((l, i) => rowFor(l, past.length > 0 || i > 0))}
+                            {moreBtn(g.id, upcoming.length, upLimit)}
+                          </>
+                        );
+                      })()}
                     </View>
                   </DropdownBody>
                 ) : null}
@@ -595,6 +636,7 @@ const LeadRow = memo(function LeadRow({
           <>
             <Text style={styles.dateDay}>{format(parseISO(l.dof), 'd')}</Text>
             <Text style={styles.dateMon}>{format(parseISO(l.dof), 'MMM')}</Text>
+            <Text style={styles.dateYear}>{format(parseISO(l.dof), 'yy')}</Text>
           </>
         ) : (
           <Text style={styles.dateMon}>—</Text>
@@ -725,7 +767,8 @@ const styles = StyleSheet.create({
   listCard: { marginTop: 8, backgroundColor: T.card, borderRadius: 18, overflow: 'hidden', ...screenChrome.card },
   lead: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 12 },
   leadDivided: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: T.hairline },
-  dateBox: { width: 46, height: 46, borderRadius: 12, backgroundColor: T.soft, alignItems: 'center', justifyContent: 'center' },
+  dateYear: { fontFamily: 'Inter_500Medium', fontSize: 10, color: T.mute, lineHeight: 12 },
+  dateBox: { width: 46, height: 54, borderRadius: 12, backgroundColor: T.soft, alignItems: 'center', justifyContent: 'center' },
   dateDay: { fontFamily: 'Inter_700Bold', fontSize: 16, color: T.ink, lineHeight: 19 },
   dateMon: { fontFamily: 'Inter_600SemiBold', fontSize: 11, color: T.inkSoft, textTransform: 'uppercase' },
   leadName: { fontFamily: 'Inter_700Bold', fontSize: 14.5, color: T.ink },
@@ -740,6 +783,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: T.hairline,
   },
+  pastDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: T.hairline },
   moreText: { fontFamily: 'Inter_600SemiBold', fontSize: 13.5, color: T.ink },
   leadRemarks: { fontFamily: 'Inter_400Regular', fontSize: 13, color: T.inkSoft, marginTop: 3, lineHeight: 18 },
   rowBtns: { flexDirection: 'row', gap: 6 },

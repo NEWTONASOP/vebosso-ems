@@ -8,12 +8,12 @@
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
-import { format, parseISO } from 'date-fns';
+import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SmoothTextInput as TextInput } from '../../../components/SmoothTextInput';
-import { Snackbar, Text } from 'react-native-paper';
+import { Menu, Snackbar, Text } from 'react-native-paper';
 import { BillSettingsSheet } from '../../../components/BillSettingsSheet';
 import { AppTheme as T, appSoftShadow, screenChrome } from '../../../constants/theme';
 import { rupees } from '../../../lib/accounts';
@@ -25,6 +25,22 @@ import { Bill, BillBrand, BillKind, BillStatus } from '../../../types/database';
 import { ShowMore, usePaged } from '../../../components/ShowMore';
 
 type Filter = 'all' | BillStatus;
+type Sort = 'function' | 'recent' | 'edited';
+
+const SORTS: { key: Sort; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+  { key: 'function', label: 'Function date', icon: 'calendar' },
+  { key: 'recent', label: 'Recently created', icon: 'plus-circle' },
+  { key: 'edited', label: 'Recently edited', icon: 'edit-3' },
+];
+
+/** Short age: Today, Yesterday, 3d ago, then the date. */
+const created = (iso: string) => {
+  const days = differenceInCalendarDays(new Date(), new Date(iso));
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days}d ago`;
+  return format(new Date(iso), new Date(iso).getFullYear() === new Date().getFullYear() ? 'd MMM' : 'd MMM yy');
+};
 
 const FILTERS: Record<BillKind, Filter[]> = {
   estimate: ['all', 'draft', 'trash'],
@@ -32,7 +48,7 @@ const FILTERS: Record<BillKind, Filter[]> = {
 };
 
 // Remembered while the app is open, so coming back to Bills keeps the brand.
-const remembered: { brand: BillBrand } = { brand: 'vebosso' };
+const remembered: { brand: BillBrand; sort: Sort } = { brand: 'vebosso', sort: 'function' };
 const rememberBrand = (b: BillBrand) => {
   remembered.brand = b;
 };
@@ -45,6 +61,12 @@ export default function BillsScreen() {
   const setBrand = (b: BillBrand) => {
     rememberBrand(b);
     setBrandState(b);
+  };
+  const [sort, setSortState] = useState<Sort>(() => remembered.sort);
+  const [sortMenu, setSortMenu] = useState(false);
+  const setSort = (s: Sort) => {
+    remembered.sort = s;
+    setSortState(s);
   };
   const [kind, setKind] = useState<BillKind>('estimate');
   const [filter, setFilter] = useState<Filter>('all');
@@ -108,9 +130,12 @@ export default function BillsScreen() {
           !q ||
           [b.number, b.client_name, b.venue, b.phone, b.event_type].some((f) => f?.toLowerCase().includes(q))
       )
-      // Nearest upcoming function first (today included); then past functions,
-      // most recent first; bills without a date last, newest edit first.
+      // Function date: nearest upcoming first (today included); then past
+      // functions, most recent first; bills without a date last, newest edit
+      // first. Or by when the bill was created / last edited, newest first.
       .sort((a, b) => {
+        if (sort === 'recent') return a.created_at < b.created_at ? 1 : -1;
+        if (sort === 'edited') return a.updated_at < b.updated_at ? 1 : -1;
         if (a.function_date && b.function_date) {
           const aUp = a.function_date >= today;
           const bUp = b.function_date >= today;
@@ -123,9 +148,9 @@ export default function BillsScreen() {
         }
         return a.updated_at < b.updated_at ? 1 : -1;
       });
-  }, [ofKind, filter, query, today]);
+  }, [ofKind, filter, query, today, sort]);
   // A page at a time — a year of bills was slow to draw.
-  const billPage = usePaged(shown, `${brand}-${kind}-${filter}-${query}`);
+  const billPage = usePaged(shown, `${brand}-${kind}-${filter}-${query}-${sort}`);
 
   const switchKind = (k: BillKind) => {
     setKind(k);
@@ -188,10 +213,10 @@ export default function BillsScreen() {
       {isOwner && !isLoading ? (
         <View style={styles.totalCard}>
           <View style={styles.totalIcon}>
-            <Feather name="check-circle" size={17} color={T.green} />
+            <Feather name="check-circle" size={15} color={T.green} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.totalLabel}>{BRANDS[brand].label} completed bills · all time</Text>
+            <Text style={styles.totalLabel}>{BRANDS[brand].label} completed · all time</Text>
             <Text style={styles.totalValue}>{rupees(completed.total)}</Text>
           </View>
           <Text style={styles.totalCount}>
@@ -236,15 +261,40 @@ export default function BillsScreen() {
         })}
       </ScrollView>
 
-      <View style={styles.search}>
-        <Feather name="search" size={16} color={T.mute} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search name, number, venue, phone"
-          placeholderTextColor={T.mute}
-          style={styles.searchInput}
-        />
+      <View style={styles.searchRow}>
+        <View style={styles.search}>
+          <Feather name="search" size={16} color={T.mute} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search name, number, venue, phone"
+            placeholderTextColor={T.mute}
+            style={styles.searchInput}
+          />
+        </View>
+        <Menu
+          visible={sortMenu}
+          onDismiss={() => setSortMenu(false)}
+          anchor={
+            <Pressable style={styles.sortBtn} onPress={() => setSortMenu(true)} accessibilityLabel="Sort bills">
+              <Feather name="sliders" size={16} color={T.ink} />
+            </Pressable>
+          }
+          contentStyle={{ backgroundColor: T.card }}
+        >
+          {SORTS.map((o) => (
+            <Menu.Item
+              key={o.key}
+              leadingIcon={sort === o.key ? 'check' : undefined}
+              title={o.label}
+              titleStyle={sort === o.key ? { fontFamily: 'Inter_700Bold' } : undefined}
+              onPress={() => {
+                setSortMenu(false);
+                setSort(o.key);
+              }}
+            />
+          ))}
+        </Menu>
       </View>
 
       <ScrollView
@@ -279,7 +329,10 @@ export default function BillsScreen() {
                 accessibilityLabel={`${b.number ?? 'Draft'} ${b.client_name ?? ''}`}
               >
                 <View style={styles.cardTop}>
-                  <Text style={styles.number}>{b.number ?? 'Draft'}</Text>
+                  <Text style={styles.number}>
+                    {b.number ?? 'Draft'}
+                    <Text style={styles.age}>{`  ·  ${created(b.created_at)}`}</Text>
+                  </Text>
                   {kind === 'client' || b.status === 'draft' || b.status === 'trash' ? (
                     <View style={[styles.status, { backgroundColor: tone.bg }]}>
                       <Text style={[styles.statusText, { color: tone.color }]}>{STATUS_LABEL[b.status]}</Text>
@@ -353,25 +406,26 @@ const styles = StyleSheet.create({
   totalCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     marginHorizontal: 20,
-    marginBottom: 12,
+    marginBottom: 8,
     backgroundColor: T.card,
-    borderRadius: 18,
-    padding: 12,
+    borderRadius: 14,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
     ...appSoftShadow,
   },
   totalIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
+    width: 28,
+    height: 28,
+    borderRadius: 9,
     backgroundColor: T.greenSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  totalLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: T.mute },
-  totalValue: { fontFamily: 'Inter_800ExtraBold', fontSize: 19, color: T.ink, marginTop: 1 },
-  totalCount: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
+  totalLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 11, color: T.mute },
+  totalValue: { fontFamily: 'Inter_800ExtraBold', fontSize: 16, color: T.ink },
+  totalCount: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: T.inkSoft },
   iconBtn: {
     width: 42,
     height: 42,
@@ -422,13 +476,22 @@ const styles = StyleSheet.create({
   chipText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
   chipCount: { fontFamily: 'Inter_500Medium', color: T.mute },
   chipTextActive: { color: T.white },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginTop: -4 },
+  sortBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: T.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...appSoftShadow,
+  },
   search: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     height: 44,
-    marginHorizontal: 20,
-    marginTop: -4,
     borderRadius: 14,
     paddingHorizontal: 14,
     backgroundColor: T.card,
@@ -442,6 +505,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: T.card, borderRadius: 18, padding: 14, gap: 3, ...appSoftShadow },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   number: { fontFamily: 'Inter_700Bold', fontSize: 12.5, color: T.mute, letterSpacing: 0.4 },
+  age: { fontFamily: 'Inter_500Medium', fontSize: 12, color: T.mute, letterSpacing: 0 },
   status: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 9 },
   statusText: { fontFamily: 'Inter_700Bold', fontSize: 11 },
   client: { fontFamily: 'Inter_700Bold', fontSize: 16, color: T.ink },

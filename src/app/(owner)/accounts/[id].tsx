@@ -378,11 +378,11 @@ export default function AccountLedgerScreen() {
                     </View>
                   )}
                   <View style={styles.entryText}>
-                    <Text style={styles.entryTitle} numberOfLines={2}>
+                    <Text style={styles.entryTitle} numberOfLines={1}>
                       {item.particular || (credit ? 'Credit' : 'Debit')}
                     </Text>
                     <View style={styles.entryMetaRow}>
-                      <Text style={styles.entryMeta}>{format(parseISO(item.txn_date), 'EEE, d MMM yyyy')}</Text>
+                      <Text style={styles.entryMeta}>{format(parseISO(item.txn_date), 'd MMM yyyy')}</Text>
                       {photos ? (
                         <View style={styles.entryClip}>
                           <Feather name="paperclip" size={11} color={T.mute} />
@@ -559,27 +559,27 @@ const styles = StyleSheet.create({
   entry: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     backgroundColor: T.card,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    marginTop: 8,
+    borderRadius: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    marginTop: 5,
     ...appSoftShadow,
   },
   entryIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
+    width: 26,
+    height: 26,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   entryText: { flex: 1, minWidth: 0 },
-  entryTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14.5, color: T.ink, lineHeight: 19 },
-  entryMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  entryMeta: { fontFamily: 'Inter_400Regular', fontSize: 12, color: T.mute },
+  entryTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 13.5, color: T.ink, lineHeight: 17 },
+  entryMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 0 },
+  entryMeta: { fontFamily: 'Inter_400Regular', fontSize: 11, color: T.mute },
   entryClip: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  entryAmount: { fontFamily: 'Inter_700Bold', fontSize: 15, flexShrink: 0 },
+  entryAmount: { fontFamily: 'Inter_700Bold', fontSize: 14, flexShrink: 0 },
   picked: { backgroundColor: T.blueSoft },
   selBar: {
     flexDirection: 'row',

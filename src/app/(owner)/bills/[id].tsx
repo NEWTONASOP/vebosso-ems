@@ -56,6 +56,7 @@ import { VideoPlayerModal } from '../../../components/VideoPlayerModal';
 import { BillPage, BillPreviewSheet } from '../../../components/BillPreviewSheet';
 import { HourPickerModal, hourLabel, PickerTheme } from '../../../components/DateTimeFields';
 import { useFeatureBase } from '../../../lib/featureAccess';
+import { sendPushNotificationToRole } from '../../../lib/notifications';
 import { useAuthStore } from '../../../store/authStore';
 import { Bill, BillBrand, BillFields, BillKind, BillSettings, BillStatus, BillVideo } from '../../../types/database';
 import { BRANDS, brandOf } from '../../../lib/billBrands';
@@ -140,6 +141,7 @@ export default function BillEditorScreen() {
   const newBrand: BillBrand = params.brand === 'navgrah' ? 'navgrah' : 'vebosso';
   const isNew = params.id === 'new';
   const profileName = useAuthStore((s) => s.profile?.full_name ?? '');
+  const me = useAuthStore((s) => s.profile);
 
   const [bill, setBill] = useState<Bill | null>(null);
   const [settings, setSettings] = useState<BillSettings | null>(null);
@@ -445,8 +447,18 @@ export default function BillEditorScreen() {
     setDirty(false);
     setViewing(true);
     setSnack(target.status === 'draft' ? `Saved as ${res.data.number}` : 'Changes saved');
+    // A bill just left draft: tell the owners (not when an owner made it themselves).
+    if (target.status === 'draft' && me && me.role !== 'owner') {
+      void sendPushNotificationToRole(
+        'owner',
+        `${me.full_name} created ${res.data.kind === 'client' ? 'a bill' : 'an estimate'} 🧾`,
+        `${res.data.number ?? 'New'}${res.data.client_name ? ` · ${res.data.client_name}` : ''}`,
+        { type: 'bill_created', bill_id: res.data.id },
+        [me.id],
+      );
+    }
     return true;
-  }, [form, defaults, ensureBill]);
+  }, [form, defaults, ensureBill, me]);
   // Leaving a saved bill with unsaved edits (text or photos) asks first.
   useEffect(() => {
     const unsub = navigation.addListener('beforeRemove' as any, (e: any) => {

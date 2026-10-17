@@ -3,9 +3,10 @@
 // Personal, contact, emergency contact, family, work, education. The person
 // fills it in once ("self"); after that it is read-only for them — they can
 // tap "Request to edit", and once the owner approves they get one edit (049).
-// The owner can fill in, change or clear anyone's ("owner"), and keeps a
-// private note at the top that the person never sees (053). ID papers and
-// bank proof live in Documents, pay in Salary — not repeated here.
+// The owner can fill in, change or clear anyone's ("owner"). The owner's note
+// lives in the member sheet (OwnerNoteCard); here the person sees it, read-only,
+// only if the owner switched sharing on (061). ID papers and bank proof live in
+// Documents, pay in Salary — not repeated here.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -31,7 +32,7 @@ import {
   WEEK_DAYS,
 } from '../lib/employeeDetails';
 import { telUrl } from '../lib/venues';
-import { fetchOwnerNote, saveOwnerNote } from '../lib/workLogRemarks';
+import { fetchOwnerNote } from '../lib/workLogRemarks';
 import { EmployeeDetails, EmployeeDetailsInput, FamilyMember } from '../types/database';
 import { DateField, TimeField } from './DateTimeFields';
 import { PaperOutlinedField } from './PaperOutlinedField';
@@ -75,35 +76,20 @@ export const EmployeeDetailsSheet = memo(function EmployeeDetailsSheet({
   const [form, setForm] = useState<EmployeeDetailsInput>(emptyDetails);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  // Owner only: private note (053). null = still loading.
-  const [note, setNote] = useState<string | null>(null);
-  const [noteDraft, setNoteDraft] = useState<string | null>(null);
-  const [noteError, setNoteError] = useState('');
+  // The owner's note, only when the owner chose to share it (061). The
+  // database returns nothing otherwise. The owner writes it in the member sheet.
+  const [note, setNote] = useState('');
 
   useEffect(() => {
-    if (!isOwner) return;
+    if (isOwner) return;
     let active = true;
     fetchOwnerNote(userId).then((res) => {
-      if (!active) return;
-      if (res.success) setNote(res.data);
-      else {
-        setNote('');
-        setNoteError(res.error);
-      }
+      if (active && res.success) setNote(res.data.note);
     });
     return () => {
       active = false;
     };
   }, [isOwner, userId]);
-
-  const saveNote = async () => {
-    if (noteDraft === null) return;
-    const res = await saveOwnerNote(userId, noteDraft);
-    if (!res.success) return setNoteError(res.error);
-    setNoteError('');
-    setNote(noteDraft.trim());
-    setNoteDraft(null);
-  };
   // The person's one approved edit (049): editing what's already saved.
   const unlockedEdit = !isOwner && !!details?.edit_unlocked;
 
@@ -300,7 +286,7 @@ export const EmployeeDetailsSheet = memo(function EmployeeDetailsSheet({
       iconBg={T.blueSoft}
       footer={footer}
     >
-      {isOwner && !editing ? renderOwnerNote() : null}
+      {!isOwner && !editing && note ? renderSharedNote() : null}
       {loading ? (
         <ActivityIndicator color={T.charcoal} style={{ marginVertical: 32 }} />
       ) : editing ? (
@@ -319,46 +305,17 @@ export const EmployeeDetailsSheet = memo(function EmployeeDetailsSheet({
     </SheetFrame>
   );
 
-  // ---- Owner's private note ---------------------------------------------------
-  function renderOwnerNote() {
+  // ---- Note from the boss (read-only, only when shared) -----------------------
+  function renderSharedNote() {
     return (
       <View style={styles.noteBox}>
         <View style={styles.noteHead}>
-          <Feather name="eye-off" size={13} color={T.violet} />
-          <Text style={styles.noteTitle}>Your note · only owners see this</Text>
-          {noteDraft === null && note !== null ? (
-            <Pressable onPress={() => setNoteDraft(note)} hitSlop={8} accessibilityLabel="Edit note">
-              <Text style={styles.noteAction}>{note ? 'Edit' : 'Add'}</Text>
-            </Pressable>
-          ) : null}
+          <Feather name="message-square" size={13} color={T.violet} />
+          <Text style={styles.noteTitle}>Note from the boss</Text>
         </View>
-        {noteDraft !== null ? (
-          <>
-            <PaperOutlinedField
-              label="Note"
-              value={noteDraft}
-              onChangeText={setNoteDraft}
-              multiline
-              maxLength={3000}
-              style={{ marginTop: 8 }}
-            />
-            <View style={styles.noteBtns}>
-              <Pressable onPress={() => setNoteDraft(null)} hitSlop={6}>
-                <Text style={styles.noteCancel}>Cancel</Text>
-              </Pressable>
-              <Pressable style={styles.noteSave} onPress={() => void saveNote()}>
-                <Text style={styles.noteSaveText}>Save note</Text>
-              </Pressable>
-            </View>
-          </>
-        ) : note ? (
-          <Text style={styles.noteText} selectable>
-            {note}
-          </Text>
-        ) : note !== null ? (
-          <Text style={styles.noteEmpty}>Nothing yet. Add anything you want to remember about {userName.split(' ')[0]}.</Text>
-        ) : null}
-        {noteError ? <Text style={styles.error}>{noteError}</Text> : null}
+        <Text style={styles.noteText} selectable>
+          {note}
+        </Text>
       </View>
     );
   }
@@ -656,13 +613,7 @@ const styles = StyleSheet.create({
   noteBox: { backgroundColor: T.violetSoft, borderRadius: 14, padding: 12, marginBottom: 14 },
   noteHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   noteTitle: { flex: 1, fontFamily: 'Inter_700Bold', fontSize: 12, color: T.violet },
-  noteAction: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.violet },
   noteText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: T.ink, marginTop: 6, lineHeight: 20 },
-  noteEmpty: { fontFamily: 'Inter_400Regular', fontSize: 13, color: T.inkSoft, marginTop: 6 },
-  noteBtns: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 14, marginTop: 6 },
-  noteCancel: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
-  noteSave: { height: 34, paddingHorizontal: 16, borderRadius: 999, backgroundColor: T.charcoal, justifyContent: 'center' },
-  noteSaveText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.white },
   meta: { fontFamily: 'Inter_400Regular', fontSize: 12.5, color: T.mute },
   lockNote: {
     flexDirection: 'row',

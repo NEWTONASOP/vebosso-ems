@@ -117,16 +117,26 @@ export async function removeRemark(id: string): Promise<Result> {
 // ---------------------------------------------------------------------------
 // Owner's private note on employee details
 
-export async function fetchOwnerNote(userId: string): Promise<Result<string>> {
-  const { data, error } = await supabase.from('employee_owner_notes').select('note').eq('user_id', userId).maybeSingle();
+export type OwnerNote = { note: string; visible: boolean };
+
+/** Owner: the note plus whether the person can read it (061). The person gets it only when shared. */
+export async function fetchOwnerNote(userId: string): Promise<Result<OwnerNote>> {
+  const { data, error } = await supabase
+    .from('employee_owner_notes')
+    .select('note, visible_to_employee')
+    .eq('user_id', userId)
+    .maybeSingle();
   if (error) return fail(error);
-  return { success: true, data: (data?.note as string) ?? '' };
+  return { success: true, data: { note: (data?.note as string) ?? '', visible: !!data?.visible_to_employee } };
 }
 
-export async function saveOwnerNote(userId: string, note: string): Promise<Result> {
+export async function saveOwnerNote(userId: string, note: string, visible: boolean): Promise<Result> {
   const { error } = await supabase
     .from('employee_owner_notes')
-    .upsert({ user_id: userId, note: note.trim().slice(0, 3000) }, { onConflict: 'user_id' });
+    .upsert(
+      { user_id: userId, note: note.trim().slice(0, 3000), visible_to_employee: visible },
+      { onConflict: 'user_id' }
+    );
   if (error) return fail(error);
   return { success: true, data: undefined };
 }

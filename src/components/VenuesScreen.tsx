@@ -12,7 +12,7 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -107,6 +107,14 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
   const [menuFor, setMenuFor] = useState<string | null>(null);
   // Adding a city: null = not adding, '' = typing.
   const [newCity, setNewCity] = useState<string | null>(null);
+  // The add-city box is at the end of the list: scroll it into view above the keyboard.
+  const scrollRef = useRef<ScrollView>(null);
+  const addingCityRow = newCity !== null;
+  useEffect(() => {
+    if (!addingCityRow) return;
+    const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
+    return () => clearTimeout(t);
+  }, [addingCityRow, keyboardInset]);
   const [addingCity, setAddingCity] = useState(false);
 
   const saveCity = async () => {
@@ -501,7 +509,9 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.charcoal} />}
       >
         {error ? <Text style={styles.error}>{error}</Text> : null}

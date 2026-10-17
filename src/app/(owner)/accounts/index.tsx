@@ -283,14 +283,14 @@ export default function AccountsScreen() {
                     <Text style={styles.avatarText}>{a.name.substring(0, 1).toUpperCase()}</Text>
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.name} numberOfLines={1}>{a.name}</Text>
+                    <Text style={styles.name}>{a.name}</Text>
                     <Text style={styles.meta} numberOfLines={1}>
                       {count === 0
                         ? 'No entries yet'
                         : `${count} entr${count === 1 ? 'y' : 'ies'}${s?.last_txn_date ? ` · last ${format(parseISO(s.last_txn_date), 'd MMM yyyy')}` : ''}`}
                     </Text>
                   </View>
-                  <View style={{ alignItems: 'flex-end' }}>
+                  <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
                     <Text style={[styles.balance, { color: balance < 0 ? T.coral : balance > 0 ? T.green : T.inkSoft }]}>
                       {rupees(balance)}
                     </Text>

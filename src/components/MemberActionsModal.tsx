@@ -14,6 +14,7 @@ import { AppTheme, RoleAccent, appSoftShadow } from '../constants/theme';
 import { ROLE_LABELS } from '../constants/roles';
 import { Feature, FEATURES } from '../lib/featureAccess';
 import { NavgrahLogo } from './NavgrahLogo';
+import { OwnerNoteCard } from './OwnerNoteCard';
 import { useSheetLift } from '../lib/useKeyboardHeight';
 import { useSheetEntrance } from '../lib/useSheetEntrance';
 import { Profile } from '../types/database';
@@ -144,6 +145,8 @@ export function MemberActionsModal({
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
+          <OwnerNoteCard userId={member.id} firstName={firstName} />
+
           {/* 1. Attendance — calendar, the day's log, then per-day extras */}
           <Text style={styles.sectionTitle}>Attendance</Text>
           <MemberAttendancePanel
