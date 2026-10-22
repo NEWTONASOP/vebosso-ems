@@ -329,6 +329,9 @@ export function AccessSheet({
                 <>
                   <Text style={[styles.note, { marginTop: 0, marginBottom: 8 }]}>
                     Hide: nothing they {verb} is shown, even where a row above allows it. Default: only what the rows above give.
+                    {a.all === 'none' && places.some((p) => ['see', 'change'].includes(a.items[rowKey.place(p.id)] ?? 'none'))
+                      ? ` See / change here stays inside the ${PLACE_HEADING[feature].toLowerCase()} allowed above.`
+                      : ''}
                   </Text>
                   <View style={styles.group}>{people.map((p, i) => personRow(p.id, p.name, i === people.length - 1))}</View>
                 </>

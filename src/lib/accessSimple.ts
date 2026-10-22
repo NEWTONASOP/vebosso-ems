@@ -173,11 +173,16 @@ export function toRules(a: SimpleAccess, feature: RuleFeature, now = new Date())
         : { ...base, scope: placeScope, scope_ids: g.ids, expires_at: g.expires_at, ...t },
     );
   }
+  // A person's row stays inside the cities / banquets / brands allowed above
+  // (when some are picked and "all" isn't on): Navgrah off means none of anyone's.
+  const allowedPlaces = a.all === 'none' ? places.flatMap((g) => g.ids) : [];
+  const within =
+    placeScope === 'brands' ? { within_ids: [], within_values: allowedPlaces } : { within_ids: allowedPlaces, within_values: [] };
   for (const g of group('person:')) {
     out.push(
       g.see === 'hide'
         ? { ...base, scope: 'people', scope_ids: g.ids, expires_at: g.expires_at, ...NO_TICKS, deny: true }
-        : { ...base, scope: 'people', scope_ids: g.ids, expires_at: g.expires_at, ...ticksFor(g.see) },
+        : { ...base, scope: 'people', scope_ids: g.ids, expires_at: g.expires_at, ...ticksFor(g.see), ...within },
     );
   }
   return out;
@@ -274,13 +279,18 @@ export function describeAccess(
   if (a.all !== 'none') parts.push(`${verb(a.all)} all ${noun}${when(rowKey.all)}`);
   const placeIds: string[] = [];
   const hidden: string[] = [];
+  // People's rows are kept inside the places allowed (when some are, and not all).
+  const allowedPlaceIds = Object.entries(a.items)
+    .filter(([k, v]) => k.startsWith('place:') && (v === 'see' || v === 'change'))
+    .map(([k]) => k.slice(6));
+  const personWithin = a.all === 'none' && allowedPlaceIds.length ? ` in ${allowedPlaceIds.map(placeName).join(', ')}` : '';
   for (const [key, see] of Object.entries(a.items)) {
     if (see === 'hide') {
       hidden.push(`${personName(key.slice(7))}’s${when(key)}`);
       continue;
     }
     if (see === 'none' || a.all === 'change' || (a.all === 'see' && see === 'see')) continue;
-    const name = key.startsWith('place:') ? placeName(key.slice(6)) : `${personName(key.slice(7))}’s ${noun}`;
+    const name = key.startsWith('place:') ? placeName(key.slice(6)) : `${personName(key.slice(7))}’s ${noun}${personWithin}`;
     if (key.startsWith('place:')) placeIds.push(key.slice(6));
     parts.push(`${a.all === 'see' ? 'change' : verb(see)} ${name}${when(key)}`);
   }

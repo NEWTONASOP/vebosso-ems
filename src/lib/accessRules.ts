@@ -33,6 +33,10 @@ export interface AccessRule {
   others_can_delete: boolean;
   /** A "hide" rule (066): nothing the people in scope_ids added is shown. Ticks ignored. */
   deny?: boolean;
+  /** A 'people' rule only reaches their items inside these cities / banquets… (068). Empty = everywhere. */
+  within_ids?: string[];
+  /** …or these brands (bills). */
+  within_values?: string[];
   starts_at: string;
   expires_at: string | null;
 }
@@ -49,6 +53,8 @@ export type RuleDraft = Pick<
   | 'others_can_edit'
   | 'others_can_delete'
   | 'deny'
+  | 'within_ids'
+  | 'within_values'
   | 'expires_at'
 >;
 
@@ -157,7 +163,17 @@ export async function saveRules(
   const ins = await supabase
     .from('access_rules')
     // Every row sends every column: a column left out of some rows would go in empty.
-    .insert(drafts.map((d) => ({ ...d, deny: d.deny ?? false, user_id: userId, feature, granted_by: ownerId })));
+    .insert(
+      drafts.map((d) => ({
+        ...d,
+        deny: d.deny ?? false,
+        within_ids: d.within_ids ?? [],
+        within_values: d.within_values ?? [],
+        user_id: userId,
+        feature,
+        granted_by: ownerId,
+      })),
+    );
   if (ins.error) return fail(ins.error);
 
   if (old.data.length) {
@@ -283,8 +299,15 @@ export function allows(rules: AccessRule[], action: RuleAction, me: string, row:
         return true;
       case 'own':
         return action === 'add' || (!!row.owner && row.owner === me);
-      case 'people':
-        return action === 'add' || (!!row.owner && (row.owner === me || r.scope_ids.includes(row.owner)));
+      case 'people': {
+        if (action === 'add' || (!!row.owner && row.owner === me)) return true;
+        if (!row.owner || !r.scope_ids.includes(row.owner)) return false;
+        // Kept inside some cities / banquets / brands (068)?
+        const ids = r.within_ids ?? [];
+        const values = r.within_values ?? [];
+        if (!ids.length && !values.length) return true;
+        return (!!row.target && ids.includes(row.target)) || (!!row.value && values.includes(row.value));
+      }
       case 'cities':
       case 'banquets':
         return (!!row.target && r.scope_ids.includes(row.target)) || mine;
@@ -297,7 +320,12 @@ export function allows(rules: AccessRule[], action: RuleAction, me: string, row:
 /** Can they see bills of this brand at all? (Mirror of access_brand_visible in 064.) */
 export function seesBrand(rules: AccessRule[], brand: string): boolean {
   return rules.some(
-    (r) => isLiveAllow(r) && (r.scope === 'all' || r.scope === 'own' || r.scope === 'people' || (r.scope === 'brands' && r.scope_values.includes(brand))),
+    (r) =>
+      isLiveAllow(r) &&
+      (r.scope === 'all' ||
+        r.scope === 'own' ||
+        (r.scope === 'people' && (!(r.within_values ?? []).length || (r.within_values ?? []).includes(brand))) ||
+        (r.scope === 'brands' && r.scope_values.includes(brand))),
   );
 }
 
