@@ -76,6 +76,14 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
     const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
     return () => clearTimeout(t);
   }, [addingBanquetRow, keyboardInset]);
+  // The tab stays alive in the background: start at the top each time it's
+  // opened, and don't leave a half-typed banquet box behind.
+  useFocusEffect(
+    useCallback(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      return () => setNewBanquet(null);
+    }, []),
+  );
 
   const apply = useCallback((res: Awaited<ReturnType<typeof loadAll>>) => {
     if (res.leads.success) {

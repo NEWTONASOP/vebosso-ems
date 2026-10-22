@@ -87,7 +87,7 @@ export const PRESETS: { key: string; label: string; hint: string; draft: RuleDra
   {
     key: 'view',
     label: 'See all · view only',
-    hint: 'Sees everything, changes nothing',
+    hint: 'Sees everything, edits nothing',
     draft: { scope: 'all', scope_ids: [], scope_values: [], can_add: false, can_edit: false, can_delete: false, others_can_edit: false, others_can_delete: false, expires_at: null },
   },
   {

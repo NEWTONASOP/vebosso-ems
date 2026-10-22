@@ -117,6 +117,14 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
     const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
     return () => clearTimeout(t);
   }, [addingCityRow, keyboardInset]);
+  // The tab stays alive in the background: start at the top each time it's
+  // opened, and don't leave a half-typed city box behind.
+  useFocusEffect(
+    useCallback(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      return () => setNewCity(null);
+    }, []),
+  );
   const [addingCity, setAddingCity] = useState(false);
 
   const saveCity = async () => {

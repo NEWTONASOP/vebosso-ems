@@ -62,8 +62,8 @@ export const emptyAccess = (): SimpleAccess => ({
 
 export const PRESETS: { key: string; label: string; make: () => SimpleAccess }[] = [
   { key: 'own', label: 'Only their own', make: () => ({ ...emptyAccess(), create: true, del: true }) },
-  { key: 'view', label: 'See all, change nothing', make: () => ({ ...emptyAccess(), all: 'see' }) },
-  { key: 'edit', label: 'See and change all', make: () => ({ ...emptyAccess(), create: true, all: 'change' }) },
+  { key: 'view', label: 'See all, edit nothing', make: () => ({ ...emptyAccess(), all: 'see' }) },
+  { key: 'edit', label: 'See and edit all', make: () => ({ ...emptyAccess(), create: true, all: 'change' }) },
 ];
 
 // ---------------------------------------------------------------------------
@@ -262,7 +262,7 @@ export function fromRules(rules: AccessRule[], feature: RuleFeature): SimpleAcce
 // ---------------------------------------------------------------------------
 // Words
 
-/** "see all bills · see and change Navgrah · add new bills · delete what they can change". */
+/** "see all bills · see and edit Navgrah · add new bills · delete what they can edit". */
 export function describeAccess(
   a: SimpleAccess,
   noun: string,
@@ -274,7 +274,7 @@ export function describeAccess(
     const t = l ? limitText(l) : '';
     return t ? ` (${t})` : '';
   };
-  const verb = (s: See) => (s === 'change' ? 'see and change' : 'see');
+  const verb = (s: See) => (s === 'change' ? 'see and edit' : 'see');
   const parts: string[] = [];
   if (a.all !== 'none') parts.push(`${verb(a.all)} all ${noun}${when(rowKey.all)}`);
   const placeIds: string[] = [];
@@ -292,13 +292,13 @@ export function describeAccess(
     if (see === 'none' || a.all === 'change' || (a.all === 'see' && see === 'see')) continue;
     const name = key.startsWith('place:') ? placeName(key.slice(6)) : `${personName(key.slice(7))}’s ${noun}${personWithin}`;
     if (key.startsWith('place:')) placeIds.push(key.slice(6));
-    parts.push(`${a.all === 'see' ? 'change' : verb(see)} ${name}${when(key)}`);
+    parts.push(`${a.all === 'see' ? 'edit' : verb(see)} ${name}${when(key)}`);
   }
   if (a.create) {
     const inside = a.all === 'none' && placeIds.length ? ` in ${placeIds.map(placeName).join(', ')}` : '';
     parts.push(`add new ${noun}${inside}`);
   }
-  if (a.del) parts.push(a.create || a.all === 'change' || parts.length ? 'delete what they can change' : 'delete');
+  if (a.del) parts.push(a.create || a.all === 'change' || parts.length ? 'delete what they can edit' : 'delete');
   if (hidden.length && parts.length) parts.push(`but not ${hidden.join(', ')} ${noun}`);
   return parts.length ? parts.join(' · ') : 'nothing yet';
 }

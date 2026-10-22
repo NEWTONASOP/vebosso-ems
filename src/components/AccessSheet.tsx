@@ -1,8 +1,8 @@
 // ============================================================================
 //  VEBOSSO EMS — Access for one person and one feature (Venues, Bills, Leads)
 // The owner's sheet, kept plain:
-//   • Can add new … (switch) — they always see and change what they add
-//   • Can delete (switch) — only what they are allowed to change
+//   • Can add new … (switch) — they always see and edit what they add
+//   • Can delete (switch) — only what they are allowed to edit
 //   • Which … can they see? — "All" plus one row per city / banquet / brand and
 //     per person, each None / See / See + change. Rows never repeat "All": when
 //     all can be seen, a row only asks "can change?"; when all can be changed,
@@ -54,7 +54,7 @@ const ROW_LIMITS: Until[] = ['30m', '1h', '4h', '1d', '1w', 'date'];
 const SEE_OPTIONS: { key: See; label: string }[] = [
   { key: 'none', label: 'None' },
   { key: 'see', label: 'See' },
-  { key: 'change', label: 'See + change' },
+  { key: 'change', label: 'See + edit' },
 ];
 
 export function AccessSheet({
@@ -180,7 +180,7 @@ export function AccessSheet({
     </View>
   );
 
-  /** One row in the list: the three choices, or just "can change" when all are seen anyway. */
+  /** One row in the list: the three choices, or just "can edit" when all are seen anyway. */
   const itemRow = (key: string, title: string, sub: string, last: boolean) => {
     const value = a.items[key] ?? 'none';
     return (
@@ -211,7 +211,7 @@ export function AccessSheet({
       { key: 'hide', label: 'Hide' },
       { key: 'none', label: 'Default' },
       ...(a.all === 'none' ? [{ key: 'see' as See, label: 'See' }] : []),
-      ...(a.all !== 'change' ? [{ key: 'change' as See, label: a.all === 'see' ? 'Change' : 'See + change' }] : []),
+      ...(a.all !== 'change' ? [{ key: 'change' as See, label: a.all === 'see' ? 'Edit' : 'See + edit' }] : []),
     ];
     return (
       <ItemRow
@@ -269,13 +269,13 @@ export function AccessSheet({
           <View style={[styles.group, { marginTop: 16 }]}>
             <SwitchRow
               title={`Can add new ${noun}`}
-              sub={`They always see and change the ${noun} they add`}
+              sub={`They always see and edit the ${noun} they add`}
               value={a.create}
               onChange={(v) => change({ create: v })}
             />
             <SwitchRow
               title="Can delete"
-              sub="Only what they’re allowed to change"
+              sub="Only what they’re allowed to edit"
               value={a.del}
               onChange={(v) => change({ del: v })}
               last
@@ -296,11 +296,11 @@ export function AccessSheet({
           </View>
 
           {a.all === 'change' ? (
-            <Text style={styles.note}>They can see and change every one, so there’s no {PLACE_HEADING[feature].toLowerCase()} to pick.</Text>
+            <Text style={styles.note}>They can see and edit every one, so there’s no {PLACE_HEADING[feature].toLowerCase()} to pick.</Text>
           ) : (
             <>
               <Text style={styles.label}>
-                {a.all === 'see' ? `They see all. Let them also change:` : `Or only some — ${PLACE_HEADING[feature].toLowerCase()}`}
+                {a.all === 'see' ? `They see all. Let them also edit:` : `Or only some — ${PLACE_HEADING[feature].toLowerCase()}`}
               </Text>
               {places.length === 0 ? (
                 <Text style={styles.note}>No {PLACE_HEADING[feature].toLowerCase()} added yet.</Text>
@@ -384,7 +384,7 @@ function SwitchRow({ title, sub, value, onChange, last }: { title: string; sub: 
 
 /**
  * One thing in the list. Normally None / See / See + change; with `checkOnly`
- * (everything is already seen) just a "Can change" checkbox. Once it has
+ * (everything is already seen) just a "Can edit" checkbox. Once it has
  * access, a ⏱ line sets a time limit for this row alone.
  */
 function ItemRow({
