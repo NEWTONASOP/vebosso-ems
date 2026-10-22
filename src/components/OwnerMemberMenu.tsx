@@ -8,7 +8,10 @@
 
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AccessRule, fetchRules, Names, RuleFeature, rulesSummary, RULE_FEATURES } from '../lib/accessRules';
 import { Feature, FEATURES, fetchFeatureAccess, setFeatureAccess } from '../lib/featureAccess';
+import { fetchBanquets } from '../lib/leads';
+import { fetchCities } from '../lib/venues';
 import { countUnreadFrom } from '../lib/chat';
 import { countPendingDocuments } from '../lib/employeeRecords';
 import { parseSupabaseError } from '../lib/errors';
@@ -17,6 +20,7 @@ import { useAuthStore } from '../store/authStore';
 import { useWorkStore } from '../store/workStore';
 import { Profile } from '../types/database';
 import { AssignManagerModal } from './AssignManagerModal';
+import { AccessSheet } from './AccessSheet';
 import { ChatSheet } from './ChatPanel';
 import { DocumentsSheet } from './DocumentsSheet';
 import { EmployeeDetailsSheet } from './EmployeeDetailsSheet';
@@ -54,6 +58,12 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
   const [pendingDocs, setPendingDocs] = useState(0);
   const [unreadChat, setUnreadChat] = useState(0);
   const [access, setAccess] = useState<Record<Feature, boolean> | null>(null);
+  // Detailed access (062): this person's rules, the names they refer to, and the open sheet.
+  const [rules, setRules] = useState<AccessRule[] | null>(null);
+  // Loading the rules failed: say so instead of "…" forever.
+  const [rulesFailed, setRulesFailed] = useState(false);
+  const [places, setPlaces] = useState<Record<string, string>>({});
+  const [accessFor, setAccessFor] = useState<RuleFeature | null>(null);
 
   // Re-count when a dropdown opens or closes — e.g. after reviewing documents
   // or reading the chat.
@@ -77,6 +87,23 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
     };
   }, [memberId]);
 
+  useEffect(() => {
+    if (!memberId) return;
+    let active = true;
+    Promise.all([fetchRules(memberId), fetchCities(), fetchBanquets()]).then(([r, c, b]) => {
+      if (!active) return;
+      if (r.success) setRules(r.data);
+      setRulesFailed(!r.success);
+      const map: Record<string, string> = {};
+      if (c.success) c.data.forEach((x) => (map[x.id] = x.name));
+      if (b.success) b.data.forEach((x) => (map[x.id] = x.name));
+      setPlaces(map);
+    });
+    return () => {
+      active = false;
+    };
+  }, [memberId, accessFor]);
+
   // Every new member opens with the requested dropdown (usually none).
   const [lastMemberId, setLastMemberId] = useState<string | null>(null);
   if ((member?.id ?? null) !== lastMemberId) {
@@ -84,6 +111,9 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
     setDialog(initialDialog);
     setAssigning(false);
     setAccess(null);
+    setRules(null);
+    setRulesFailed(false);
+    setAccessFor(null);
   }
 
   if (!member) return null;
@@ -134,6 +164,18 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
     }
   };
 
+  const names: Names = {
+    people: Object.fromEntries(teamMembers.map((m) => [m.id, m.full_name])),
+    places,
+  };
+  const ruleSummaries: Partial<Record<RuleFeature, string>> | undefined = rules
+    ? Object.fromEntries(
+        RULE_FEATURES.map((f) => [f, rulesSummary(rules.filter((r) => r.feature === f), names, f)]),
+      )
+    : rulesFailed
+      ? Object.fromEntries(RULE_FEATURES.map((f) => [f, 'Couldn’t load · tap to see why']))
+      : undefined;
+
   const toggleAccess = async (feature: Feature, grant: boolean) => {
     if (!profile?.id) return;
     if (access?.[feature] === grant) return; // already in that state (double tap)
@@ -159,6 +201,8 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
         onAssignManager={() => setAssigning(true)}
         access={access}
         onToggleAccess={(feature, grant) => void toggleAccess(feature, grant)}
+        onOpenAccess={setAccessFor}
+        ruleSummaries={ruleSummaries}
         onManageProfile={() => {
           onClose();
           router.push(`/(owner)/member/${member.id}` as any);
@@ -227,6 +271,16 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
           title={`Chat with ${member.full_name.split(' ')[0]}`}
           subtitle="Only you and them see this"
           onDismiss={() => setDialog(null)}
+        />
+      ) : null}
+
+      {accessFor ? (
+        <AccessSheet
+          userId={member.id}
+          userName={member.full_name}
+          feature={accessFor}
+          onDismiss={() => setAccessFor(null)}
+          onSaved={onMessage}
         />
       ) : null}
 

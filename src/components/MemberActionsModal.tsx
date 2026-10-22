@@ -12,6 +12,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Modal, Portal, Switch, Text } from 'react-native-paper';
 import { AppTheme, RoleAccent, appSoftShadow } from '../constants/theme';
 import { ROLE_LABELS } from '../constants/roles';
+import { isRuleFeature, RuleFeature } from '../lib/accessRules';
 import { Feature, FEATURES } from '../lib/featureAccess';
 import { NavgrahLogo } from './NavgrahLogo';
 import { OwnerNoteCard } from './OwnerNoteCard';
@@ -42,6 +43,10 @@ interface MemberActionsModalProps {
   /** Which of Bills / Venues / Accounts they can use; null while loading. */
   access?: Record<Feature, boolean> | null;
   onToggleAccess?: (feature: Feature, grant: boolean) => void;
+  /** Venues, Bills and Leads open their detailed access sheet (062). */
+  onOpenAccess?: (feature: RuleFeature) => void;
+  /** One line per feature: what the person can do right now, or "Off". */
+  ruleSummaries?: Partial<Record<RuleFeature, string>>;
   pendingTaskCount?: number;
   inProgressTaskCount?: number;
   doneTaskCount?: number;
@@ -80,6 +85,8 @@ export function MemberActionsModal({
   onManageProfile,
   access = null,
   onToggleAccess,
+  onOpenAccess,
+  ruleSummaries,
   pendingTaskCount = 0,
   inProgressTaskCount = 0,
   doneTaskCount = 0,
@@ -239,6 +246,40 @@ export function MemberActionsModal({
               {onToggleAccess
                 ? FEATURES.map((f) => {
                     const on = !!access?.[f.key];
+                    if (isRuleFeature(f.key) && onOpenAccess) {
+                      const key = f.key;
+                      const summary = ruleSummaries?.[key];
+                      const live = !!summary && summary !== 'Off' && summary !== 'Ended';
+                      return (
+                        <Pressable
+                          key={f.key}
+                          style={({ pressed }) => [styles.navRow, pressed && styles.navRowPressed]}
+                          onPress={() => onOpenAccess(key)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${f.label} access`}
+                        >
+                          <View style={[styles.navIcon, { backgroundColor: AppTheme.violetSoft }]}>
+                            {key === 'leads' ? (
+                              <NavgrahLogo size={18} color={AppTheme.violet} />
+                            ) : (
+                              <Feather name={f.icon} size={16} color={AppTheme.violet} />
+                            )}
+                          </View>
+                          <View style={[styles.navText, styles.navTextDivider]}>
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                              <Text style={styles.navLabel}>{f.label} access</Text>
+                              <Text
+                                style={[styles.navHint, summary === 'Ended' ? { color: AppTheme.coral } : live ? { color: AppTheme.violet } : null]}
+                                numberOfLines={2}
+                              >
+                                {summary ?? '…'}
+                              </Text>
+                            </View>
+                            <Feather name="chevron-right" size={16} color={AppTheme.mute} />
+                          </View>
+                        </Pressable>
+                      );
+                    }
                     return (
                       <Pressable
                         key={f.key}

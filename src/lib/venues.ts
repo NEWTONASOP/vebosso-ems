@@ -7,7 +7,7 @@
 // ============================================================================
 
 import { Platform } from 'react-native';
-import { Venue, VenueCity, VenueContact, VenueInput } from '../types/database';
+import { CloudImage, Venue, VenueCity, VenueContact, VenueInput } from '../types/database';
 import { parseSupabaseError } from './errors';
 import { sendPushNotificationToRole } from './notifications';
 import { supabase } from './supabase';
@@ -86,6 +86,51 @@ export const mailtoUrl = (emails: string[]) => {
     ? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}`
     : `mailto:${to}`;
 };
+
+// ---------------------------------------------------------------------------
+// Photos and the "in business" permission proof (065). Changing them needs
+// edit rights on the venue (RLS). Each change re-reads the venue first, so two
+// people adding photos at once don't wipe each other's.
+
+type MediaField = 'photos' | 'business_proof_images';
+
+async function currentList(id: string, field: MediaField): Promise<Result<CloudImage[]>> {
+  const { data, error } = await supabase.from('venues').select(field).eq('id', id).single();
+  if (error) return fail(error);
+  const list = (data as Record<string, unknown>)[field];
+  return { success: true, data: Array.isArray(list) ? (list as CloudImage[]) : [] };
+}
+
+async function writeList(id: string, field: MediaField, list: CloudImage[]): Promise<Result<Venue>> {
+  const { data, error } = await supabase.from('venues').update({ [field]: list }).eq('id', id).select().single();
+  if (error) return fail(error);
+  return { success: true, data: data as Venue };
+}
+
+export async function addVenueImages(id: string, field: MediaField, added: CloudImage[]): Promise<Result<Venue>> {
+  const now = await currentList(id, field);
+  if (!now.success) return now;
+  return writeList(id, field, [...now.data, ...added]);
+}
+
+export async function removeVenueImage(id: string, field: MediaField, publicId: string): Promise<Result<Venue>> {
+  const now = await currentList(id, field);
+  if (!now.success) return now;
+  return writeList(id, field, now.data.filter((p) => p.public_id !== publicId));
+}
+
+/** The permission message / email, as pasted. Empty clears it. */
+export async function setBusinessProof(id: string, text: string): Promise<Result<Venue>> {
+  const clean = text.trim().slice(0, 10000);
+  const { data, error } = await supabase
+    .from('venues')
+    .update({ business_proof: clean || null })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) return fail(error);
+  return { success: true, data: data as Venue };
+}
 
 /** Owner only (RLS). Venues in it stay, with no city (ON DELETE SET NULL). */
 export async function deleteCity(id: string): Promise<Result> {

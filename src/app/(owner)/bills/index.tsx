@@ -10,7 +10,7 @@
 import { Feather } from '@expo/vector-icons';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SmoothTextInput as TextInput } from '../../../components/SmoothTextInput';
 import { Menu, Snackbar, Text } from 'react-native-paper';
@@ -19,6 +19,7 @@ import { AppTheme as T, appSoftShadow, screenChrome } from '../../../constants/t
 import { rupees } from '../../../lib/accounts';
 import { BRAND_KEYS, BRANDS, brandOf } from '../../../lib/billBrands';
 import { BILL_STATUS_TONE, billTotals, fetchBills, STATUS_LABEL } from '../../../lib/bills';
+import { useMyAccess } from '../../../lib/accessRules';
 import { useFeatureBase } from '../../../lib/featureAccess';
 import { useAuthStore } from '../../../store/authStore';
 import { Bill, BillBrand, BillKind, BillStatus } from '../../../types/database';
@@ -56,12 +57,15 @@ const rememberBrand = (b: BillBrand) => {
 export default function BillsScreen() {
   const router = useRouter();
   const base = useFeatureBase('bills');
+  const access = useMyAccess('bills');
   const isOwner = useAuthStore((s) => s.profile?.role === 'owner');
   const [brand, setBrandState] = useState<BillBrand>(() => remembered.brand);
   const setBrand = (b: BillBrand) => {
     rememberBrand(b);
     setBrandState(b);
   };
+  // Brands this person's rules let them see; the owner sees both.
+  const brandsShown = useMemo(() => BRAND_KEYS.filter((b) => access.canSeeBrand(b)), [access]);
   const [sort, setSortState] = useState<Sort>(() => remembered.sort);
   const [sortMenu, setSortMenu] = useState(false);
   const setSort = (s: Sort) => {
@@ -101,6 +105,12 @@ export default function BillsScreen() {
     apply(await fetchBills());
     setRefreshing(false);
   };
+
+  // Someone limited to one brand lands on it, not on an empty other tab.
+  useEffect(() => {
+    if (!access.loading && brandsShown.length > 0 && !brandsShown.includes(brand)) setBrand(brandsShown[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [access.loading, brandsShown, brand]);
 
   const ofBrand = useMemo(() => bills.filter((b) => brandOf(b) === brand), [bills, brand]);
   const ofKind = useMemo(() => ofBrand.filter((b) => b.kind === kind), [ofBrand, kind]);
@@ -168,24 +178,31 @@ export default function BillsScreen() {
           ) : null}
           <View style={{ flexShrink: 1 }}>
             <Text style={screenChrome.title}>Bills</Text>
-            <Text style={screenChrome.subtitle}>Estimates and client bills</Text>
+            <Text style={screenChrome.subtitle}>
+              {brandsShown.length === 1 ? `${BRANDS[brandsShown[0]].label} · ` : ''}Estimates and client bills
+            </Text>
           </View>
         </View>
         <View style={styles.headerActions}>
-          <Pressable style={styles.iconBtn} onPress={() => setSettingsOpen(true)} accessibilityLabel="Bill settings">
-            <Feather name="settings" size={17} color={T.ink} />
-          </Pressable>
-          <Pressable
-            style={styles.newBtn}
-            onPress={() => router.push(`${base}/new?kind=${kind}&brand=${brand}` as any)}
-            accessibilityLabel={`New ${kind === 'client' ? 'client bill' : 'estimate'}`}
-          >
-            <Feather name="plus" size={16} color={T.white} />
-            <Text style={styles.newText}>New</Text>
-          </Pressable>
+          {access.can('edit', { value: brand }) ? (
+            <Pressable style={styles.iconBtn} onPress={() => setSettingsOpen(true)} accessibilityLabel="Bill settings">
+              <Feather name="settings" size={17} color={T.ink} />
+            </Pressable>
+          ) : null}
+          {access.can('add', { value: brand }) ? (
+            <Pressable
+              style={styles.newBtn}
+              onPress={() => router.push(`${base}/new?kind=${kind}&brand=${brand}` as any)}
+              accessibilityLabel={`New ${kind === 'client' ? 'client bill' : 'estimate'}`}
+            >
+              <Feather name="plus" size={16} color={T.white} />
+              <Text style={styles.newText}>New</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
+      {brandsShown.length > 1 ? (
       <View style={styles.brands}>
         {BRAND_KEYS.map((k) => {
           const active = brand === k;
@@ -209,6 +226,7 @@ export default function BillsScreen() {
           );
         })}
       </View>
+      ) : null}
 
       {isOwner && !isLoading ? (
         <View style={styles.totalCard}>

@@ -340,6 +340,12 @@ export interface Venue {
   in_business: boolean;
   in_business_by_name: string | null;
   in_business_at: string | null;
+  /** Pictures from the venue, in Cloudinary (065). */
+  photos?: CloudImage[];
+  /** The permission message / email the venue sent, pasted in (065). */
+  business_proof?: string | null;
+  /** Screenshots of that permission (065). */
+  business_proof_images?: CloudImage[];
   added_by: string | null;
   /** Filled in by the database from added_by. */
   added_by_name: string | null;
@@ -468,6 +474,18 @@ export interface BillItem {
 }
 
 /** One video on a bill; the file lives in Cloudinary. */
+/** A picture kept in Cloudinary (venue photos and permission screenshots, 065). */
+export interface CloudImage {
+  url: string;
+  public_id: string;
+  width: number | null;
+  height: number | null;
+  /** Size in bytes. */
+  bytes: number | null;
+  added_at: string;
+  added_by_name: string | null;
+}
+
 export interface BillVideo {
   url: string;
   public_id: string;

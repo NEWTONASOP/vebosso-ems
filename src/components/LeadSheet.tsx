@@ -18,6 +18,7 @@ import { RecordingBar, useVoiceRecorder, VoiceNote } from './VoiceNote';
 // Loaded on first use: the spreadsheet code is big and slowed down app start.
 const leadsFile = () => import('../lib/leadsFile');
 import { telUrl, whatsappUrl } from '../lib/venues';
+import { useMyAccess } from '../lib/accessRules';
 import { Lead, LeadBanquet, LeadInput } from '../types/database';
 import { DateField } from './DateTimeFields';
 import { PaperOutlinedField } from './PaperOutlinedField';
@@ -59,6 +60,11 @@ export function LeadSheet({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const me = useAuthStore((s) => s.profile);
+  // What this person's access rules allow for this lead (062).
+  const access = useMyAccess('leads');
+  const facts = lead ? { owner: lead.created_by, target: lead.banquet_id } : undefined;
+  const canEdit = !lead || access.can('edit', facts);
+  const canDelete = !!lead && access.can('delete', facts);
   // Voice note with the remarks (054): the saved one, a new recording, or removed.
   const recorder = useVoiceRecorder();
   const [newClip, setNewClip] = useState<VoiceClip | null>(null);
@@ -167,14 +173,20 @@ export function LeadSheet({
         footer={
           <View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <View style={styles.footerRow}>
-              <Pressable style={[styles.btn, styles.deleteBtn]} onPress={remove} accessibilityLabel="Delete lead">
-                <Feather name="trash-2" size={16} color={T.coral} />
-              </Pressable>
-              <Pressable style={[styles.btn, styles.saveBtn]} onPress={() => setViewing(false)} accessibilityLabel="Edit lead">
-                <Text style={styles.saveText}>Edit</Text>
-              </Pressable>
-            </View>
+            {canEdit || canDelete ? (
+              <View style={styles.footerRow}>
+                {canDelete ? (
+                  <Pressable style={[styles.btn, styles.deleteBtn]} onPress={remove} accessibilityLabel="Delete lead">
+                    <Feather name="trash-2" size={16} color={T.coral} />
+                  </Pressable>
+                ) : null}
+                {canEdit ? (
+                  <Pressable style={[styles.btn, styles.saveBtn]} onPress={() => setViewing(false)} accessibilityLabel="Edit lead">
+                    <Text style={styles.saveText}>Edit</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
           </View>
         }
       >
@@ -241,7 +253,7 @@ export function LeadSheet({
         <View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <View style={styles.footerRow}>
-            {lead ? (
+            {canDelete ? (
               <Pressable style={[styles.btn, styles.deleteBtn]} onPress={remove} accessibilityLabel="Delete lead">
                 <Feather name="trash-2" size={16} color={T.coral} />
               </Pressable>
@@ -255,7 +267,10 @@ export function LeadSheet({
     >
       <Text style={styles.label}>Banquet</Text>
       <View style={styles.chips}>
-        {banquets.map((b) => {
+        {banquets
+          // A new lead can only go in a banquet their rules let them add to.
+          .filter((b) => lead || access.can('add', { target: b.id }))
+          .map((b) => {
           const on = form.banquet_id === b.id;
           return (
             <Pressable

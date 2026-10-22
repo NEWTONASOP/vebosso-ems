@@ -9,6 +9,7 @@
 import { useFocusEffect, useSegments } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
+import { AccessRule, isActive } from './accessRules';
 import { parseSupabaseError } from './errors';
 import { sendPushNotification } from './notifications';
 import { supabase } from './supabase';
@@ -19,8 +20,8 @@ export type Feature = 'bills' | 'venues' | 'accounts' | 'leads';
 export const FEATURES: { key: Feature; label: string; hint: string; icon: 'file-text' | 'map-pin' | 'book' | 'users' }[] = [
   { key: 'bills', label: 'Bills', hint: 'Create and manage bills', icon: 'file-text' },
   { key: 'venues', label: 'Venues', hint: 'See and add venues', icon: 'map-pin' },
-  { key: 'accounts', label: 'Accounts', hint: 'Manage the account books', icon: 'book' },
   { key: 'leads', label: 'Navgrah Leads', hint: 'See and add leads', icon: 'users' },
+  { key: 'accounts', label: 'Accounts', hint: 'Manage the account books', icon: 'book' },
 ];
 
 type Result = { success: true } | { success: false; error: string };
@@ -73,6 +74,19 @@ export function useHasFeature(feature: Feature): boolean {
     useCallback(() => {
       if (isOwner || !userId) return;
       let active = true;
+      // Venues, Bills and Leads need an access rule that is on right now (062):
+      // a rule that has ended switches the feature off.
+      if (feature !== 'accounts') {
+        supabase
+          .from('access_rules')
+          .select('starts_at, expires_at')
+          .eq('user_id', userId)
+          .eq('feature', feature)
+          .then(({ data }) => active && setGranted(((data || []) as AccessRule[]).some((r) => isActive(r))));
+        return () => {
+          active = false;
+        };
+      }
       // Readable by the person themselves (read_own_feature_access).
       supabase
         .from('feature_access')

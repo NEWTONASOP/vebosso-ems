@@ -56,6 +56,7 @@ import { VideoPlayerModal } from '../../../components/VideoPlayerModal';
 import { BillPage, BillPreviewSheet } from '../../../components/BillPreviewSheet';
 import { HourPickerModal, hourLabel, PickerTheme } from '../../../components/DateTimeFields';
 import { useFeatureBase } from '../../../lib/featureAccess';
+import { useMyAccess } from '../../../lib/accessRules';
 import { sendPushNotificationToRole } from '../../../lib/notifications';
 import { useAuthStore } from '../../../store/authStore';
 import { Bill, BillBrand, BillFields, BillKind, BillSettings, BillStatus, BillVideo } from '../../../types/database';
@@ -142,6 +143,8 @@ export default function BillEditorScreen() {
   const isNew = params.id === 'new';
   const profileName = useAuthStore((s) => s.profile?.full_name ?? '');
   const me = useAuthStore((s) => s.profile);
+  // What this person's access rules allow (062).
+  const access = useMyAccess('bills');
 
   const [bill, setBill] = useState<Bill | null>(null);
   const [settings, setSettings] = useState<BillSettings | null>(null);
@@ -664,6 +667,10 @@ export default function BillEditorScreen() {
   const saved = !!bill && status !== 'draft';
   const inTrash = status === 'trash';
   const statusLabel = form.kind === 'estimate' && saved && !inTrash ? 'Estimate' : STATUS_LABEL[status];
+  // Per bill: whether their rules let them change it, or move it to trash (a change that needs both).
+  const billFacts = bill ? { owner: bill.created_by, value: bill.brand } : undefined;
+  const canEditBill = !bill || access.can('edit', billFacts);
+  const canTrashBill = canEditBill && (!bill || access.can('delete', billFacts));
 
   if (viewing && bill && settings) {
     return (
@@ -693,7 +700,7 @@ export default function BillEditorScreen() {
               <Feather name="clock" size={16} color={T.inkSoft} />
             </Pressable>
             {/* Bills are never deleted: trash is final, and can be restored. */}
-            {!inTrash ? (
+            {!inTrash && canTrashBill ? (
               <Pressable style={styles.iconBtn} onPress={trash} accessibilityLabel="Move to trash">
                 <Feather name="trash-2" size={16} color={T.inkSoft} />
               </Pressable>
@@ -707,7 +714,7 @@ export default function BillEditorScreen() {
 
         <View style={[styles.viewBar, { paddingBottom: 96 + insets.bottom }]}>
           {error ? <Text style={styles.error}>{error}</Text> : null}
-          {inTrash ? (
+          {inTrash && !canEditBill ? null : inTrash ? (
             <Pressable style={styles.editBtn} onPress={restore} disabled={busy === 'restore'}>
               {busy === 'restore' ? (
                 <ActivityIndicator color={T.white} />
@@ -731,7 +738,7 @@ export default function BillEditorScreen() {
               <View style={styles.actionsRow}>
                 <ActionBtn icon="share-2" label="Share PDF" busy={busy === 'share'} onPress={share} />
                 <ActionBtn icon="message-circle" label="WhatsApp" busy={busy === 'wa'} onPress={whatsapp} tint={T.green} />
-                {form.kind === 'estimate' ? (
+                {!canEditBill ? null : form.kind === 'estimate' ? (
                   <ActionBtn icon="arrow-right-circle" label="To client bill" busy={busy === 'convert'} onPress={convert} tint={T.violet} />
                 ) : status === 'completed' ? (
                   <ActionBtn icon="check-circle" label="Completed" busy={busy === 'status'} onPress={reopen} tint={T.green} />
@@ -739,10 +746,12 @@ export default function BillEditorScreen() {
                   <ActionBtn icon="check" label="Mark completed" busy={busy === 'status'} onPress={markCompleted} tint={T.green} />
                 )}
               </View>
-              <Pressable style={styles.editBtn} onPress={() => setViewing(false)} accessibilityRole="button">
-                <Feather name="edit-2" size={16} color={T.white} />
-                <Text style={styles.editText}>Edit</Text>
-              </Pressable>
+              {canEditBill ? (
+                <Pressable style={styles.editBtn} onPress={() => setViewing(false)} accessibilityRole="button">
+                  <Feather name="edit-2" size={16} color={T.white} />
+                  <Text style={styles.editText}>Edit</Text>
+                </Pressable>
+              ) : null}
             </>
           )}
         </View>
@@ -800,7 +809,7 @@ export default function BillEditorScreen() {
               <Feather name="clock" size={16} color={T.inkSoft} />
             </Pressable>
           ) : null}
-          {bill && !inTrash ? (
+          {bill && !inTrash && canTrashBill ? (
             <Pressable style={styles.iconBtn} onPress={trash} accessibilityLabel="Move to trash">
               <Feather name="trash-2" size={16} color={T.inkSoft} />
             </Pressable>

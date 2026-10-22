@@ -27,7 +27,7 @@ import { Menu, Snackbar, Text } from 'react-native-paper';
 import { PaperOutlinedField } from './PaperOutlinedField';
 import { AppTheme as T, screenChrome } from '../constants/theme';
 import { Alert } from '../lib/alert';
-import { useWorkStore } from '../store/workStore';
+import { useMyAccess } from '../lib/accessRules';
 import { supabase } from '../lib/supabase';
 import {
   addCity,
@@ -46,6 +46,7 @@ import { Chevron, DropdownBody } from './Dropdown';
 import { SheetFrame } from './SheetFrame';
 import { EmailPeopleSheet } from './EmailPeopleSheet';
 import { VenueFormSheet } from './VenueFormSheet';
+import { VenueMedia } from './VenueMedia';
 import { useKeyboardOverlap } from '../lib/useKeyboardHeight';
 import { PAGE, ShowMore } from './ShowMore';
 
@@ -82,7 +83,8 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
   const router = useRouter();
   // Owner's "Share venues with everyone" (052) — only changes the wording here;
   // the database decides what each person can see.
-  const shared = useWorkStore((s) => s.settings['venues_shared'] === 'true');
+  // What this person's access rules allow (062): hides buttons they can't use.
+  const access = useMyAccess('venues');
   // "?add=1" (from the home shortcut) opens straight into the add form.
   const { add } = useLocalSearchParams<{ add?: string }>();
   const [venues, setVenues] = useState<Venue[]>([]);
@@ -440,6 +442,10 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
     );
   };
 
+  const rowFacts = detail ? { owner: detail.added_by, target: detail.city_id } : undefined;
+  const canEditDetail = !!detail && access.can('edit', rowFacts);
+  const canDeleteDetail = !!detail && access.can('delete', rowFacts);
+
   return (
     <View ref={keyboardRef} style={[screenChrome.root, { paddingBottom: keyboardInset }]}>
       <View style={screenChrome.headerRow}>
@@ -460,22 +466,24 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
             <Text style={screenChrome.subtitle}>
               {isLoading
                 ? 'Loading…'
-                : `${venues.length} onboarded${canManage || shared ? '' : ' by you'} · ${cities.length} ${cities.length === 1 ? 'city' : 'cities'}`}
+                : `${venues.length} onboarded · ${cities.length} ${cities.length === 1 ? 'city' : 'cities'}`}
             </Text>
           </View>
         </View>
-        <Pressable
-          style={({ pressed }) => [screenChrome.primaryPill, pressed && { opacity: 0.9 }]}
-          onPress={() => {
-            setFormCity(null);
-            setFormFor('new');
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Add venue"
-        >
-          <Feather name="plus" size={16} color={T.white} />
-          <Text style={screenChrome.primaryPillText}>Add venue</Text>
-        </Pressable>
+        {access.canAdd ? (
+          <Pressable
+            style={({ pressed }) => [screenChrome.primaryPill, pressed && { opacity: 0.9 }]}
+            onPress={() => {
+              setFormCity(null);
+              setFormFor('new');
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Add venue"
+          >
+            <Feather name="plus" size={16} color={T.white} />
+            <Text style={screenChrome.primaryPillText}>Add venue</Text>
+          </Pressable>
+        ) : null}
       </View>
 
 
@@ -566,15 +574,17 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
                       }
                       contentStyle={styles.menu}
                     >
-                      <Menu.Item
-                        leadingIcon="plus"
-                        title="Add a venue here"
-                        onPress={() => {
-                          setMenuFor(null);
-                          setFormCity(g.id);
-                          setFormFor('new');
-                        }}
-                      />
+                      {access.can('add', { target: g.id }) ? (
+                        <Menu.Item
+                          leadingIcon="plus"
+                          title="Add a venue here"
+                          onPress={() => {
+                            setMenuFor(null);
+                            setFormCity(g.id);
+                            setFormFor('new');
+                          }}
+                        />
+                      ) : null}
                       {canManage ? (
                         <Menu.Item
                           leadingIcon="trash-can-outline"
@@ -597,7 +607,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
         )}
 
         {/* Cities are added here, on the list — not inside the venue form. */}
-        {!isLoading && !query.trim() ? (
+        {!isLoading && !query.trim() && access.canList('add') ? (
           newCity === null ? (
             <Pressable style={styles.addCityBtn} onPress={() => setNewCity('')} accessibilityRole="button">
               <Feather name="plus" size={15} color={T.ink} />
@@ -647,7 +657,9 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
           iconColor={T.blue}
           iconBg={T.blueSoft}
           footer={
+            canEditDetail || canDeleteDetail ? (
             <View style={{ gap: 8 }}>
+              {canEditDetail ? (
               <Pressable
                 style={[styles.markBtn, detail.in_business && styles.unmarkBtn]}
                 onPress={() => toggleInBusiness(detail)}
@@ -668,11 +680,15 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
                   </>
                 )}
               </Pressable>
+              ) : null}
               <View style={styles.detailActions}>
+                {canDeleteDetail ? (
                 <Pressable style={[styles.detailBtn, styles.deleteBtn]} onPress={() => confirmDelete(detail)}>
                   <Feather name="trash-2" size={15} color={T.coral} />
                   <Text style={[styles.detailBtnText, { color: T.coral }]}>Delete</Text>
                 </Pressable>
+                ) : null}
+                {canEditDetail ? (
                 <Pressable
                   style={[styles.detailBtn, styles.editBtn]}
                   onPress={() => {
@@ -683,8 +699,10 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
                   <Feather name="edit-2" size={15} color={T.white} />
                   <Text style={[styles.detailBtnText, { color: T.white }]}>Edit</Text>
                 </Pressable>
+                ) : null}
               </View>
             </View>
+            ) : undefined
           }
         >
           {detail.in_business ? (
@@ -720,6 +738,14 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
               />
             ));
           })()}
+          <VenueMedia
+            venue={detail}
+            canEdit={canEditDetail}
+            onChanged={(v) => {
+              setDetail(v);
+              setVenues((list) => list.map((x) => (x.id === v.id ? v : x)));
+            }}
+          />
         </SheetFrame>
       ) : null}
 

@@ -14,6 +14,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Menu, Snackbar, Text } from 'react-native-paper';
 import { AppTheme as T, screenChrome } from '../constants/theme';
+import { useMyAccess } from '../lib/accessRules';
 import { Alert } from '../lib/alert';
 import { addBanquet, contactName, deleteBanquet, fetchBanquets, fetchLeads, leadPhones, markLeadsTouched } from '../lib/leads';
 // Loaded on first use: the spreadsheet code is big and slowed down app start.
@@ -46,6 +47,8 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
   // Shrink to the space above the keyboard so the focused box stays in sight.
   const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
   const router = useRouter();
+  // What this person's access rules allow (062): hides buttons they can't use.
+  const access = useMyAccess('leads');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [banquets, setBanquets] = useState<LeadBanquet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -270,15 +273,17 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
             </Text>
           </View>
         </View>
-        <Pressable
-          style={({ pressed }) => [screenChrome.primaryPill, pressed && { opacity: 0.9 }]}
-          onPress={() => setSheet({ lead: null, banquetId: null })}
-          accessibilityRole="button"
-          accessibilityLabel="Add lead"
-        >
-          <Feather name="plus" size={16} color={T.white} />
-          <Text style={screenChrome.primaryPillText}>Add lead</Text>
-        </Pressable>
+        {access.canAdd ? (
+          <Pressable
+            style={({ pressed }) => [screenChrome.primaryPill, pressed && { opacity: 0.9 }]}
+            onPress={() => setSheet({ lead: null, banquetId: null })}
+            accessibilityRole="button"
+            accessibilityLabel="Add lead"
+          >
+            <Feather name="plus" size={16} color={T.white} />
+            <Text style={screenChrome.primaryPillText}>Add lead</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.searchRow}>
@@ -309,14 +314,16 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
           }
           contentStyle={styles.menu}
         >
-          <Menu.Item
-            leadingIcon="tray-arrow-down"
-            title="Import from Excel"
-            onPress={() => {
-              setMenuFor(null);
-              setImporting({ target: null });
-            }}
-          />
+          {access.canAdd && access.canList('add') ? (
+            <Menu.Item
+              leadingIcon="tray-arrow-down"
+              title="Import from Excel"
+              onPress={() => {
+                setMenuFor(null);
+                setImporting({ target: null });
+              }}
+            />
+          ) : null}
           <Menu.Item
             leadingIcon="tray-arrow-up"
             title={query.trim() ? 'Export these' : 'Export all'}
@@ -388,7 +395,7 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
                     }
                     contentStyle={styles.menu}
                   >
-                    {g.banquet ? (
+                    {g.banquet && access.can('add', { target: g.banquet.id }) ? (
                       <Menu.Item
                         leadingIcon="plus"
                         title="Add a lead here"
@@ -408,7 +415,7 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
                         }}
                       />
                     ) : null}
-                    {g.banquet ? (
+                    {g.banquet && access.can('add', { target: g.banquet.id }) ? (
                       <Menu.Item
                         leadingIcon="tray-arrow-down"
                         title="Import into this"
@@ -418,7 +425,7 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
                         }}
                       />
                     ) : null}
-                    {g.leads.length ? (
+                    {g.leads.length && access.canEdit && access.canList('edit') ? (
                       <Menu.Item
                         leadingIcon="arrow-right-bold-box-outline"
                         title={query.trim() ? `Move these ${g.leads.length} to a banquet` : 'Move all to a banquet'}
@@ -438,7 +445,7 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
                         }}
                       />
                     ) : null}
-                    {g.banquet ? (
+                    {g.banquet && access.canList('delete') ? (
                       <Menu.Item
                         leadingIcon="trash-can-outline"
                         title="Remove banquet"
@@ -517,7 +524,7 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
         )}
 
         {/* Banquets are added here, on the list. */}
-        {!isLoading && !query.trim() ? (
+        {!isLoading && !query.trim() && access.canList('add') ? (
           newBanquet === null ? (
             <Pressable style={styles.addBtn} onPress={() => setNewBanquet('')} accessibilityRole="button">
               <Feather name="plus" size={15} color={T.ink} />
