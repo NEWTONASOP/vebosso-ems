@@ -48,6 +48,8 @@ import { SheetFrame } from './SheetFrame';
 const TITLE: Record<RuleFeature, string> = { venues: 'Venues', bills: 'Bills', leads: 'Navgrah Leads' };
 const PLACE_HEADING: Record<RuleFeature, string> = { venues: 'Cities', bills: 'Brands', leads: 'Banquets' };
 const OVERALL: Until[] = ['none', '30m', '1h', '1d', '1w', '1m', 'date'];
+/** People listed before "Show all". */
+const PEOPLE_FIRST = 5;
 const ROW_LIMITS: Until[] = ['30m', '1h', '4h', '1d', '1w', 'date'];
 const SEE_OPTIONS: { key: See; label: string }[] = [
   { key: 'none', label: 'None' },
@@ -80,7 +82,7 @@ export function AccessSheet({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [peopleOpen, setPeopleOpen] = useState(false);
+  const [showAllPeople, setShowAllPeople] = useState(false);
   const [placeList, setPlaceList] = useState<{ id: string; name: string }[]>([]);
   // People worth listing: they have this feature, or have added something in it.
   const [relevant, setRelevant] = useState<Set<string> | null>(null);
@@ -113,7 +115,6 @@ export function AccessSheet({
         const loaded = fromRules(rules.data, feature);
         setA(loaded);
         setHadRules(rules.data.length > 0);
-        setPeopleOpen(Object.entries(loaded.items).some(([k, v]) => k.startsWith('person:') && v !== 'none'));
       } else setError(rules.error);
       if (list?.success) setPlaceList(list.data.map((x) => ({ id: x.id, name: x.name })));
       setLoading(false);
@@ -313,29 +314,27 @@ export function AccessSheet({
 
           {people.length > 0 ? (
             <>
-              <Pressable
-                style={styles.sectionToggle}
-                onPress={() => setPeopleOpen((v) => !v)}
-                accessibilityRole="button"
-                accessibilityState={{ expanded: peopleOpen }}
-              >
-                <Text style={[styles.label, { marginTop: 0, marginBottom: 0, flex: 1 }]}>
-                  Certain people’s {noun}
-                  {pickedPeople ? ` · ${pickedPeople}` : ''}
-                </Text>
-                <Feather name={peopleOpen ? 'chevron-up' : 'chevron-down'} size={16} color={T.inkSoft} />
-              </Pressable>
-              {peopleOpen ? (
-                <>
-                  <Text style={[styles.note, { marginTop: 0, marginBottom: 8 }]}>
-                    Hide: nothing they {verb} is shown, even where a row above allows it. Default: only what the rows above give.
-                    {a.all === 'none' && places.some((p) => ['see', 'change'].includes(a.items[rowKey.place(p.id)] ?? 'none'))
-                      ? ` See / change here stays inside the ${PLACE_HEADING[feature].toLowerCase()} allowed above.`
-                      : ''}
-                  </Text>
-                  <View style={styles.group}>{people.map((p, i) => personRow(p.id, p.name, i === people.length - 1))}</View>
-                </>
-              ) : null}
+              <Text style={styles.label}>
+                Certain people’s {noun}
+                {pickedPeople ? ` · ${pickedPeople} set` : ''}
+              </Text>
+              {(() => {
+                // Anyone already set comes first; the rest fold away when there are many.
+                const set = (id: string) => (a.items[rowKey.person(id)] ?? 'none') !== 'none';
+                const sorted = [...people].sort((x, y) => Number(set(y.id)) - Number(set(x.id)));
+                const shown = showAllPeople ? sorted : sorted.slice(0, Math.max(PEOPLE_FIRST, pickedPeople));
+                return (
+                  <>
+                    <View style={styles.group}>{shown.map((p, i) => personRow(p.id, p.name, i === shown.length - 1))}</View>
+                    {sorted.length > shown.length ? (
+                      <Pressable style={styles.morePeople} onPress={() => setShowAllPeople(true)} accessibilityRole="button">
+                        <Text style={styles.morePeopleText}>Show all {sorted.length} people</Text>
+                        <Feather name="chevron-down" size={15} color={T.ink} />
+                      </Pressable>
+                    ) : null}
+                  </>
+                );
+              })()}
             </>
           ) : null}
 
@@ -531,7 +530,8 @@ const styles = StyleSheet.create({
   limitChip: { paddingHorizontal: 11, height: 30, borderRadius: 15, backgroundColor: T.soft, alignItems: 'center', justifyContent: 'center' },
   limitChipOn: { backgroundColor: T.violet },
   limitChipText: { fontFamily: 'Inter_600SemiBold', fontSize: 12.5, color: T.inkSoft },
-  sectionToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 20, marginBottom: 8 },
+  morePeople: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, marginTop: 8, borderRadius: 12, backgroundColor: T.soft },
+  morePeopleText: { fontFamily: 'Inter_600SemiBold', fontSize: 13.5, color: T.ink },
   note: { fontFamily: 'Inter_400Regular', fontSize: 12.5, color: T.mute, marginTop: 8 },
   error: { fontFamily: 'Inter_500Medium', fontSize: 13, color: T.coral, marginBottom: 8 },
   saveBtn: { height: 48, borderRadius: 999, backgroundColor: T.charcoal, alignItems: 'center', justifyContent: 'center' },
