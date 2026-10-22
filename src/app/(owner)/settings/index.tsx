@@ -19,6 +19,7 @@ import {
 } from '../../../constants/theme';
 import { Alert } from '../../../lib/alert';
 import { useAuthStore } from '../../../store/authStore';
+import { BugReportSheet } from '../../../components/BugReportSheet';
 import { ProfilePhotoEditor } from '../../../components/ProfilePhotoEditor';
 import { useWorkStore } from '../../../store/workStore';
 import { useSundayReminder } from '../../../lib/useSundayReminder';
@@ -29,6 +30,7 @@ export default function OwnerSettingsScreen() {
   const { settings, updateSetting } = useWorkStore();
 
   const [snackMessage, setSnackMessage] = React.useState('');
+  const [reporting, setReporting] = React.useState(false);
 
   const requireCheckoutApproval = settings['require_checkout_approval'] === 'true';
   const handleToggleCheckout = async () => {
@@ -107,6 +109,15 @@ export default function OwnerSettingsScreen() {
             subtitle="Everything deleted in the app — restore it"
             onPress={() => router.push('/(owner)/settings/recycle-bin')}
           />
+          <View style={styles.separator} />
+          <SettingsRow
+            icon="alert-triangle"
+            iconColor={AppTheme.coral}
+            iconBg={AppTheme.coralSoft}
+            title="Problem reports"
+            subtitle="Problems the team reported from the app"
+            onPress={() => router.push('/(owner)/settings/bug-reports')}
+          />
         </View>
 
         {/* App Settings */}
@@ -143,6 +154,15 @@ export default function OwnerSettingsScreen() {
             subtitle="Update your password"
             onPress={() => router.push('/(auth)/change-password')}
           />
+          <View style={styles.separator} />
+          <SettingsRow
+            icon="alert-triangle"
+            iconColor={AppTheme.coral}
+            iconBg={AppTheme.coralSoft}
+            title="Report a problem"
+            subtitle="Something not working? Tell us"
+            onPress={() => setReporting(true)}
+          />
         </View>
 
         {/* Sign out — visually separated destructive action */}
@@ -174,6 +194,8 @@ export default function OwnerSettingsScreen() {
           <Text style={styles.appVersion}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
         </View>
       </ScrollView>
+
+      {reporting ? <BugReportSheet onDismiss={() => setReporting(false)} onSent={setSnackMessage} /> : null}
 
       <Snackbar
         visible={!!snackMessage}

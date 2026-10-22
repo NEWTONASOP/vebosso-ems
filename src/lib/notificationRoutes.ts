@@ -120,6 +120,8 @@ export function notificationTarget(role: Role | null | undefined, data: Data): N
       const id = typeof data?.bill_id === 'string' ? data.bill_id : '';
       return owner && id ? { pathname: `/(owner)/bills/${id}` } : owner ? { pathname: '/(owner)/bills' } : home(role);
     }
+    case 'bug_report':
+      return owner ? { pathname: '/(owner)/settings/bug-reports' } : home(role);
     case 'venue_added':
       return { pathname: `${group}/venues` };
     case 'manager_assigned':

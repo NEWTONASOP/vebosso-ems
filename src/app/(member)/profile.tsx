@@ -10,6 +10,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Switch, Text } from 'react-native-paper';
+import { BugReportSheet } from '../../components/BugReportSheet';
 import { DocumentsSheet } from '../../components/DocumentsSheet';
 import { EmployeeDetailsSheet } from '../../components/EmployeeDetailsSheet';
 import { ExpensesSheet } from '../../components/ExpensesSheet';
@@ -55,7 +56,7 @@ function SundayReminderRow() {
 export default function MemberProfileScreen() {
   const router = useRouter();
   const { profile, signOut } = useAuthStore();
-  const [openSheet, setOpenSheet] = useState<'details' | 'documents' | 'salary' | 'expenses' | null>(null);
+  const [openSheet, setOpenSheet] = useState<'details' | 'documents' | 'salary' | 'expenses' | 'bug' | null>(null);
   // A tapped notification can ask for one of these sheets (?open=…); `ts` makes a repeat tap count.
   const { open: openParam, ts: openTs } = useLocalSearchParams<{ open?: string; ts?: string }>();
   const [seenTs, setSeenTs] = useState<string | undefined>();
@@ -163,6 +164,15 @@ export default function MemberProfileScreen() {
             iconBg={AppTheme.violetSoft}
             onPress={() => setOpenSheet('expenses')}
           />
+          <View style={styles.separator} />
+          <ActionRow
+            label="Leave Requests"
+            subtitle="Apply for time off and track status"
+            icon="calendar"
+            iconColor={AppTheme.blue}
+            iconBg={AppTheme.blueSoft}
+            onPress={() => router.push('/(member)/leaves')}
+          />
         </View>
 
         <Text style={styles.sectionLabel}>Security & settings</Text>
@@ -176,16 +186,16 @@ export default function MemberProfileScreen() {
             onPress={() => router.push('/(auth)/change-password')}
           />
           <View style={styles.separator} />
-          <ActionRow
-            label="Leave Requests"
-            subtitle="Apply for time off and track status"
-            icon="calendar"
-            iconColor={AppTheme.blue}
-            iconBg={AppTheme.blueSoft}
-            onPress={() => router.push('/(member)/leaves')}
-          />
-          <View style={styles.separator} />
           <SundayReminderRow />
+          <View style={styles.separator} />
+          <ActionRow
+            label="Report a problem"
+            subtitle="Something not working? Tell the boss"
+            icon="alert-triangle"
+            iconColor={AppTheme.coral}
+            iconBg={AppTheme.coralSoft}
+            onPress={() => setOpenSheet('bug')}
+          />
         </View>
 
         <View style={styles.signOutCard}>
@@ -245,6 +255,9 @@ export default function MemberProfileScreen() {
           userName={profile.full_name}
           mode="self"
         />
+      ) : null}
+      {openSheet === 'bug' ? (
+        <BugReportSheet onDismiss={() => setOpenSheet(null)} onSent={(m) => Alert.alert(m)} />
       ) : null}
     </PageTransition>
   );
