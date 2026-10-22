@@ -12,6 +12,9 @@ on:
       - '**.md'
       - '.gitignore'
       - 'supabase/**'
+  # "Run workflow" button in the Actions tab. A manual run always publishes,
+  # even if the last commit changed the app.json version.
+  workflow_dispatch:
 
 jobs:
   check-version:
@@ -47,7 +50,10 @@ jobs:
 
           git checkout HEAD -- app.json
 
-          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual run — publishing OTA update for v$CURRENT_VERSION"
+            echo "version_changed=false" >> $GITHUB_OUTPUT
+          elif [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
             echo "Version changed — APK workflow owns this release; skipping OTA publish"
             echo "version_changed=true" >> $GITHUB_OUTPUT
           else
