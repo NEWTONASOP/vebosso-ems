@@ -4,7 +4,9 @@
 //   create   they can add new ones (and always see and change what they add)
 //   del      they can delete — only what they are allowed to change
 //   all      every one of this kind: none / see / see + change
-//   items    each city / banquet / brand, and each other person's: same choice
+//   items    each city / banquet / brand, and each other person's: same choice;
+//            a person can also be 'hide' — nothing they added is shown, even
+//            where another row allows it (066)
 // Any row can have its own time limit; the rest use the overall end. This file
 // turns that into the rules the database stores (migrations 062–064) and back.
 // ============================================================================
@@ -12,7 +14,8 @@
 import { addDays, addHours, addMinutes, addMonths, endOfDay, format, isSameDay, parseISO } from 'date-fns';
 import { AccessRule, RuleDraft, RuleFeature, SCOPE_BY_FEATURE } from './accessRules';
 
-export type See = 'none' | 'see' | 'change';
+/** 'hide' only for people: takes their items away whatever else allows them. */
+export type See = 'none' | 'see' | 'change' | 'hide';
 
 /** How long. 'keep' is an exact end already stored (e.g. a 30-minute grant being re-saved). */
 export type Until = 'none' | '30m' | '1h' | '4h' | '1d' | '1w' | '1m' | 'date' | 'keep';
@@ -143,8 +146,9 @@ export function toRules(a: SimpleAccess, feature: RuleFeature, now = new Date())
     const groups = new Map<string, G>();
     for (const [key, see] of Object.entries(a.items)) {
       if (!key.startsWith(prefix) || see === 'none') continue;
-      // Below "all" there is nothing to add: "see" when all is seen, anything when all is changed.
-      if (a.all === 'change' || (a.all === 'see' && see === 'see')) continue;
+      // Below "all" there is nothing to add: "see" when all is seen, anything when
+      // all is changed. Hiding always counts.
+      if (see !== 'hide' && (a.all === 'change' || (a.all === 'see' && see === 'see'))) continue;
       const expires_at = endFor(key);
       const k = `${see}|${expires_at ?? ''}`;
       const g = groups.get(k) ?? { see, ids: [], expires_at };
@@ -170,7 +174,11 @@ export function toRules(a: SimpleAccess, feature: RuleFeature, now = new Date())
     );
   }
   for (const g of group('person:')) {
-    out.push({ ...base, scope: 'people', scope_ids: g.ids, expires_at: g.expires_at, ...ticksFor(g.see) });
+    out.push(
+      g.see === 'hide'
+        ? { ...base, scope: 'people', scope_ids: g.ids, expires_at: g.expires_at, ...NO_TICKS, deny: true }
+        : { ...base, scope: 'people', scope_ids: g.ids, expires_at: g.expires_at, ...ticksFor(g.see) },
+    );
   }
   return out;
 }
@@ -179,7 +187,8 @@ export function toRules(a: SimpleAccess, feature: RuleFeature, now = new Date())
 // Rules → access
 
 const seeOf = (r: AccessRule): See => (r.others_can_edit ? 'change' : 'see');
-const more = (x: See | undefined, y: See): See => (x === 'change' || y === 'change' ? 'change' : x === 'see' || y === 'see' ? 'see' : 'none');
+const more = (x: See | undefined, y: See): See =>
+  x === 'hide' ? 'hide' : x === 'change' || y === 'change' ? 'change' : x === 'see' || y === 'see' ? 'see' : 'none';
 
 export function fromRules(rules: AccessRule[], feature: RuleFeature): SimpleAccess {
   const a = emptyAccess();
@@ -188,12 +197,19 @@ export function fromRules(rules: AccessRule[], feature: RuleFeature): SimpleAcce
   const ends = new Map<string, { see: See; iso: string | null }>();
   const note = (key: string, see: See, iso: string | null) => {
     const old = ends.get(key);
-    const rank = (s: See) => (s === 'change' ? 2 : s === 'see' ? 1 : 0);
+    const rank = (s: See) => (s === 'hide' ? 3 : s === 'change' ? 2 : s === 'see' ? 1 : 0);
     const later = !old || (old.iso !== null && (iso === null || iso > old.iso));
     if (!old || rank(see) > rank(old.see) || (see === old.see && later)) ends.set(key, { see, iso });
   };
 
   for (const r of rules) {
+    if (r.deny) {
+      for (const id of r.scope_ids) {
+        a.items[rowKey.person(id)] = 'hide';
+        ends.set(rowKey.person(id), { see: 'hide', iso: r.expires_at });
+      }
+      continue;
+    }
     if (r.can_add) a.create = true;
     if (r.can_delete || r.others_can_delete) a.del = true;
     switch (r.scope) {
@@ -223,7 +239,8 @@ export function fromRules(rules: AccessRule[], feature: RuleFeature): SimpleAcce
   }
   // The overall end: the adding rule's, else the "all" row's, else one end every rule shares.
   const own = rules.find((r) => r.scope === 'own');
-  const shared = new Set(rules.map((r) => r.expires_at)).size === 1 ? rules[0]?.expires_at ?? null : null;
+  const allow = rules.filter((r) => !r.deny);
+  const shared = new Set(allow.map((r) => r.expires_at)).size === 1 ? allow[0]?.expires_at ?? null : null;
   const overall = own ? own.expires_at : ends.get(rowKey.all)?.iso ?? shared;
   if (overall) {
     a.until = 'keep';
@@ -256,7 +273,12 @@ export function describeAccess(
   const parts: string[] = [];
   if (a.all !== 'none') parts.push(`${verb(a.all)} all ${noun}${when(rowKey.all)}`);
   const placeIds: string[] = [];
+  const hidden: string[] = [];
   for (const [key, see] of Object.entries(a.items)) {
+    if (see === 'hide') {
+      hidden.push(`${personName(key.slice(7))}’s${when(key)}`);
+      continue;
+    }
     if (see === 'none' || a.all === 'change' || (a.all === 'see' && see === 'see')) continue;
     const name = key.startsWith('place:') ? placeName(key.slice(6)) : `${personName(key.slice(7))}’s ${noun}`;
     if (key.startsWith('place:')) placeIds.push(key.slice(6));
@@ -267,5 +289,6 @@ export function describeAccess(
     parts.push(`add new ${noun}${inside}`);
   }
   if (a.del) parts.push(a.create || a.all === 'change' || parts.length ? 'delete what they can change' : 'delete');
+  if (hidden.length && parts.length) parts.push(`but not ${hidden.join(', ')} ${noun}`);
   return parts.length ? parts.join(' · ') : 'nothing yet';
 }

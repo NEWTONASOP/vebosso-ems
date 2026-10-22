@@ -31,6 +31,8 @@ export interface AccessRule {
   /** On rows someone else added, inside what the rule lets them see. */
   others_can_edit: boolean;
   others_can_delete: boolean;
+  /** A "hide" rule (066): nothing the people in scope_ids added is shown. Ticks ignored. */
+  deny?: boolean;
   starts_at: string;
   expires_at: string | null;
 }
@@ -46,6 +48,7 @@ export type RuleDraft = Pick<
   | 'can_delete'
   | 'others_can_edit'
   | 'others_can_delete'
+  | 'deny'
   | 'expires_at'
 >;
 
@@ -153,7 +156,8 @@ export async function saveRules(
 
   const ins = await supabase
     .from('access_rules')
-    .insert(drafts.map((d) => ({ ...d, user_id: userId, feature, granted_by: ownerId })));
+    // Every row sends every column: a column left out of some rows would go in empty.
+    .insert(drafts.map((d) => ({ ...d, deny: d.deny ?? false, user_id: userId, feature, granted_by: ownerId })));
   if (ins.error) return fail(ins.error);
 
   if (old.data.length) {
@@ -236,12 +240,20 @@ export function ruleLine(r: AccessRule, names: Names, feature: RuleFeature): str
   return [scopeText(r, names, feature), doText(r), untilText(r)].filter(Boolean).join(' · ');
 }
 
+/** A rule that is on right now and gives access (not a "hide" rule). */
+export const isLiveAllow = (r: AccessRule) => isActive(r) && !r.deny;
+
+/** People whose items a live "hide" rule takes away. */
+const hiddenOwners = (rules: AccessRule[]) => new Set(rules.filter((r) => r.deny && isActive(r)).flatMap((r) => r.scope_ids));
+
 /** The summary of all of a person's rules for one feature (several shown as a count). */
 export function rulesSummary(rules: AccessRule[], names: Names, feature: RuleFeature): string {
-  const live = rules.filter((r) => isActive(r));
-  if (rules.length === 0) return 'Off';
+  const live = rules.filter(isLiveAllow);
+  if (!rules.some((r) => !r.deny)) return 'Off';
   if (live.length === 0) return 'Ended';
-  return live.length === 1 ? ruleLine(live[0], names, feature) : `${live.length} rules · ${ruleLine(live[0], names, feature)} …`;
+  const hidden = [...hiddenOwners(rules)].map((id) => names.people[id] ?? 'someone');
+  const main = live.length === 1 ? ruleLine(live[0], names, feature) : `${live.length} rules · ${ruleLine(live[0], names, feature)} …`;
+  return hidden.length ? `${main} · hides ${join(hidden)}` : main;
 }
 
 // ---------------------------------------------------------------------------
@@ -260,9 +272,11 @@ const tick = (r: AccessRule, a: RuleAction, mine: boolean) =>
 
 /** Mirror of the database check, so buttons can be hidden per row. */
 export function allows(rules: AccessRule[], action: RuleAction, me: string, row: RuleRow = {}): boolean {
+  // Hidden people's items are off whatever else allows them (066).
+  if (row.owner && row.owner !== me && hiddenOwners(rules).has(row.owner)) return false;
   return rules.some((r) => {
     const own = !!row.owner && row.owner === me;
-    if (!isActive(r) || !tick(r, action, own)) return false;
+    if (!isLiveAllow(r) || !tick(r, action, own)) return false;
     const mine = action !== 'add' && own;
     switch (r.scope) {
       case 'all':
@@ -283,7 +297,7 @@ export function allows(rules: AccessRule[], action: RuleAction, me: string, row:
 /** Can they see bills of this brand at all? (Mirror of access_brand_visible in 064.) */
 export function seesBrand(rules: AccessRule[], brand: string): boolean {
   return rules.some(
-    (r) => isActive(r) && (r.scope === 'all' || r.scope === 'own' || r.scope === 'people' || (r.scope === 'brands' && r.scope_values.includes(brand))),
+    (r) => isLiveAllow(r) && (r.scope === 'all' || r.scope === 'own' || r.scope === 'people' || (r.scope === 'brands' && r.scope_values.includes(brand))),
   );
 }
 
@@ -291,7 +305,7 @@ export function seesBrand(rules: AccessRule[], brand: string): boolean {
 export function allowsList(rules: AccessRule[], action: Exclude<RuleAction, 'view'>): boolean {
   return rules.some(
     (r) =>
-      isActive(r) &&
+      isLiveAllow(r) &&
       r.scope !== 'cities' &&
       r.scope !== 'banquets' &&
       (action === 'add' ? r.can_add : action === 'edit' ? r.can_edit || r.others_can_edit : r.can_delete || r.others_can_delete),
@@ -348,7 +362,7 @@ export function useMyAccess(feature: RuleFeature): MyAccess {
         .then(({ data }) => {
           if (!active) return;
           const rules = (data || []) as AccessRule[];
-          const live = rules.filter((r) => isActive(r));
+          const live = rules.filter(isLiveAllow);
           setState({
             loading: false,
             has: live.length > 0,

@@ -6,10 +6,12 @@
 //   • Which … can they see? — "All" plus one row per city / banquet / brand and
 //     per person, each None / See / See + change. Rows never repeat "All": when
 //     all can be seen, a row only asks "can change?"; when all can be changed,
-//     the rows are not needed and hide.
+//     those rows are not needed and hide.
+//   • A person can also be set to Hide: nothing they added is shown, even where
+//     another row allows it (066).
 // Any row can have its own time limit (say one person's bills for 30 minutes);
 // the rest use the overall end. Stored as rules by lib/accessSimple, enforced
-// by the database (migrations 062–064).
+// by the database (migrations 062–066).
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -195,6 +197,36 @@ export function AccessSheet({
     );
   };
 
+  /**
+   * One person: Hide, Default (only what the rows above give), or more. The
+   * "more" choices shrink as "All" grows, so nothing repeats it.
+   */
+  const personRow = (id: string, name: string, last: boolean) => {
+    const key = rowKey.person(id);
+    const stored = a.items[key] ?? 'none';
+    const shown: See =
+      stored === 'hide' ? 'hide' : a.all === 'change' || (a.all === 'see' && stored === 'see') ? 'none' : stored;
+    const options: { key: See; label: string }[] = [
+      { key: 'hide', label: 'Hide' },
+      { key: 'none', label: 'Default' },
+      ...(a.all === 'none' ? [{ key: 'see' as See, label: 'See' }] : []),
+      ...(a.all !== 'change' ? [{ key: 'change' as See, label: a.all === 'see' ? 'Change' : 'See + change' }] : []),
+    ];
+    return (
+      <ItemRow
+        key={key}
+        title={name}
+        sub={`${noun[0].toUpperCase()}${noun.slice(1)} ${name.split(' ')[0]} ${verb}`}
+        value={shown}
+        options={options}
+        onChange={(v) => setItem(key, v)}
+        limit={a.limits[key]}
+        onLimit={(l) => setLimit(key, l)}
+        last={last}
+      />
+    );
+  };
+
   const pickedPeople = Object.entries(a.items).filter(([k, v]) => k.startsWith('person:') && v !== 'none').length;
 
   return (
@@ -263,7 +295,7 @@ export function AccessSheet({
           </View>
 
           {a.all === 'change' ? (
-            <Text style={styles.note}>They can see and change every one, so there’s nothing more to pick.</Text>
+            <Text style={styles.note}>They can see and change every one, so there’s no {PLACE_HEADING[feature].toLowerCase()} to pick.</Text>
           ) : (
             <>
               <Text style={styles.label}>
@@ -276,33 +308,33 @@ export function AccessSheet({
                   {places.map((p, i) => itemRow(rowKey.place(p.id), p.name, `${noun[0].toUpperCase()}${noun.slice(1)} anyone ${verb} here`, i === places.length - 1))}
                 </View>
               )}
+            </>
+          )}
 
-              {people.length > 0 ? (
+          {people.length > 0 ? (
+            <>
+              <Pressable
+                style={styles.sectionToggle}
+                onPress={() => setPeopleOpen((v) => !v)}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: peopleOpen }}
+              >
+                <Text style={[styles.label, { marginTop: 0, marginBottom: 0, flex: 1 }]}>
+                  Certain people’s {noun}
+                  {pickedPeople ? ` · ${pickedPeople}` : ''}
+                </Text>
+                <Feather name={peopleOpen ? 'chevron-up' : 'chevron-down'} size={16} color={T.inkSoft} />
+              </Pressable>
+              {peopleOpen ? (
                 <>
-                  <Pressable
-                    style={styles.sectionToggle}
-                    onPress={() => setPeopleOpen((v) => !v)}
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: peopleOpen }}
-                  >
-                    <Text style={[styles.label, { marginTop: 0, marginBottom: 0, flex: 1 }]}>
-                      {a.all === 'see' ? 'Or change what certain people ' : 'Or what certain people '}
-                      {verb}
-                      {pickedPeople ? ` · ${pickedPeople}` : ''}
-                    </Text>
-                    <Feather name={peopleOpen ? 'chevron-up' : 'chevron-down'} size={16} color={T.inkSoft} />
-                  </Pressable>
-                  {peopleOpen ? (
-                    <View style={styles.group}>
-                      {people.map((p, i) =>
-                        itemRow(rowKey.person(p.id), p.name, `${noun[0].toUpperCase()}${noun.slice(1)} ${p.name.split(' ')[0]} ${verb}`, i === people.length - 1),
-                      )}
-                    </View>
-                  ) : null}
+                  <Text style={[styles.note, { marginTop: 0, marginBottom: 8 }]}>
+                    Hide: nothing they {verb} is shown, even where a row above allows it. Default: only what the rows above give.
+                  </Text>
+                  <View style={styles.group}>{people.map((p, i) => personRow(p.id, p.name, i === people.length - 1))}</View>
                 </>
               ) : null}
             </>
-          )}
+          ) : null}
 
           <Text style={styles.label}>Until when</Text>
           <View style={styles.chips}>
@@ -358,6 +390,7 @@ function ItemRow({
   sub,
   value,
   checkOnly,
+  options,
   onChange,
   limit,
   onLimit,
@@ -367,20 +400,23 @@ function ItemRow({
   sub: string;
   value: See;
   checkOnly?: boolean;
+  /** Choices to show instead of None / See / See + change (people rows). */
+  options?: { key: See; label: string }[];
   onChange: (v: See) => void;
   limit?: Limit;
   onLimit: (l: Limit | null) => void;
   last?: boolean;
 }) {
   const [limitOpen, setLimitOpen] = useState(false);
-  const active = checkOnly ? value === 'change' : value !== 'none';
+  const asCheck = checkOnly && !options;
+  const active = asCheck ? value === 'change' : value !== 'none';
   const limited = !!limit && limit.until !== 'none';
   const endIso = limit ? expiryOf(limit) : null;
   const ended = !!endIso && new Date(endIso).getTime() <= Date.now();
 
   return (
     <View style={[styles.row, !last && styles.rowDivider]}>
-      {checkOnly ? (
+      {asCheck ? (
         <Pressable
           style={styles.checkRow}
           onPress={() => onChange(value === 'change' ? 'none' : 'change')}
@@ -400,13 +436,13 @@ function ItemRow({
           <Text style={styles.rowTitle}>{title}</Text>
           <Text style={styles.rowSub}>{sub}</Text>
           <View style={styles.seg}>
-            {SEE_OPTIONS.map((o) => {
+            {(options ?? SEE_OPTIONS).map((o) => {
               const on = value === o.key;
               return (
                 <Pressable
                   key={o.key}
                   onPress={() => onChange(o.key)}
-                  style={[styles.segBtn, on && (o.key === 'none' ? styles.segNone : styles.segOn)]}
+                  style={[styles.segBtn, on && (o.key === 'none' ? styles.segNone : o.key === 'hide' ? styles.segHide : styles.segOn)]}
                   accessibilityRole="radio"
                   accessibilityLabel={`${title}: ${o.label}`}
                   accessibilityState={{ checked: on }}
@@ -484,6 +520,7 @@ const styles = StyleSheet.create({
   segBtn: { flex: 1, height: 38, borderRadius: 10, backgroundColor: T.soft, alignItems: 'center', justifyContent: 'center' },
   segOn: { backgroundColor: T.violet },
   segNone: { backgroundColor: T.charcoal },
+  segHide: { backgroundColor: T.coral },
   segText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
   limitLink: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', marginTop: 10, paddingVertical: 2 },
   limitText: { fontFamily: 'Inter_600SemiBold', fontSize: 12.5, color: T.mute },

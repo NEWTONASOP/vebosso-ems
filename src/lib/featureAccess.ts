@@ -9,7 +9,7 @@
 import { useFocusEffect, useSegments } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { AccessRule, isActive } from './accessRules';
+import { AccessRule, isLiveAllow } from './accessRules';
 import { parseSupabaseError } from './errors';
 import { sendPushNotification } from './notifications';
 import { supabase } from './supabase';
@@ -79,10 +79,10 @@ export function useHasFeature(feature: Feature): boolean {
       if (feature !== 'accounts') {
         supabase
           .from('access_rules')
-          .select('starts_at, expires_at')
+          .select('starts_at, expires_at, deny')
           .eq('user_id', userId)
           .eq('feature', feature)
-          .then(({ data }) => active && setGranted(((data || []) as AccessRule[]).some((r) => isActive(r))));
+          .then(({ data }) => active && setGranted(((data || []) as AccessRule[]).some(isLiveAllow)));
         return () => {
           active = false;
         };
