@@ -1,5 +1,5 @@
 // ============================================================================
-// VEBOSSO EMS — Access for one person and one feature (Venues, Bills, Leads)
+//  VEBOSSO EMS — Access for one person and one feature (Venues, Bills, Leads)
 // The owner's sheet, kept plain:
 //   • Can add new … (switch) — they always see and change what they add
 //   • Can delete (switch) — only what they are allowed to change
@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Switch, Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
-import { fetchContributorIds, fetchRules, FEATURE_NOUN, RuleFeature, saveRules, SCOPE_BY_FEATURE } from '../lib/accessRules';
+import { FEATURE_NOUN, fetchContributorIds, fetchRules, RuleFeature, saveRules, SCOPE_BY_FEATURE } from '../lib/accessRules';
 import {
   describeAccess,
   emptyAccess,
