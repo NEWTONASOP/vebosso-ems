@@ -17,12 +17,13 @@ import {
   screenChrome,
 } from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../store/workStore';
 import { TaskStatus } from '../../types/database';
 
 export default function MemberTasksScreen() {
-  const { profile } = useAuthStore();
-  const { todayTasks, fetchTodayTasks, updateTaskStatus, isLoadingToday } = useWorkStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
+  const { todayTasks, fetchTodayTasks, updateTaskStatus, isLoadingToday } = useWorkStore(useShallow((s) => ({ todayTasks: s.todayTasks, fetchTodayTasks: s.fetchTodayTasks, updateTaskStatus: s.updateTaskStatus, isLoadingToday: s.isLoadingToday })));
   const [filter, setFilter] = useState<TaskStatus | 'all'>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');

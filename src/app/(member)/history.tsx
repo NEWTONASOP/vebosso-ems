@@ -31,6 +31,7 @@ import {
   screenChrome,
 } from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../store/workStore';
 import { LeaveRequest, Task, WorkLog } from '../../types/database';
 
@@ -38,7 +39,7 @@ const memberAccent = RoleAccent.member;
 const KEY = (d: Date) => format(d, 'yyyy-MM-dd');
 
 export default function MemberHistoryScreen() {
-  const { profile } = useAuthStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
   const {
     fetchWorkHistory,
     fetchCompletedTasksInRange,
@@ -46,7 +47,7 @@ export default function MemberHistoryScreen() {
     backfillPermissions,
     fetchBackfillPermissions,
     submitBackfill,
-  } = useWorkStore();
+  } = useWorkStore(useShallow((s) => ({ fetchWorkHistory: s.fetchWorkHistory, fetchCompletedTasksInRange: s.fetchCompletedTasksInRange, fetchLeaveInRange: s.fetchLeaveInRange, backfillPermissions: s.backfillPermissions, fetchBackfillPermissions: s.fetchBackfillPermissions, submitBackfill: s.submitBackfill })));
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()));

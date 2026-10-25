@@ -1141,10 +1141,13 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         return await q;
       };
 
-      const { count: totalMembers } = await supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_active', true).neq('role', 'owner');
-      const { count: activeNow } = await supabase.from('work_logs').select('id', { count: 'exact', head: true }).eq('date', today).in('status', ['working', 'pending_approval']);
-      const { count: onLeaveToday } = await supabase.from('leave_requests').select('id', { count: 'exact', head: true }).lte('date', today).or(endsOnOrAfter(today)).eq('status', 'approved');
-      const { count: pendingApprovals } = await supabase.from('work_logs').select('id', { count: 'exact', head: true }).eq('status', 'pending_approval');
+      // Four independent counts, asked for together.
+      const [{ count: totalMembers }, { count: activeNow }, { count: onLeaveToday }, { count: pendingApprovals }] = await Promise.all([
+        supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_active', true).neq('role', 'owner'),
+        supabase.from('work_logs').select('id', { count: 'exact', head: true }).eq('date', today).in('status', ['working', 'pending_approval']),
+        supabase.from('leave_requests').select('id', { count: 'exact', head: true }).lte('date', today).or(endsOnOrAfter(today)).eq('status', 'approved'),
+        supabase.from('work_logs').select('id', { count: 'exact', head: true }).eq('status', 'pending_approval'),
+      ]);
 
       set({
         stats: {
@@ -1701,12 +1704,22 @@ export const useWorkStore = create<WorkState>((set, get) => ({
       }, 400);
     };
 
-    const workLogsChannel = supabase
-      .channel(`work_logs_changes_${channelId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'work_logs' }, () => {
+    // A burst of check-ins (the morning rush) refreshes once, not once per row.
+    let workLogsTimer: ReturnType<typeof setTimeout> | null = null;
+    const refreshWorkLogs = () => {
+      if (workLogsTimer) clearTimeout(workLogsTimer);
+      workLogsTimer = setTimeout(() => {
+        workLogsTimer = null;
         if (role === 'owner') { get().fetchPendingApprovals(); get().fetchStats(); }
         else if (role === 'manager') { get().fetchPendingApprovals(managerId); get().fetchStats(managerId); }
         get().fetchTodayLog(userId);
+      }, 800);
+    };
+
+    const workLogsChannel = supabase
+      .channel(`work_logs_changes_${channelId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'work_logs' }, () => {
+        refreshWorkLogs();
         scheduleTeamLiveRefresh();
       })
       .subscribe();

@@ -31,6 +31,7 @@ import {
 import { Alert } from '../../lib/alert';
 import { useSundayReminder } from '../../lib/useSundayReminder';
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 
 /** On/off for the 11:30 AM check-in reminder on Sundays. */
 function SundayReminderRow() {
@@ -55,7 +56,7 @@ function SundayReminderRow() {
 
 export default function MemberProfileScreen() {
   const router = useRouter();
-  const { profile, signOut } = useAuthStore();
+  const { profile, signOut } = useAuthStore(useShallow((s) => ({ profile: s.profile, signOut: s.signOut })));
   const [openSheet, setOpenSheet] = useState<'details' | 'documents' | 'salary' | 'expenses' | 'bug' | null>(null);
   // A tapped notification can ask for one of these sheets (?open=…); `ts` makes a repeat tap count.
   const { open: openParam, ts: openTs } = useLocalSearchParams<{ open?: string; ts?: string }>();

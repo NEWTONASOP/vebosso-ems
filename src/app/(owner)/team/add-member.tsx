@@ -23,11 +23,12 @@ import { supabase } from '../../../lib/supabase';
 import { getDownloadUrl } from '../../../lib/versionCheck';
 import { useKeyboardOverlap } from '../../../lib/useKeyboardHeight';
 import { useWorkStore } from '../../../store/workStore';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function AddMemberScreen() {
   const router = useRouter();
   const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
-  const { teamMembers, fetchTeamMembers } = useWorkStore();
+  const { teamMembers, fetchTeamMembers } = useWorkStore(useShallow((s) => ({ teamMembers: s.teamMembers, fetchTeamMembers: s.fetchTeamMembers })));
 
   const [fullName, setFullName] = useState('');
   const [department, setDepartment] = useState('');

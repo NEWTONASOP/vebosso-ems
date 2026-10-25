@@ -11,11 +11,12 @@ import { InlineError } from '../../components/InlineError';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { AppSpace, AppTheme, screenChrome } from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../store/workStore';
 import { WorkLogWithProfile, LeaveRequestWithProfile } from '../../types/database';
 
 export default function ManagerApprovalsScreen() {
-  const { profile } = useAuthStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
   const {
     pendingApprovals,
     isLoadingApprovals,
@@ -29,7 +30,7 @@ export default function ManagerApprovalsScreen() {
     fetchLeaveRequests,
     approveLeaveRequest,
     rejectLeaveRequest,
-  } = useWorkStore();
+  } = useWorkStore(useShallow((s) => ({ pendingApprovals: s.pendingApprovals, isLoadingApprovals: s.isLoadingApprovals, approvalsError: s.approvalsError, fetchPendingApprovals: s.fetchPendingApprovals, approveCheckIn: s.approveCheckIn, rejectCheckIn: s.rejectCheckIn, leaveRequests: s.leaveRequests, isLoadingLeaves: s.isLoadingLeaves, fetchLeaveRequests: s.fetchLeaveRequests, approveLeaveRequest: s.approveLeaveRequest, rejectLeaveRequest: s.rejectLeaveRequest })));
 
   const [activeTab, setActiveTab] = useState<'attendance' | 'leaves'>('attendance');
   const [refreshing, setRefreshing] = useState(false);

@@ -36,6 +36,7 @@ import { isAppVisible } from '../../lib/appActive';
 import { DepartmentData, fetchDepartments } from '../../lib/departments';
 import { sortMembersByLiveStatus } from '../../lib/teamSort';
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useWorkStore } from '../../store/workStore';
 import { Profile, WorkLogWithProfile } from '../../types/database';
@@ -47,7 +48,7 @@ const ENTER = Easing.bezier(0.22, 1, 0.36, 1);
 export default function OwnerDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { profile } = useAuthStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
   const {
     stats,
     pendingApprovals,
@@ -66,7 +67,7 @@ export default function OwnerDashboard() {
     rejectCheckIn,
     subscribeToRealtime,
     unsubscribeFromRealtime,
-  } = useWorkStore();
+  } = useWorkStore(useShallow((s) => ({ stats: s.stats, pendingApprovals: s.pendingApprovals, isLoadingApprovals: s.isLoadingApprovals, approvalsError: s.approvalsError, teamMembers: s.teamMembers, isLoadingTeam: s.isLoadingTeam, teamError: s.teamError, memberLiveStatus: s.memberLiveStatus, fetchStats: s.fetchStats, fetchPendingApprovals: s.fetchPendingApprovals, fetchSettings: s.fetchSettings, fetchTeamMembers: s.fetchTeamMembers, refreshMemberLiveStatus: s.refreshMemberLiveStatus, approveCheckIn: s.approveCheckIn, rejectCheckIn: s.rejectCheckIn, subscribeToRealtime: s.subscribeToRealtime, unsubscribeFromRealtime: s.unsubscribeFromRealtime })));
 
   const [refreshing, setRefreshing] = React.useState(false);
   const [menuMember, setMenuMember] = React.useState<Profile | null>(null);
@@ -569,8 +570,8 @@ function GroupRow({
 
 function SoftBell() {
   const router = useRouter();
-  const { profile } = useAuthStore();
-  const { unreadCount, fetchNotifications, setupSubscription } = useNotificationStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
+  const { unreadCount, fetchNotifications, setupSubscription } = useNotificationStore(useShallow((s) => ({ unreadCount: s.unreadCount, fetchNotifications: s.fetchNotifications, setupSubscription: s.setupSubscription })));
 
   useEffect(() => {
     if (!profile?.id) return;

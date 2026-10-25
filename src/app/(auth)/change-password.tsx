@@ -15,6 +15,7 @@ import {
   screenChrome,
 } from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useKeyboardOverlap } from '../../lib/useKeyboardHeight';
 
 export default function ChangePasswordScreen() {
@@ -26,7 +27,7 @@ export default function ChangePasswordScreen() {
   const [snackMessage, setSnackMessage] = useState('');
   const [isChanging, setIsChanging] = useState(false);
 
-  const { changePassword } = useAuthStore();
+  const { changePassword } = useAuthStore(useShallow((s) => ({ changePassword: s.changePassword })));
   const router = useRouter();
 
   const getPasswordStrength = (): { score: number; label: string; color: string } => {

@@ -26,6 +26,7 @@ import {
 } from '../lib/authSessionLifecycle';
 import { notificationHref } from '../lib/notificationRoutes';
 import { useAuthStore } from '../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 // Side-effect import: registers the background location task before the bundle
 // finishes evaluating, so a headless relaunch can deliver a fix to it.
 import '../lib/locationTracking';
@@ -78,7 +79,7 @@ function AuthGuard() {
   const router = useRouter();
   const segments = useSegments();
   const rootNavigationState = useRootNavigationState();
-  const { isAuthenticated, isInitialized, profile, isLoading } = useAuthStore();
+  const { isAuthenticated, isInitialized, profile, isLoading } = useAuthStore(useShallow((s) => ({ isAuthenticated: s.isAuthenticated, isInitialized: s.isInitialized, profile: s.profile, isLoading: s.isLoading })));
 
   useEffect(() => {
     if (isAuthenticated && profile?.id) {

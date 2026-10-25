@@ -23,6 +23,7 @@ import {
   getMonthRange,
 } from '../lib/attendanceTimeline';
 import { useWorkStore } from '../store/workStore';
+import { useShallow } from 'zustand/react/shallow';
 import { LeaveRequest, Task, WorkLog } from '../types/database';
 
 const KEY = (d: Date) => format(d, 'yyyy-MM-dd');
@@ -65,8 +66,7 @@ export function MemberAttendancePanel({
   footer,
   dayAction,
 }: MemberAttendancePanelProps) {
-  const { fetchWorkHistory, fetchCompletedTasksInRange, fetchLeaveInRange } =
-    useWorkStore();
+  const { fetchWorkHistory, fetchCompletedTasksInRange, fetchLeaveInRange } = useWorkStore(useShallow((s) => ({ fetchWorkHistory: s.fetchWorkHistory, fetchCompletedTasksInRange: s.fetchCompletedTasksInRange, fetchLeaveInRange: s.fetchLeaveInRange })));
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()));

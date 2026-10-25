@@ -27,6 +27,7 @@ import {
   RoleAccent,
 } from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../store/workStore';
 import { TaskStatus, WorkFile } from '../../types/database';
 import { MyRemarksCard } from '../../components/MyRemarksCard';
@@ -34,7 +35,7 @@ import { MyRemarksCard } from '../../components/MyRemarksCard';
 const memberAccent = RoleAccent.member;
 
 export default function MemberHomeScreen() {
-  const { profile } = useAuthStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
   const todayLog = useWorkStore((s) => s.todayLog);
   const todayTasks = useWorkStore((s) => s.todayTasks);
   const isLoadingToday = useWorkStore((s) => s.isLoadingToday);

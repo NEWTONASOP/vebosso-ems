@@ -19,6 +19,7 @@ import {
 } from '../../../constants/theme';
 import { Alert } from '../../../lib/alert';
 import { useAuthStore } from '../../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { BugReportSheet } from '../../../components/BugReportSheet';
 import { ProfilePhotoEditor } from '../../../components/ProfilePhotoEditor';
 import { useWorkStore } from '../../../store/workStore';
@@ -26,8 +27,8 @@ import { useSundayReminder } from '../../../lib/useSundayReminder';
 
 export default function OwnerSettingsScreen() {
   const router = useRouter();
-  const { signOut, profile } = useAuthStore();
-  const { settings, updateSetting } = useWorkStore();
+  const { signOut, profile } = useAuthStore(useShallow((s) => ({ signOut: s.signOut, profile: s.profile })));
+  const { settings, updateSetting } = useWorkStore(useShallow((s) => ({ settings: s.settings, updateSetting: s.updateSetting })));
 
   const [snackMessage, setSnackMessage] = React.useState('');
   const [reporting, setReporting] = React.useState(false);

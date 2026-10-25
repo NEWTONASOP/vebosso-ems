@@ -4,7 +4,9 @@
 
 import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
+import { imageSource } from '../lib/imageSource';
 import { Button, Dialog, Modal, Portal, Text } from 'react-native-paper';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { AnimatedPressable } from './AnimatedPressable';
@@ -231,7 +233,7 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
                       onPress={() => setSelectedPhoto(url)}
                       style={({ pressed }) => [styles.photoWrapper, pressed && { opacity: 0.9 }]}
                     >
-                      <Image source={{ uri: url }} style={styles.photo} />
+                      <Image source={imageSource(url)} style={styles.photo} contentFit="cover" />
                     </Pressable>
                   ))}
                 </View>
@@ -264,7 +266,7 @@ export function ApprovalCard({ workLog, onApprove, onReject, onAssignAndApprove,
                       onPress={() => setSelectedPhoto(url)}
                       style={({ pressed }) => [styles.photoWrapper, pressed && { opacity: 0.9 }]}
                     >
-                      <Image source={{ uri: url }} style={styles.photo} />
+                      <Image source={imageSource(url)} style={styles.photo} contentFit="cover" />
                     </Pressable>
                   ))}
                 </View>

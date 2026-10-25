@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 
 import { useNotificationStore } from '../store/notificationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../store/authStore';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { AnimatedPressable } from './AnimatedPressable';
@@ -19,8 +20,8 @@ interface NotificationBellProps {
 
 export function NotificationBell({ role }: NotificationBellProps) {
   const router = useRouter();
-  const { profile } = useAuthStore();
-  const { unreadCount, fetchNotifications, setupSubscription } = useNotificationStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
+  const { unreadCount, fetchNotifications, setupSubscription } = useNotificationStore(useShallow((s) => ({ unreadCount: s.unreadCount, fetchNotifications: s.fetchNotifications, setupSubscription: s.setupSubscription })));
 
   useEffect(() => {
     if (!profile?.id) return;

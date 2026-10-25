@@ -6,6 +6,7 @@
 
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { imageSource } from '../lib/imageSource';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
@@ -33,7 +34,7 @@ export function ImageViewerModal({
         </View>
         {uri ? (
           <Pressable onPress={onDismiss} accessibilityLabel="Close photo">
-            <Image source={{ uri }} style={[styles.image, { height: Math.round(height * 0.72) }]} contentFit="contain" />
+            <Image source={imageSource(uri)} style={[styles.image, { height: Math.round(height * 0.72) }]} contentFit="contain" />
           </Pressable>
         ) : null}
       </Modal>

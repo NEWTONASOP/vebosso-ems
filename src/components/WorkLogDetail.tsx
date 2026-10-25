@@ -5,7 +5,9 @@
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
+import { imageSource } from '../lib/imageSource';
 import { Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { WORK_LOG_STATUS_CONFIG } from '../constants/roles';
@@ -296,7 +298,7 @@ export function WorkLogDetail({
                       onPress={() => setSelectedPhoto(url)}
                       style={({ pressed }) => [styles.photoWrapper, pressed && { opacity: 0.9 }]}
                     >
-                      <Image source={{ uri: url }} style={styles.photo} />
+                      <Image source={imageSource(url)} style={styles.photo} contentFit="cover" />
                     </Pressable>
                   ))}
                 </View>
@@ -320,7 +322,7 @@ export function WorkLogDetail({
                       onPress={() => setSelectedPhoto(url)}
                       style={({ pressed }) => [styles.photoWrapper, pressed && { opacity: 0.9 }]}
                     >
-                      <Image source={{ uri: url }} style={styles.photo} />
+                      <Image source={imageSource(url)} style={styles.photo} contentFit="cover" />
                     </Pressable>
                   ))}
                 </View>

@@ -13,11 +13,12 @@ import { MemberCard } from '../../components/MemberCard';
 import { AppSpace, AppTheme, RoleAccent, screenChrome } from '../../constants/theme';
 import { isAppVisible } from '../../lib/appActive';
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../store/workStore';
 import { Profile } from '../../types/database';
 
 export default function ManagerMyTeamScreen() {
-  const { profile } = useAuthStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
   const {
     teamMembers,
     isLoadingTeam,
@@ -25,7 +26,7 @@ export default function ManagerMyTeamScreen() {
     refreshMemberLiveStatus,
     memberLiveStatus,
     subscribeToRealtime,
-  } = useWorkStore();
+  } = useWorkStore(useShallow((s) => ({ teamMembers: s.teamMembers, isLoadingTeam: s.isLoadingTeam, fetchTeamMembers: s.fetchTeamMembers, refreshMemberLiveStatus: s.refreshMemberLiveStatus, memberLiveStatus: s.memberLiveStatus, subscribeToRealtime: s.subscribeToRealtime })));
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [attendanceMember, setAttendanceMember] = useState<Profile | null>(null);

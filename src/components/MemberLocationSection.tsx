@@ -29,6 +29,7 @@ import { isAppVisible } from '../lib/appActive';
 import { reverseGeocodeStop } from '../lib/reverseGeocode';
 import { supabase } from '../lib/supabase';
 import { useWorkStore } from '../store/workStore';
+import { useShallow } from 'zustand/react/shallow';
 import { LocationPing, MemberLocation } from '../types/database';
 
 /** How often the live marker is refreshed while the sheet stays open. */
@@ -59,7 +60,7 @@ export function MemberLocationSection({
   date,
   accentColor = T.blue,
 }: MemberLocationSectionProps) {
-  const { fetchDayLocations } = useWorkStore();
+  const { fetchDayLocations } = useWorkStore(useShallow((s) => ({ fetchDayLocations: s.fetchDayLocations })));
 
   const [pings, setPings] = useState<LocationPing[]>([]);
   const [live, setLive] = useState<MemberLocation | null>(null);

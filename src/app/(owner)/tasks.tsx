@@ -5,7 +5,7 @@
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
 import { EmptyState } from '../../components/EmptyState';
@@ -22,10 +22,13 @@ import {
 } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../store/workStore';
 import { Task, TaskStatus } from '../../types/database';
 import { UserAvatar } from '../../components/UserAvatar';
 import { ShowMore, usePaged } from '../../components/ShowMore';
+
+const DONE_BATCH = 100;
 
 interface TaskWithAssignee extends Task {
   assignee: {
@@ -39,8 +42,8 @@ interface TaskWithAssignee extends Task {
 
 export default function OwnerTaskTrackingScreen() {
   const router = useRouter();
-  const { profile } = useAuthStore();
-  const { reassignTask, updateTask, approveTask, rejectTask, reopenTask } = useWorkStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
+  const { reassignTask, updateTask, approveTask, rejectTask, reopenTask } = useWorkStore(useShallow((s) => ({ reassignTask: s.reassignTask, updateTask: s.updateTask, approveTask: s.approveTask, rejectTask: s.rejectTask, reopenTask: s.reopenTask })));
   const [tasks, setTasks] = useState<TaskWithAssignee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -50,22 +53,32 @@ export default function OwnerTaskTrackingScreen() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showMemberPicker, setShowMemberPicker] = useState(false);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  // Completed tasks are fetched a batch at a time; open ones always in full.
+  const doneLimit = useRef(DONE_BATCH);
+  const [doneTotal, setDoneTotal] = useState(0);
 
   const fetchAssignedTasks = useCallback(async (silent = false) => {
     if (!profile?.id) return;
     if (!silent) setIsLoading(true);
     
     try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*, assignee:profiles!tasks_assigned_to_fkey(id, full_name, employee_id, avatar_url, role)')
-        .eq('assigned_by', profile.id)
-        .order('created_at', { ascending: false });
+      // Everything still open, however old; completed ones a batch at a time,
+      // plus how many there are in all so the progress stays all-time.
+      const select = '*, assignee:profiles!tasks_assigned_to_fkey(id, full_name, employee_id, avatar_url, role)';
+      const [open, done, doneCount] = await Promise.all([
+        supabase.from('tasks').select(select).eq('assigned_by', profile.id).neq('status', 'done')
+          .order('created_at', { ascending: false }),
+        supabase.from('tasks').select(select).eq('assigned_by', profile.id).eq('status', 'done')
+          .order('created_at', { ascending: false }).limit(doneLimit.current),
+        supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('assigned_by', profile.id).eq('status', 'done'),
+      ]);
 
+      const error = open.error || done.error;
       if (error) {
         setSnackMessage(error.message);
       } else {
-        setTasks((data || []) as unknown as TaskWithAssignee[]);
+        setTasks([...(open.data || []), ...(done.data || [])] as unknown as TaskWithAssignee[]);
+        setDoneTotal(doneCount.count ?? (done.data || []).length);
       }
     } catch (err: any) {
       setSnackMessage(err.message || 'Failed to fetch tasks');
@@ -169,9 +182,15 @@ export default function OwnerTaskTrackingScreen() {
   // A page at a time — a long history of tasks was slow to draw.
   const taskPage = usePaged(filteredTasks, filter);
 
+  const loadedDone = tasks.filter((t) => t.status === 'done').length;
+  const loadOlderDone = () => {
+    doneLimit.current += DONE_BATCH;
+    void fetchAssignedTasks(true);
+  };
+
   const stats = {
-    total: tasks.length,
-    done: tasks.filter((t) => t.status === 'done').length,
+    total: tasks.length - loadedDone + doneTotal,
+    done: doneTotal,
     inProgress: tasks.filter((t) => t.status === 'in_progress').length,
     pending: tasks.filter((t) => t.status === 'pending').length,
     review: tasks.filter((t) => t.status === 'review').length,
@@ -373,6 +392,10 @@ export default function OwnerTaskTrackingScreen() {
                   );
                 })}
                 <ShowMore page={taskPage} />
+                {/* Older completed tasks are still on the server: bring the next batch. */}
+                {taskPage.left === 0 && (filter === 'all' || filter === 'done') ? (
+                  <ShowMore page={{ left: doneTotal - loadedDone, more: loadOlderDone }} />
+                ) : null}
               </View>
             ) : (
               <View style={styles.emptyCard}>

@@ -22,13 +22,14 @@ import { uploadVoiceNote, VoiceClip } from '../lib/voice';
 /** Title for a task given only as a voice note. */
 export const VOICE_TASK_TITLE = '🎤 Voice task';
 
-const fetchMemberTasks = async (memberId: string) =>
-  await supabase
-    .from('tasks')
-    .select('*')
-    .eq('assigned_to', memberId)
-    .order('created_at', { ascending: false })
-    .limit(40);
+/** Every task still open or waiting for review, however old, plus the latest 40 done. */
+const fetchMemberTasks = async (memberId: string) => {
+  const [open, done] = await Promise.all([
+    supabase.from('tasks').select('*').eq('assigned_to', memberId).neq('status', 'done').order('created_at', { ascending: false }),
+    supabase.from('tasks').select('*').eq('assigned_to', memberId).eq('status', 'done').order('created_at', { ascending: false }).limit(40),
+  ]);
+  return { data: [...(open.data || []), ...(done.data || [])], error: open.error || done.error };
+};
 
 interface MemberTasksSheetProps {
   /** Show in place (e.g. a dropdown in the member sheet) instead of as a sheet. */
@@ -258,33 +259,40 @@ function TaskLine({ task, onPress }: { task: Task; onPress: () => void }) {
   const isDone = task.status === 'done';
   const inReview = task.status === 'review';
   return (
-    <Pressable
-      style={({ pressed }) => [styles.line, pressed && { opacity: 0.6 }]}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`Open task: ${task.title}`}
-    >
-      <View
-        style={[
-          styles.dot,
-          { backgroundColor: isDone ? T.greenSoft : inReview ? T.violetSoft : T.amberSoft },
-        ]}
+    // The voice note is itself a button, and a button cannot sit inside a button
+    // on web, so the row is a View and only the text parts open the task.
+    <View style={styles.line}>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => pressed && { opacity: 0.6 }}
+        accessibilityRole="button"
+        accessibilityLabel={`Open task: ${task.title}`}
       >
-        <Feather
-          name={isDone ? 'check' : inReview ? 'eye' : 'circle'}
-          size={12}
-          color={isDone ? T.green : inReview ? T.violet : T.amber}
-        />
-      </View>
+        <View
+          style={[
+            styles.dot,
+            { backgroundColor: isDone ? T.greenSoft : inReview ? T.violetSoft : T.amberSoft },
+          ]}
+        >
+          <Feather
+            name={isDone ? 'check' : inReview ? 'eye' : 'circle'}
+            size={12}
+            color={isDone ? T.green : inReview ? T.violet : T.amber}
+          />
+        </View>
+      </Pressable>
       <View style={{ flex: 1 }}>
         {!(task.voice_path && task.title === VOICE_TASK_TITLE) ? (
-          <Text style={[styles.lineText, isDone && styles.lineTextDone]}>{task.title}</Text>
+          <Pressable onPress={onPress} style={({ pressed }) => pressed && { opacity: 0.6 }} accessibilityRole="button">
+            <Text style={[styles.lineText, isDone && styles.lineTextDone]}>{task.title}</Text>
+          </Pressable>
         ) : null}
         {task.voice_path ? (
           <View style={{ marginTop: 4 }}>
             <VoiceNote path={task.voice_path} durationMs={task.voice_ms} />
           </View>
         ) : null}
+        <Pressable onPress={onPress} style={({ pressed }) => pressed && { opacity: 0.6 }} accessibilityRole="button">
         {task.description ? <Text style={styles.lineSub}>{task.description}</Text> : null}
         {(isDone || inReview) && task.completion_note ? (
           <Text style={styles.note}>“{task.completion_note}”</Text>
@@ -299,8 +307,9 @@ function TaskLine({ task, onPress }: { task: Task; onPress: () => void }) {
               ? `Done ${format(new Date(task.completed_at), 'd MMM, h:mm a')}`
               : `Given ${format(new Date(task.created_at), 'd MMM, h:mm a')}`}
         </Text>
+        </Pressable>
       </View>
-    </Pressable>
+    </View>
   );
 }
 

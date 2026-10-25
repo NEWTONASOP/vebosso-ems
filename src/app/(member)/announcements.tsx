@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../store/workStore';
 import { AnnouncementCard } from '../../components/AnnouncementCard';
 import { EmptyState } from '../../components/EmptyState';
@@ -17,8 +18,8 @@ import {
 } from '../../constants/theme';
 
 export default function MemberAnnouncementsScreen() {
-  const { profile } = useAuthStore();
-  const { announcements, fetchAnnouncements } = useWorkStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
+  const { announcements, fetchAnnouncements } = useWorkStore(useShallow((s) => ({ announcements: s.announcements, fetchAnnouncements: s.fetchAnnouncements })));
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {

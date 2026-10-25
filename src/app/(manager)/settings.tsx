@@ -28,6 +28,7 @@ import {
 } from '../../constants/theme';
 import { Alert } from '../../lib/alert';
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { ProfilePhotoEditor } from '../../components/ProfilePhotoEditor';
 import { useSundayReminder } from '../../lib/useSundayReminder';
 
@@ -54,7 +55,7 @@ function SundayReminderRow() {
 
 export default function ManagerSettingsScreen() {
   const router = useRouter();
-  const { profile, signOut } = useAuthStore();
+  const { profile, signOut } = useAuthStore(useShallow((s) => ({ profile: s.profile, signOut: s.signOut })));
   const [openSheet, setOpenSheet] = useState<'details' | 'documents' | 'salary' | 'expenses' | 'bug' | null>(null);
   // A tapped notification can ask for one of these sheets (?open=â€¦); `ts` makes a repeat tap count.
   const { open: openParam, ts: openTs } = useLocalSearchParams<{ open?: string; ts?: string }>();

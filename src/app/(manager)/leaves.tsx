@@ -9,6 +9,7 @@ import { Snackbar, Text } from 'react-native-paper';
 import { Feather } from '@expo/vector-icons';
 
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../store/workStore';
 import { LeaveCard } from '../../components/LeaveCard';
 import { LeaveRequestModal } from '../../components/LeaveRequestModal';
@@ -18,13 +19,13 @@ import { AppSpace, AppTheme, screenChrome } from '../../constants/theme';
 
 export default function LeavesScreen() {
   const router = useRouter();
-  const { profile } = useAuthStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
   const {
     leaveRequests,
     isLoadingLeaves,
     fetchLeaveRequests,
     submitLeaveRequest,
-  } = useWorkStore();
+  } = useWorkStore(useShallow((s) => ({ leaveRequests: s.leaveRequests, isLoadingLeaves: s.isLoadingLeaves, fetchLeaveRequests: s.fetchLeaveRequests, submitLeaveRequest: s.submitLeaveRequest })));
 
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);

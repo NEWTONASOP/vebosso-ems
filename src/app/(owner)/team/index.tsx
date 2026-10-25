@@ -16,12 +16,13 @@ import { AppSpace, AppTheme, screenChrome } from '../../../constants/theme';
 import { isAppVisible } from '../../../lib/appActive';
 import { sortMembersByLiveStatus } from '../../../lib/teamSort';
 import { useAuthStore } from '../../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../../store/workStore';
 import { Profile } from '../../../types/database';
 
 export default function OwnerTeamScreen() {
   const router = useRouter();
-  const { profile } = useAuthStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
   const {
     teamMembers,
     isLoadingTeam,
@@ -30,7 +31,7 @@ export default function OwnerTeamScreen() {
     refreshMemberLiveStatus,
     memberLiveStatus,
     subscribeToRealtime,
-  } = useWorkStore();
+  } = useWorkStore(useShallow((s) => ({ teamMembers: s.teamMembers, isLoadingTeam: s.isLoadingTeam, teamError: s.teamError, fetchTeamMembers: s.fetchTeamMembers, refreshMemberLiveStatus: s.refreshMemberLiveStatus, memberLiveStatus: s.memberLiveStatus, subscribeToRealtime: s.subscribeToRealtime })));
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);

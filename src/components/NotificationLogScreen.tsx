@@ -18,6 +18,7 @@ import { Feather } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
 
 import { useAuthStore } from '../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useNotificationStore } from '../store/notificationStore';
 import { EmptyState } from './EmptyState';
 import { AppTheme, appSoftShadow } from '../constants/theme';
@@ -27,7 +28,7 @@ import { PageTransition } from './PageTransition';
 
 export default function NotificationLogScreen() {
   const router = useRouter();
-  const { profile } = useAuthStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
   const {
     notifications,
     isLoading,
@@ -37,7 +38,7 @@ export default function NotificationLogScreen() {
     deleteNotification,
     clearAllNotifications,
     setupSubscription,
-  } = useNotificationStore();
+  } = useNotificationStore(useShallow((s) => ({ notifications: s.notifications, isLoading: s.isLoading, fetchNotifications: s.fetchNotifications, markAsRead: s.markAsRead, markAllAsRead: s.markAllAsRead, deleteNotification: s.deleteNotification, clearAllNotifications: s.clearAllNotifications, setupSubscription: s.setupSubscription })));
 
   const [refreshing, setRefreshing] = useState(false);
 

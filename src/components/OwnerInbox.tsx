@@ -13,6 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { useFocusEffect } from 'expo-router';
 import { Image } from 'expo-image';
+import { imageSource } from '../lib/imageSource';
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SmoothTextInput as TextInput } from './SmoothTextInput';
@@ -364,24 +365,44 @@ export function OwnerInboxSheet({
       meta={[
         `${isCheckout ? 'Checkout' : 'Check-in'} · ${whenLabel(w.date)}`,
         // A check-in shows its time in; a checkout shows its time out.
+        // When the check-in was never approved the two boxes below carry the times.
         isCheckout
-          ? w.check_out_time ? `Out ${format(parseISO(w.check_out_time), 'h:mm a')}` : null
+          ? !w.check_in_approved ? 'Check-in not approved' : w.check_out_time ? `Out ${format(parseISO(w.check_out_time), 'h:mm a')}` : null
           : w.check_in_time ? `In ${format(parseISO(w.check_in_time), 'h:mm a')}` : null,
       ]
         .filter(Boolean)
         .join(' · ')}
-      body={isCheckout ? w.day_report : w.check_in_plan}
+      body={isCheckout && !w.check_in_approved ? null : isCheckout ? w.day_report : w.check_in_plan}
       extra={
-        <WorkLogPhotos
-          groups={
-            isCheckout
-              ? [
-                  { label: 'Checkout', paths: w.check_out_photos ?? [] },
-                  { label: 'Check-in', paths: w.check_in_photos ?? [] },
-                ]
-              : [{ label: 'Check-in', paths: w.check_in_photos ?? [] }]
-          }
-        />
+        <>
+          {/* Day was never checked in by the owner: show the morning and the evening as two labelled parts. */}
+          {isCheckout && !w.check_in_approved ? (
+            <>
+              <View style={[styles.noteBox, styles.noteBoxAmber]}>
+                <Text style={[styles.noteLabel, { color: T.amber }]}>
+                  Check-in{w.check_in_time ? ` · ${format(parseISO(w.check_in_time), 'h:mm a')}` : ''} · not approved
+                </Text>
+                <Text style={styles.noteText}>{w.check_in_plan || 'No plan added'}</Text>
+              </View>
+              <View style={styles.noteBox}>
+                <Text style={styles.noteLabel}>
+                  Checkout{w.check_out_time ? ` · ${format(parseISO(w.check_out_time), 'h:mm a')}` : ''}
+                </Text>
+                <Text style={styles.noteText}>{w.day_report || 'No report added'}</Text>
+              </View>
+            </>
+          ) : null}
+          <WorkLogPhotos
+            groups={
+              isCheckout
+                ? [
+                    { label: 'Checkout', paths: w.check_out_photos ?? [] },
+                    { label: 'Check-in', paths: w.check_in_photos ?? [] },
+                  ]
+                : [{ label: 'Check-in', paths: w.check_in_photos ?? [] }]
+            }
+          />
+        </>
       }
       busy={busy === w.id}
       actions={[
@@ -920,7 +941,7 @@ function WorkLogPhotos({
                 accessibilityLabel={`${g.label} photo`}
               >
                 {urls[path] ? (
-                  <Image source={{ uri: urls[path] }} style={styles.photoThumb} contentFit="cover" />
+                  <Image source={imageSource(urls[path])} style={styles.photoThumb} contentFit="cover" />
                 ) : (
                   <View style={[styles.photoThumb, styles.photoThumbLoading]}>
                     <ActivityIndicator size="small" color={T.charcoal} />
@@ -1248,6 +1269,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 4,
   },
+  noteBoxAmber: { borderLeftColor: T.amber, marginBottom: 0 },
   noteLabel: { fontFamily: 'Inter_700Bold', fontSize: 11, color: T.violet, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 },
   noteText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: T.inkSoft, lineHeight: 20 },
   noNote: { fontFamily: 'Inter_400Regular', fontSize: 13, color: T.mute, marginTop: 6, marginBottom: 2 },

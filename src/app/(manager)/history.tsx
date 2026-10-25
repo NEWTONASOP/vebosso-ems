@@ -47,6 +47,7 @@ import {
   screenChrome,
 } from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../store/workStore';
 import {
   LeaveRequest,
@@ -63,7 +64,7 @@ const KEY = (d: Date) => format(d, 'yyyy-MM-dd');
 type ViewMode = 'team' | 'person';
 
 export default function ManagerHistoryScreen() {
-  const { profile } = useAuthStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
   const {
     teamMembers,
     fetchTeamMembers,
@@ -71,7 +72,7 @@ export default function ManagerHistoryScreen() {
     fetchCompletedTasksInRange,
     fetchLeaveInRange,
     fetchTeamDay,
-  } = useWorkStore();
+  } = useWorkStore(useShallow((s) => ({ teamMembers: s.teamMembers, fetchTeamMembers: s.fetchTeamMembers, fetchWorkHistory: s.fetchWorkHistory, fetchCompletedTasksInRange: s.fetchCompletedTasksInRange, fetchLeaveInRange: s.fetchLeaveInRange, fetchTeamDay: s.fetchTeamDay })));
 
   const [mode, setMode] = useState<ViewMode>('team');
   const [selectedDate, setSelectedDate] = useState(new Date());

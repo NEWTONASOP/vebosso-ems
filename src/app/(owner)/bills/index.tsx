@@ -18,11 +18,11 @@ import { BillSettingsSheet } from '../../../components/BillSettingsSheet';
 import { AppTheme as T, appSoftShadow, screenChrome } from '../../../constants/theme';
 import { rupees } from '../../../lib/accounts';
 import { BRAND_KEYS, BRANDS, brandOf } from '../../../lib/billBrands';
-import { BILL_STATUS_TONE, billTotals, fetchBills, STATUS_LABEL } from '../../../lib/bills';
+import { BILL_STATUS_TONE, BillSummary, billTotals, fetchBills, STATUS_LABEL } from '../../../lib/bills';
 import { useMyAccess } from '../../../lib/accessRules';
 import { useFeatureBase } from '../../../lib/featureAccess';
 import { useAuthStore } from '../../../store/authStore';
-import { Bill, BillBrand, BillKind, BillStatus } from '../../../types/database';
+import { BillBrand, BillKind, BillStatus } from '../../../types/database';
 import { ShowMore, usePaged } from '../../../components/ShowMore';
 
 type Filter = 'all' | BillStatus;
@@ -74,7 +74,7 @@ export default function BillsScreen() {
   };
   const [kind, setKind] = useState<BillKind>('estimate');
   const [filter, setFilter] = useState<Filter>('all');
-  const [bills, setBills] = useState<Bill[]>([]);
+  const [bills, setBills] = useState<BillSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -164,7 +164,8 @@ export default function BillsScreen() {
 
   const switchKind = (k: BillKind) => {
     setKind(k);
-    setFilter('all');
+    // Client bills open on what still needs work; estimates have no Pending.
+    setFilter(k === 'client' ? 'pending' : 'all');
   };
 
   return (

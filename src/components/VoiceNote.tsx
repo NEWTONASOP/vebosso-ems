@@ -128,10 +128,32 @@ export function RecordingBar({
 
 // ----------------------------------------------------------------------------
 
-/** Plays a stored voice note. `dark` for use on a dark background. */
-export function VoiceNote({ path, durationMs, dark }: { path: string; durationMs?: number | null; dark?: boolean }) {
+type VoiceNoteProps = { path: string; durationMs?: number | null; dark?: boolean };
+
+/**
+ * Plays a stored voice note. `dark` for use on a dark background.
+ * Nothing is fetched until the first tap: a chat full of voice notes would
+ * otherwise sign, download and hold a player for every one of them on open.
+ */
+export function VoiceNote(props: VoiceNoteProps) {
+  const [started, setStarted] = useState(false);
+  if (started) return <VoiceNotePlayer {...props} />;
+  return (
+    <NoteView
+      dark={props.dark}
+      icon="play"
+      onPress={() => setStarted(true)}
+      progress={0}
+      timeMs={props.durationMs ?? null}
+    />
+  );
+}
+
+/** Mounted on the first tap: signs the link, loads the clip and plays it. */
+function VoiceNotePlayer({ path, durationMs, dark }: VoiceNoteProps) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const autoPlayed = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -147,6 +169,15 @@ export function VoiceNote({ path, durationMs, dark }: { path: string; durationMs
 
   const player = useAudioPlayer(url ? { uri: url } : null);
   const status = useAudioPlayerStatus(player);
+  const ready = !!url && status.isLoaded;
+
+  // The tap that mounted this was a "play": start as soon as it has loaded.
+  useEffect(() => {
+    if (ready && !autoPlayed.current) {
+      autoPlayed.current = true;
+      player.play();
+    }
+  }, [ready, player]);
 
   // Back to the start once it has played through.
   useEffect(() => {
@@ -158,9 +189,6 @@ export function VoiceNote({ path, durationMs, dark }: { path: string; durationMs
 
   const totalMs = status.duration > 0 ? status.duration * 1000 : durationMs ?? 0;
   const progress = totalMs ? Math.min(1, (status.currentTime * 1000) / totalMs) : 0;
-  const ready = !!url && status.isLoaded;
-  const ink = dark ? T.white : T.ink;
-  const track = dark ? 'rgba(255,255,255,0.3)' : T.soft2;
 
   const toggle = () => {
     if (!ready) return;
@@ -169,27 +197,57 @@ export function VoiceNote({ path, durationMs, dark }: { path: string; durationMs
   };
 
   return (
+    <NoteView
+      dark={dark}
+      icon={failed ? 'alert' : !ready ? 'loading' : status.playing ? 'pause' : 'play'}
+      onPress={toggle}
+      disabled={!ready}
+      progress={progress}
+      timeMs={status.playing || status.currentTime > 0 ? status.currentTime * 1000 : totalMs}
+    />
+  );
+}
+
+function NoteView({
+  dark,
+  icon,
+  onPress,
+  disabled,
+  progress,
+  timeMs,
+}: {
+  dark?: boolean;
+  icon: 'play' | 'pause' | 'loading' | 'alert';
+  onPress: () => void;
+  disabled?: boolean;
+  progress: number;
+  /** null when the length isn't known yet. */
+  timeMs: number | null;
+}) {
+  const ink = dark ? T.white : T.ink;
+  const track = dark ? 'rgba(255,255,255,0.3)' : T.soft2;
+  return (
     <View style={styles.note}>
       <Pressable
-        onPress={toggle}
+        onPress={onPress}
         style={[styles.play, { backgroundColor: dark ? 'rgba(255,255,255,0.18)' : T.soft }]}
-        disabled={!ready}
+        disabled={disabled}
         accessibilityRole="button"
-        accessibilityLabel={status.playing ? 'Pause voice message' : 'Play voice message'}
+        accessibilityLabel={icon === 'pause' ? 'Pause voice message' : 'Play voice message'}
       >
-        {failed ? (
+        {icon === 'alert' ? (
           <Feather name="alert-circle" size={16} color={ink} />
-        ) : !ready ? (
+        ) : icon === 'loading' ? (
           <ActivityIndicator size="small" color={ink} />
         ) : (
-          <Feather name={status.playing ? 'pause' : 'play'} size={16} color={ink} />
+          <Feather name={icon} size={16} color={ink} />
         )}
       </Pressable>
       <View style={[styles.track, { backgroundColor: track }]}>
         <View style={[styles.fill, { width: `${progress * 100}%`, backgroundColor: ink }]} />
       </View>
       <Text style={[styles.time, { color: dark ? 'rgba(255,255,255,0.8)' : T.inkSoft }]}>
-        {clipTime(status.playing || status.currentTime > 0 ? status.currentTime * 1000 : totalMs)}
+        {timeMs ? clipTime(timeMs) : ''}
       </Text>
     </View>
   );

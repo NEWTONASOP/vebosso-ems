@@ -18,6 +18,7 @@ import {
   screenChrome,
 } from '../../../constants/theme';
 import { useAuthStore } from '../../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../../store/workStore';
 import { Alert } from '../../../lib/alert';
 import { useKeyboardOverlap } from '../../../lib/useKeyboardHeight';
@@ -26,8 +27,8 @@ export default function AnnouncementsScreen() {
   // Shrink to the space above the keyboard so the focused box stays in sight.
   const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
   const router = useRouter();
-  const { profile } = useAuthStore();
-  const { announcements, fetchAnnouncements, createAnnouncement, deleteAnnouncement } = useWorkStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
+  const { announcements, fetchAnnouncements, createAnnouncement, deleteAnnouncement } = useWorkStore(useShallow((s) => ({ announcements: s.announcements, fetchAnnouncements: s.fetchAnnouncements, createAnnouncement: s.createAnnouncement, deleteAnnouncement: s.deleteAnnouncement })));
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');

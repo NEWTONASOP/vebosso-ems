@@ -55,10 +55,21 @@ export function billTotals(b: Pick<Bill, 'total' | 'advance' | 'balance'>) {
 // ---------------------------------------------------------------------------
 // Read
 
-export async function fetchBills(): Promise<Result<Bill[]>> {
-  const { data, error } = await supabase.from('bills').select('*').order('updated_at', { ascending: false });
+/** What a card in the Bills list needs; the full bill is loaded when it is opened. */
+const BILL_LIST_COLUMNS = [
+  'id', 'kind', 'brand', 'status', 'number', 'client_name', 'venue', 'function_date',
+  'event_type', 'phone', 'total', 'advance', 'balance', 'created_at', 'updated_at',
+] as const;
+
+export type BillSummary = Pick<Bill, (typeof BILL_LIST_COLUMNS)[number]>;
+
+export async function fetchBills(): Promise<Result<BillSummary[]>> {
+  const { data, error } = await supabase
+    .from('bills')
+    .select(BILL_LIST_COLUMNS.join(','))
+    .order('updated_at', { ascending: false });
   if (error) return fail(error);
-  return { success: true, data: (data || []) as Bill[] };
+  return { success: true, data: (data || []) as unknown as BillSummary[] };
 }
 
 export async function fetchBill(id: string): Promise<Result<Bill>> {

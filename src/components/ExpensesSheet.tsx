@@ -30,6 +30,7 @@ import { DateField } from './DateTimeFields';
 import { ImageViewerModal } from './ImageViewerModal';
 import { PaperOutlinedField } from './PaperOutlinedField';
 import { SheetFrame } from './SheetFrame';
+import { ShowMore, usePaged } from './ShowMore';
 
 const STATUS: Record<ExpenseStatus, { label: string; color: string; bg: string }> = {
   submitted: { label: 'Waiting', color: T.amber, bg: T.amberSoft },
@@ -39,12 +40,9 @@ const STATUS: Record<ExpenseStatus, { label: string; color: string; bg: string }
 
 const KEY = (d: Date) => format(d, 'yyyy-MM-dd');
 
-const loadAll = async (userId: string) => {
-  const res = await fetchExpenses(userId);
-  if (!res.success) return res;
-  const urls = await signReceiptUrls(res.data.flatMap((c) => c.photos ?? []));
-  return { success: true as const, data: { claims: res.data, urls } };
-};
+// Claims are small rows, so all of them load (the waiting total needs them);
+// receipt links are made only for the claims on screen, a page at a time.
+const loadAll = (userId: string) => fetchExpenses(userId);
 
 interface ExpensesSheetProps {
   /** Show in place (e.g. a dropdown in the member sheet) instead of as a sheet. */
@@ -68,8 +66,7 @@ export function ExpensesSheet({ onDismiss, userId, userName, mode, ownerId, inli
 
   const apply = useCallback((res: Awaited<ReturnType<typeof loadAll>>) => {
     if (res.success) {
-      setClaims(res.data.claims);
-      setUrls(res.data.urls);
+      setClaims(res.data);
     } else {
       setError(res.error);
     }
@@ -86,6 +83,24 @@ export function ExpensesSheet({ onDismiss, userId, userName, mode, ownerId, inli
       active = false;
     };
   }, [apply, userId]);
+
+  const claimPage = usePaged(claims, userId);
+
+  // Links for the receipts now on screen that don't have one yet.
+  const missing = claimPage.items
+    .flatMap((c) => c.photos ?? [])
+    .filter((p) => !urls[p])
+    .join('|');
+  useEffect(() => {
+    if (!missing) return;
+    let active = true;
+    signReceiptUrls(missing.split('|')).then((signed) => {
+      if (active) setUrls((u) => ({ ...u, ...signed }));
+    });
+    return () => {
+      active = false;
+    };
+  }, [missing]);
 
   const unpaidTotal = useMemo(
     () =>
@@ -179,7 +194,8 @@ export function ExpensesSheet({ onDismiss, userId, userName, mode, ownerId, inli
           <Text style={styles.emptyText}>No expenses yet</Text>
         </View>
       ) : (
-        claims.map((c) => {
+        <>
+        {claimPage.items.map((c) => {
           const s = STATUS[c.status];
           const amount = formatAmount(c.amount);
           const when =
@@ -209,7 +225,8 @@ export function ExpensesSheet({ onDismiss, userId, userName, mode, ownerId, inli
                   {c.photos.map((p) =>
                     urls[p] ? (
                       <Pressable key={p} onPress={() => setEnlarged(p)} accessibilityLabel="View receipt">
-                        <Image source={{ uri: urls[p] }} style={styles.thumb} contentFit="cover" />
+                        {/* Keyed by path: a new signed link each open still hits the disk cache. */}
+                        <Image source={{ uri: urls[p], cacheKey: p }} style={styles.thumb} contentFit="cover" cachePolicy="disk" />
                       </Pressable>
                     ) : null
                   )}
@@ -228,7 +245,9 @@ export function ExpensesSheet({ onDismiss, userId, userName, mode, ownerId, inli
               ) : null}
             </View>
           );
-        })
+        })}
+        <ShowMore page={claimPage} />
+        </>
       )}
     </SheetFrame>
   );

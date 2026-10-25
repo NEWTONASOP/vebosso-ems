@@ -10,6 +10,7 @@
 import { Feather } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { Image } from 'expo-image';
+import { imageSource } from '../../../lib/imageSource';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -954,7 +955,7 @@ export default function BillEditorScreen() {
                 <View key={p}>
                   <Pressable onPress={() => imageUrls[p] && setViewImage(p)} accessibilityLabel="View image">
                     {imageUrls[p] ? (
-                      <Image source={{ uri: imageUrls[p] }} style={styles.thumb} contentFit="cover" />
+                      <Image source={imageSource(imageUrls[p])} style={styles.thumb} contentFit="cover" />
                     ) : (
                       <View style={[styles.thumb, { backgroundColor: T.soft2 }]} />
                     )}

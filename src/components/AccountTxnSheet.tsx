@@ -10,6 +10,7 @@
 import { Feather } from '@expo/vector-icons';
 import { addDays, format, parseISO } from 'date-fns';
 import { Image } from 'expo-image';
+import { imageSource } from '../lib/imageSource';
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
@@ -215,7 +216,7 @@ export function AccountTxnSheet({
                 {receipts.map((p) => (
                   <Pressable key={p} onPress={() => setEnlarged(p)} accessibilityLabel="View photo">
                     {receiptUrls[p] ? (
-                      <Image source={{ uri: receiptUrls[p] }} style={styles.thumb} contentFit="cover" />
+                      <Image source={imageSource(receiptUrls[p])} style={styles.thumb} contentFit="cover" />
                     ) : (
                       <View style={styles.thumb} />
                     )}
@@ -300,7 +301,7 @@ export function AccountTxnSheet({
           <View key={p}>
             <Pressable onPress={() => setEnlarged(p)} accessibilityLabel="View photo">
               {receiptUrls[p] ? (
-                <Image source={{ uri: receiptUrls[p] }} style={styles.thumb} contentFit="cover" />
+                <Image source={imageSource(receiptUrls[p])} style={styles.thumb} contentFit="cover" />
               ) : (
                 <View style={styles.thumb} />
               )}

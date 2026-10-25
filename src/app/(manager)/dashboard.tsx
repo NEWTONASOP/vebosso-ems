@@ -36,20 +36,21 @@ import {
   screenChrome,
 } from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../store/workStore';
 import { Profile, WorkFile } from '../../types/database';
 import { MyRemarksCard } from '../../components/MyRemarksCard';
 
 export default function ManagerDashboard() {
   const router = useRouter();
-  const { profile } = useAuthStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
   const {
     pendingApprovals, isLoadingApprovals, approvalsError, todayLog, todayTasks, isLoadingToday,
     fetchPendingApprovals, fetchSettings, fetchTodayLog, fetchTodayTasks,
     approveCheckIn, rejectCheckIn, checkIn, updateCheckInPlan, checkOut, updateTaskStatus,
     subscribeToRealtime, unsubscribeFromRealtime,
     teamMembers, fetchTeamMembers, addTask,
-  } = useWorkStore();
+  } = useWorkStore(useShallow((s) => ({ pendingApprovals: s.pendingApprovals, isLoadingApprovals: s.isLoadingApprovals, approvalsError: s.approvalsError, todayLog: s.todayLog, todayTasks: s.todayTasks, isLoadingToday: s.isLoadingToday, fetchPendingApprovals: s.fetchPendingApprovals, fetchSettings: s.fetchSettings, fetchTodayLog: s.fetchTodayLog, fetchTodayTasks: s.fetchTodayTasks, approveCheckIn: s.approveCheckIn, rejectCheckIn: s.rejectCheckIn, checkIn: s.checkIn, updateCheckInPlan: s.updateCheckInPlan, checkOut: s.checkOut, updateTaskStatus: s.updateTaskStatus, subscribeToRealtime: s.subscribeToRealtime, unsubscribeFromRealtime: s.unsubscribeFromRealtime, teamMembers: s.teamMembers, fetchTeamMembers: s.fetchTeamMembers, addTask: s.addTask })));
 
   const [refreshing, setRefreshing] = React.useState(false);
   const [showCheckIn, setShowCheckIn] = useState(false);

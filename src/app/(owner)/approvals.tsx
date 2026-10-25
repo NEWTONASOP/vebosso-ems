@@ -10,11 +10,12 @@ import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { AppSpace, AppTheme, screenChrome } from '../../constants/theme';
 import { Alert } from '../../lib/alert';
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../store/workStore';
 import { LeaveRequestWithProfile, WorkLogWithProfile } from '../../types/database';
 
 export default function OwnerApprovalsScreen() {
-  const { profile } = useAuthStore();
+  const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
   const {
     pendingApprovals,
     isLoadingApprovals,
@@ -27,7 +28,7 @@ export default function OwnerApprovalsScreen() {
     fetchLeaveRequests,
     approveLeaveRequest,
     rejectLeaveRequest,
-  } = useWorkStore();
+  } = useWorkStore(useShallow((s) => ({ pendingApprovals: s.pendingApprovals, isLoadingApprovals: s.isLoadingApprovals, fetchPendingApprovals: s.fetchPendingApprovals, approveCheckIn: s.approveCheckIn, rejectCheckIn: s.rejectCheckIn, leaveRequests: s.leaveRequests, isLoadingLeaves: s.isLoadingLeaves, fetchLeaveRequests: s.fetchLeaveRequests, approveLeaveRequest: s.approveLeaveRequest, rejectLeaveRequest: s.rejectLeaveRequest })));
 
   const [activeTab, setActiveTab] = useState<'attendance' | 'leaves'>('attendance');
   const [refreshing, setRefreshing] = useState(false);

@@ -34,6 +34,7 @@ import { supabase } from '../../../lib/supabase';
 import { getDownloadUrl } from '../../../lib/versionCheck';
 import { useKeyboardOverlap } from '../../../lib/useKeyboardHeight';
 import { useAuthStore } from '../../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../../store/workStore';
 import { Profile } from '../../../types/database';
 
@@ -48,8 +49,8 @@ export default function MemberProfileManagementScreen() {
   const router = useRouter();
   const { id: memberId } = useLocalSearchParams<{ id: string }>();
   const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
-  const { profile: currentOwner } = useAuthStore();
-  const { teamMembers, fetchTeamMembers } = useWorkStore();
+  const { profile: currentOwner } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
+  const { teamMembers, fetchTeamMembers } = useWorkStore(useShallow((s) => ({ teamMembers: s.teamMembers, fetchTeamMembers: s.fetchTeamMembers })));
 
   // Profile data state
   const [member, setMember] = useState<Profile | null>(null);

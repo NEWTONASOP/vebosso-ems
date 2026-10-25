@@ -7,6 +7,7 @@ import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable
 import { TextInput, Text, Snackbar } from 'react-native-paper';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useAuthStore } from '../../store/authStore';
+import { useShallow } from 'zustand/react/shallow';
 import { APP_TAGLINE } from '../../constants/roles';
 import { Feather } from '@expo/vector-icons';
 import {
@@ -27,7 +28,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [snackError, setSnackError] = useState('');
 
-  const { signIn, isLoading, clearError, logoutReason, clearLogoutReason } = useAuthStore();
+  const { signIn, isLoading, clearError, logoutReason, clearLogoutReason } = useAuthStore(useShallow((s) => ({ signIn: s.signIn, isLoading: s.isLoading, clearError: s.clearError, logoutReason: s.logoutReason, clearLogoutReason: s.clearLogoutReason })));
 
   const handleLogin = async () => {
     clearLogoutReason();
