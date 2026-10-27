@@ -62,6 +62,8 @@ export function MemberTasksSheet({
   const [text, setText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState('');
+  // Done tasks stay folded away until asked for.
+  const [showDone, setShowDone] = useState(false);
 
   const apply = useCallback((res: Awaited<ReturnType<typeof fetchMemberTasks>>) => {
     if (res.error) setError(res.error.message);
@@ -237,10 +239,22 @@ export function MemberTasksSheet({
           {open.map((t) => (
             <TaskLine key={t.id} task={t} onPress={() => setSelected(t)} />
           ))}
-          {done.length > 0 ? <Text style={[styles.group, { marginTop: 14 }]}>Done · {done.length}</Text> : null}
-          {done.map((t) => (
-            <TaskLine key={t.id} task={t} onPress={() => setSelected(t)} />
-          ))}
+          {done.length > 0 ? (
+            <Pressable
+              onPress={() => setShowDone((v) => !v)}
+              style={styles.doneToggle}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showDone }}
+              accessibilityLabel={showDone ? 'Hide done tasks' : 'Show done tasks'}
+            >
+              <Text style={[styles.group, { marginBottom: 0 }]}>Done · {done.length}</Text>
+              <Feather name={showDone ? 'chevron-up' : 'chevron-down'} size={14} color={T.mute} />
+            </Pressable>
+          ) : null}
+          {showDone
+            ? done.map((t) => <TaskLine key={t.id} task={t} onPress={() => setSelected(t)} />)
+            : null}
         </>
       )}
     </SheetFrame>
@@ -327,6 +341,14 @@ const styles = StyleSheet.create({
     color: T.mute,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  doneToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    marginTop: 14,
     marginBottom: 6,
   },
   groupEmpty: {
