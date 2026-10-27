@@ -11,7 +11,6 @@ import { format, parseISO } from 'date-fns';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
-import { PDFDocument } from 'pdf-lib';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import { Bill, BillBrand, BillPdf, BillSettings, BillVideo } from '../types/database';
@@ -369,6 +368,9 @@ async function renderPdf(b: Bill, s: BillSettings): Promise<string> {
  * sending the client a bill with part of it missing.
  */
 async function appendBillPdfs(billUri: string, pdfs: BillPdf[]): Promise<string> {
+  // Loaded only here (phone): pdf-lib's tslib helper breaks the web bundle
+  // at import time, and web never merges PDFs.
+  const { PDFDocument } = await import('pdf-lib');
   const read = (uri: string) => FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
   const out = await PDFDocument.load(await read(billUri));
   const signed = await signBillImages(pdfs.map((p) => p.path));
