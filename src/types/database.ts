@@ -496,6 +496,13 @@ export interface BillVideo {
   duration: number | null;
 }
 
+/** A PDF attached to a bill (070), in the 'bills' storage bucket. */
+export interface BillPdf {
+  path: string;
+  /** The file's own name, as picked. */
+  name: string;
+}
+
 export interface Bill {
   id: string;
   kind: BillKind;
@@ -527,6 +534,8 @@ export interface Bill {
   images: string[];
   /** Cloudinary videos attached to the bill (058). */
   videos: BillVideo[];
+  /** Added after the bill's own pages when shared from the phone. */
+  pdfs: BillPdf[];
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -569,6 +578,7 @@ export type BillFields = Pick<
   | 'terms'
   | 'images'
   | 'videos'
+  | 'pdfs'
 >;
 
 export interface BillSettings {

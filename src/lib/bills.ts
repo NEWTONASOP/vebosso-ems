@@ -116,6 +116,7 @@ const EDIT_FIELD_LABEL: Record<string, string> = {
   items: 'Services',
   images: 'Photos',
   videos: 'Videos',
+  pdfs: 'PDFs',
 };
 
 /** One changed field as a label and readable old / new values. */
@@ -130,6 +131,7 @@ export function describeEdit(change: BillEdit['changes'][number]): { label: stri
     if (change.field === 'kind') return KIND_LABEL[v as BillKind] ?? String(v);
     if (change.field === 'images') return `${v} photo${Number(v) === 1 ? '' : 's'}`;
     if (change.field === 'videos') return `${v} video${Number(v) === 1 ? '' : 's'}`;
+    if (change.field === 'pdfs') return `${v} PDF${Number(v) === 1 ? '' : 's'}`;
     return String(v);
   };
   return {
@@ -150,7 +152,7 @@ function cleanFields(f: Partial<BillFields>): Partial<BillFields> {
       out.items = ((v as BillItem[]) ?? [])
         .map((i) => ({ description: (i.description ?? '').trim() }))
         .filter((i) => i.description);
-    } else if (k === 'images' || k === 'videos') {
+    } else if (k === 'images' || k === 'videos' || k === 'pdfs') {
       out[k] = v;
     } else if (k === 'total' || k === 'advance' || k === 'balance') {
       out[k] = blank(v) ? null : num(v as number);
@@ -225,6 +227,18 @@ export async function uploadBillImage(billId: string, uri: string): Promise<Resu
   }
 }
 
+/** A PDF as picked — uploaded as is (the bucket takes up to 15MB). */
+export async function uploadBillPdf(billId: string, uri: string): Promise<Result<string>> {
+  try {
+    const path = `pdf/${billId}/${Date.now()}_${Math.random().toString(36).slice(2, 6)}.pdf`;
+    await uploadCheckoutPhoto(path, uri, 'pdf', BUCKET, false, 'application/pdf');
+    return { success: true, data: path };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/** Removes a stored bill file — a photo or a PDF. */
 export async function removeBillImage(path: string) {
   await supabase.storage.from(BUCKET).remove([path]);
 }

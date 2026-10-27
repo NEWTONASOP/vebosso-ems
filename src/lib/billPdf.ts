@@ -11,9 +11,10 @@ import { format, parseISO } from 'date-fns';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
+import { PDFDocument } from 'pdf-lib';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
-import { Bill, BillBrand, BillSettings, BillVideo } from '../types/database';
+import { Bill, BillBrand, BillPdf, BillSettings, BillVideo } from '../types/database';
 import { money } from './accounts';
 import { Alert } from './alert';
 import { BRANDS, brandOf } from './billBrands';
@@ -346,14 +347,45 @@ export async function buildBillHtml(b: Bill, s: BillSettings): Promise<string> {
 // ---------------------------------------------------------------------------
 // Output
 
-/** Render to a named PDF in the cache (native). */
+/** Render to a named PDF in the cache (native), with the bill's PDFs after it. */
 async function renderPdf(b: Bill, s: BillSettings): Promise<string> {
   const html = await buildBillHtml(b, s);
   const { uri } = await Print.printToFileAsync({ html, width: 595, height: 842 });
   const named = `${FileSystem.cacheDirectory}${billFileName(b)}`;
   await FileSystem.deleteAsync(named, { idempotent: true });
-  await FileSystem.moveAsync({ from: uri, to: named });
+  if (b.pdfs?.length) {
+    const merged = await appendBillPdfs(uri, b.pdfs);
+    await FileSystem.writeAsStringAsync(named, merged, { encoding: FileSystem.EncodingType.Base64 });
+    await FileSystem.deleteAsync(uri, { idempotent: true });
+  } else {
+    await FileSystem.moveAsync({ from: uri, to: named });
+  }
   return named;
+}
+
+/**
+ * Every page of each attached PDF, in the order added, after the bill's pages.
+ * A file that can't be read stops the share and says which one, rather than
+ * sending the client a bill with part of it missing.
+ */
+async function appendBillPdfs(billUri: string, pdfs: BillPdf[]): Promise<string> {
+  const read = (uri: string) => FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+  const out = await PDFDocument.load(await read(billUri));
+  const signed = await signBillImages(pdfs.map((p) => p.path));
+  for (const p of pdfs) {
+    const local = `${FileSystem.cacheDirectory}attached_${Date.now()}.pdf`;
+    try {
+      if (!signed[p.path]) throw new Error('no link');
+      await FileSystem.downloadAsync(signed[p.path], local);
+      const src = await PDFDocument.load(await read(local), { ignoreEncryption: true });
+      for (const page of await out.copyPages(src, src.getPageIndices())) out.addPage(page);
+    } catch {
+      throw new Error(`Couldn't add "${p.name}" to the bill PDF`);
+    } finally {
+      await FileSystem.deleteAsync(local, { idempotent: true });
+    }
+  }
+  return out.saveAsBase64();
 }
 
 /** Share sheet — WhatsApp, email, Drive, Save to files… (print dialog on web). */

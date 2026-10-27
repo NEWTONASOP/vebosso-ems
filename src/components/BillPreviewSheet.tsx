@@ -4,6 +4,8 @@
 // laid out as an A4 page and scaled to fit the screen. Works for drafts and
 // unsaved edits too, so the owner can check before saving or sending.
 // BillPage is the page on its own — also what a saved bill opens to.
+// PDFs attached to the bill follow it, drawn page by page with PDF.js (the
+// WebView can't show a PDF by itself), as they come after it when shared.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -13,6 +15,7 @@ import { Modal, Portal, Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTheme as T } from '../constants/theme';
 import { buildBillHtml } from '../lib/billPdf';
+import { signBillImages } from '../lib/bills';
 import { useSheetEntrance } from '../lib/useSheetEntrance';
 import { Bill, BillSettings } from '../types/database';
 import { BillPreviewFrame } from './BillPreviewFrame';
@@ -39,6 +42,56 @@ function asPreviewPage(html: string): string {
   return html.includes('</head>') ? html.replace('</head>', `${extra}</head>`) : extra + html;
 }
 
+const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174';
+
+/** The attached PDFs' pages under the bill, one file after another. */
+function withAttachedPdfs(html: string, files: { name: string; url: string }[]): string {
+  if (!files.length) return html;
+  // Safe inside <script>: no "</script>" can come out of a file name.
+  const list = JSON.stringify(files).replace(/</g, '\\u003c');
+  const part = `
+<style>
+  .att-head { background: #E6E9EF; padding: 18px 24px 8px; font: 600 14px sans-serif; color: #555; }
+  .att-page { display: block; width: 100%; height: auto; border-bottom: 1px solid #ddd; }
+  .att-error { padding: 16px 24px; font: 14px sans-serif; color: #c0392b; }
+</style>
+<div id="attached"></div>
+<script src="${PDFJS}/pdf.min.js"></script>
+<script>
+(function () {
+  var box = document.getElementById('attached');
+  var note = function (text, cls) {
+    var d = document.createElement('div'); d.className = cls; d.textContent = text; box.appendChild(d);
+  };
+  var files = ${list};
+  if (!window.pdfjsLib) { note('Attached PDFs could not be shown — check the internet', 'att-error'); return; }
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '${PDFJS}/pdf.worker.min.js';
+  files.reduce(function (done, f) {
+    return done.then(function () {
+      note(f.name, 'att-head');
+      return pdfjsLib.getDocument(f.url).promise.then(function (doc) {
+        var pages = Promise.resolve();
+        for (var i = 1; i <= doc.numPages; i++) (function (n) {
+          pages = pages.then(function () {
+            return doc.getPage(n).then(function (page) {
+              // A little over the sheet's width, so text stays sharp when zoomed.
+              var vp = page.getViewport({ scale: 1.25 * ${PAGE_PX} / page.getViewport({ scale: 1 }).width });
+              var c = document.createElement('canvas');
+              c.width = vp.width; c.height = vp.height; c.className = 'att-page';
+              box.appendChild(c);
+              return page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+            });
+          });
+        })(i);
+        return pages;
+      }).catch(function () { note('Could not show ' + f.name, 'att-error'); });
+    });
+  }, Promise.resolve());
+})();
+</script>`;
+  return html.includes('</body>') ? html.replace('</body>', `${part}</body>`) : html + part;
+}
+
 /** The bill as an A4 page, fitted to the space it is given. */
 export function BillPage({ bill, settings }: { bill: Bill; settings: BillSettings }) {
   const [html, setHtml] = useState<string | null>(null);
@@ -46,8 +99,12 @@ export function BillPage({ bill, settings }: { bill: Bill; settings: BillSetting
 
   useEffect(() => {
     let active = true;
-    buildBillHtml(bill, settings)
-      .then((h) => active && setHtml(asPreviewPage(h)))
+    const pdfs = bill.pdfs ?? [];
+    Promise.all([buildBillHtml(bill, settings), signBillImages(pdfs.map((p) => p.path))])
+      .then(([h, urls]) => {
+        const files = pdfs.filter((p) => urls[p.path]).map((p) => ({ name: p.name, url: urls[p.path] }));
+        if (active) setHtml(asPreviewPage(withAttachedPdfs(h, files)));
+      })
       .catch((e) => active && setError(e?.message || 'Could not build the preview'));
     return () => {
       active = false;

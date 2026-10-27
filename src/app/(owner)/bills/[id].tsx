@@ -11,11 +11,13 @@ import { Feather } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { Image } from 'expo-image';
 import { imageSource } from '../../../lib/imageSource';
+import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -49,6 +51,7 @@ import {
   STATUS_LABEL,
   updateBill,
   uploadBillImage,
+  uploadBillPdf,
 } from '../../../lib/bills';
 import { BillHistorySheet } from '../../../components/BillHistorySheet';
 import { ImageViewerModal } from '../../../components/ImageViewerModal';
@@ -60,7 +63,7 @@ import { useFeatureBase } from '../../../lib/featureAccess';
 import { useMyAccess } from '../../../lib/accessRules';
 import { sendPushNotificationToRole } from '../../../lib/notifications';
 import { useAuthStore } from '../../../store/authStore';
-import { Bill, BillBrand, BillFields, BillKind, BillSettings, BillStatus, BillVideo } from '../../../types/database';
+import { Bill, BillBrand, BillFields, BillKind, BillPdf, BillSettings, BillStatus, BillVideo } from '../../../types/database';
 import { BRANDS, brandOf } from '../../../lib/billBrands';
 
 registerTranslation('en-GB', enGB);
@@ -99,6 +102,7 @@ const emptyForm = (kind: BillKind, brand: BillBrand): BillFields => ({
   terms: '',
   images: [],
   videos: [],
+  pdfs: [],
 });
 
 const fromBill = (b: Bill): BillFields => ({
@@ -122,6 +126,7 @@ const fromBill = (b: Bill): BillFields => ({
   terms: b.terms ?? '',
   images: b.images ?? [],
   videos: b.videos ?? [],
+  pdfs: b.pdfs ?? [],
 });
 
 /** Has the owner typed anything worth keeping as a draft? */
@@ -131,6 +136,7 @@ const hasContent = (f: BillFields, defaults: BillFields) =>
     if (k === 'items') return f.items.some((i) => i.description.trim());
     if (k === 'images') return f.images.length > 0;
     if (k === 'videos') return f.videos.length > 0;
+    if (k === 'pdfs') return f.pdfs.length > 0;
     return JSON.stringify(f[k] ?? '') !== JSON.stringify(defaults[k] ?? '');
   });
 
@@ -176,7 +182,7 @@ export default function BillEditorScreen() {
   const [playVideo, setPlayVideo] = useState<BillVideo | null>(null);
   const [sendingVideo, setSendingVideo] = useState<string | null>(null);
   const [videoStatus, setVideoStatus] = useState<'compressing' | 'uploading' | null>(null);
-  // Photos uploaded to a saved bill but not saved yet — removed on discard.
+  // Photos and PDFs uploaded to a saved bill but not saved yet — removed on discard.
   const newImages = useRef<string[]>([]);
   // A service row to focus once it has rendered (Enter adds the next one).
   const focusItem = useRef<number | null>(null);
@@ -387,6 +393,54 @@ export default function BillEditorScreen() {
     ]);
   };
 
+  // ---- PDFs (phone only: they're added to the shared bill PDF) -------------
+  const addPdfs = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+        multiple: true,
+      });
+      if (res.canceled || !res.assets?.length) return;
+
+      setBusy('pdfs');
+      const target = await ensureBill(form);
+      if (!target) return;
+      const added: BillPdf[] = [];
+      for (const a of res.assets) {
+        if (a.size && a.size > 15 * 1024 * 1024) {
+          setError(`"${a.name}" is over 15 MB`);
+          continue;
+        }
+        const up = await uploadBillPdf(target.id, a.uri);
+        if (up.success) added.push({ path: up.data, name: a.name });
+        else setError(up.error);
+      }
+      if (!added.length) return;
+      // Drafts autosave it; on a saved bill they're an unsaved edit, gone on discard.
+      if (target.status !== 'draft') newImages.current.push(...added.map((p) => p.path));
+      set('pdfs', [...form.pdfs, ...added]);
+    } catch {
+      setError('Could not open the file picker');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const removePdf = (pdf: BillPdf) =>
+    Alert.alert('Remove PDF?', pdf.name, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => {
+          set('pdfs', form.pdfs.filter((p) => p.path !== pdf.path));
+          // A draft lets go of the file now; a saved bill on Save.
+          if (isDraft) void removeBillImage(pdf.path);
+        },
+      },
+    ]);
+
   // ---- Videos (Cloudinary) -------------------------------------------------
   const addVideos = async () => {
     try {
@@ -445,6 +499,7 @@ export default function BillEditorScreen() {
     }
     // Photos taken off the bill go for good once the change is saved.
     for (const path of (defaults?.images ?? []).filter((p) => !form.images.includes(p))) void removeBillImage(path);
+    for (const p of (defaults?.pdfs ?? []).filter((x) => !form.pdfs.some((y) => y.path === x.path))) void removeBillImage(p.path);
     newImages.current = [];
     setBill(res.data);
     setDefaults(form);
@@ -982,6 +1037,31 @@ export default function BillEditorScreen() {
             </View>
           </Section>
 
+          {Platform.OS !== 'web' ? (
+            <Section title={`PDFs${form.pdfs.length ? ` · ${form.pdfs.length}` : ''}`}>
+              {form.pdfs.map((p) => (
+                <View key={p.path} style={styles.pdfRow}>
+                  <Feather name="file-text" size={16} color={T.inkSoft} />
+                  <Text style={styles.pdfName} numberOfLines={1}>{p.name}</Text>
+                  <Pressable onPress={() => removePdf(p)} hitSlop={8} accessibilityLabel={`Remove ${p.name}`}>
+                    <Feather name="x" size={16} color={T.mute} />
+                  </Pressable>
+                </View>
+              ))}
+              <Pressable style={styles.addImg} onPress={() => addPdfs()} disabled={busy === 'pdfs'}>
+                {busy === 'pdfs' ? (
+                  <ActivityIndicator color={T.charcoal} />
+                ) : (
+                  <>
+                    <Feather name="file-plus" size={18} color={T.inkSoft} />
+                    <Text style={styles.addImgText}>PDF</Text>
+                  </>
+                )}
+              </Pressable>
+              <Text style={styles.videosLabel}>Added after the bill's pages when you share or WhatsApp it</Text>
+            </Section>
+          ) : null}
+
           <Section title={`Videos${form.videos.length ? ` · ${form.videos.length}` : ''}`}>
             <View style={styles.images}>
               <BillVideoStrip videos={form.videos} onPlay={setPlayVideo} onRemove={removeVideo} />
@@ -1383,6 +1463,17 @@ const styles = StyleSheet.create({
   videosRow: { flexDirection: 'row', gap: 10, paddingTop: 8, paddingRight: 8 },
   videosLabel: { fontFamily: 'Inter_500Medium', fontSize: 12, color: T.inkSoft, marginTop: 6 },
   addImgText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: T.inkSoft },
+  pdfRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: T.soft,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    marginBottom: 8,
+  },
+  pdfName: { flex: 1, fontFamily: 'Inter_500Medium', fontSize: 14, color: T.ink },
   saveBar: {
     position: 'absolute',
     left: 0,
