@@ -152,7 +152,7 @@ function cleanFields(f: Partial<BillFields>): Partial<BillFields> {
       out.items = ((v as BillItem[]) ?? [])
         .map((i) => ({ description: (i.description ?? '').trim() }))
         .filter((i) => i.description);
-    } else if (k === 'images' || k === 'videos' || k === 'pdfs') {
+    } else if (k === 'images' || k === 'image_captions' || k === 'videos' || k === 'pdfs') {
       out[k] = v;
     } else if (k === 'total' || k === 'advance' || k === 'balance') {
       out[k] = blank(v) ? null : num(v as number);

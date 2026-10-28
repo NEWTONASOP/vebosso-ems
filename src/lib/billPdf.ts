@@ -164,9 +164,15 @@ export async function buildBillHtml(b: Bill, s: BillSettings): Promise<string> {
   const p = paletteFor(b);
   const [logo, watermark] = await Promise.all([logoFor(p.brand), watermarkFor(p.brand)]);
   const signed = await signBillImages(b.images ?? []);
-  const images = (await Promise.all((b.images ?? []).map((x) => (signed[x] ? toDataUri(signed[x]) : null)))).filter(
-    (x): x is string => !!x
-  );
+  // Each photo with what its caption says; one that can't be fetched drops out with its caption.
+  const images = (
+    await Promise.all(
+      (b.images ?? []).map(async (x) => ({
+        src: signed[x] ? await toDataUri(signed[x]) : null,
+        caption: b.image_captions?.[x]?.trim() ?? '',
+      }))
+    )
+  ).filter((x): x is { src: string; caption: string } => !!x.src);
   const t = billTotals(b);
   const items = (b.items ?? []).filter((i) => i.description?.trim());
   const date = b.function_date ? format(parseISO(b.function_date), 'EEE, d MMM yyyy') : '';
@@ -271,8 +277,10 @@ export async function buildBillHtml(b: Bill, s: BillSettings): Promise<string> {
   .sig .name { font-size: 12px; font-weight: 700; color: #1B1E24; margin-bottom: 6px; min-height: 16px; }
 
   .imgs { break-before: page; page-break-before: always; }
-  .imgs img { display: block; max-width: 100%; max-height: 240mm; width: auto; height: auto; margin: 0 auto 14px;
-    border-radius: 10px; break-inside: avoid; page-break-inside: avoid; }
+  .imgs figure { margin: 0 0 14px; break-inside: avoid; page-break-inside: avoid; }
+  .imgs img { display: block; max-width: 100%; max-height: 225mm; width: auto; height: auto; margin: 0 auto;
+    border-radius: 10px; }
+  .imgs figcaption { text-align: center; font-size: 11.5px; color: #4A4556; margin-top: 6px; line-height: 1.4; }
 
   tr, .kv, .card, .money, .terms, .signs { break-inside: avoid; page-break-inside: avoid; }
 </style></head><body>
@@ -337,7 +345,9 @@ export async function buildBillHtml(b: Bill, s: BillSettings): Promise<string> {
       </div>
     </div>
 
-    ${images.length ? `<div class="imgs"><h3>Images</h3>${images.map((src) => `<img src="${src}" alt="" />`).join('')}</div>` : ''}
+    ${images.length ? `<div class="imgs"><h3>Images</h3>${images
+      .map((i) => `<figure><img src="${i.src}" alt="" />${i.caption ? `<figcaption>${nl(i.caption)}</figcaption>` : ''}</figure>`)
+      .join('')}</div>` : ''}
   </div>
   </div>
 </body></html>`;

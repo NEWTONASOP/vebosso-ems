@@ -55,6 +55,7 @@ import {
 } from '../../../lib/bills';
 import { BillHistorySheet } from '../../../components/BillHistorySheet';
 import { ImageViewerModal } from '../../../components/ImageViewerModal';
+import { PhotoCropper } from '../../../components/PhotoCropper';
 import { BillVideoStrip } from '../../../components/BillVideoStrip';
 import { VideoPlayerModal } from '../../../components/VideoPlayerModal';
 import { BillPage, BillPreviewSheet } from '../../../components/BillPreviewSheet';
@@ -101,6 +102,7 @@ const emptyForm = (kind: BillKind, brand: BillBrand): BillFields => ({
   balance: null,
   terms: '',
   images: [],
+  image_captions: {},
   videos: [],
   pdfs: [],
 });
@@ -125,6 +127,7 @@ const fromBill = (b: Bill): BillFields => ({
   balance: b.balance,
   terms: b.terms ?? '',
   images: b.images ?? [],
+  image_captions: b.image_captions ?? {},
   videos: b.videos ?? [],
   pdfs: b.pdfs ?? [],
 });
@@ -178,6 +181,8 @@ export default function BillEditorScreen() {
   const [showHistory, setShowHistory] = useState(false);
   // The bill image open in the big popup.
   const [viewImage, setViewImage] = useState<string | null>(null);
+  // The photo being cropped: a camera shot not added yet, or one already on the bill.
+  const [cropping, setCropping] = useState<{ uri: string; path?: string } | null>(null);
   // The bill video playing in the popup, and the one being sent on WhatsApp.
   const [playVideo, setPlayVideo] = useState<BillVideo | null>(null);
   const [sendingVideo, setSendingVideo] = useState<string | null>(null);
@@ -335,13 +340,23 @@ export default function BillEditorScreen() {
           ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
           : await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsMultipleSelection: true, quality: 0.8 });
       if (res.canceled || !res.assets?.length) return;
+      // A shot from the camera can be cropped before it goes on the bill.
+      if (source === 'camera') return setCropping({ uri: res.assets[0].uri });
+      await addPicked(res.assets.map((a) => a.uri));
+    } catch {
+      setError('Could not open the picker');
+    }
+  };
 
+  /** Uploads photos (picked, shot or cropped) and puts them on the bill. */
+  const addPicked = async (uris: string[]) => {
+    try {
       setBusy('images');
       const target = await ensureBill(form);
       if (!target) return;
       const added: string[] = [];
-      for (const a of res.assets) {
-        const up = await uploadBillImage(target.id, a.uri);
+      for (const uri of uris) {
+        const up = await uploadBillImage(target.id, uri);
         if (up.success) added.push(up.data);
         else setError(up.error);
       }
@@ -375,22 +390,70 @@ export default function BillEditorScreen() {
         style: 'destructive',
         onPress: async () => {
           const images = form.images.filter((p) => p !== path);
+          const { [path]: _gone, ...image_captions } = form.image_captions;
           if (!isDraft) {
             // Saved bill: gone on Save (the file is deleted then), back on discard.
-            setForm((f) => ({ ...f, images }));
+            setForm((f) => ({ ...f, images, image_captions }));
             setDirty(true);
             return;
           }
           if (bill) {
-            const saved = await updateBill(bill.id, { images });
+            const saved = await updateBill(bill.id, { images, image_captions });
             if (saved.success) setBill(saved.data);
           }
           await removeBillImage(path);
-          setForm((f) => ({ ...f, images }));
-          setDefaults((d) => (d ? { ...d, images } : d));
+          setForm((f) => ({ ...f, images, image_captions }));
+          setDefaults((d) => (d ? { ...d, images, image_captions } : d));
         },
       },
     ]);
+  };
+
+  /** What the photo shows — printed under it on the bill. */
+  const setCaption = (path: string, text: string) =>
+    set('image_captions', { ...form.image_captions, [path]: text.slice(0, 300) });
+
+  /** The cropper finished: a new shot goes on the bill, a photo already there is replaced. */
+  const finishCrop = async (uri: string) => {
+    const job = cropping;
+    setCropping(null);
+    if (!job) return;
+    if (!job.path) return void (await addPicked([uri]));
+
+    const old = job.path;
+    try {
+      setBusy('images');
+      const target = await ensureBill(form);
+      if (!target) return;
+      const up = await uploadBillImage(target.id, uri);
+      if (!up.success) return setError(up.error);
+      const fresh = up.data;
+      const signed = await signBillImages([fresh]);
+      setImageUrls((u) => ({ ...u, ...signed }));
+
+      // Same place in the list, same caption.
+      const images = form.images.map((p) => (p === old ? fresh : p));
+      const { [old]: caption, ...rest } = form.image_captions;
+      const image_captions = caption ? { ...rest, [fresh]: caption } : rest;
+      if (target.status === 'draft') {
+        const saved = await updateBill(target.id, { images, image_captions });
+        if (saved.success) setBill(saved.data);
+        setForm((f) => ({ ...f, images, image_captions }));
+        setDefaults((d) => (d ? { ...d, images, image_captions } : d));
+        await removeBillImage(old);
+      } else {
+        // A saved bill changes on Save: the old file goes then — or now, if it was never saved.
+        newImages.current.push(fresh);
+        if (newImages.current.includes(old)) {
+          newImages.current = newImages.current.filter((p) => p !== old);
+          await removeBillImage(old);
+        }
+        setForm((f) => ({ ...f, images, image_captions }));
+        setDirty(true);
+      }
+    } finally {
+      setBusy(null);
+    }
   };
 
   // ---- PDFs (phone only: they're added to the shared bill PDF) -------------
@@ -1005,21 +1068,45 @@ export default function BillEditorScreen() {
           </Section>
 
           <Section title={`Images${form.images.length ? ` · ${form.images.length}` : ''}`}>
-            <View style={styles.images}>
-              {form.images.map((p) => (
-                <View key={p}>
-                  <Pressable onPress={() => imageUrls[p] && setViewImage(p)} accessibilityLabel="View image">
-                    {imageUrls[p] ? (
-                      <Image source={imageSource(imageUrls[p])} style={styles.thumb} contentFit="cover" />
-                    ) : (
-                      <View style={[styles.thumb, { backgroundColor: T.soft2 }]} />
-                    )}
-                  </Pressable>
-                  <Pressable style={styles.thumbX} onPress={() => removeImage(p)} hitSlop={6} accessibilityLabel="Remove image">
-                    <Feather name="x" size={12} color={T.white} />
-                  </Pressable>
+            {form.images.map((p) => (
+              <View key={p} style={styles.photoRow}>
+                <Pressable onPress={() => imageUrls[p] && setViewImage(p)} accessibilityLabel="View image">
+                  {imageUrls[p] ? (
+                    <Image source={imageSource(imageUrls[p])} style={styles.photoThumb} contentFit="cover" />
+                  ) : (
+                    <View style={[styles.photoThumb, { backgroundColor: T.soft2 }]} />
+                  )}
+                </Pressable>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <TextInput
+                    value={form.image_captions[p] ?? ''}
+                    onChangeText={(v) => setCaption(p, v)}
+                    placeholder="What's in this photo? (shown under it on the bill)"
+                    placeholderTextColor={T.mute}
+                    style={[styles.input, styles.caption]}
+                    multiline
+                    textAlignVertical="top"
+                  />
+                  <View style={styles.photoActions}>
+                    <Pressable
+                      onPress={() => imageUrls[p] && setCropping({ uri: imageUrls[p], path: p })}
+                      disabled={!imageUrls[p] || busy === 'images'}
+                      style={styles.photoAction}
+                      hitSlop={6}
+                      accessibilityLabel="Crop photo"
+                    >
+                      <Feather name="crop" size={14} color={T.inkSoft} />
+                      <Text style={styles.photoActionText}>Crop</Text>
+                    </Pressable>
+                    <Pressable onPress={() => removeImage(p)} style={styles.photoAction} hitSlop={6} accessibilityLabel="Remove image">
+                      <Feather name="trash-2" size={14} color={T.coral} />
+                      <Text style={[styles.photoActionText, { color: T.coral }]}>Remove</Text>
+                    </Pressable>
+                  </View>
                 </View>
-              ))}
+              </View>
+            ))}
+            <View style={styles.images}>
               <Pressable style={styles.addImg} onPress={() => addImages('library')} disabled={busy === 'images'}>
                 {busy === 'images' ? (
                   <ActivityIndicator color={T.charcoal} />
@@ -1084,6 +1171,13 @@ export default function BillEditorScreen() {
       {showHistory && bill ? (
         <BillHistorySheet billId={bill.id} billNumber={bill.number} onDismiss={() => setShowHistory(false)} />
       ) : null}
+
+      <PhotoCropper
+        uri={cropping?.uri ?? null}
+        doneLabel={cropping?.path ? 'Done' : 'Use photo'}
+        onDone={(uri) => void finishCrop(uri)}
+        onCancel={() => setCropping(null)}
+      />
 
       <ImageViewerModal
         uri={viewImage ? imageUrls[viewImage] ?? null : null}
@@ -1439,18 +1533,12 @@ const styles = StyleSheet.create({
   balanceValue: { fontFamily: 'Inter_800ExtraBold', fontSize: 18, color: T.white },
   terms: { minHeight: 120, paddingTop: 12 },
   images: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  thumb: { width: 88, height: 88, borderRadius: 14 },
-  thumbX: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: T.charcoal,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  photoRow: { flexDirection: 'row', gap: 12, marginBottom: 12, alignItems: 'flex-start' },
+  photoThumb: { width: 84, height: 84, borderRadius: 14 },
+  caption: { minHeight: 52, paddingTop: 10, paddingBottom: 10, fontSize: 14 },
+  photoActions: { flexDirection: 'row', gap: 18, paddingHorizontal: 2 },
+  photoAction: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  photoActionText: { fontFamily: 'Inter_600SemiBold', fontSize: 12.5, color: T.inkSoft },
   addImg: {
     width: 88,
     height: 88,

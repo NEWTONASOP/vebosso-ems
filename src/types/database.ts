@@ -532,6 +532,8 @@ export interface Bill {
   balance: number | string | null;
   terms: string | null;
   images: string[];
+  /** What each photo shows, by the photo's path (071); printed under it on the PDF. */
+  image_captions: Record<string, string>;
   /** Cloudinary videos attached to the bill (058). */
   videos: BillVideo[];
   /** Added after the bill's own pages when shared from the phone. */
@@ -577,6 +579,7 @@ export type BillFields = Pick<
   | 'balance'
   | 'terms'
   | 'images'
+  | 'image_captions'
   | 'videos'
   | 'pdfs'
 >;
