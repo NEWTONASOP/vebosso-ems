@@ -1,7 +1,8 @@
 // ============================================================================
-// VEBOSSO EMS — Member Tasks Sheet ("Tasks by Boss")
+// VEBOSSO EMS — Member Tasks Sheet ("Tasks")
 // The owner's view of one person's tasks: what's open, what's finished (with
-// their note), and a message box to give a new one.
+// their note), and a message box to give a new one. Two tabs: tasks the boss
+// gave, and tasks the person added for themselves (072).
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -12,6 +13,7 @@ import { SmoothTextInput as TextInput } from './SmoothTextInput';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../store/authStore';
 import { useWorkStore } from '../store/workStore';
 import { Task } from '../types/database';
 import { SheetFrame } from './SheetFrame';
@@ -51,6 +53,7 @@ export function MemberTasksSheet({
   onMessage,
   inline,
 }: MemberTasksSheetProps) {
+  const me = useAuthStore((s) => s.profile);
   const addTask = useWorkStore((s) => s.addTask);
   const updateTask = useWorkStore((s) => s.updateTask);
   const approveTask = useWorkStore((s) => s.approveTask);
@@ -64,6 +67,8 @@ export function MemberTasksSheet({
   const [error, setError] = useState('');
   // Done tasks stay folded away until asked for.
   const [showDone, setShowDone] = useState(false);
+  // Tasks the boss gave, or ones the person added for themselves.
+  const [tab, setTab] = useState<'boss' | 'self'>('boss');
 
   const apply = useCallback((res: Awaited<ReturnType<typeof fetchMemberTasks>>) => {
     if (res.error) setError(res.error.message);
@@ -118,12 +123,14 @@ export function MemberTasksSheet({
     }
   };
 
+  const inTab = tasks.filter((t) => (tab === 'self' ? !!t.self_added : !t.self_added));
+  const selfWaiting = tasks.filter((t) => t.self_added && t.status === 'review').length;
   // Finished work waiting for approval comes first.
   const open = [
-    ...tasks.filter((t) => t.status === 'review'),
-    ...tasks.filter((t) => t.status !== 'done' && t.status !== 'review'),
+    ...inTab.filter((t) => t.status === 'review'),
+    ...inTab.filter((t) => t.status !== 'done' && t.status !== 'review'),
   ];
-  const done = tasks.filter((t) => t.status === 'done');
+  const done = inTab.filter((t) => t.status === 'done');
 
   /** Edit, approve or reject from the task popup; reloads the list on success. */
   const manage: TaskManage | undefined = selected
@@ -221,23 +228,45 @@ export function MemberTasksSheet({
       inline={inline}
       visible={visible}
       onDismiss={onDismiss}
-      title="Tasks by Boss"
+      title="Tasks"
       subtitle={memberName}
       icon="clipboard"
       iconColor={T.blue}
       iconBg={T.blueSoft}
-      footer={composer}
+      footer={tab === 'boss' ? composer : undefined}
     >
+      <View style={styles.tabs}>
+        {([['boss', 'From boss'], ['self', 'Self']] as const).map(([key, label]) => (
+          <Pressable
+            key={key}
+            style={[styles.tab, tab === key && styles.tabActive]}
+            onPress={() => {
+              setTab(key);
+              setShowDone(false);
+            }}
+            accessibilityRole="button"
+            accessibilityState={{ selected: tab === key }}
+          >
+            <Text style={[styles.tabText, tab === key && styles.tabTextActive]}>
+              {label}
+              {key === 'self' && selfWaiting ? ` · ${selfWaiting} to review` : ''}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       {isLoading ? (
         <ActivityIndicator color={T.charcoal} style={{ marginVertical: 24 }} />
-      ) : tasks.length === 0 ? (
-        <Text style={styles.empty}>No tasks yet. Write one below.</Text>
+      ) : inTab.length === 0 ? (
+        <Text style={styles.empty}>
+          {tab === 'self' ? `${memberName.split(' ')[0]} hasn't added any tasks yet.` : 'No tasks yet. Write one below.'}
+        </Text>
       ) : (
         <>
           <Text style={styles.group}>Open · {open.length}</Text>
           {open.length === 0 ? <Text style={styles.groupEmpty}>Nothing open. All caught up.</Text> : null}
           {open.map((t) => (
-            <TaskLine key={t.id} task={t} onPress={() => setSelected(t)} />
+            <TaskLine key={t.id} task={t} who={memberName} onPress={() => setSelected(t)} />
           ))}
           {done.length > 0 ? (
             <Pressable
@@ -253,7 +282,7 @@ export function MemberTasksSheet({
             </Pressable>
           ) : null}
           {showDone
-            ? done.map((t) => <TaskLine key={t.id} task={t} onPress={() => setSelected(t)} />)
+            ? done.map((t) => <TaskLine key={t.id} task={t} who={memberName} onPress={() => setSelected(t)} />)
             : null}
         </>
       )}
@@ -264,12 +293,13 @@ export function MemberTasksSheet({
       onDismiss={() => setSelected(null)}
       task={selected}
       manage={manage}
+      viewer={me ? { id: me.id, name: me.full_name, isOwner: me.role === 'owner' } : undefined}
     />
     </>
   );
 }
 
-function TaskLine({ task, onPress }: { task: Task; onPress: () => void }) {
+function TaskLine({ task, who, onPress }: { task: Task; who: string; onPress: () => void }) {
   const isDone = task.status === 'done';
   const inReview = task.status === 'review';
   return (
@@ -319,7 +349,7 @@ function TaskLine({ task, onPress }: { task: Task; onPress: () => void }) {
             ? `Waiting for your approval · finished ${format(new Date(task.completed_at), 'd MMM, h:mm a')}`
             : isDone && task.completed_at
               ? `Done ${format(new Date(task.completed_at), 'd MMM, h:mm a')}`
-              : `Given ${format(new Date(task.created_at), 'd MMM, h:mm a')}`}
+              : `${task.self_added ? `Added by ${who.split(' ')[0]}` : 'Given'} ${format(new Date(task.created_at), 'd MMM, h:mm a')}`}
         </Text>
         </Pressable>
       </View>
@@ -328,6 +358,18 @@ function TaskLine({ task, onPress }: { task: Task; onPress: () => void }) {
 }
 
 const styles = StyleSheet.create({
+  tabs: {
+    flexDirection: 'row',
+    gap: 6,
+    padding: 4,
+    marginBottom: 12,
+    borderRadius: 999,
+    backgroundColor: T.soft,
+  },
+  tab: { flex: 1, height: 34, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  tabActive: { backgroundColor: T.card },
+  tabText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
+  tabTextActive: { color: T.ink },
   empty: {
     fontFamily: 'Inter_400Regular',
     fontSize: 14,

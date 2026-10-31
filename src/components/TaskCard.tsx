@@ -9,11 +9,13 @@ import { Text } from 'react-native-paper';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { AnimatedPressable } from './AnimatedPressable';
 import { TaskCompleteModal } from './TaskCompleteModal';
-import { TaskDetailModal } from './TaskDetailModal';
+import { TaskDetailModal, TaskOwn } from './TaskDetailModal';
 import { VoiceNote } from './VoiceNote';
 
 import { Feather } from '@expo/vector-icons';
 import { AppTheme, appSoftShadow } from '../constants/theme';
+import { deleteMyTask, editMyTask } from '../lib/selfTasks';
+import { useAuthStore } from '../store/authStore';
 import { Task, TaskStatus } from '../types/database';
 
 /** Only the first few cards animate in — a long list would otherwise crawl. */
@@ -24,9 +26,14 @@ interface TaskCardProps {
   onStatusChange?: (taskId: string, status: TaskStatus, completionNote?: string) => void;
   isLast?: boolean;
   index?: number;
+  /** How many comments are on it (shows a small badge). */
+  commentCount?: number;
+  /** After the person edited or deleted their own task. */
+  onChanged?: () => void;
 }
 
-export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardProps) {
+export function TaskCard({ task, onStatusChange, isLast, index = 0, commentCount = 0, onChanged }: TaskCardProps) {
+  const profile = useAuthStore((s) => s.profile);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
@@ -88,6 +95,25 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
 
   const dueDate = getFormattedDate();
 
+  // The person's own added task, still open: they can reword or delete it.
+  const own: TaskOwn | undefined =
+    task.self_added && (task.status === 'pending' || task.status === 'in_progress')
+      ? {
+          onSave: async (title) => {
+            const res = await editMyTask(task.id, title, task.description || '');
+            if (!res.success) return res.error;
+            onChanged?.();
+            return null;
+          },
+          onDelete: async () => {
+            const res = await deleteMyTask(task.id);
+            if (!res.success) return res.error;
+            onChanged?.();
+            return null;
+          },
+        }
+      : undefined;
+
   return (
     <>
       <Animated.View 
@@ -116,6 +142,12 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
                 </Text>
               </View>
               <View style={styles.metaRow}>
+                {commentCount > 0 ? (
+                  <View style={styles.commentBadge}>
+                    <Feather name="message-circle" size={11} color={AppTheme.blue} />
+                    <Text style={styles.commentBadgeText}>{commentCount}</Text>
+                  </View>
+                ) : null}
                 {dueDate && (
                   <Text style={styles.metaText}>
                     Due {dueDate}
@@ -199,6 +231,8 @@ export function TaskCard({ task, onStatusChange, isLast, index = 0 }: TaskCardPr
         visible={showDetailModal}
         onDismiss={() => setShowDetailModal(false)}
         task={task as any}
+        own={own}
+        viewer={profile ? { id: profile.id, name: profile.full_name, isOwner: profile.role === 'owner' } : undefined}
       />
     </>
   );
@@ -264,6 +298,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
     color: AppTheme.mute,
+  },
+  commentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginRight: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: AppTheme.blueSoft,
+  },
+  commentBadgeText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+    color: AppTheme.blue,
   },
   description: {
     fontFamily: 'Inter_400Regular',

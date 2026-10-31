@@ -20,7 +20,8 @@ import { PaperOutlinedField } from './PaperOutlinedField';
 import { FieldChainScope } from './FieldChain';
 import { useDialogLift } from '../lib/useKeyboardHeight';
 import { WorkFile } from '../types/database';
-import { WorkFilePicker } from './WorkFilePicker';
+import { MAX_WORK_FILES } from '../lib/employeeRecords';
+import { pickWorkFiles, WorkFileList } from './WorkFilePicker';
 
 const MAX_PHOTOS = 5;
 
@@ -194,7 +195,7 @@ export function CheckInModal({
             {!isEditMode ? (
               <>
                 <Text style={styles.sectionTitle}>
-                  Attach Photos (Optional, Max {MAX_PHOTOS})
+                  Attach (Optional)
                 </Text>
                 <View style={styles.photoActions}>
                   <Button
@@ -202,6 +203,7 @@ export function CheckInModal({
                     onPress={takePhoto}
                     disabled={isLoading || photos.length >= MAX_PHOTOS}
                     icon="camera"
+                    compact
                     style={styles.photoButton}
                     buttonColor={AppTheme.soft}
                     textColor={AppTheme.inkSoft}
@@ -213,11 +215,24 @@ export function CheckInModal({
                     onPress={pickImage}
                     disabled={isLoading || photos.length >= MAX_PHOTOS}
                     icon="image"
+                    compact
                     style={styles.photoButton}
                     buttonColor={AppTheme.soft}
                     textColor={AppTheme.inkSoft}
                   >
                     Gallery
+                  </Button>
+                  <Button
+                    mode="contained"
+                    onPress={() => void pickWorkFiles(files, setFiles, setError)}
+                    disabled={isLoading || files.length >= MAX_WORK_FILES}
+                    icon="file-plus"
+                    compact
+                    style={styles.photoButton}
+                    buttonColor={AppTheme.soft}
+                    textColor={AppTheme.inkSoft}
+                  >
+                    File
                   </Button>
                 </View>
 
@@ -245,7 +260,7 @@ export function CheckInModal({
                   </ScrollView>
                 ) : null}
 
-                <WorkFilePicker files={files} onChange={setFiles} onError={setError} disabled={isLoading} />
+                <WorkFileList files={files} onChange={setFiles} disabled={isLoading} />
               </>
             ) : null}
 
@@ -347,7 +362,7 @@ const styles = StyleSheet.create({
   },
   photoActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     marginBottom: 12,
   },
   photoButton: {

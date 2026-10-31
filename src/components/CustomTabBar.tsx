@@ -11,7 +11,8 @@ import { AppTheme, RoleAccent, SIDEBAR_WIDTH, type Role, appShadow } from '../co
 import { useAuthStore } from '../store/authStore';
 
 const SLIM_WIDTH    = 400;
-const DESKTOP_WIDTH = 1024;
+/** From this width (web) the bottom bar becomes a sidebar on the left. */
+export const DESKTOP_WIDTH = 1024;
 
 // Map route names to icons
 const ICON_MAP: Record<string, string> = {

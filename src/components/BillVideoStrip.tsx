@@ -1,7 +1,8 @@
 // ============================================================================
 // VEBOSSO EMS — Bill video thumbnails
 // A bill's videos as a row of thumbnails: tap one to play it. Remove (X, while
-// editing) and Send (WhatsApp, on the saved bill) sit on each thumbnail.
+// editing) sits on the thumbnail; Send (WhatsApp, on the saved bill) is its own
+// button under it, big enough to hit without starting the video.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
@@ -34,7 +35,7 @@ export function BillVideoStrip({
             <Image source={{ uri: videoThumb(v) }} style={styles.thumb} contentFit="cover" />
             <View style={styles.playWrap} pointerEvents="none">
               <View style={styles.play}>
-                <Feather name="play" size={16} color={T.white} />
+                <Feather name="play" size={18} color={T.white} />
               </View>
             </View>
             {videoLength(v.duration) ? (
@@ -50,16 +51,19 @@ export function BillVideoStrip({
           ) : null}
           {onSend ? (
             <Pressable
-              style={styles.send}
+              style={({ pressed }) => [styles.send, pressed && { opacity: 0.8 }]}
               onPress={() => onSend(v)}
               disabled={!!sendingId}
-              hitSlop={6}
+              accessibilityRole="button"
               accessibilityLabel="Send video on WhatsApp"
             >
               {sendingId === v.public_id ? (
                 <ActivityIndicator size="small" color={T.white} />
               ) : (
-                <Feather name="send" size={13} color={T.white} />
+                <>
+                  <Feather name="send" size={13} color={T.white} />
+                  <Text style={styles.sendText}>Send</Text>
+                </>
               )}
             </Pressable>
           ) : null}
@@ -70,12 +74,12 @@ export function BillVideoStrip({
 }
 
 const styles = StyleSheet.create({
-  thumb: { width: 76, height: 76, borderRadius: 12, backgroundColor: T.soft2 },
+  thumb: { width: 96, height: 96, borderRadius: 12, backgroundColor: T.soft2 },
   playWrap: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   play: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -102,14 +106,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   send: {
-    position: 'absolute',
-    right: 4,
-    bottom: 4,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    marginTop: 6,
+    width: 96,
+    height: 34,
+    borderRadius: 999,
+    flexDirection: 'row',
+    gap: 6,
     backgroundColor: T.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  sendText: { fontFamily: 'Inter_700Bold', fontSize: 12.5, color: T.white },
 });

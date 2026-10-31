@@ -48,6 +48,8 @@ export default function OwnerTaskTrackingScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<TaskStatus | 'all'>('all');
+  // Tasks I gave, or tasks my people added for themselves (072).
+  const [source, setSource] = useState<'given' | 'team'>('given');
   const [snackMessage, setSnackMessage] = useState('');
   const [selectedTask, setSelectedTask] = useState<TaskWithAssignee | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -64,13 +66,14 @@ export default function OwnerTaskTrackingScreen() {
     try {
       // Everything still open, however old; completed ones a batch at a time,
       // plus how many there are in all so the progress stays all-time.
+      const scope = source === 'given' ? { assigned_by: profile.id } : { self_added: true };
       const select = '*, assignee:profiles!tasks_assigned_to_fkey(id, full_name, employee_id, avatar_url, role)';
       const [open, done, doneCount] = await Promise.all([
-        supabase.from('tasks').select(select).eq('assigned_by', profile.id).neq('status', 'done')
+        supabase.from('tasks').select(select).match(scope).neq('status', 'done')
           .order('created_at', { ascending: false }),
-        supabase.from('tasks').select(select).eq('assigned_by', profile.id).eq('status', 'done')
+        supabase.from('tasks').select(select).match(scope).eq('status', 'done')
           .order('created_at', { ascending: false }).limit(doneLimit.current),
-        supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('assigned_by', profile.id).eq('status', 'done'),
+        supabase.from('tasks').select('id', { count: 'exact', head: true }).match(scope).eq('status', 'done'),
       ]);
 
       const error = open.error || done.error;
@@ -85,7 +88,7 @@ export default function OwnerTaskTrackingScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [profile?.id]);
+  }, [profile?.id, source]);
 
   useEffect(() => {
     fetchAssignedTasks();
@@ -263,7 +266,7 @@ export default function OwnerTaskTrackingScreen() {
             <Feather name="arrow-left" size={18} color={T.charcoal} />
           </Pressable>
           <View style={styles.headerTextContainer}>
-            <Text style={screenChrome.title}>Track Tasks</Text>
+            <Text style={screenChrome.title}>{source === 'team' ? 'Added by Team' : 'Track Tasks'}</Text>
             <Text style={screenChrome.subtitle}>
               {stats.done}/{stats.total} completed
             </Text>
@@ -290,6 +293,23 @@ export default function OwnerTaskTrackingScreen() {
               </View>
             </View>
           )}
+
+          <View style={styles.sourceTabs}>
+            {([['given', 'Given by me'], ['team', 'Added by team']] as const).map(([key, label]) => (
+              <Pressable
+                key={key}
+                style={[styles.sourceTab, source === key && styles.sourceTabActive]}
+                onPress={() => {
+                  setSource(key);
+                  setFilter('all');
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: source === key }}
+              >
+                <Text style={[styles.sourceTabText, source === key && styles.sourceTabTextActive]}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
 
           <View style={styles.filterRow}>
             {filterOptions.map((f) => {
@@ -402,7 +422,7 @@ export default function OwnerTaskTrackingScreen() {
                 <EmptyState
                   icon="clipboard-text-outline"
                   title="No Tasks Found"
-                  subtitle={filter === 'all' ? 'You haven\'t assigned any tasks yet.' : 'No tasks in this category'}
+                  subtitle={filter === 'all' ? (source === 'team' ? 'Tasks your people add for themselves show up here.' : 'You haven\'t assigned any tasks yet.') : 'No tasks in this category'}
                 />
               </View>
             )}
@@ -419,6 +439,7 @@ export default function OwnerTaskTrackingScreen() {
           task={selectedTask}
           onReassign={handleReassignPress}
           manage={manage}
+          viewer={profile ? { id: profile.id, name: profile.full_name, isOwner: profile.role === 'owner' } : undefined}
         />
 
         <MemberPickerModal
@@ -491,6 +512,18 @@ const styles = StyleSheet.create({
     backgroundColor: T.charcoal,
     borderRadius: 3,
   },
+  sourceTabs: {
+    flexDirection: 'row',
+    gap: 6,
+    padding: 4,
+    marginTop: 6,
+    borderRadius: 999,
+    backgroundColor: T.soft2,
+  },
+  sourceTab: { flex: 1, height: 36, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  sourceTabActive: { backgroundColor: T.card, ...appSoftShadow },
+  sourceTabText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
+  sourceTabTextActive: { color: T.ink },
   filterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

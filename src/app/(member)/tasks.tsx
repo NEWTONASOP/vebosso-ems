@@ -2,9 +2,11 @@
 // VEBOSSO EMS — Member Tasks Screen
 // ============================================================================
 
-import { useEffect, useState } from 'react';
+import { Feather } from '@expo/vector-icons';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
+import { AddMyTaskModal } from '../../components/AddMyTaskModal';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { PageTransition } from '../../components/PageTransition';
@@ -16,6 +18,7 @@ import {
   appSoftShadow,
   screenChrome,
 } from '../../constants/theme';
+import { addMyTask, fetchCommentCounts } from '../../lib/selfTasks';
 import { useAuthStore } from '../../store/authStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../store/workStore';
@@ -27,10 +30,40 @@ export default function MemberTasksScreen() {
   const [filter, setFilter] = useState<TaskStatus | 'all'>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
+  // Given by the boss / manager, or added by the person themselves (072).
+  const [tab, setTab] = useState<'boss' | 'mine'>('boss');
+  const [adding, setAdding] = useState(false);
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (profile) fetchTodayTasks(profile.id);
   }, [profile, fetchTodayTasks]);
+
+  // Little comment badges on the cards; refreshed whenever the list changes.
+  const taskIds = todayTasks.map((t) => t.id).join(',');
+  useEffect(() => {
+    if (!taskIds) return setCommentCounts({});
+    let active = true;
+    void fetchCommentCounts(taskIds.split(',')).then((c) => active && setCommentCounts(c));
+    return () => {
+      active = false;
+    };
+  }, [taskIds, refreshing]);
+
+  const reload = useCallback(() => {
+    if (profile) void fetchTodayTasks(profile.id);
+  }, [profile, fetchTodayTasks]);
+
+  const handleAdd = async (title: string) => {
+    if (!profile) return 'Not signed in';
+    const res = await addMyTask(profile.id, profile.full_name, title);
+    if (!res.success) return res.error;
+    setTab('mine');
+    setFilter('all');
+    setSnackMessage('Task added — your manager can see it');
+    reload();
+    return null;
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -47,15 +80,16 @@ export default function MemberTasksScreen() {
     }
   };
 
+  const tabTasks = todayTasks.filter((t) => (tab === 'mine' ? !!t.self_added : !t.self_added));
   const filteredTasks = filter === 'all'
-    ? todayTasks
-    : todayTasks.filter((t) => t.status === filter);
+    ? tabTasks
+    : tabTasks.filter((t) => t.status === filter);
 
   const stats = {
-    total: todayTasks.length,
-    done: todayTasks.filter((t) => t.status === 'done').length,
-    inProgress: todayTasks.filter((t) => t.status === 'in_progress').length,
-    pending: todayTasks.filter((t) => t.status === 'pending').length,
+    total: tabTasks.length,
+    done: tabTasks.filter((t) => t.status === 'done').length,
+    inProgress: tabTasks.filter((t) => t.status === 'in_progress').length,
+    pending: tabTasks.filter((t) => t.status === 'pending').length,
   };
 
   const completionPct = stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0;
@@ -71,10 +105,10 @@ export default function MemberTasksScreen() {
     <PageTransition>
       <View style={screenChrome.root}>
         <View style={screenChrome.header}>
-          <Text style={screenChrome.title}>Tasks by Boss</Text>
+          <Text style={screenChrome.title}>{tab === 'mine' ? 'My Tasks' : 'Tasks by Boss'}</Text>
           <Text style={screenChrome.subtitle}>
             {stats.total === 0
-              ? 'No assignments yet today'
+              ? tab === 'mine' ? 'Nothing added yet' : 'No assignments yet today'
               : `${stats.done} of ${stats.total} done · ${completionPct}%`}
           </Text>
         </View>
@@ -86,6 +120,23 @@ export default function MemberTasksScreen() {
           }
           showsVerticalScrollIndicator={false}
         >
+          <View style={styles.tabs}>
+            {([['boss', 'From boss'], ['mine', 'My tasks']] as const).map(([key, label]) => (
+              <Pressable
+                key={key}
+                style={[styles.tab, tab === key && styles.tabActive]}
+                onPress={() => {
+                  setTab(key);
+                  setFilter('all');
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: tab === key }}
+              >
+                <Text style={[styles.tabText, tab === key && styles.tabTextActive]}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+
           {stats.total > 0 && (
             <View style={styles.progressCard}>
               <View style={styles.progressBar}>
@@ -136,6 +187,8 @@ export default function MemberTasksScreen() {
                   <TaskCard
                     key={task.id}
                     task={task}
+                    commentCount={commentCounts[task.id] || 0}
+                    onChanged={reload}
                     onStatusChange={handleStatusChange}
                     isLast={index === filteredTasks.length - 1}
                   />
@@ -147,7 +200,9 @@ export default function MemberTasksScreen() {
                 title={filter === 'all' ? 'No tasks yet' : 'Nothing here'}
                 subtitle={
                   filter === 'all'
-                    ? 'When your manager assigns work, it will show up here.'
+                    ? tab === 'mine'
+                      ? 'Add what you plan to work on. Your manager and the boss can see it and comment.'
+                      : 'When your manager assigns work, it will show up here.'
                     : 'Try another filter, or pull down to refresh.'
                 }
                 actionLabel={filter !== 'all' ? 'Show all tasks' : undefined}
@@ -156,6 +211,19 @@ export default function MemberTasksScreen() {
             )}
           </View>
         </ScrollView>
+
+        {/* Add your own task, from either tab */}
+        <Pressable
+          style={styles.fab}
+          onPress={() => setAdding(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Add my task"
+        >
+          <Feather name="plus" size={18} color={T.white} />
+          <Text style={styles.fabText}>Add task</Text>
+        </Pressable>
+
+        <AddMyTaskModal visible={adding} onDismiss={() => setAdding(false)} onAdd={handleAdd} />
 
         <Snackbar
           visible={!!snackMessage}
@@ -196,6 +264,32 @@ const styles = StyleSheet.create({
     backgroundColor: T.charcoal,
     borderRadius: 4,
   },
+  tabs: {
+    flexDirection: 'row',
+    gap: 6,
+    padding: 4,
+    marginTop: 6,
+    borderRadius: 999,
+    backgroundColor: T.soft2,
+  },
+  tab: { flex: 1, height: 36, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  tabActive: { backgroundColor: T.card, ...appSoftShadow },
+  tabText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
+  tabTextActive: { color: T.ink },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 100,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 46,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    backgroundColor: T.charcoal,
+    ...appSoftShadow,
+  },
+  fabText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: T.white },
   filterRow: {
     flexDirection: 'row',
     paddingVertical: 16,

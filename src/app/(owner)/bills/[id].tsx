@@ -22,6 +22,7 @@ import {
   ScrollView,
   StyleSheet,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { SmoothTextInput as TextInput } from '../../../components/SmoothTextInput';
 import type { TextInput as RNTextInput } from 'react-native';
@@ -54,7 +55,7 @@ import {
   uploadBillPdf,
 } from '../../../lib/bills';
 import { BillHistorySheet } from '../../../components/BillHistorySheet';
-import { ImageViewerModal } from '../../../components/ImageViewerModal';
+import { BillImageEditor } from '../../../components/BillImageEditor';
 import { PhotoCropper } from '../../../components/PhotoCropper';
 import { BillVideoStrip } from '../../../components/BillVideoStrip';
 import { VideoPlayerModal } from '../../../components/VideoPlayerModal';
@@ -63,6 +64,7 @@ import { HourPickerModal, hourLabel, PickerTheme } from '../../../components/Dat
 import { useFeatureBase } from '../../../lib/featureAccess';
 import { useMyAccess } from '../../../lib/accessRules';
 import { sendPushNotificationToRole } from '../../../lib/notifications';
+import { DESKTOP_WIDTH } from '../../../components/CustomTabBar';
 import { useAuthStore } from '../../../store/authStore';
 import { Bill, BillBrand, BillFields, BillKind, BillPdf, BillSettings, BillStatus, BillVideo } from '../../../types/database';
 import { BRANDS, brandOf } from '../../../lib/billBrands';
@@ -124,7 +126,9 @@ const fromBill = (b: Bill): BillFields => ({
   items: b.items?.length ? b.items.map((i) => ({ description: i.description ?? '' })) : [{ description: '' }],
   total: b.total,
   advance: b.advance,
-  balance: b.balance,
+  // Balance is always worked out (total − advance); there is no box for it, so
+  // an old typed-in balance is cleared the next time the bill is saved.
+  balance: null,
   terms: b.terms ?? '',
   images: b.images ?? [],
   image_captions: b.image_captions ?? {},
@@ -153,6 +157,12 @@ export default function BillEditorScreen() {
   const isNew = params.id === 'new';
   const profileName = useAuthStore((s) => s.profile?.full_name ?? '');
   const me = useAuthStore((s) => s.profile);
+  // Only the owner has the bottom tab bar here (others open Bills from Home,
+  // without it), and on wide web screens it is a sidebar — so only then leave
+  // room for it under the buttons.
+  const { width: screenWidth } = useWindowDimensions();
+  const tabBarSpace =
+    me?.role === 'owner' && !(Platform.OS === 'web' && screenWidth >= DESKTOP_WIDTH) ? 96 : 16;
   // What this person's access rules allow (062).
   const access = useMyAccess('bills');
 
@@ -180,7 +190,8 @@ export default function BillEditorScreen() {
   const [viewing, setViewing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   // The bill image open in the big popup.
-  const [viewImage, setViewImage] = useState<string | null>(null);
+  // The photo open in the popup (caption + crop).
+  const [editImage, setEditImage] = useState<string | null>(null);
   // The photo being cropped: a camera shot not added yet, or one already on the bill.
   const [cropping, setCropping] = useState<{ uri: string; path?: string } | null>(null);
   // The bill video playing in the popup, and the one being sent on WhatsApp.
@@ -831,7 +842,7 @@ export default function BillEditorScreen() {
           <BillPage bill={bill} settings={settings} />
         </View>
 
-        <View style={[styles.viewBar, { paddingBottom: 96 + insets.bottom }]}>
+        <View style={[styles.viewBar, { paddingBottom: tabBarSpace + insets.bottom }]}>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {inTrash && !canEditBill ? null : inTrash ? (
             <Pressable style={styles.editBtn} onPress={restore} disabled={busy === 'restore'}>
@@ -848,7 +859,7 @@ export default function BillEditorScreen() {
             <>
               {form.videos.length ? (
                 <View>
-                  <Text style={styles.videosLabel}>Videos · {form.videos.length} — tap to play, green button sends on WhatsApp</Text>
+                  <Text style={styles.videosLabel}>Videos · {form.videos.length}</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.videosRow}>
                     <BillVideoStrip videos={form.videos} onPlay={setPlayVideo} onSend={sendVideo} sendingId={sendingVideo} />
                   </ScrollView>
@@ -882,6 +893,8 @@ export default function BillEditorScreen() {
         {showHistory ? (
           <BillHistorySheet billId={bill.id} billNumber={bill.number} onDismiss={() => setShowHistory(false)} />
         ) : null}
+
+        <VideoPlayerModal uri={playVideo?.url ?? null} title={playVideo?.name} onDismiss={() => setPlayVideo(null)} />
       </View>
     );
   }
@@ -938,7 +951,7 @@ export default function BillEditorScreen() {
 
       <View ref={keyboardRef} style={{ flex: 1, paddingBottom: keyboardInset }}>
         <ScrollView
-          contentContainerStyle={[styles.body, { paddingBottom: 190 + insets.bottom }]}
+          contentContainerStyle={[styles.body, { paddingBottom: tabBarSpace + 94 + insets.bottom }]}
           keyboardShouldPersistTaps="handled"
         >
           {inTrash ? (
@@ -1044,16 +1057,9 @@ export default function BillEditorScreen() {
             />
             <MoneyRow
               inputRef={reg('advance')}
-              onNext={focusNext('balance')}
               label="Advance"
               value={form.advance === null || form.advance === undefined ? '' : String(form.advance)}
               onChange={(v) => set('advance', v === '' ? null : (v as unknown as number))}
-            />
-            <MoneyRow
-              inputRef={reg('balance')}
-              label="Balance"
-              value={form.balance === null || form.balance === undefined ? '' : String(form.balance)}
-              onChange={(v) => set('balance', v === '' ? null : (v as unknown as number))}
             />
           </Section>
 
@@ -1068,44 +1074,40 @@ export default function BillEditorScreen() {
           </Section>
 
           <Section title={`Images${form.images.length ? ` · ${form.images.length}` : ''}`}>
-            {form.images.map((p) => (
-              <View key={p} style={styles.photoRow}>
-                <Pressable onPress={() => imageUrls[p] && setViewImage(p)} accessibilityLabel="View image">
-                  {imageUrls[p] ? (
-                    <Image source={imageSource(imageUrls[p])} style={styles.photoThumb} contentFit="cover" />
-                  ) : (
-                    <View style={[styles.photoThumb, { backgroundColor: T.soft2 }]} />
-                  )}
-                </Pressable>
-                <View style={{ flex: 1, gap: 6 }}>
-                  <TextInput
-                    value={form.image_captions[p] ?? ''}
-                    onChangeText={(v) => setCaption(p, v)}
-                    placeholder="What's in this photo? (shown under it on the bill)"
-                    placeholderTextColor={T.mute}
-                    style={[styles.input, styles.caption]}
-                    multiline
-                    textAlignVertical="top"
-                  />
-                  <View style={styles.photoActions}>
+            {/* Tap a photo for its caption and Crop; the X removes it. */}
+            {form.images.length ? (
+              <View style={styles.photoGrid}>
+                {form.images.map((p) => (
+                  <View key={p}>
                     <Pressable
-                      onPress={() => imageUrls[p] && setCropping({ uri: imageUrls[p], path: p })}
-                      disabled={!imageUrls[p] || busy === 'images'}
-                      style={styles.photoAction}
-                      hitSlop={6}
-                      accessibilityLabel="Crop photo"
+                      onPress={() => imageUrls[p] && setEditImage(p)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Open photo"
                     >
-                      <Feather name="crop" size={14} color={T.inkSoft} />
-                      <Text style={styles.photoActionText}>Crop</Text>
+                      {imageUrls[p] ? (
+                        <Image source={imageSource(imageUrls[p])} style={styles.photoThumb} contentFit="cover" />
+                      ) : (
+                        <View style={[styles.photoThumb, { backgroundColor: T.soft2 }]} />
+                      )}
+                      {form.image_captions[p]?.trim() ? (
+                        <View style={styles.captionBadge} pointerEvents="none">
+                          <Feather name="type" size={11} color={T.white} />
+                        </View>
+                      ) : null}
                     </Pressable>
-                    <Pressable onPress={() => removeImage(p)} style={styles.photoAction} hitSlop={6} accessibilityLabel="Remove image">
-                      <Feather name="trash-2" size={14} color={T.coral} />
-                      <Text style={[styles.photoActionText, { color: T.coral }]}>Remove</Text>
+                    <Pressable
+                      onPress={() => removeImage(p)}
+                      style={styles.photoX}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Remove photo"
+                    >
+                      <Feather name="x" size={13} color={T.white} />
                     </Pressable>
                   </View>
-                </View>
+                ))}
               </View>
-            ))}
+            ) : null}
             <View style={styles.images}>
               <Pressable style={styles.addImg} onPress={() => addImages('library')} disabled={busy === 'images'}>
                 {busy === 'images' ? (
@@ -1179,9 +1181,17 @@ export default function BillEditorScreen() {
         onCancel={() => setCropping(null)}
       />
 
-      <ImageViewerModal
-        uri={viewImage ? imageUrls[viewImage] ?? null : null}
-        onDismiss={() => setViewImage(null)}
+      <BillImageEditor
+        uri={editImage ? imageUrls[editImage] ?? null : null}
+        caption={editImage ? form.image_captions[editImage] ?? '' : ''}
+        onCaption={(v) => editImage && setCaption(editImage, v)}
+        cropDisabled={busy === 'images'}
+        onCrop={() => {
+          const p = editImage;
+          setEditImage(null);
+          if (p && imageUrls[p]) setCropping({ uri: imageUrls[p], path: p });
+        }}
+        onDismiss={() => setEditImage(null)}
       />
       <VideoPlayerModal uri={playVideo?.url ?? null} title={playVideo?.name} onDismiss={() => setPlayVideo(null)} />
 
@@ -1230,7 +1240,7 @@ export default function BillEditorScreen() {
       />
 
       {/* Save bar */}
-      <View style={[styles.saveBar, { paddingBottom: 96 + insets.bottom }]}>
+      <View style={[styles.saveBar, { paddingBottom: tabBarSpace + insets.bottom }]}>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <View style={styles.saveRow}>
           <View style={{ flex: 1 }}>
@@ -1533,12 +1543,32 @@ const styles = StyleSheet.create({
   balanceValue: { fontFamily: 'Inter_800ExtraBold', fontSize: 18, color: T.white },
   terms: { minHeight: 120, paddingTop: 12 },
   images: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  photoRow: { flexDirection: 'row', gap: 12, marginBottom: 12, alignItems: 'flex-start' },
-  photoThumb: { width: 84, height: 84, borderRadius: 14 },
-  caption: { minHeight: 52, paddingTop: 10, paddingBottom: 10, fontSize: 14 },
-  photoActions: { flexDirection: 'row', gap: 18, paddingHorizontal: 2 },
-  photoAction: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  photoActionText: { fontFamily: 'Inter_600SemiBold', fontSize: 12.5, color: T.inkSoft },
+  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 12, paddingTop: 6, paddingRight: 6 },
+  photoThumb: { width: 88, height: 88, borderRadius: 14 },
+  photoX: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: T.coral,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: T.card,
+  },
+  captionBadge: {
+    position: 'absolute',
+    left: 5,
+    bottom: 5,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   addImg: {
     width: 88,
     height: 88,

@@ -1,29 +1,25 @@
 // ============================================================================
 // VEBOSSO EMS — Work file picker
 // "Attach files" for the check-in and check-out forms: PDF and Word, up to
-// MAX_WORK_FILES. They end up in the person's Documents under Work.
+// MAX_WORK_FILES. They end up in the person's Documents under Work. The forms
+// put the File button in one row with Camera and Gallery, and show the
+// picked files with WorkFileList.
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Button, Text } from 'react-native-paper';
-import { AppRadius, AppTheme, appSoftShadow } from '../constants/theme';
+import { Text } from 'react-native-paper';
+import { AppRadius, AppTheme } from '../constants/theme';
 import { MAX_WORK_FILE_BYTES, MAX_WORK_FILES, WORK_FILE_TYPES } from '../lib/employeeRecords';
 import { WorkFile } from '../types/database';
 
-export function WorkFilePicker({
-  files,
-  onChange,
-  onError,
-  disabled,
-}: {
-  files: WorkFile[];
-  onChange: (files: WorkFile[]) => void;
-  onError: (message: string) => void;
-  disabled?: boolean;
-}) {
-  const pick = async () => {
+/** Opens the file picker and adds what was chosen (PDF / Word, size and count checked). */
+export async function pickWorkFiles(
+  files: WorkFile[],
+  onChange: (files: WorkFile[]) => void,
+  onError: (message: string) => void,
+) {
     if (files.length >= MAX_WORK_FILES) {
       onError(`You can attach a maximum of ${MAX_WORK_FILES} files`);
       return;
@@ -51,22 +47,20 @@ export function WorkFilePicker({
     } catch {
       onError('Could not open the file picker');
     }
-  };
+}
 
+/** The picked files, each with a remove button. */
+export function WorkFileList({
+  files,
+  onChange,
+  disabled,
+}: {
+  files: WorkFile[];
+  onChange: (files: WorkFile[]) => void;
+  disabled?: boolean;
+}) {
   return (
     <>
-      <Text style={styles.sectionTitle}>Attach Files — PDF / Word (Optional, Max {MAX_WORK_FILES})</Text>
-      <Button
-        mode="contained"
-        onPress={pick}
-        disabled={disabled || files.length >= MAX_WORK_FILES}
-        icon="file-plus"
-        style={styles.button}
-        buttonColor={AppTheme.soft}
-        textColor={AppTheme.inkSoft}
-      >
-        Add file
-      </Button>
       {files.map((f, i) => (
         <View key={`${f.uri}-${i}`} style={styles.row}>
           <Feather name="file-text" size={16} color={AppTheme.inkSoft} />
@@ -86,14 +80,6 @@ export function WorkFilePicker({
 }
 
 const styles = StyleSheet.create({
-  sectionTitle: {
-    fontSize: 14,
-    fontFamily: 'Inter_600SemiBold',
-    color: AppTheme.ink,
-    marginTop: 8,
-    marginBottom: 10,
-  },
-  button: { borderRadius: 24, marginBottom: 10, ...appSoftShadow },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

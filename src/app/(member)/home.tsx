@@ -7,6 +7,7 @@ import { differenceInMinutes, format } from 'date-fns';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
+import { AddMyTaskModal } from '../../components/AddMyTaskModal';
 import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { CheckInModal } from '../../components/CheckInModal';
 import { CheckOutModal } from '../../components/CheckOutModal';
@@ -15,6 +16,7 @@ import { MessageButtons } from '../../components/MessageButtons';
 import { FeatureShortcut } from '../../components/FeatureShortcut';
 import { VenuesShortcut } from '../../components/VenuesShortcut';
 import { StatusCardSkeleton } from '../../components/LoadingSkeleton';
+import { BugReportButton } from '../../components/BugReportButton';
 import { NotificationBell } from '../../components/NotificationBell';
 import { PageTransition } from '../../components/PageTransition';
 import { TaskCard } from '../../components/TaskCard';
@@ -26,6 +28,7 @@ import {
   appSoftShadow,
   RoleAccent,
 } from '../../constants/theme';
+import { addMyTask } from '../../lib/selfTasks';
 import { useAuthStore } from '../../store/authStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../store/workStore';
@@ -57,6 +60,17 @@ export default function MemberHomeScreen() {
   const [editPlanLoading, setEditPlanLoading] = useState(false);
   const [checkOutLoading, setCheckOutLoading] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
+  const [addingTask, setAddingTask] = useState(false);
+
+  /** Add a task for myself (072); it joins the list below. */
+  const handleAddTask = async (title: string) => {
+    if (!profile) return 'Not signed in';
+    const res = await addMyTask(profile.id, profile.full_name, title);
+    if (!res.success) return res.error;
+    setSnackMessage('Task added — your manager can see it');
+    void fetchTodayTasks(profile.id);
+    return null;
+  };
   const [refreshing, setRefreshing] = useState(false);
   const [tick, setTick] = useState(0);
 
@@ -413,7 +427,10 @@ export default function MemberHomeScreen() {
               </Text>
               <Text style={styles.date}>{format(new Date(), 'EEEE, MMMM dd')}</Text>
             </View>
-            <NotificationBell role="member" />
+            <View style={styles.headerButtons}>
+              <BugReportButton />
+              <NotificationBell role="member" />
+            </View>
           </View>
 
           <View style={styles.content}>
@@ -438,9 +455,21 @@ export default function MemberHomeScreen() {
           {/* Remarks from the boss on my check-ins / check-outs (053). */}
           <MyRemarksCard style={{ marginHorizontal: 20, marginTop: 12 }} />
 
-          {todayTasks.length > 0 && (
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Tasks by Boss</Text>
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Tasks by Boss</Text>
+              <AnimatedPressable
+                scaleTo={0.94}
+                style={styles.addTaskBtn}
+                onPress={() => setAddingTask(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Add my task"
+              >
+                <Feather name="plus" size={14} color={T.white} />
+                <Text style={styles.addTaskText}>Add task</Text>
+              </AnimatedPressable>
+            </View>
+            {todayTasks.length > 0 && (
               <View style={styles.tasksContainer}>
                 {todayTasks.map((task, index) => (
                   <TaskCard
@@ -451,10 +480,12 @@ export default function MemberHomeScreen() {
                   />
                 ))}
               </View>
-            </View>
-          )}
+            )}
+          </View>
         </ScrollView>
       </PageTransition>
+
+      <AddMyTaskModal visible={addingTask} onDismiss={() => setAddingTask(false)} onAdd={handleAddTask} />
 
       {showCheckIn ? (
         <CheckInModal
@@ -678,6 +709,23 @@ const styles = StyleSheet.create({
     marginTop: AppSpace.xxl,
     paddingHorizontal: AppSpace.screen,
   },
+  headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  addTaskBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: T.charcoal,
+  },
+  addTaskText: { fontFamily: 'Inter_700Bold', fontSize: 12.5, color: T.white },
   sectionTitle: {
     fontFamily: 'Inter_700Bold',
     fontSize: 17,

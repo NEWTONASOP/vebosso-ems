@@ -72,6 +72,8 @@ export function notificationTarget(role: Role | null | undefined, data: Data): N
     // ---- Tasks --------------------------------------------------------------
     case 'task_completed':
       return owner ? inbox('task') : { pathname: `${group}/tasks` };
+    case 'task_self_added':
+    case 'task_comment':
     case 'task_assigned':
     case 'task_updated':
     case 'task_approved':

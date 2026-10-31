@@ -8,10 +8,12 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
+import { AddMyTaskModal } from '../../components/AddMyTaskModal';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/LoadingSkeleton';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
 import { PageTransition } from '../../components/PageTransition';
+import { TaskCard } from '../../components/TaskCard';
 import { TaskDetailModal, TaskManage } from '../../components/TaskDetailModal';
 import {
   AppTheme as T,
@@ -20,6 +22,7 @@ import {
   appSoftShadow,
   screenChrome,
 } from '../../constants/theme';
+import { addMyTask } from '../../lib/selfTasks';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -43,11 +46,14 @@ interface TaskWithAssignee extends Task {
 export default function ManagerTaskTrackingScreen() {
   const router = useRouter();
   const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
-  const { reassignTask, updateTask, approveTask, rejectTask, reopenTask } = useWorkStore(useShallow((s) => ({ reassignTask: s.reassignTask, updateTask: s.updateTask, approveTask: s.approveTask, rejectTask: s.rejectTask, reopenTask: s.reopenTask })));
+  const { reassignTask, updateTask, approveTask, rejectTask, reopenTask, updateTaskStatus } = useWorkStore(useShallow((s) => ({ updateTaskStatus: s.updateTaskStatus, reassignTask: s.reassignTask, updateTask: s.updateTask, approveTask: s.approveTask, rejectTask: s.rejectTask, reopenTask: s.reopenTask })));
   const [tasks, setTasks] = useState<TaskWithAssignee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<TaskStatus | 'all'>('all');
+  // Tasks I gave, tasks my people added for themselves, or my own (072).
+  const [source, setSource] = useState<'given' | 'team' | 'mine'>('given');
+  const [adding, setAdding] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
   const [selectedTask, setSelectedTask] = useState<TaskWithAssignee | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -64,13 +70,20 @@ export default function ManagerTaskTrackingScreen() {
     try {
       // Everything still open, however old; completed ones a batch at a time,
       // plus how many there are in all so the progress stays all-time.
+      // The query for each list: mine are the ones I added for myself; the team's exclude mine.
+      const inScope = (b: any) =>
+        source === 'given'
+          ? b.match({ assigned_by: profile.id, self_added: false })
+          : source === 'mine'
+            ? b.match({ assigned_to: profile.id, self_added: true })
+            : b.match({ self_added: true }).neq('assigned_to', profile.id);
       const select = '*, assignee:profiles!tasks_assigned_to_fkey(id, full_name, employee_id, avatar_url, role)';
       const [open, done, doneCount] = await Promise.all([
-        supabase.from('tasks').select(select).eq('assigned_by', profile.id).neq('status', 'done')
+        inScope(supabase.from('tasks').select(select)).neq('status', 'done')
           .order('created_at', { ascending: false }),
-        supabase.from('tasks').select(select).eq('assigned_by', profile.id).eq('status', 'done')
+        inScope(supabase.from('tasks').select(select)).eq('status', 'done')
           .order('created_at', { ascending: false }).limit(doneLimit.current),
-        supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('assigned_by', profile.id).eq('status', 'done'),
+        inScope(supabase.from('tasks').select('id', { count: 'exact', head: true })).eq('status', 'done'),
       ]);
 
       const error = open.error || done.error;
@@ -85,7 +98,7 @@ export default function ManagerTaskTrackingScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [profile?.id]);
+  }, [profile?.id, source]);
 
   useEffect(() => {
     fetchAssignedTasks();
@@ -128,6 +141,17 @@ export default function ManagerTaskTrackingScreen() {
     setShowMemberPicker(true);
   };
 
+  const handleAddMine = async (title: string) => {
+    if (!profile) return 'Not signed in';
+    const res = await addMyTask(profile.id, profile.full_name, title);
+    if (!res.success) return res.error;
+    setSource('mine');
+    setFilter('all');
+    setSnackMessage('Task added — the boss can see it');
+    void fetchAssignedTasks(true);
+    return null;
+  };
+
   const handleMemberSelect = async (member: any) => {
     if (!selectedTask || !profile?.id) return;
     
@@ -145,7 +169,7 @@ export default function ManagerTaskTrackingScreen() {
   };
 
   /** Edit, approve or reject from the task popup; refreshes the list on success. */
-  const manage: TaskManage | undefined = selectedTask && profile?.id
+  const manage: TaskManage | undefined = source !== 'mine' && selectedTask && profile?.id
     ? {
         onSave: async (changes) => {
           const res = await updateTask(selectedTask.id, changes);
@@ -265,7 +289,7 @@ export default function ManagerTaskTrackingScreen() {
             <Feather name="arrow-left" size={18} color={T.ink} />
           </Pressable>
           <View style={styles.headerTextContainer}>
-            <Text style={screenChrome.title}>Track Tasks</Text>
+            <Text style={screenChrome.title}>{source === 'team' ? 'Added by Team' : source === 'mine' ? 'My Tasks' : 'Track Tasks'}</Text>
             <Text style={screenChrome.subtitle}>
               {stats.total === 0
                 ? 'Tasks you assign to your team'
@@ -294,6 +318,23 @@ export default function ManagerTaskTrackingScreen() {
               </View>
             </View>
           )}
+
+          <View style={styles.sourceTabs}>
+            {([['given', 'Given by me'], ['team', 'Team'], ['mine', 'My tasks']] as const).map(([key, label]) => (
+              <Pressable
+                key={key}
+                style={[styles.sourceTab, source === key && styles.sourceTabActive]}
+                onPress={() => {
+                  setSource(key);
+                  setFilter('all');
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: source === key }}
+              >
+                <Text style={[styles.sourceTabText, source === key && styles.sourceTabTextActive]}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
 
           <View style={styles.filterRow}>
             {filterOptions.map((f) => {
@@ -336,7 +377,18 @@ export default function ManagerTaskTrackingScreen() {
               <ListSkeleton count={4} variant="task-row" />
             ) : filteredTasks.length > 0 ? (
               <View style={styles.tasksList}>
-                {taskPage.items.map((task) => {
+                {source === 'mine' ? taskPage.items.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    onChanged={() => void fetchAssignedTasks(true)}
+                    onStatusChange={async (id, status, note) => {
+                      const res = await updateTaskStatus(id, status, note);
+                      setSnackMessage(res.success ? 'Sent for approval' : res.error || 'Failed to update task');
+                      void fetchAssignedTasks(true);
+                    }}
+                  />
+                )) : taskPage.items.map((task) => {
                   const statusConfig = getStatusConfig(task.status);
                   const dueDate = getFormattedDate(task.due_date);
                   
@@ -404,10 +456,14 @@ export default function ManagerTaskTrackingScreen() {
             ) : (
               <EmptyState
                 icon="clipboard-text-outline"
-                title={filter === 'all' ? 'No tasks assigned yet' : 'Nothing in this filter'}
+                title={filter === 'all' ? (source === 'team' ? 'Nothing added yet' : source === 'mine' ? 'No tasks yet' : 'No tasks assigned yet') : 'Nothing in this filter'}
                 subtitle={
                   filter === 'all'
-                    ? 'Assign work from your dashboard. Once you give someone a task, it appears here.'
+                    ? source === 'team'
+                      ? 'Tasks your team adds for themselves show up here, ready to comment on and approve.'
+                      : source === 'mine'
+                        ? 'Add what you plan to work on. The boss can see it and comment.'
+                      : 'Assign work from your dashboard. Once you give someone a task, it appears here.'
                     : 'Try another filter, or assign a new task from the dashboard.'
                 }
                 actionLabel={filter === 'all' ? 'Back to Dashboard' : 'Show all'}
@@ -420,6 +476,18 @@ export default function ManagerTaskTrackingScreen() {
           </View>
         </ScrollView>
 
+        <Pressable
+          style={styles.fab}
+          onPress={() => setAdding(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Add my task"
+        >
+          <Feather name="plus" size={18} color={T.white} />
+          <Text style={styles.fabText}>Add my task</Text>
+        </Pressable>
+
+        <AddMyTaskModal visible={adding} onDismiss={() => setAdding(false)} onAdd={handleAddMine} />
+
         <Snackbar visible={!!snackMessage} onDismiss={() => setSnackMessage('')} duration={3000} wrapperStyle={{ marginBottom: 90 }}>
           {snackMessage}
         </Snackbar>
@@ -430,6 +498,7 @@ export default function ManagerTaskTrackingScreen() {
           task={selectedTask}
           onReassign={handleReassignPress}
           manage={manage}
+          viewer={profile ? { id: profile.id, name: profile.full_name, isOwner: profile.role === 'owner' } : undefined}
         />
 
         <MemberPickerModal
@@ -502,6 +571,32 @@ const styles = StyleSheet.create({
     backgroundColor: T.charcoal,
     borderRadius: 3,
   },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 100,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 46,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    backgroundColor: T.charcoal,
+    ...appSoftShadow,
+  },
+  fabText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: T.white },
+  sourceTabs: {
+    flexDirection: 'row',
+    gap: 6,
+    padding: 4,
+    marginTop: 6,
+    borderRadius: 999,
+    backgroundColor: T.soft2,
+  },
+  sourceTab: { flex: 1, height: 36, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  sourceTabActive: { backgroundColor: T.card, ...appSoftShadow },
+  sourceTabText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
+  sourceTabTextActive: { color: T.ink },
   filterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

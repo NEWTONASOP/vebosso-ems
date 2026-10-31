@@ -15,6 +15,7 @@ import { Alert } from '../lib/alert';
 import { AnimatedPressable } from './AnimatedPressable';
 import { UserAvatar } from './UserAvatar';
 import { FieldChainScope } from './FieldChain';
+import { TaskComments } from './TaskComments';
 import { useDialogLift } from '../lib/useKeyboardHeight';
 
 /** What the owner or manager can do with a task. Each returns an error message, or null on success. */
@@ -24,6 +25,12 @@ export interface TaskManage {
   onReject: (reason: string) => Promise<string | null>;
   /** Open a finished task again. */
   onReopen: () => Promise<string | null>;
+}
+
+/** The employee's own added task, while still open: reword it or remove it. */
+export interface TaskOwn {
+  onSave: (title: string) => Promise<string | null>;
+  onDelete: () => Promise<string | null>;
 }
 
 interface TaskDetailModalProps {
@@ -41,6 +48,9 @@ interface TaskDetailModalProps {
     voice_path?: string | null;
     voice_ms?: number | null;
     rejection_reason?: string | null;
+    assigned_to?: string;
+    /** Added by the employee for themselves. */
+    self_added?: boolean;
     /** Left out where the person is already obvious, e.g. inside their own task list. */
     assignee?: {
       id: string;
@@ -58,6 +68,10 @@ interface TaskDetailModalProps {
   onReassign?: () => void;
   /** Owner / manager only: edit the task, approve or reject finished work. */
   manage?: TaskManage;
+  /** Employee on their own open task: edit or delete. */
+  own?: TaskOwn;
+  /** Who is looking — turns on the comments under a self-added task. */
+  viewer?: { id: string; name: string; isOwner: boolean };
 }
 
 export function TaskDetailModal({
@@ -66,6 +80,8 @@ export function TaskDetailModal({
   task,
   onReassign,
   manage,
+  own,
+  viewer,
 }: TaskDetailModalProps) {
   // Above the keyboard on Android too (KeyboardAvoidingView only works on iOS here).
   const lifted = useDialogLift();
@@ -190,6 +206,9 @@ export function TaskDetailModal({
                 {statusConfig.label}
               </Text>
             </View>
+          ) : null}
+          {mode !== 'edit' && task.self_added ? (
+            <Text style={styles.selfTag}>Added by the employee</Text>
           ) : null}
 
           {mode === 'edit' ? (
@@ -342,7 +361,58 @@ export function TaskDetailModal({
             </View>
             <Text style={styles.infoText}>{getFormattedDateTime(task.created_at)}</Text>
           </View>
+
+          {viewer && task.assigned_to && task.self_added ? (
+            <>
+              <Divider style={styles.divider} />
+              <TaskComments task={{ id: task.id, title: task.title, assigned_to: task.assigned_to }} viewer={viewer} />
+            </>
+          ) : null}
           </>
+          ) : null}
+
+          {/* The employee, on their own open task: edit or delete */}
+          {!manage && own ? (
+            <>
+              <Divider style={styles.divider} />
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+              {mode === 'edit' ? (
+                <View style={styles.btnRow}>
+                  <AnimatedPressable scaleTo={0.96} style={[styles.btn, styles.btnSoft]} onPress={() => setMode('view')} disabled={busy}>
+                    <Text style={styles.btnSoftText}>Cancel</Text>
+                  </AnimatedPressable>
+                  <AnimatedPressable
+                    scaleTo={0.96}
+                    style={[styles.btn, styles.btnDark]}
+                    onPress={() => run(() => own.onSave(titleRef.current))}
+                    disabled={busy || !hasTitle}
+                  >
+                    {busy ? <ActivityIndicator color={AppTheme.white} size="small" /> : <Text style={styles.btnDarkText}>Save changes</Text>}
+                  </AnimatedPressable>
+                </View>
+              ) : (
+                <View style={styles.btnRow}>
+                  <AnimatedPressable
+                    scaleTo={0.96}
+                    style={[styles.btn, styles.btnSoft]}
+                    onPress={() =>
+                      Alert.alert('Delete this task?', 'It is removed for good.', [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', style: 'destructive', onPress: () => void run(own.onDelete) },
+                      ])
+                    }
+                    disabled={busy}
+                  >
+                    <Feather name="trash-2" size={16} color={AppTheme.coral} />
+                    <Text style={[styles.btnSoftText, { color: AppTheme.coral }]}>Delete</Text>
+                  </AnimatedPressable>
+                  <AnimatedPressable scaleTo={0.96} style={[styles.btn, styles.btnSoft]} onPress={startEdit} disabled={busy}>
+                    <Feather name="edit-2" size={16} color={AppTheme.ink} />
+                    <Text style={styles.btnSoftText}>Edit task</Text>
+                  </AnimatedPressable>
+                </View>
+              )}
+            </>
           ) : null}
 
           {/* Owner / manager: approve or reject finished work, edit the task */}
@@ -440,7 +510,7 @@ export function TaskDetailModal({
           ) : null}
 
           {/* Reassign Button - only for tasks still being worked on */}
-          {(task.status === 'pending' || task.status === 'in_progress') && onReassign && mode === 'view' && (
+          {(task.status === 'pending' || task.status === 'in_progress') && onReassign && !task.self_added && mode === 'view' && (
             <>
               <Divider style={styles.divider} />
               <AnimatedPressable
@@ -504,6 +574,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
     fontSize: 11,
     textTransform: 'uppercase',
+  },
+  selfTag: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12.5,
+    color: AppTheme.mute,
+    marginTop: -8,
+    marginBottom: 14,
   },
   title: {
     fontFamily: 'Inter_700Bold',

@@ -5,8 +5,9 @@
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
+import { useEvent } from 'expo';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 
@@ -15,13 +16,32 @@ function Player({ uri }: { uri: string }) {
   const player = useVideoPlayer(uri, (p) => {
     p.play();
   });
+  // Say what is happening: a spinner while it loads, a message if it can't play.
+  const { status, error } = useEvent(player, 'statusChange', { status: player.status });
   return (
-    <VideoView
-      player={player}
-      style={[styles.video, { height: Math.round(height * 0.6) }]}
-      contentFit="contain"
-      nativeControls
-    />
+    <View>
+      <VideoView
+        player={player}
+        style={[styles.video, { height: Math.round(height * 0.6) }]}
+        contentFit="contain"
+        nativeControls
+        // Android's default surface can stay black inside a popup.
+        surfaceType={Platform.OS === 'android' ? 'textureView' : undefined}
+      />
+      {status === 'loading' ? (
+        <View style={styles.overlay} pointerEvents="none">
+          <ActivityIndicator color={T.white} />
+        </View>
+      ) : status === 'error' ? (
+        <View style={styles.overlay} pointerEvents="none">
+          <Text style={styles.errorText}>
+            {"This video can't play here."}
+            {error?.message ? `
+${error.message}` : ''}
+          </Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -68,4 +88,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   video: { width: '100%', borderRadius: 12, backgroundColor: '#000' },
+  overlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  errorText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: T.white, textAlign: 'center' },
 });

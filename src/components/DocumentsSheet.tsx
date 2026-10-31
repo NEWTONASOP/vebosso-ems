@@ -12,7 +12,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { memo, useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SmoothTextInput as TextInput } from './SmoothTextInput';
 import { Menu, Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
@@ -21,6 +21,7 @@ import {
   createFolder,
   deleteDocument,
   deleteFolder,
+  downloadDocumentFile,
   documentKind,
   DocumentKind,
   fetchDocuments,
@@ -73,6 +74,8 @@ const STATUS_CHIP: Record<DocumentStatus, { label: string; color: string; bg: st
   approved: { label: 'Approved', color: T.green, bg: T.greenSoft },
   rejected: { label: 'Needs a change', color: T.amber, bg: T.amberSoft },
 };
+
+const isWeb = Platform.OS === 'web';
 
 /** Most files that go up in one go. */
 const MAX_BATCH = 20;
@@ -304,6 +307,33 @@ export const DocumentsSheet = memo(function DocumentsSheet({
     const res = await openDocumentFile(doc, url);
     setOpeningId(null);
     if (!res.success) setError(res.error);
+  };
+
+  const downloadDoc = async (doc: EmployeeDocument) => {
+    const url = urls[doc.file_path];
+    if (!url) {
+      setError('Could not load this file. Close and reopen documents.');
+      return;
+    }
+    setOpeningId(doc.id);
+    const res = await downloadDocumentFile(doc, url);
+    setOpeningId(null);
+    if (!res.success) setError(res.error);
+  };
+
+  const docMenuItems = (doc: EmployeeDocument) => {
+    const close = () => setMenuFor(null);
+    const items: { title: string; icon: string; danger?: boolean; onPress: () => void }[] = [
+      { title: 'Download', icon: 'download-outline', onPress: () => { close(); void downloadDoc(doc); } },
+    ];
+    if (doc.category === 'work' && canOrganise) {
+      items.push({ title: 'Move to folder', icon: 'folder-move-outline', onPress: () => { close(); setFiling(doc); } });
+    }
+    if (canManage) {
+      items.push({ title: 'Rename', icon: 'pencil-outline', onPress: () => { close(); setRenamingId(doc.id); setRenameText(doc.name); } });
+      items.push({ title: 'Delete', icon: 'trash-can-outline', danger: true, onPress: () => { close(); confirmDelete(doc); } });
+    }
+    return items;
   };
 
   const handleUpload = async () => {
@@ -764,7 +794,7 @@ export const DocumentsSheet = memo(function DocumentsSheet({
           const needsReview = canManage && doc.status === 'pending';
           const kind = documentKind(doc.mime_type);
           return (
-            <View key={doc.id} style={[styles.docItem, needsReview && styles.docItemPending]}>
+            <View key={doc.id} style={[styles.docItem, needsReview && styles.docItemPending, menuFor === doc.id && { zIndex: 30 }]}>
             <View style={styles.docRow}>
               <Pressable
                 style={styles.docMain}
@@ -805,11 +835,13 @@ export const DocumentsSheet = memo(function DocumentsSheet({
                   )}
                   <View style={styles.statusRow}>
                     {doc.category === 'work' ? (
-                      <View style={[styles.statusChip, { backgroundColor: T.blueSoft }]}>
-                        <Text style={[styles.statusChipText, { color: T.blue }]}>
-                          {doc.work_phase === 'check_out' ? 'Check-out' : 'Check-in'}
-                        </Text>
-                      </View>
+                      doc.work_phase ? (
+                        <View style={[styles.statusChip, { backgroundColor: T.blueSoft }]}>
+                          <Text style={[styles.statusChipText, { color: T.blue }]}>
+                            {doc.work_phase === 'check_out' ? 'Check-out' : 'Check-in'}
+                          </Text>
+                        </View>
+                      ) : null
                     ) : (
                       <View style={[styles.statusChip, { backgroundColor: chip.bg }]}>
                         <Text style={[styles.statusChipText, { color: chip.color }]}>{chip.label}</Text>
@@ -824,62 +856,53 @@ export const DocumentsSheet = memo(function DocumentsSheet({
                 {openingId === doc.id ? <ActivityIndicator size="small" color={T.charcoal} /> : null}
               </Pressable>
 
-              {canManage || (doc.category === 'work' && canOrganise) ? (
-                renamingId === doc.id ? (
-                  <Pressable style={styles.iconBtn} onPress={() => handleRename(doc)} hitSlop={6}>
-                    <Feather name="check" size={16} color={T.green} />
-                  </Pressable>
-                ) : (
-                  <Menu
-                    visible={menuFor === doc.id}
-                    onDismiss={() => setMenuFor(null)}
-                    anchor={
-                      <Pressable
-                        style={styles.iconBtn}
-                        onPress={() => setMenuFor(doc.id)}
-                        hitSlop={6}
-                        accessibilityLabel={`More for ${doc.name}`}
-                      >
-                        <Feather name="more-vertical" size={16} color={T.inkSoft} />
-                      </Pressable>
-                    }
-                    contentStyle={styles.menu}
+              {renamingId === doc.id ? (
+                <Pressable style={styles.iconBtn} onPress={() => handleRename(doc)} hitSlop={6}>
+                  <Feather name="check" size={16} color={T.green} />
+                </Pressable>
+              ) : isWeb ? (
+                // Web: Paper's floating menu drifted off the sheet, so this one is
+                // placed by the button itself.
+                <View style={{ position: 'relative', zIndex: menuFor === doc.id ? 20 : 0 }}>
+                  <Pressable
+                    style={styles.iconBtn}
+                    onPress={() => setMenuFor(menuFor === doc.id ? null : doc.id)}
+                    hitSlop={6}
+                    accessibilityLabel={`More for ${doc.name}`}
                   >
-                    {doc.category === 'work' && canOrganise ? (
-                      <Menu.Item
-                        leadingIcon="folder-move-outline"
-                        title="Move to folder"
-                        onPress={() => {
-                          setMenuFor(null);
-                          setFiling(doc);
-                        }}
-                      />
-                    ) : null}
-                    {canManage ? (
-                      <Menu.Item
-                        leadingIcon="pencil-outline"
-                        title="Rename"
-                        onPress={() => {
-                          setMenuFor(null);
-                          setRenamingId(doc.id);
-                          setRenameText(doc.name);
-                        }}
-                      />
-                    ) : null}
-                    {canManage ? (
-                      <Menu.Item
-                        leadingIcon="trash-can-outline"
-                        title="Delete"
-                        titleStyle={{ color: T.coral }}
-                        onPress={() => {
-                          setMenuFor(null);
-                          confirmDelete(doc);
-                        }}
-                      />
-                    ) : null}
-                  </Menu>
-                )
-              ) : null}
+                    <Feather name="more-vertical" size={16} color={T.inkSoft} />
+                  </Pressable>
+                  {menuFor === doc.id ? (
+                    <View style={styles.webMenu}>
+                      {docMenuItems(doc).map((it) => (
+                        <Pressable key={it.title} style={styles.webMenuItem} onPress={it.onPress} accessibilityRole="button">
+                          <Text style={[styles.webMenuText, it.danger && { color: T.coral }]}>{it.title}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : null}
+                </View>
+              ) : (
+                <Menu
+                  visible={menuFor === doc.id}
+                  onDismiss={() => setMenuFor(null)}
+                  anchor={
+                    <Pressable
+                      style={styles.iconBtn}
+                      onPress={() => setMenuFor(doc.id)}
+                      hitSlop={6}
+                      accessibilityLabel={`More for ${doc.name}`}
+                    >
+                      <Feather name="more-vertical" size={16} color={T.inkSoft} />
+                    </Pressable>
+                  }
+                  contentStyle={styles.menu}
+                >
+                  {docMenuItems(doc).map((it) => (
+                    <Menu.Item key={it.title} leadingIcon={it.icon} title={it.title} titleStyle={it.danger ? { color: T.coral } : undefined} onPress={it.onPress} />
+                  ))}
+                </Menu>
+              )}
             </View>
 
             {/* Seen big and in full before Approve / Reject. Tap to open it properly. */}
@@ -1110,6 +1133,24 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   menu: { backgroundColor: T.card, borderRadius: 14 },
+  webMenu: {
+    position: 'absolute',
+    top: 38,
+    right: 0,
+    minWidth: 170,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: T.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: T.hairline,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  webMenuItem: { paddingVertical: 11, paddingHorizontal: 16 },
+  webMenuText: { fontFamily: 'Inter_500Medium', fontSize: 14, color: T.ink },
   iconBtn: {
     width: 34,
     height: 34,

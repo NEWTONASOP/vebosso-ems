@@ -171,7 +171,7 @@ export function MemberActionsModal({
                 <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Work & pay</Text>
                 <View style={styles.group}>
                   <NavRow
-                    label="Tasks by Boss"
+                    label="Tasks"
                     hint={taskHint}
                     icon="clipboard"
                     iconColor={AppTheme.blue}

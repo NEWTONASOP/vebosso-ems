@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import { create } from 'zustand';
 import { parseSupabaseError } from '../lib/errors';
 import { sendPushNotification, sendPushNotificationToRole } from '../lib/notifications';
+import { notifyReviewers } from '../lib/selfTasks';
 import { supabase } from '../lib/supabase';
 import { formatWorkLogDateForMessage } from '../lib/workLogDates';
 import { Platform } from 'react-native';
@@ -735,11 +736,20 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         try {
           const { data: task } = await supabase
             .from('tasks')
-            .select('assigned_by, title, profiles!tasks_assigned_to_fkey(full_name)')
+            .select('assigned_by, assigned_to, self_added, title, profiles!tasks_assigned_to_fkey(full_name)')
             .eq('id', taskId)
             .single();
 
-          if (task?.assigned_by) {
+          if (task?.self_added) {
+            // Their own task: the reviewers are their manager and the owner, not themselves.
+            const assigneeName = (task as any).profiles?.full_name || 'A team member';
+            void notifyReviewers(
+              task.assigned_to,
+              'Task Ready to Review 🔎',
+              `${assigneeName} finished: "${task.title}". Approve it or send it back.`,
+              { type: 'task_completed', task_id: taskId },
+            );
+          } else if (task?.assigned_by) {
             const assigneeName = (task as any).profiles?.full_name || 'A team member';
             sendPushNotification(
               task.assigned_by,

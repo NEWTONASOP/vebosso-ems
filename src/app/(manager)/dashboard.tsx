@@ -23,6 +23,7 @@ import { VOICE_TASK_TITLE } from '../../components/MemberTasksSheet';
 import { uploadVoiceNote, VoiceClip } from '../../lib/voice';
 import { FeatureShortcut } from '../../components/FeatureShortcut';
 import { VenuesShortcut } from '../../components/VenuesShortcut';
+import { BugReportButton } from '../../components/BugReportButton';
 import { NotificationBell } from '../../components/NotificationBell';
 import { QuickActionCard } from '../../components/QuickActionCard';
 import { ReasonSheet } from '../../components/ReasonSheet';
@@ -511,7 +512,10 @@ export default function ManagerDashboard() {
           <Text style={styles.name}>{firstName}</Text>
           <Text style={styles.date}>{today}</Text>
         </View>
-        <NotificationBell role="manager" />
+        <View style={styles.headerButtons}>
+          <BugReportButton />
+          <NotificationBell role="manager" />
+        </View>
       </View>
 
       <View style={styles.workStatusContainer}>
@@ -717,6 +721,7 @@ const rowStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   messageRow: {
     paddingHorizontal: AppSpace.screen,
     marginTop: 14,

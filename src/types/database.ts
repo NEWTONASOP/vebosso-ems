@@ -117,8 +117,20 @@ export interface Task {
   rejection_reason?: string | null;
   reviewed_by?: string | null;
   reviewed_at?: string | null;
+  /** Added by the employee for themselves (072); the owner / their manager reviews it. */
+  self_added?: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/** A comment on a task (072), newest last. */
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+  author?: { full_name: string; avatar_url: string | null; role: UserRole } | null;
 }
 
 export interface Announcement {
@@ -629,6 +641,7 @@ export interface TaskInsert {
   due_date?: string | null;
   voice_path?: string | null;
   voice_ms?: number | null;
+  self_added?: boolean;
 }
 
 export interface AnnouncementInsert {

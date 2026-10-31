@@ -9,6 +9,7 @@ import { format, parseISO } from 'date-fns';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as IntentLauncher from 'expo-intent-launcher';
+import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
 import { Image as RNImage, Linking, Platform } from 'react-native';
 import { uploadCheckoutPhoto } from '../store/workStore';
@@ -239,6 +240,10 @@ export async function uploadDocument(params: {
   try {
     const source = fileName || uri;
     const rawExt = (source.split('.').pop()?.split('?')[0] || '').toLowerCase();
+    // Anything else (Excel, zip…) used to be saved as a ".jpg" — a blank "image".
+    if (!EXT_MIME[rawExt] && mimeType && !mimeType.startsWith('image/') && mimeType !== 'application/pdf') {
+      return { success: false, error: 'Only photos, PDF and Word files can be uploaded' };
+    }
     let ext = EXT_MIME[rawExt] ? rawExt : mimeType === 'application/pdf' ? 'pdf' : 'jpg';
     let mime = mimeType && Object.values(EXT_MIME).includes(mimeType) ? mimeType : EXT_MIME[ext];
     let fileUri = uri;
@@ -352,6 +357,27 @@ export async function openDocumentFile(doc: EmployeeDocument, signedUrl: string)
     } catch {
       return fail(err);
     }
+  }
+}
+
+/** Download a document (any type) — the share sheet offers "Save to device". Web: a normal download. */
+export async function downloadDocumentFile(doc: EmployeeDocument, signedUrl: string): Promise<Result> {
+  try {
+    if (Platform.OS === 'web') {
+      const a = document.createElement('a');
+      a.href = signedUrl;
+      a.download = doc.name;
+      a.click();
+      return { success: true, data: undefined };
+    }
+    const ext = doc.file_path.split('.').pop() || 'pdf';
+    const safeName = doc.name.replace(/[\\/:*?"<>|]/g, '_').slice(0, 80) || 'document';
+    const target = `${FileSystem.cacheDirectory}${safeName}.${ext}`;
+    const { uri } = await FileSystem.downloadAsync(signedUrl, target);
+    await Sharing.shareAsync(uri, { mimeType: doc.mime_type || EXT_MIME[ext], dialogTitle: doc.name });
+    return { success: true, data: undefined };
+  } catch (err) {
+    return fail(err);
   }
 }
 
