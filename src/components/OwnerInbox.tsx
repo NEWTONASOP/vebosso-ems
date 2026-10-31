@@ -3,7 +3,8 @@
 // Everything waiting on the owner, in one place:
 //   check-ins · checkouts (incl. backfilled days) · leave requests ·
 //   documents · employee details edit requests · salary requests ·
-//   travel expenses · unread chat messages
+//   travel expenses · finished tasks · newly added self tasks · bug reports ·
+//   unread chat messages
 // useOwnerInbox() gathers it and keeps it live; NeedsYouCard is the dashboard
 // summary; OwnerInboxSheet lists every item with its action.
 // ============================================================================
@@ -33,7 +34,9 @@ import {
   salaryMonthLabel,
   WaitingSalaryRequest,
 } from '../lib/employeeRecords';
+import { BugReport, fetchBugReports, setBugStatus } from '../lib/bugReports';
 import { fetchUnreadChats, markChatRead, UnreadChat } from '../lib/chat';
+import { markSelfTaskSeen } from '../lib/selfTasks';
 import { answerDetailsEdit, DetailsEditRequest, fetchDetailsEditRequests } from '../lib/employeeDetails';
 import {
   fetchAllSubmittedExpenses,
@@ -53,6 +56,7 @@ import { PaperOutlinedField } from './PaperOutlinedField';
 import { PayDateSheet } from './PayDateSheet';
 import { ReasonSheet } from './ReasonSheet';
 import { SheetFrame } from './SheetFrame';
+import { TaskDetailModal } from './TaskDetailModal';
 import { UserAvatar } from './UserAvatar';
 import { VOICE_TASK_TITLE } from './MemberTasksSheet';
 import { VoiceNote } from './VoiceNote';
@@ -70,6 +74,8 @@ export type InboxKind =
   | 'salary'
   | 'expense'
   | 'task'
+  | 'selftask'
+  | 'bug'
   | 'message';
 
 /** A task its assignee finished, waiting for approval (status 'review'). */
@@ -84,6 +90,26 @@ const fetchTasksToReview = async (): Promise<{ success: true; data: TaskToReview
     .order('completed_at', { ascending: true });
   if (error) return { success: false };
   return { success: true, data: (data || []) as unknown as TaskToReview[] };
+};
+
+/** Tasks people added for themselves that the owner hasn't looked at yet (073), oldest first. */
+const fetchNewSelfTasks = async (): Promise<{ success: true; data: TaskToReview[] } | { success: false }> => {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*, person:profiles!tasks_assigned_to_fkey(full_name, avatar_url)')
+    .eq('self_added', true)
+    .eq('owner_seen', false)
+    .in('status', ['pending', 'in_progress'])
+    .order('created_at', { ascending: true });
+  if (error) return { success: false };
+  return { success: true, data: (data || []) as unknown as TaskToReview[] };
+};
+
+/** Bug reports not marked fixed yet, oldest first. */
+const fetchOpenBugs = async (): Promise<{ success: true; data: BugReport[] } | { success: false }> => {
+  const res = await fetchBugReports();
+  if (!res.success) return { success: false };
+  return { success: true, data: res.data.filter((b) => b.status === 'open').reverse() };
 };
 
 const KINDS: {
@@ -102,19 +128,23 @@ const KINDS: {
   { key: 'salary', one: 'salary request', many: 'salary requests', icon: 'credit-card', color: T.green, soft: T.greenSoft },
   { key: 'expense', one: 'travel expense', many: 'travel expenses', icon: 'navigation', color: T.violet, soft: T.violetSoft },
   { key: 'task', one: 'task approval', many: 'task approvals', icon: 'check-square', color: T.violet, soft: T.violetSoft },
+  { key: 'selftask', one: 'new self task', many: 'new self tasks', icon: 'plus-square', color: T.blue, soft: T.blueSoft },
+  { key: 'bug', one: 'bug report', many: 'bug reports', icon: 'alert-octagon', color: T.coral, soft: T.coralSoft },
   { key: 'message', one: 'message', many: 'messages', icon: 'message-circle', color: T.inkSoft, soft: T.soft },
 ];
 
 const loadExtras = async () => {
-  const [docs, details, salary, expenses, tasks, messages] = await Promise.all([
+  const [docs, details, salary, expenses, tasks, selfTasks, bugs, messages] = await Promise.all([
     fetchAllPendingDocuments(),
     fetchDetailsEditRequests(),
     fetchAllSalaryRequests(),
     fetchAllSubmittedExpenses(),
     fetchTasksToReview(),
+    fetchNewSelfTasks(),
+    fetchOpenBugs(),
     fetchUnreadChats(),
   ]);
-  return { docs, details, salary, expenses, tasks, messages };
+  return { docs, details, salary, expenses, tasks, selfTasks, bugs, messages };
 };
 
 export interface OwnerInbox {
@@ -128,6 +158,10 @@ export interface OwnerInbox {
   expenses: WaitingExpense[];
   /** Finished tasks waiting for approval. */
   tasks: TaskToReview[];
+  /** Newly added self tasks the owner hasn't looked at. */
+  selfTasks: TaskToReview[];
+  /** Bug reports not fixed yet. */
+  bugs: BugReport[];
   /** One entry per person with unread chat messages. */
   messages: UnreadChat[];
   counts: Record<InboxKind, number>;
@@ -147,6 +181,8 @@ export function useOwnerInbox(): OwnerInbox {
   const [salary, setSalary] = useState<WaitingSalaryRequest[]>([]);
   const [expenses, setExpenses] = useState<WaitingExpense[]>([]);
   const [tasks, setTasks] = useState<TaskToReview[]>([]);
+  const [selfTasks, setSelfTasks] = useState<TaskToReview[]>([]);
+  const [bugs, setBugs] = useState<BugReport[]>([]);
   const [messages, setMessages] = useState<UnreadChat[]>([]);
 
   const applyExtras = useCallback((res: Awaited<ReturnType<typeof loadExtras>>) => {
@@ -155,6 +191,8 @@ export function useOwnerInbox(): OwnerInbox {
     if (res.salary.success) setSalary(res.salary.data);
     if (res.expenses.success) setExpenses(res.expenses.data);
     if (res.tasks.success) setTasks(res.tasks.data);
+    if (res.selfTasks.success) setSelfTasks(res.selfTasks.data);
+    if (res.bugs.success) setBugs(res.bugs.data);
     if (res.messages.success) setMessages(res.messages.data);
   }, []);
 
@@ -185,7 +223,7 @@ export function useOwnerInbox(): OwnerInbox {
       timer = setTimeout(() => void refresh(), 1500);
     };
     const channel = supabase.channel(`owner_inbox_${Math.random().toString(36).slice(2, 8)}`);
-    for (const table of ['employee_documents', 'employee_details', 'salary_requests', 'expense_claims', 'tasks', 'chat_messages', 'leave_requests']) {
+    for (const table of ['employee_documents', 'employee_details', 'salary_requests', 'expense_claims', 'tasks', 'chat_messages', 'leave_requests', 'bug_reports']) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, soon);
     }
     channel.subscribe();
@@ -208,11 +246,13 @@ export function useOwnerInbox(): OwnerInbox {
       salary: salary.length,
       expense: expenses.length,
       task: tasks.length,
+      selftask: selfTasks.length,
+      bug: bugs.length,
       message: messages.reduce((n, m) => n + m.count, 0),
     };
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    return { checkIns, checkOuts, leaves, documents, detailsEdits, salary, expenses, tasks, messages, counts, total, refresh };
-  }, [pendingApprovals, leaveRequests, documents, detailsEdits, salary, expenses, tasks, messages, refresh]);
+    return { checkIns, checkOuts, leaves, documents, detailsEdits, salary, expenses, tasks, selfTasks, bugs, messages, counts, total, refresh };
+  }, [pendingApprovals, leaveRequests, documents, detailsEdits, salary, expenses, tasks, selfTasks, bugs, messages, refresh]);
 }
 
 // ============================================================================
@@ -294,6 +334,9 @@ export function OwnerInboxSheet({
 
   const [filter, setFilter] = useState<InboxKind | 'all'>(initialFilter);
   const [busy, setBusy] = useState<string | null>(null);
+  const me = useAuthStore((s) => s.profile);
+  // A new self task open to read and comment on.
+  const [openSelfTask, setOpenSelfTask] = useState<TaskToReview | null>(null);
 
   const run = async (
     key: string,
@@ -633,6 +676,63 @@ export function OwnerInboxSheet({
           ))
         : null}
 
+      {show('selftask') ? <Section kind="selftask" /> : null}
+      {show('selftask')
+        ? inbox.selfTasks.map((t) => (
+            <InboxItem
+              key={t.id}
+              name={t.person?.full_name}
+              avatar={t.person?.avatar_url}
+              meta={`Added ${formatDistanceToNow(new Date(t.created_at), { addSuffix: true })}${t.status === 'in_progress' ? ' · running' : ''}`}
+              body={t.title}
+              bodyBold
+              busy={busy === t.id}
+              actions={[
+                {
+                  label: 'Comment',
+                  tone: 'plain',
+                  // Opening it to comment counts as seen.
+                  onPress: () => {
+                    setOpenSelfTask(t);
+                    void markSelfTaskSeen(t.id);
+                  },
+                },
+                {
+                  label: 'Seen',
+                  tone: 'approve',
+                  onPress: () => run(t.id, () => markSelfTaskSeen(t.id), 'Marked seen'),
+                },
+              ]}
+            />
+          ))
+        : null}
+
+      {show('bug') ? <Section kind="bug" /> : null}
+      {show('bug')
+        ? inbox.bugs.map((b) => (
+            <InboxItem
+              key={b.id}
+              name={b.reporter_name ?? 'Someone'}
+              meta={[
+                formatDistanceToNow(new Date(b.created_at), { addSuffix: true }),
+                b.place,
+                b.screenshots?.length ? `${b.screenshots.length} screenshot${b.screenshots.length === 1 ? '' : 's'}` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+              body={b.description}
+              busy={busy === b.id}
+              actions={[
+                {
+                  label: 'Mark fixed',
+                  tone: 'approve',
+                  onPress: () => run(b.id, () => setBugStatus(b.id, 'fixed'), 'Marked fixed'),
+                },
+              ]}
+            />
+          ))
+        : null}
+
       {show('expense') ? <Section kind="expense" /> : null}
       {show('expense')
         ? inbox.expenses.map((x) => (
@@ -717,6 +817,16 @@ export function OwnerInboxSheet({
           ))
         : null}
     </SheetFrame>
+
+    <TaskDetailModal
+      visible={!!openSelfTask}
+      onDismiss={() => {
+        setOpenSelfTask(null);
+        void inbox.refresh();
+      }}
+      task={openSelfTask ? { ...openSelfTask, assignee: undefined } : null}
+      viewer={me ? { id: me.id, name: me.full_name, isOwner: true } : undefined}
+    />
 
     {sendingBack ? (
       <ReasonSheet

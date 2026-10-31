@@ -119,6 +119,8 @@ export interface Task {
   reviewed_at?: string | null;
   /** Added by the employee for themselves (072); the owner / their manager reviews it. */
   self_added?: boolean;
+  /** The owner has looked at this self-added task (073); it leaves their inbox. */
+  owner_seen?: boolean;
   created_at: string;
   updated_at: string;
 }

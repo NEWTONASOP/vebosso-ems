@@ -119,6 +119,13 @@ export async function addTaskComment(
   return { success: true, data: undefined };
 }
 
+/** Owner: done looking at a newly added self task — it leaves "Needs you now". */
+export async function markSelfTaskSeen(taskId: string): Promise<Result> {
+  const { error } = await supabase.from('tasks').update({ owner_seen: true }).eq('id', taskId);
+  if (error) return fail(error);
+  return { success: true, data: undefined };
+}
+
 export async function deleteTaskComment(commentId: string): Promise<Result> {
   const { error } = await supabase.from('task_comments').delete().eq('id', commentId);
   if (error) return fail(error);
