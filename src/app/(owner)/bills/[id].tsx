@@ -22,7 +22,6 @@ import {
   ScrollView,
   StyleSheet,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import { SmoothTextInput as TextInput } from '../../../components/SmoothTextInput';
 import type { TextInput as RNTextInput } from 'react-native';
@@ -64,8 +63,8 @@ import { HourPickerModal, hourLabel, PickerTheme } from '../../../components/Dat
 import { useFeatureBase } from '../../../lib/featureAccess';
 import { useMyAccess } from '../../../lib/accessRules';
 import { sendPushNotificationToRole } from '../../../lib/notifications';
-import { DESKTOP_WIDTH } from '../../../components/CustomTabBar';
 import { useAuthStore } from '../../../store/authStore';
+import { useTabBarStore } from '../../../store/tabBarStore';
 import { Bill, BillBrand, BillFields, BillKind, BillPdf, BillSettings, BillStatus, BillVideo } from '../../../types/database';
 import { BRANDS, brandOf } from '../../../lib/billBrands';
 
@@ -157,12 +156,10 @@ export default function BillEditorScreen() {
   const isNew = params.id === 'new';
   const profileName = useAuthStore((s) => s.profile?.full_name ?? '');
   const me = useAuthStore((s) => s.profile);
-  // Only the owner has the bottom tab bar here (others open Bills from Home,
-  // without it), and on wide web screens it is a sidebar — so only then leave
-  // room for it under the buttons.
-  const { width: screenWidth } = useWindowDimensions();
-  const tabBarSpace =
-    me?.role === 'owner' && !(Platform.OS === 'web' && screenWidth >= DESKTOP_WIDTH) ? 96 : 16;
+  // Room under the bottom buttons: just above the floating tab bar when it is
+  // showing (it measures itself), otherwise a normal gap above the phone's edge.
+  const barSpace = useTabBarStore((s) => s.space);
+  const bottomGap = barSpace > 0 ? barSpace + 12 : 16 + insets.bottom;
   // What this person's access rules allow (062).
   const access = useMyAccess('bills');
 
@@ -842,7 +839,7 @@ export default function BillEditorScreen() {
           <BillPage bill={bill} settings={settings} />
         </View>
 
-        <View style={[styles.viewBar, { paddingBottom: tabBarSpace + insets.bottom }]}>
+        <View style={[styles.viewBar, { paddingBottom: bottomGap }]}>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {inTrash && !canEditBill ? null : inTrash ? (
             <Pressable style={styles.editBtn} onPress={restore} disabled={busy === 'restore'}>
@@ -951,7 +948,7 @@ export default function BillEditorScreen() {
 
       <View ref={keyboardRef} style={{ flex: 1, paddingBottom: keyboardInset }}>
         <ScrollView
-          contentContainerStyle={[styles.body, { paddingBottom: tabBarSpace + 94 + insets.bottom }]}
+          contentContainerStyle={[styles.body, { paddingBottom: bottomGap + 94 }]}
           keyboardShouldPersistTaps="handled"
         >
           {inTrash ? (
@@ -1240,7 +1237,7 @@ export default function BillEditorScreen() {
       />
 
       {/* Save bar */}
-      <View style={[styles.saveBar, { paddingBottom: tabBarSpace + insets.bottom }]}>
+      <View style={[styles.saveBar, { paddingBottom: bottomGap }]}>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <View style={styles.saveRow}>
           <View style={{ flex: 1 }}>

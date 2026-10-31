@@ -9,10 +9,10 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTheme, RoleAccent, SIDEBAR_WIDTH, type Role, appShadow } from '../constants/theme';
 import { useAuthStore } from '../store/authStore';
+import { useTabBarStore } from '../store/tabBarStore';
 
 const SLIM_WIDTH    = 400;
-/** From this width (web) the bottom bar becomes a sidebar on the left. */
-export const DESKTOP_WIDTH = 1024;
+const DESKTOP_WIDTH = 1024;
 
 // Map route names to icons
 const ICON_MAP: Record<string, string> = {
@@ -97,6 +97,13 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
     }
     return () => { document.getElementById(styleId)?.remove(); };
   }, [isDesktop]);
+
+  // Tell screens how much of the bottom the floating bar covers (none when
+  // hidden or shown as the desktop sidebar); the mobile bar measures itself.
+  const setTabBarSpace = useTabBarStore((s) => s.setSpace);
+  useEffect(() => {
+    if (shouldHide || isDesktop) setTabBarSpace(0);
+  }, [shouldHide, isDesktop, setTabBarSpace]);
 
   if (shouldHide) return null;
 
@@ -183,6 +190,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
         isSlim && styles.outerContainerSlim,
         { bottom: bottomOffset },
       ]}
+      onLayout={(e) => setTabBarSpace(Math.ceil(e.nativeEvent.layout.height + bottomOffset))}
     >
       <BlurView tint="light" intensity={90} style={styles.blurContainer}>
         <View style={[styles.innerContainer, isSlim && styles.innerContainerSlim]}>
