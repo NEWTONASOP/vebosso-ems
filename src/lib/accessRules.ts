@@ -277,7 +277,11 @@ export function rulesSummary(rules: AccessRule[], names: Names, feature: RuleFea
 
 export type RuleAction = 'view' | 'add' | 'edit' | 'delete';
 /** The facts about one row that rules look at (same as access_ok in 062). */
-export type RuleRow = { owner?: string | null; target?: string | null; value?: string | null };
+export type RuleRow = { owner?: string | null; target?: string | null | (string | null)[]; value?: string | null };
+
+/** A row's city / banquet, or a venue's city AND brand (074): reachable through any of them. */
+const targetsOf = (row: RuleRow): string[] =>
+  (Array.isArray(row.target) ? row.target : [row.target]).filter((t): t is string => !!t);
 
 /** Is this action ticked? Edit / delete depend on whether the row is theirs. */
 const tick = (r: AccessRule, a: RuleAction, mine: boolean) =>
@@ -306,11 +310,11 @@ export function allows(rules: AccessRule[], action: RuleAction, me: string, row:
         const ids = r.within_ids ?? [];
         const values = r.within_values ?? [];
         if (!ids.length && !values.length) return true;
-        return (!!row.target && ids.includes(row.target)) || (!!row.value && values.includes(row.value));
+        return targetsOf(row).some((t) => ids.includes(t)) || (!!row.value && values.includes(row.value));
       }
       case 'cities':
       case 'banquets':
-        return (!!row.target && r.scope_ids.includes(row.target)) || mine;
+        return targetsOf(row).some((t) => r.scope_ids.includes(t)) || mine;
       case 'brands':
         return (!!row.value && r.scope_values.includes(row.value)) || mine;
     }

@@ -16,6 +16,7 @@ const fail = (error: unknown): { success: false; error: string } => ({
 
 export type BinTable =
   | 'venue_cities'
+  | 'venue_brands'
   | 'venues'
   | 'accounts'
   | 'account_transactions'
@@ -42,6 +43,7 @@ export type BinGroup = 'venues' | 'accounts' | 'leads' | 'team' | 'other';
 
 export const BIN_KINDS: Record<BinTable, { one: string; many: string; icon: string; group: BinGroup }> = {
   venue_cities: { one: 'City', many: 'cities', icon: 'map', group: 'venues' },
+  venue_brands: { one: 'Brand', many: 'brands', icon: 'award', group: 'venues' },
   venues: { one: 'Venue', many: 'venues', icon: 'map-pin', group: 'venues' },
   accounts: { one: 'Account', many: 'accounts', icon: 'book', group: 'accounts' },
   account_transactions: { one: 'Account entry', many: 'entries', icon: 'list', group: 'accounts' },

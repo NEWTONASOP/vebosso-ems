@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessRule, fetchRules, Names, RuleFeature, rulesSummary, RULE_FEATURES } from '../lib/accessRules';
 import { Feature, FEATURES, fetchFeatureAccess, setFeatureAccess } from '../lib/featureAccess';
 import { fetchBanquets } from '../lib/leads';
-import { fetchCities } from '../lib/venues';
+import { fetchBrands, fetchCities } from '../lib/venues';
 import { countUnreadFrom } from '../lib/chat';
 import { countPendingDocuments } from '../lib/employeeRecords';
 import { parseSupabaseError } from '../lib/errors';
@@ -90,12 +90,13 @@ export function OwnerMemberMenu({ member, onClose, onMessage, initialDialog = nu
   useEffect(() => {
     if (!memberId) return;
     let active = true;
-    Promise.all([fetchRules(memberId), fetchCities(), fetchBanquets()]).then(([r, c, b]) => {
+    Promise.all([fetchRules(memberId), fetchCities(), fetchBanquets(), fetchBrands()]).then(([r, c, b, br]) => {
       if (!active) return;
       if (r.success) setRules(r.data);
       setRulesFailed(!r.success);
       const map: Record<string, string> = {};
       if (c.success) c.data.forEach((x) => (map[x.id] = x.name));
+      if (br.success) br.data.forEach((x) => (map[x.id] = x.name));
       if (b.success) b.data.forEach((x) => (map[x.id] = x.name));
       setPlaces(map);
     });

@@ -15,7 +15,7 @@ import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { addVenue, isValidEmail, updateVenue, venueContacts } from '../lib/venues';
 import { useAuthStore } from '../store/authStore';
-import { Venue, VenueCity, VenueContact, VenueInput } from '../types/database';
+import { Venue, VenueBrand, VenueCity, VenueContact, VenueInput } from '../types/database';
 import { DateField } from './DateTimeFields';
 import { useFieldChain } from '../lib/useFieldChain';
 import { SheetFrame } from './SheetFrame';
@@ -29,8 +29,12 @@ interface VenueFormSheetProps {
   existing: Venue[];
   /** Cities to choose from (cities are added on the venues list). */
   cities: VenueCity[];
+  /** Brands to choose from (brands are added on the venues list). */
+  brands: VenueBrand[];
   /** Preselected city for a new venue (e.g. added from inside that city). */
   defaultCityId?: string | null;
+  /** Preselected brand for a new venue (e.g. added from inside that brand). */
+  defaultBrandId?: string | null;
 }
 
 const KEY = (d: Date) => format(d, 'yyyy-MM-dd');
@@ -42,7 +46,9 @@ export function VenueFormSheet({
   venue,
   existing,
   cities,
+  brands,
   defaultCityId = null,
+  defaultBrandId = null,
 }: VenueFormSheetProps) {
   const profile = useAuthStore((s) => s.profile);
   const chain = useFieldChain();
@@ -55,6 +61,7 @@ export function VenueFormSheet({
     location: venue?.location ?? '',
     contacts: [],
     city_id: venue ? venue.city_id : defaultCityId,
+    brand_id: venue ? venue.brand_id : defaultBrandId,
   });
   // Everyone met there, each with a steady key so removing one doesn't shuffle
   // the boxes. Always at least one (empty) person to fill in.
@@ -154,6 +161,29 @@ export function VenueFormSheet({
         </View>
         {cities.length === 0 ? (
           <Text style={styles.cityHint}>No cities yet — add one with “Add city” on the venues list.</Text>
+        ) : null}
+      </View>
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Brand</Text>
+        <View style={styles.cities}>
+          {brands.map((b) => {
+            const on = form.brand_id === b.id;
+            return (
+              <Pressable
+                key={b.id}
+                onPress={() => setForm((f) => ({ ...f, brand_id: on ? null : b.id }))}
+                style={[styles.cityChip, on && styles.cityChipOn]}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+              >
+                <Text style={[styles.cityText, on && styles.cityTextOn]}>{b.name}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        {brands.length === 0 ? (
+          <Text style={styles.cityHint}>No brands yet. Add one with “Add brand” on the venues list.</Text>
         ) : null}
       </View>
 

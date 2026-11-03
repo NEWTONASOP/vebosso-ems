@@ -7,7 +7,7 @@
 // ============================================================================
 
 import { Platform } from 'react-native';
-import { CloudImage, Venue, VenueCity, VenueContact, VenueInput } from '../types/database';
+import { CloudImage, Venue, VenueBrand, VenueCity, VenueContact, VenueInput } from '../types/database';
 import { parseSupabaseError } from './errors';
 import { sendPushNotificationToRole } from './notifications';
 import { supabase } from './supabase';
@@ -46,6 +46,7 @@ function clean(input: VenueInput): VenueInput {
     location: opt(input.location),
     contacts: (input.contacts ?? []).map(cleanContact).filter((c): c is VenueContact => !!c),
     city_id: input.city_id || null,
+    brand_id: input.brand_id || null,
   };
 }
 
@@ -191,6 +192,30 @@ export async function addCity(name: string): Promise<Result<VenueCity>> {
     return { success: false, error: /duplicate|unique/i.test(text) ? `${clean} is already on the list` : text };
   }
   return { success: true, data: data as VenueCity };
+}
+
+/** Owner only (RLS). Venues in it stay, with no brand (ON DELETE SET NULL). */
+export async function deleteBrand(id: string): Promise<Result> {
+  const { error } = await supabase.from('venue_brands').delete().eq('id', id);
+  if (error) return fail(error);
+  return { success: true, data: undefined };
+}
+
+export async function fetchBrands(): Promise<Result<VenueBrand[]>> {
+  const { data, error } = await supabase.from('venue_brands').select('*').order('name', { ascending: true });
+  if (error) return fail(error);
+  return { success: true, data: (data || []) as VenueBrand[] };
+}
+
+export async function addBrand(name: string): Promise<Result<VenueBrand>> {
+  const clean = name.trim().replace(/\s+/g, ' ').slice(0, 80);
+  if (!clean) return { success: false, error: 'Type the brand name' };
+  const { data, error } = await supabase.from('venue_brands').insert({ name: clean }).select().single();
+  if (error) {
+    const text = parseSupabaseError(error);
+    return { success: false, error: /duplicate|unique/i.test(text) ? `${clean} is already on the list` : text };
+  }
+  return { success: true, data: data as VenueBrand };
 }
 
 /** Anyone with Venues access can mark and unmark (043). */

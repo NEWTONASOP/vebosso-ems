@@ -30,9 +30,12 @@ import { Alert } from '../lib/alert';
 import { useMyAccess } from '../lib/accessRules';
 import { supabase } from '../lib/supabase';
 import {
+  addBrand,
   addCity,
+  deleteBrand,
   deleteCity,
   deleteVenue,
+  fetchBrands,
   fetchCities,
   fetchVenues,
   mailtoUrl,
@@ -41,7 +44,7 @@ import {
   venueContacts,
   whatsappUrl,
 } from '../lib/venues';
-import { Venue, VenueCity, VenueContact } from '../types/database';
+import { Venue, VenueBrand, VenueCity, VenueContact } from '../types/database';
 import { Chevron, DropdownBody } from './Dropdown';
 import { SheetFrame } from './SheetFrame';
 import { EmailPeopleSheet } from './EmailPeopleSheet';
@@ -55,6 +58,8 @@ const COLUMNS: { key: string; label: string; width: number }[] = [
   { key: 'by', label: 'Team member', width: 140 },
   { key: 'venue', label: 'Venue', width: 180 },
   { key: 'location', label: 'Location', width: 170 },
+  // Under a city this shows the venue's brand, under a brand its city.
+  { key: 'other', label: '', width: 140 },
   { key: 'role', label: 'Person met (role)', width: 170 },
   { key: 'name', label: 'Their name', width: 140 },
   { key: 'phone', label: 'Their phone', width: 140 },
@@ -66,8 +71,16 @@ const dash = (v: string | null | undefined) => (v && v.trim() ? v : '—');
 const WHATSAPP_GREEN = '#1FA855';
 
 const loadAll = async () => {
-  const [venues, cities] = await Promise.all([fetchVenues(), fetchCities()]);
-  return { venues, cities };
+  const [venues, cities, brands] = await Promise.all([fetchVenues(), fetchCities(), fetchBrands()]);
+  return { venues, cities, brands };
+};
+
+/** The two ways venues are grouped. A venue sits in one of each, so it shows under both. */
+type Kind = 'city' | 'brand';
+type Group = { id: string; name: string; venues: Venue[] };
+const KIND_TEXT: Record<Kind, { one: string; many: string; none: string }> = {
+  city: { one: 'city', many: 'cities', none: 'No city' },
+  brand: { one: 'brand', many: 'brands', none: 'No brand' },
 };
 
 interface VenuesScreenProps {
@@ -89,12 +102,16 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
   const { add } = useLocalSearchParams<{ add?: string }>();
   const [venues, setVenues] = useState<Venue[]>([]);
   const [cities, setCities] = useState<VenueCity[]>([]);
+  const [brands, setBrands] = useState<VenueBrand[]>([]);
+  // Open groups (city and brand ids never clash; the two "No …" groups have their own keys).
   const [openCities, setOpenCities] = useState<Set<string>>(() => new Set());
   // How many venues each open city shows (PAGE to start) — a city full of
   // venues was slow to open.
   const [shownVenues, setShownVenues] = useState<Record<string, number>>({});
   // City preselected in the add form (when adding from inside a city).
   const [formCity, setFormCity] = useState<string | null>(null);
+  // Brand preselected in the add form (when adding from inside a brand).
+  const [formBrand, setFormBrand] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -105,37 +122,32 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
   const [marking, setMarking] = useState(false);
   // The "Email people" sheet: tick people, write one email to all of them.
   const [emailing, setEmailing] = useState(false);
-  // The city whose ⋮ menu is open.
+  // The group whose ⋮ menu is open.
   const [menuFor, setMenuFor] = useState<string | null>(null);
-  // Adding a city: null = not adding, '' = typing.
-  const [newCity, setNewCity] = useState<string | null>(null);
-  // The add-city box is at the end of the list: scroll it into view above the keyboard.
+  // Adding a city or brand: null = not adding, text '' = typing.
+  const [newItem, setNewItem] = useState<{ kind: Kind; text: string } | null>(null);
   const scrollRef = useRef<ScrollView>(null);
-  const addingCityRow = newCity !== null;
-  useEffect(() => {
-    if (!addingCityRow) return;
-    const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
-    return () => clearTimeout(t);
-  }, [addingCityRow, keyboardInset]);
   // The tab stays alive in the background: start at the top each time it's
-  // opened, and don't leave a half-typed city box behind.
+  // opened, and don't leave a half-typed city / brand box behind.
   useFocusEffect(
     useCallback(() => {
       scrollRef.current?.scrollTo({ y: 0, animated: false });
-      return () => setNewCity(null);
+      return () => setNewItem(null);
     }, []),
   );
-  const [addingCity, setAddingCity] = useState(false);
+  const [savingItem, setSavingItem] = useState(false);
 
-  const saveCity = async () => {
-    if (newCity === null) return;
-    setAddingCity(true);
-    const res = await addCity(newCity);
-    setAddingCity(false);
+  const saveItem = async () => {
+    if (newItem === null) return;
+    setSavingItem(true);
+    const res = newItem.kind === 'city' ? await addCity(newItem.text) : await addBrand(newItem.text);
+    setSavingItem(false);
     if (!res.success) return setSnack(res.error);
-    setCities((list) => [...list, res.data].sort((a, b) => a.name.localeCompare(b.name)));
+    const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
+    if (newItem.kind === 'city') setCities((list) => [...list, res.data].sort(byName));
+    else setBrands((list) => [...list, res.data].sort(byName));
     setOpenCities((prev) => new Set(prev).add(res.data.id));
-    setNewCity(null);
+    setNewItem(null);
     setSnack(`${res.data.name} added`);
   };
 
@@ -147,6 +159,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
       setError(res.venues.error);
     }
     if (res.cities.success) setCities(res.cities.data);
+    if (res.brands.success) setBrands(res.brands.data);
     setIsLoading(false);
   }, []);
 
@@ -167,6 +180,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
       .channel(`venues_${Math.random().toString(36).slice(2, 8)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'venues' }, () => void load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'venue_cities' }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'venue_brands' }, () => void load())
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -181,6 +195,9 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
 
   useEffect(() => setShownVenues({}), [query]);
 
+  const cityName = (id: string | null) => cities.find((c) => c.id === id)?.name ?? null;
+  const brandName = (id: string | null) => brands.find((b) => b.id === id)?.name ?? null;
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return venues;
@@ -189,25 +206,32 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
         v.venue_name,
         v.location,
         v.added_by_name,
+        cityName(v.city_id),
+        brandName(v.brand_id),
         ...venueContacts(v).flatMap((c) => [c.name, c.role, c.email, c.phone]),
       ].some((f) => f?.toLowerCase().includes(q))
     );
-  }, [venues, query]);
+  }, [venues, query, cities, brands]);
 
-  // City by city, in name order; venues without a city (or whose city was
-  // removed) last. While searching, only cities with matches show, opened.
-  const groups = useMemo(() => {
+  // Venues grouped by city and, separately, by brand, each in name order, with
+  // the venues that have none (or whose city / brand was removed) last. A venue
+  // is in one of each, so it shows under both. While searching, only groups
+  // with matches show, opened.
+  const groupsOf = (kind: Kind): Group[] => {
     const searching = !!query.trim();
-    const known = new Set(cities.map((c) => c.id));
-    const list: { id: string; name: string; venues: Venue[] }[] = cities.map((c) => ({
-      id: c.id,
-      name: c.name,
-      venues: filtered.filter((v) => v.city_id === c.id),
-    }));
-    const noCity = filtered.filter((v) => !v.city_id || !known.has(v.city_id));
-    if (noCity.length) list.push({ id: 'none', name: 'No city', venues: noCity });
+    const items: { id: string; name: string }[] = kind === 'city' ? cities : brands;
+    const idOf = (v: Venue) => (kind === 'city' ? v.city_id : v.brand_id);
+    const known = new Set(items.map((c) => c.id));
+    const list: Group[] = items.map((c) => ({ id: c.id, name: c.name, venues: filtered.filter((v) => idOf(v) === c.id) }));
+    const none = filtered.filter((v) => !idOf(v) || !known.has(idOf(v)!));
+    // Only cities get a "No city" group; a venue without a brand is just not under any brand.
+    if (none.length && kind === 'city') list.push({ id: `none-${kind}`, name: KIND_TEXT[kind].none, venues: none });
     return searching ? list.filter((g) => g.venues.length > 0) : list;
-  }, [cities, filtered, query]);
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const cityGroups = useMemo(() => groupsOf('city'), [cities, filtered, query]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const brandGroups = useMemo(() => groupsOf('brand'), [brands, filtered, query]);
 
   const toggleCity = (id: string) =>
     setOpenCities((prev) => {
@@ -217,8 +241,6 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
       return next;
     });
 
-  const cityName = (id: string | null) => cities.find((c) => c.id === id)?.name ?? null;
-
   const open = (url: string, fail: string) => {
     Linking.openURL(url).catch(() => setSnack(fail));
   };
@@ -226,20 +248,21 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
   const whatsapp = (phone: string) => open(whatsappUrl(phone), 'Could not open WhatsApp');
 
 
-  /** Owner only. Venues in it move to "No city"; nothing is deleted. */
-  const confirmDeleteCity = (c: { id: string; name: string; venues: Venue[] }) => {
+  /** Owner only. Venues in it move to "No city" / "No brand"; nothing is deleted. */
+  const confirmDeleteGroup = (kind: Kind, c: Group) => {
+    const t = KIND_TEXT[kind];
     Alert.alert(
       `Remove ${c.name}?`,
       c.venues.length
-        ? `The ${c.venues.length} ${c.venues.length === 1 ? 'venue' : 'venues'} in it will move to "No city". No venue is deleted.`
-        : 'This city has no venues.',
+        ? `The ${c.venues.length} ${c.venues.length === 1 ? 'venue' : 'venues'} in it will move to "${t.none}". No venue is deleted.`
+        : `This ${t.one} has no venues.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Remove city',
+          text: `Remove ${t.one}`,
           style: 'destructive',
           onPress: async () => {
-            const res = await deleteCity(c.id);
+            const res = await (kind === 'city' ? deleteCity(c.id) : deleteBrand(c.id));
             if (res.success) {
               setSnack(`${c.name} removed`);
               await load();
@@ -367,8 +390,10 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
     );
   };
 
-  const cell = (col: string, v: Venue) => {
+  const cell = (col: string, v: Venue, kind: Kind = 'city') => {
     switch (col) {
+      case 'other':
+        return dash(kind === 'city' ? brandName(v.brand_id) : cityName(v.city_id));
       case 'date':
         return format(parseISO(v.met_on), 'd MMM yyyy');
       case 'by':
@@ -390,7 +415,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
     }
   };
 
-  const renderTable = (all: Venue[], key: string) => {
+  const renderTable = (all: Venue[], key: string, kind: Kind) => {
     const limit = shownVenues[key] ?? PAGE;
     const list = all.length > limit ? all.slice(0, limit) : all;
     return (
@@ -400,7 +425,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
           <View style={[styles.row, styles.headRow]}>
             {COLUMNS.map((c) => (
               <Text key={c.key} style={[styles.headCell, { width: c.width }]}>
-                {c.label}
+                {c.key === 'other' ? (kind === 'city' ? 'Brand' : 'City') : c.label}
               </Text>
             ))}
           </View>
@@ -434,7 +459,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
                     style={[styles.cell, { width: c.width }, c.key === 'venue' && styles.cellStrong]}
                     numberOfLines={2}
                   >
-                    {cell(c.key, v)}
+                    {cell(c.key, v, kind)}
                   </Text>
                 )
               )}
@@ -450,9 +475,102 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
     );
   };
 
-  const rowFacts = detail ? { owner: detail.added_by, target: detail.city_id } : undefined;
+  const rowFacts = detail ? { owner: detail.added_by, target: [detail.city_id, detail.brand_id] } : undefined;
   const canEditDetail = !!detail && access.can('edit', rowFacts);
   const canDeleteDetail = !!detail && access.can('delete', rowFacts);
+
+  /** One list of groups (all the cities, or all the brands) with its own add box. */
+  const renderSection = (kind: Kind) => {
+    const groups = kind === 'city' ? cityGroups : brandGroups;
+    const searching = !!query.trim();
+    const text = KIND_TEXT[kind];
+    const canAddItem = !searching && access.canList('add');
+    if (!groups.length && !canAddItem) return null;
+    return (
+      <View key={kind} style={styles.section}>
+        <Text style={styles.sectionTitle}>By {text.one}</Text>
+        {groups.map((g) => {
+              const open = searching || openCities.has(g.id);
+              const inBusiness = g.venues.filter((v) => v.in_business).length;
+              const isNone = g.id.startsWith('none-');
+              return (
+                <View key={g.id} style={styles.group}>
+                  <Pressable
+                    onPress={() => toggleCity(g.id)}
+                    style={({ pressed }) => [styles.cityRow, pressed && { opacity: 0.85 }]}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: open }}
+                    accessibilityLabel={`${g.name}, ${g.venues.length} venues`}
+                  >
+                    <View style={styles.cityIcon}>
+                      <Feather name={isNone ? 'help-circle' : kind === 'city' ? 'map-pin' : 'award'} size={16} color={T.blue} />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.cityName} numberOfLines={1}>{g.name}</Text>
+                      <Text style={styles.cityMeta} numberOfLines={1}>
+                        {g.venues.length === 0
+                          ? 'No venues yet'
+                          : `${g.venues.length} ${g.venues.length === 1 ? 'venue' : 'venues'}${inBusiness ? ` · ${inBusiness} in business` : ''}`}
+                      </Text>
+                    </View>
+                    {!isNone ? (
+                      <Menu
+                        visible={menuFor === g.id}
+                        onDismiss={() => setMenuFor(null)}
+                        anchor={
+                          <Pressable
+                            onPress={() => setMenuFor(g.id)}
+                            style={styles.cityAdd}
+                            hitSlop={6}
+                            accessibilityLabel={`More for ${g.name}`}
+                          >
+                            <Feather name="more-vertical" size={16} color={T.ink} />
+                          </Pressable>
+                        }
+                        contentStyle={styles.menu}
+                      >
+                        {access.can('add', { target: g.id }) ? (
+                          <Menu.Item
+                            leadingIcon="plus"
+                            title="Add a venue here"
+                            onPress={() => {
+                              setMenuFor(null);
+                              setFormCity(kind === 'city' ? g.id : null);
+                              setFormBrand(kind === 'brand' ? g.id : null);
+                              setFormFor('new');
+                            }}
+                          />
+                        ) : null}
+                        {canManage ? (
+                          <Menu.Item
+                            leadingIcon="trash-can-outline"
+                            title={`Remove ${text.one}`}
+                            titleStyle={{ color: T.coral }}
+                            onPress={() => {
+                              setMenuFor(null);
+                              confirmDeleteGroup(kind, g);
+                            }}
+                          />
+                        ) : null}
+                      </Menu>
+                    ) : null}
+                    <Chevron open={open} color={T.mute} />
+                  </Pressable>
+                  {open && g.venues.length > 0 ? <DropdownBody>{renderTable(g.venues, g.id, kind)}</DropdownBody> : null}
+                </View>
+              );
+            })}
+
+        {/* Cities and brands are added here, on the list, not inside the venue form. */}
+        {canAddItem ? (
+          <Pressable style={styles.addCityBtn} onPress={() => setNewItem({ kind, text: '' })} accessibilityRole="button">
+            <Feather name="plus" size={15} color={T.ink} />
+            <Text style={styles.addCityText}>Add {text.one}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  };
 
   return (
     <View ref={keyboardRef} style={[screenChrome.root, { paddingBottom: keyboardInset }]}>
@@ -474,7 +592,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
             <Text style={screenChrome.subtitle}>
               {isLoading
                 ? 'Loading…'
-                : `${venues.length} onboarded · ${cities.length} ${cities.length === 1 ? 'city' : 'cities'}`}
+                : `${venues.length} onboarded · ${cities.length} ${cities.length === 1 ? 'city' : 'cities'} · ${brands.length} ${brands.length === 1 ? 'brand' : 'brands'}`}
             </Text>
           </View>
         </View>
@@ -483,6 +601,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
             style={({ pressed }) => [screenChrome.primaryPill, pressed && { opacity: 0.9 }]}
             onPress={() => {
               setFormCity(null);
+              setFormBrand(null);
               setFormFor('new');
             }}
             accessibilityRole="button"
@@ -534,7 +653,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
 
         {isLoading ? (
           <ActivityIndicator color={T.charcoal} style={{ marginTop: 40 }} />
-        ) : groups.length === 0 ? (
+        ) : cityGroups.length === 0 && brandGroups.length === 0 ? (
           <View style={styles.empty}>
             <Feather name="map-pin" size={24} color={T.mute} />
             <Text style={styles.emptyTitle}>{query ? 'No matches' : 'No venues yet'}</Text>
@@ -542,111 +661,10 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
               {query ? 'Try a different search.' : 'Tap “Add venue” after you meet one.'}
             </Text>
           </View>
-        ) : (
-          groups.map((g) => {
-            const open = !!query.trim() || openCities.has(g.id);
-            const inBusiness = g.venues.filter((v) => v.in_business).length;
-            return (
-              <View key={g.id} style={styles.group}>
-                <Pressable
-                  onPress={() => toggleCity(g.id)}
-                  style={({ pressed }) => [styles.cityRow, pressed && { opacity: 0.85 }]}
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: open }}
-                  accessibilityLabel={`${g.name}, ${g.venues.length} venues`}
-                >
-                  <View style={styles.cityIcon}>
-                    <Feather name={g.id === 'none' ? 'help-circle' : 'map-pin'} size={16} color={T.blue} />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.cityName} numberOfLines={1}>{g.name}</Text>
-                    <Text style={styles.cityMeta} numberOfLines={1}>
-                      {g.venues.length === 0
-                        ? 'No venues yet'
-                        : `${g.venues.length} ${g.venues.length === 1 ? 'venue' : 'venues'}${inBusiness ? ` · ${inBusiness} in business` : ''}`}
-                    </Text>
-                  </View>
-                  {g.id !== 'none' ? (
-                    <Menu
-                      visible={menuFor === g.id}
-                      onDismiss={() => setMenuFor(null)}
-                      anchor={
-                        <Pressable
-                          onPress={() => setMenuFor(g.id)}
-                          style={styles.cityAdd}
-                          hitSlop={6}
-                          accessibilityLabel={`More for ${g.name}`}
-                        >
-                          <Feather name="more-vertical" size={16} color={T.ink} />
-                        </Pressable>
-                      }
-                      contentStyle={styles.menu}
-                    >
-                      {access.can('add', { target: g.id }) ? (
-                        <Menu.Item
-                          leadingIcon="plus"
-                          title="Add a venue here"
-                          onPress={() => {
-                            setMenuFor(null);
-                            setFormCity(g.id);
-                            setFormFor('new');
-                          }}
-                        />
-                      ) : null}
-                      {canManage ? (
-                        <Menu.Item
-                          leadingIcon="trash-can-outline"
-                          title="Remove city"
-                          titleStyle={{ color: T.coral }}
-                          onPress={() => {
-                            setMenuFor(null);
-                            confirmDeleteCity(g);
-                          }}
-                        />
-                      ) : null}
-                    </Menu>
-                  ) : null}
-                  <Chevron open={open} color={T.mute} />
-                </Pressable>
-                {open && g.venues.length > 0 ? <DropdownBody>{renderTable(g.venues, g.id)}</DropdownBody> : null}
-              </View>
-            );
-          })
-        )}
-
-        {/* Cities are added here, on the list — not inside the venue form. */}
-        {!isLoading && !query.trim() && access.canList('add') ? (
-          newCity === null ? (
-            <Pressable style={styles.addCityBtn} onPress={() => setNewCity('')} accessibilityRole="button">
-              <Feather name="plus" size={15} color={T.ink} />
-              <Text style={styles.addCityText}>Add city</Text>
-            </Pressable>
-          ) : (
-            <View style={styles.newCityRow}>
-              <PaperOutlinedField
-                label="City name"
-                value={newCity}
-                onChangeText={setNewCity}
-                style={{ flex: 1 }}
-                maxLength={80}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={() => void saveCity()}
-              />
-              <Pressable style={styles.cityAdd} onPress={() => setNewCity(null)} accessibilityLabel="Cancel">
-                <Feather name="x" size={16} color={T.inkSoft} />
-              </Pressable>
-              <Pressable
-                style={[styles.cityAdd, styles.citySave]}
-                onPress={() => void saveCity()}
-                disabled={addingCity}
-                accessibilityLabel="Save city"
-              >
-                {addingCity ? <ActivityIndicator color={T.white} /> : <Feather name="check" size={16} color={T.white} />}
-              </Pressable>
-            </View>
-          )
         ) : null}
+
+        {!isLoading ? renderSection('brand') : null}
+        {!isLoading ? renderSection('city') : null}
 
         {!isLoading && filtered.length > 0 ? (
           <Text style={styles.hint}>
@@ -731,6 +749,7 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
           <DetailRow label="Date met" value={cell('date', detail)} />
           <DetailRow label="Team member" value={dash(detail.added_by_name)} />
           <DetailRow label="City" value={dash(cityName(detail.city_id))} />
+          <DetailRow label="Brand" value={dash(brandName(detail.brand_id))} />
           <DetailRow label="Location" value={dash(detail.location)} />
           {(() => {
             const people = venueContacts(detail);
@@ -762,13 +781,46 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
           venue={formFor === 'new' ? null : formFor}
           existing={venues}
           cities={cities}
+          brands={brands}
           defaultCityId={formCity}
+          defaultBrandId={formBrand}
           onDismiss={() => setFormFor(null)}
           onSaved={(m) => {
             setSnack(m);
             void load();
           }}
         />
+      ) : null}
+
+      {newItem ? (
+        <SheetFrame
+          visible
+          onDismiss={() => setNewItem(null)}
+          title={newItem.kind === 'city' ? 'Add a city' : 'Add a brand'}
+          subtitle={newItem.kind === 'city' ? 'Venues are grouped city by city' : 'Venues of one brand are grouped together'}
+          icon={newItem.kind === 'city' ? 'map-pin' : 'award'}
+          iconColor={T.blue}
+          iconBg={T.blueSoft}
+          footer={
+            <Pressable style={styles.saveItemBtn} onPress={() => void saveItem()} disabled={savingItem}>
+              {savingItem ? (
+                <ActivityIndicator color={T.white} />
+              ) : (
+                <Text style={styles.saveItemText}>{newItem.kind === 'city' ? 'Add city' : 'Add brand'}</Text>
+              )}
+            </Pressable>
+          }
+        >
+          <PaperOutlinedField
+            label={newItem.kind === 'city' ? 'City name' : 'Brand name'}
+            value={newItem.text}
+            onChangeText={(t) => setNewItem({ kind: newItem.kind, text: t })}
+            maxLength={80}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={() => void saveItem()}
+          />
+        </SheetFrame>
       ) : null}
 
       {emailing ? (
@@ -857,8 +909,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   addCityText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: T.ink },
-  newCityRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2, marginBottom: 6 },
-  citySave: { backgroundColor: T.charcoal },
+  saveItemBtn: { height: 48, borderRadius: 999, backgroundColor: T.charcoal, alignItems: 'center', justifyContent: 'center' },
+  saveItemText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: T.white },
   emailPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -929,6 +981,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
     color: T.mute,
+  },
+  section: { marginBottom: 8 },
+  sectionTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+    color: T.mute,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 8,
+    marginBottom: 8,
   },
   group: { marginBottom: 10 },
   cityRow: {

@@ -39,14 +39,14 @@ import {
 } from '../lib/accessSimple';
 import { BRAND_KEYS, BRANDS } from '../lib/billBrands';
 import { fetchBanquets } from '../lib/leads';
-import { fetchCities } from '../lib/venues';
+import { fetchBrands, fetchCities } from '../lib/venues';
 import { useAuthStore } from '../store/authStore';
 import { useWorkStore } from '../store/workStore';
 import { DateField } from './DateTimeFields';
 import { SheetFrame } from './SheetFrame';
 
 const TITLE: Record<RuleFeature, string> = { venues: 'Venues', bills: 'Bills', leads: 'Navgrah Leads' };
-const PLACE_HEADING: Record<RuleFeature, string> = { venues: 'Cities', bills: 'Brands', leads: 'Banquets' };
+const PLACE_HEADING: Record<RuleFeature, string> = { venues: 'Cities and brands', bills: 'Brands', leads: 'Banquets' };
 const OVERALL: Until[] = ['none', '30m', '1h', '1d', '1w', '1m', 'date'];
 /** People listed before "Show all". */
 const PEOPLE_FIRST = 5;
@@ -84,12 +84,17 @@ export function AccessSheet({
   const [error, setError] = useState('');
   const [showAllPeople, setShowAllPeople] = useState(false);
   const [placeList, setPlaceList] = useState<{ id: string; name: string }[]>([]);
+  // Venues can also be given by brand (074); rules hold brand ids beside city ids.
+  const [brandList, setBrandList] = useState<{ id: string; name: string }[]>([]);
   // People worth listing: they have this feature, or have added something in it.
   const [relevant, setRelevant] = useState<Set<string> | null>(null);
 
   const places = useMemo(
-    () => (SCOPE_BY_FEATURE[feature] === 'brands' ? BRAND_KEYS.map((b) => ({ id: b, name: BRANDS[b].label })) : placeList),
-    [feature, placeList],
+    () =>
+      SCOPE_BY_FEATURE[feature] === 'brands'
+        ? BRAND_KEYS.map((b) => ({ id: b, name: BRANDS[b].label }))
+        : [...placeList, ...brandList],
+    [feature, placeList, brandList],
   );
   const people = useMemo(
     () =>
@@ -104,10 +109,11 @@ export function AccessSheet({
   useEffect(() => {
     let active = true;
     (async () => {
-      const [rules, list, who] = await Promise.all([
+      const [rules, list, who, brands] = await Promise.all([
         fetchRules(userId, feature),
         feature === 'venues' ? fetchCities() : feature === 'leads' ? fetchBanquets() : Promise.resolve(null),
         fetchContributorIds(feature),
+        feature === 'venues' ? fetchBrands() : Promise.resolve(null),
       ]);
       if (!active) return;
       setRelevant(who);
@@ -117,6 +123,7 @@ export function AccessSheet({
         setHadRules(rules.data.length > 0);
       } else setError(rules.error);
       if (list?.success) setPlaceList(list.data.map((x) => ({ id: x.id, name: x.name })));
+      if (brands?.success) setBrandList(brands.data.map((x) => ({ id: x.id, name: x.name })));
       setLoading(false);
     })();
     return () => {
@@ -305,9 +312,25 @@ export function AccessSheet({
               {places.length === 0 ? (
                 <Text style={styles.note}>No {PLACE_HEADING[feature].toLowerCase()} added yet.</Text>
               ) : (
-                <View style={styles.group}>
-                  {places.map((p, i) => itemRow(rowKey.place(p.id), p.name, `${noun[0].toUpperCase()}${noun.slice(1)} anyone ${verb} here`, i === places.length - 1))}
-                </View>
+                <>
+                  {placeList.length > 0 || feature !== 'venues' ? (
+                    <View style={styles.group}>
+                      {(feature === 'venues' ? placeList : places).map((p, i, all) =>
+                        itemRow(rowKey.place(p.id), p.name, `${noun[0].toUpperCase()}${noun.slice(1)} anyone ${verb} here`, i === all.length - 1),
+                      )}
+                    </View>
+                  ) : null}
+                  {feature === 'venues' && brandList.length > 0 ? (
+                    <>
+                      <Text style={styles.label}>Brands</Text>
+                      <View style={styles.group}>
+                        {brandList.map((p, i) =>
+                          itemRow(rowKey.place(p.id), p.name, `Venues of this brand, in any city`, i === brandList.length - 1),
+                        )}
+                      </View>
+                    </>
+                  ) : null}
+                </>
               )}
             </>
           )}

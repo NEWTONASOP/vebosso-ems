@@ -350,6 +350,8 @@ export interface Venue {
   contact_phone: string | null;
   /** The city it is in (venue_cities); null = not set. */
   city_id: string | null;
+  /** The brand it belongs to (venue_brands, 074); null = not set. */
+  brand_id: string | null;
   /** Given permission and working with VEBOSSO. Anyone marks; only the owner unmarks. */
   in_business: boolean;
   in_business_by_name: string | null;
@@ -408,7 +410,7 @@ export interface VenueContact {
   email?: string | null;
 }
 
-export type VenueInput = Pick<Venue, 'met_on' | 'venue_name' | 'location' | 'contacts' | 'city_id'>;
+export type VenueInput = Pick<Venue, 'met_on' | 'venue_name' | 'location' | 'contacts' | 'city_id' | 'brand_id'>;
 
 /** A city venues are grouped under. Anyone with Venues access can add one. */
 export interface VenueCity {
@@ -417,6 +419,9 @@ export interface VenueCity {
   created_by: string | null;
   created_at: string;
 }
+
+/** A brand (a hotel chain) whose venues are grouped together (074). Same rules as a city. */
+export type VenueBrand = VenueCity;
 
 export type ExpenseStatus = 'submitted' | 'paid' | 'received';
 
