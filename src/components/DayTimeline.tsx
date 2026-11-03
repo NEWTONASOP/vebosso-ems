@@ -7,7 +7,7 @@
 
 import { Feather } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { Text } from 'react-native-paper';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -19,6 +19,7 @@ import {
   TimelineEventKind,
 } from '../lib/attendanceTimeline';
 import { AppTheme, appSoftShadow } from '../constants/theme';
+import { supabase } from '../lib/supabase';
 import { RemarksMode, WorkLogRemarks } from './WorkLogRemarks';
 
 /** Only the first few cards animate in — a long list would otherwise crawl. */
@@ -88,7 +89,37 @@ interface DayTimelineProps {
   remarks?: TimelineRemarks;
 }
 
+/** Files attached at check-in / check-out, counted per "<workLogId>:<phase>". */
+function useAttachedFileCounts(events: TimelineEvent[], enabled: boolean) {
+  const ids = Array.from(new Set(events.map((e) => e.workLogId).filter(Boolean) as string[])).join(',');
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!enabled || !ids) return;
+    let active = true;
+    supabase
+      .from('employee_documents')
+      .select('work_log_id, work_phase')
+      .in('work_log_id', ids.split(','))
+      .eq('category', 'work')
+      .then(({ data }) => {
+        if (!active) return;
+        const next: Record<string, number> = {};
+        for (const d of data ?? []) {
+          const key = `${d.work_log_id}:${d.work_phase === 'check_out' ? 'check-out' : 'check-in'}`;
+          next[key] = (next[key] || 0) + 1;
+        }
+        setCounts(next);
+      });
+    return () => {
+      active = false;
+    };
+  }, [ids, enabled]);
+  return counts;
+}
+
 export function DayTimeline({ timeline, onPressEvent, remarks }: DayTimelineProps) {
+  const fileCounts = useAttachedFileCounts(timeline.events, !!onPressEvent);
+
   if (timeline.events.length === 0) {
     const copy = EMPTY_COPY[timeline.emptyReason ?? 'no-record'];
     return (
@@ -112,6 +143,7 @@ export function DayTimeline({ timeline, onPressEvent, remarks }: DayTimelineProp
           isLast={index === timeline.events.length - 1}
           onPress={onPressEvent}
           remarks={remarks}
+          fileCount={event.workLogId ? fileCounts[`${event.workLogId}:${event.kind}`] ?? 0 : 0}
         />
       ))}
     </View>
@@ -124,12 +156,14 @@ function TimelineRow({
   isLast,
   onPress,
   remarks,
+  fileCount,
 }: {
   event: TimelineEvent;
   index: number;
   isLast: boolean;
   onPress?: (event: TimelineEvent) => void;
   remarks?: TimelineRemarks;
+  fileCount: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   // Full (unclamped) line counts, reported by the hidden measuring copies.
@@ -141,6 +175,17 @@ function TimelineRow({
   const fullTitleLines = titleLines ?? estimateLines(event.title);
   const fullSubtitleLines = subtitleLines ?? estimateLines(event.subtitle);
   const canExpand = fullTitleLines > TITLE_LINES || fullSubtitleLines > CLAMPED_LINES;
+  // Photos and attached files live in the day's full log: say so on the card.
+  const photos = event.photoCount ?? 0;
+  const mediaLabel =
+    onPress && (photos > 0 || fileCount > 0)
+      ? [
+          photos ? `${photos} photo${photos === 1 ? '' : 's'}` : null,
+          fileCount ? `${fileCount} file${fileCount === 1 ? '' : 's'}` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : null;
 
   // Expanding a long note happens in place; only entries backed by a work log
   // have somewhere else to go.
@@ -226,6 +271,19 @@ function TimelineRow({
                 color={event.color}
               />
             </View>
+          ) : null}
+          {mediaLabel && onPress ? (
+            <AnimatedPressable
+              scaleTo={0.97}
+              style={styles.mediaLink}
+              onPress={() => onPress(event)}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${mediaLabel}`}
+            >
+              <Feather name="image" size={13} color={AppTheme.blue} />
+              <Text style={styles.mediaText}>{mediaLabel}</Text>
+              <Feather name="chevron-right" size={13} color={AppTheme.blue} />
+            </AnimatedPressable>
           ) : null}
           {remarks && event.workLogId && (event.kind === 'check-in' || event.kind === 'check-out') ? (
             // Taps here stay here — they shouldn't also open the day's detail.
@@ -352,6 +410,18 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 2,
   },
+  mediaLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    marginTop: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: AppTheme.blueSoft,
+  },
+  mediaText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: AppTheme.blue },
   moreRow: {
     flexDirection: 'row',
     alignItems: 'center',

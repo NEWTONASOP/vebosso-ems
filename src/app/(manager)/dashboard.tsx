@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Snackbar, Text } from 'react-native-paper';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import { AddMyTaskModal } from '../../components/AddMyTaskModal';
 import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { ApprovalCard } from '../../components/ApprovalCard';
 import { AssignTaskModal } from '../../components/AssignTaskModal';
@@ -36,6 +37,7 @@ import {
   appSoftShadow,
   screenChrome,
 } from '../../constants/theme';
+import { addMyTask } from '../../lib/selfTasks';
 import { useAuthStore } from '../../store/authStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useWorkStore } from '../../store/workStore';
@@ -61,6 +63,17 @@ export default function ManagerDashboard() {
   const [editPlanLoading, setEditPlanLoading] = useState(false);
   const [checkOutLoading, setCheckOutLoading] = useState(false);
   const [snackMessage, setSnackMessage] = useState('');
+  const [addingTask, setAddingTask] = useState(false);
+
+  /** Add a task for myself (072); it joins the list below, for the boss to review. */
+  const handleAddTask = async (title: string) => {
+    if (!profile) return 'Not signed in';
+    const res = await addMyTask(profile.id, profile.full_name, title);
+    if (!res.success) return res.error;
+    setSnackMessage('Task added — the boss can see it');
+    void fetchTodayTasks(profile.id);
+    return null;
+  };
   const [elapsed, setElapsed] = useState('');
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -533,9 +546,21 @@ export default function ManagerDashboard() {
       {/* Remarks from the boss on my check-ins / check-outs (053). */}
       <MyRemarksCard style={{ marginHorizontal: 20, marginTop: 12 }} />
 
-      {todayTasks.length > 0 && (
-        <View style={styles.tasksSection}>
-          <Text style={styles.sectionLabel}>Tasks by Boss</Text>
+      <View style={styles.tasksSection}>
+        <View style={styles.tasksHeader}>
+          <Text style={[styles.sectionLabel, styles.tasksHeaderLabel]}>Tasks by Boss</Text>
+          <AnimatedPressable
+            scaleTo={0.94}
+            style={styles.addTaskBtn}
+            onPress={() => setAddingTask(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Add my task"
+          >
+            <Feather name="plus" size={14} color={T.white} />
+            <Text style={styles.addTaskText}>Add task</Text>
+          </AnimatedPressable>
+        </View>
+        {todayTasks.length > 0 && (
           <View style={styles.tasksContainer}>
             {todayTasks.map((task, index) => (
               <TaskCard 
@@ -547,8 +572,8 @@ export default function ManagerDashboard() {
               />
             ))}
           </View>
-        </View>
-      )}
+        )}
+      </View>
 
       <Text style={styles.sectionLabel}>Quick actions</Text>
       <View style={styles.quickActionsContainer}>
@@ -655,6 +680,8 @@ export default function ManagerDashboard() {
         onDismiss={() => setReasonFor(null)}
       />
     ) : null}
+
+    <AddMyTaskModal visible={addingTask} onDismiss={() => setAddingTask(false)} onAdd={handleAddTask} />
 
     <Snackbar
       visible={!!snackMessage}
@@ -888,6 +915,25 @@ const styles = StyleSheet.create({
   tasksSection: {
     marginTop: 4,
   },
+  tasksHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: AppSpace.screen,
+    marginTop: 28,
+    marginBottom: 10,
+  },
+  tasksHeaderLabel: { paddingHorizontal: 0, marginTop: 0, marginBottom: 0 },
+  addTaskBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: T.charcoal,
+  },
+  addTaskText: { fontFamily: 'Inter_700Bold', fontSize: 12.5, color: T.white },
   tasksContainer: {
     paddingHorizontal: AppSpace.screen,
     paddingTop: 2,

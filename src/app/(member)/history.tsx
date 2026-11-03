@@ -210,14 +210,6 @@ export default function MemberHistoryScreen() {
               checkOutTime={selectedLog?.check_out_time}
               totalHours={selectedLog?.total_hours}
               actions={[
-                {
-                  key: 'log',
-                  label: 'View full log',
-                  icon: 'file-text',
-                  tone: selectedLog && !backfill ? 'primary' : 'neutral',
-                  disabled: !selectedLog,
-                  onPress: () => setDetailVisible(true),
-                },
                 ...(backfill
                   ? ([
                       {

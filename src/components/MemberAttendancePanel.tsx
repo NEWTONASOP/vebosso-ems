@@ -146,18 +146,7 @@ export function MemberAttendancePanel({
     [workLogs]
   );
 
-  const dayActions: DayAction[] = enableDetailSheet
-    ? [
-        {
-          key: 'log',
-          label: 'View full log',
-          icon: 'file-text',
-          tone: 'primary',
-          disabled: !selectedLog,
-          onPress: () => setDetailVisible(true),
-        },
-      ]
-    : [];
+  const dayActions: DayAction[] = [];
 
   return (
     <View>

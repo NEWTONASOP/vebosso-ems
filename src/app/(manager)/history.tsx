@@ -215,6 +215,18 @@ export default function ManagerHistoryScreen() {
 
   const openPicker = () => setPickerVisible(true);
 
+  // The manager checks in too: "You" sits at the top of the person list.
+  const isMe = !!profile && selectedMember?.id === profile.id;
+  const pickerMembers = useMemo(
+    () => (profile ? [{ ...profile, full_name: `${profile.full_name} (You)` }, ...teamMembers] : teamMembers),
+    [profile, teamMembers]
+  );
+  const showMine = () => {
+    if (!profile) return;
+    setSelectedMember(profile);
+    setMode('person');
+  };
+
   const selectMemberFromTeam = (userId: string) => {
     const member = teamMembers.find((m) => m.id === userId) ?? null;
     if (member) {
@@ -233,7 +245,7 @@ export default function ManagerHistoryScreen() {
               {mode === 'team'
                 ? 'Your team on this day'
                 : selectedMember
-                  ? `${selectedMember.full_name}'s week`
+                  ? isMe ? 'Your attendance' : `${selectedMember.full_name}'s week`
                   : 'Pick someone to review'}
             </Text>
           </View>
@@ -296,10 +308,11 @@ export default function ManagerHistoryScreen() {
           <MemberPickerModal
             visible={pickerVisible}
             onDismiss={() => setPickerVisible(false)}
-            members={teamMembers}
+            members={pickerMembers}
             selectedMember={selectedMember}
             onSelectMember={(member) => {
-              setSelectedMember(member);
+              // "(You)" is only a label in the list; keep the real profile.
+              setSelectedMember(profile && member.id === profile.id ? profile : member);
               setPickerVisible(false);
             }}
           />
@@ -312,8 +325,18 @@ export default function ManagerHistoryScreen() {
                 </View>
                 <Text style={styles.emptyTitle}>Attendance History</Text>
                 <Text style={styles.emptyBody}>
-                  See any of your reports&apos; attendance day by day
+                  See your own or any of your reports&apos; attendance day by day
                 </Text>
+                <AnimatedPressable
+                  scaleTo={0.97}
+                  style={[styles.chooseMemberBtn, styles.myAttendanceBtn]}
+                  onPress={showMine}
+                  accessibilityRole="button"
+                  accessibilityLabel="My attendance"
+                >
+                  <Feather name="calendar" size={18} color={T.ink} />
+                  <Text style={[styles.chooseMemberText, { color: T.ink }]}>My attendance</Text>
+                </AnimatedPressable>
                 <AnimatedPressable
                   scaleTo={0.97}
                   style={styles.chooseMemberBtn}
@@ -421,19 +444,10 @@ export default function ManagerHistoryScreen() {
                     checkInTime={selectedLog?.check_in_time}
                     checkOutTime={selectedLog?.check_out_time}
                     totalHours={selectedLog?.total_hours}
-                    actions={[
-                      {
-                        key: 'log',
-                        label: 'View full log',
-                        icon: 'file-text',
-                        tone: 'primary',
-                        disabled: !selectedLog,
-                        onPress: () => setDetailVisible(true),
-                      },
-                    ]}
                   />
 
-                  {selectedMember ? (
+                  {/* Location is for reviewing the team; nobody sees their own here (members can't either). */}
+                  {selectedMember && !isMe ? (
                     <MemberLocationSection
                       memberId={selectedMember.id}
                       date={selectedDate}
@@ -580,6 +594,7 @@ const styles = StyleSheet.create({
     height: 48,
     paddingHorizontal: 22,
   },
+  myAttendanceBtn: { backgroundColor: T.soft2, marginBottom: 10 },
   chooseMemberText: {
     ...screenChrome.primaryPillText,
     fontSize: 15,

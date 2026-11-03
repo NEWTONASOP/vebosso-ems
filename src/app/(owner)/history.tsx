@@ -245,14 +245,6 @@ export default function OwnerHistoryScreen() {
   const isPastDay = selectedKey < KEY(new Date());
   const dayActions: DayAction[] = [
     {
-      key: 'log',
-      label: 'View full log',
-      icon: 'file-text',
-      tone: 'primary',
-      disabled: !selectedLog,
-      onPress: () => setDetailVisible(true),
-    },
-    {
       key: 'authorize',
       label: activePermission
         ? 'Edit allowed'
