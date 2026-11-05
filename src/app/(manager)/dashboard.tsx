@@ -20,6 +20,7 @@ import { InlineError } from '../../components/InlineError';
 import { ListSkeleton, StatusCardSkeleton } from '../../components/LoadingSkeleton';
 import { MemberPickerModal } from '../../components/MemberPickerModal';
 import { MessageButtons } from '../../components/MessageButtons';
+import { SentBackNotice } from '../../components/SentBackNotice';
 import { VOICE_TASK_TITLE } from '../../components/MemberTasksSheet';
 import { uploadVoiceNote, VoiceClip } from '../../lib/voice';
 import { FeatureShortcut } from '../../components/FeatureShortcut';
@@ -431,6 +432,10 @@ export default function ManagerDashboard() {
               </Text>
             </View>
           </View>
+
+          {todayLog.check_out_time && todayLog.rejection_reason ? (
+            <SentBackNotice reason={todayLog.rejection_reason} />
+          ) : null}
 
           {renderPlanSection()}
 

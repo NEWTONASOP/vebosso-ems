@@ -13,6 +13,7 @@ import { CheckInModal } from '../../components/CheckInModal';
 import { CheckOutModal } from '../../components/CheckOutModal';
 import { InlineError } from '../../components/InlineError';
 import { MessageButtons } from '../../components/MessageButtons';
+import { SentBackNotice } from '../../components/SentBackNotice';
 import { FeatureShortcut } from '../../components/FeatureShortcut';
 import { VenuesShortcut } from '../../components/VenuesShortcut';
 import { StatusCardSkeleton } from '../../components/LoadingSkeleton';
@@ -299,6 +300,10 @@ export default function MemberHomeScreen() {
               </>
             ) : null}
           </View>
+
+          {todayLog.check_out_time && todayLog.rejection_reason ? (
+            <SentBackNotice reason={todayLog.rejection_reason} />
+          ) : null}
 
           {renderPlanSection()}
 
