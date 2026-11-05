@@ -495,6 +495,7 @@ export default function MemberHomeScreen() {
       {showCheckIn ? (
         <CheckInModal
           visible
+          initialPlan={todayLog?.status === 'rejected' ? todayLog.check_in_plan ?? '' : ''}
           onDismiss={handleDismissCheckIn}
           onSubmit={handleCheckIn}
           isLoading={checkInLoading}
@@ -513,6 +514,7 @@ export default function MemberHomeScreen() {
       {showCheckOut ? (
         <CheckOutModal
           visible
+          initialReport={todayLog?.check_out_time && todayLog.rejection_reason ? todayLog.day_report ?? '' : ''}
           onDismiss={handleDismissCheckOut}
           onSubmit={handleCheckOut}
           isLoading={checkOutLoading}

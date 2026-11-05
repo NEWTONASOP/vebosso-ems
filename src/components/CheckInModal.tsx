@@ -31,7 +31,7 @@ interface CheckInModalProps {
   /** Photos are only collected when starting the day, not when editing the plan. */
   onSubmit: (plan: string, photoUris?: string[], files?: WorkFile[]) => Promise<void>;
   isLoading?: boolean;
-  /** Pre-fill the plan field (used when updating an existing plan) */
+  /** Pre-fill the plan field: when updating a plan, or sending a sent-back check-in again */
   initialPlan?: string;
   /** 'checkin' = start day, 'edit' = update existing plan */
   mode?: 'checkin' | 'edit';
@@ -56,7 +56,7 @@ export function CheckInModal({
 
   useEffect(() => {
     if (!visible) return;
-    const seed = isEditMode ? initialPlan : '';
+    const seed = initialPlan;
     planRef.current = seed;
     setCharCount(seed.length);
     setPhotos([]);
@@ -170,10 +170,10 @@ export function CheckInModal({
             </View>
 
             <PaperOutlinedField
-              key={isEditMode ? `edit-${initialPlan}` : 'checkin'}
+              key={isEditMode ? `edit-${initialPlan}` : `checkin-${initialPlan}`}
               label="Today's Plan"
               placeholder="Describe what you'll be working on today..."
-              defaultValue={isEditMode ? initialPlan : ''}
+              defaultValue={initialPlan}
               onChangeText={handleChangeText}
               multiline
               maxLength={2000}

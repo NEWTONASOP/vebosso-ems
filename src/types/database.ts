@@ -57,6 +57,28 @@ export interface WorkLog {
   updated_at: string;
 }
 
+/** One step in a day's attendance log (075): sent, sent back, sent again. */
+export type WorkLogEventKind =
+  | 'check_in'
+  | 'plan_updated'
+  | 'check_in_sent_back'
+  | 'check_out'
+  | 'check_out_sent_back';
+
+export interface WorkLogEvent {
+  id: string;
+  /** Tie-breaker for events recorded in the same instant. */
+  seq: number;
+  work_log_id: string;
+  kind: WorkLogEventKind;
+  /** The plan, the day report or the reason, depending on `kind`. */
+  body: string | null;
+  actor_id: string | null;
+  /** Filled in by the database: members cannot read other people's profiles. */
+  actor_name: string | null;
+  occurred_at: string;
+}
+
 export interface LocationPing {
   id: string;
   user_id: string;

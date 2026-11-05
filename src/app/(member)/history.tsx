@@ -24,6 +24,7 @@ import {
   getDayStatus,
   getMonthRange,
 } from '../../lib/attendanceTimeline';
+import { useWorkLogEvents } from '../../lib/workLogEvents';
 import {
   AppTheme as T,
   RoleAccent,
@@ -113,6 +114,7 @@ export default function MemberHistoryScreen() {
   const selectedLeave = leaveFor(selectedDate);
   const selectedStatus = getDayStatus({ workLog: selectedLog, leave: selectedLeave });
 
+  const logEvents = useWorkLogEvents(selectedLog?.id, selectedLog?.updated_at);
   const timeline = useMemo(
     () =>
       buildDayTimeline({
@@ -120,8 +122,9 @@ export default function MemberHistoryScreen() {
         workLog: selectedLog,
         tasks,
         leave: selectedLeave,
+        logEvents,
       }),
-    [selectedKey, selectedLog, tasks, selectedLeave]
+    [selectedKey, selectedLog, tasks, selectedLeave, logEvents]
   );
 
   // Stepping in the detail sheet skips days with no record, so it never opens

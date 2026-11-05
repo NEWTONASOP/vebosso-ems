@@ -30,6 +30,8 @@ const KIND_ICON: Record<TimelineEventKind, React.ComponentProps<typeof Feather>[
   task: 'check-circle',
   'check-out': 'log-out',
   leave: 'sun',
+  'sent-back': 'corner-up-left',
+  'plan-update': 'edit-3',
 };
 
 /**

@@ -7,9 +7,9 @@
 // ============================================================================
 
 import { AppTheme } from '../constants/theme';
-import { LeaveRequest, Task, WorkLog } from '../types/database';
+import { LeaveRequest, Task, WorkLog, WorkLogEvent } from '../types/database';
 
-export type TimelineEventKind = 'check-in' | 'task' | 'check-out' | 'leave';
+export type TimelineEventKind = 'check-in' | 'task' | 'check-out' | 'leave' | 'sent-back' | 'plan-update';
 
 export interface TimelineEvent {
   id: string;
@@ -72,6 +72,7 @@ export function buildDayTimeline({
   workLog,
   tasks,
   leave,
+  logEvents = [],
   now = new Date(),
 }: {
   /** yyyy-MM-dd */
@@ -79,6 +80,11 @@ export function buildDayTimeline({
   workLog: WorkLog | null;
   tasks: Task[];
   leave: LeaveRequest | null;
+  /**
+   * The day's attendance log (075): each time it was sent, sent back and sent
+   * again. Empty for days before the log existed, which keep the plain display.
+   */
+  logEvents?: WorkLogEvent[];
   now?: Date;
 }): DayTimeline {
   // An approved leave replaces the whole day.
@@ -111,20 +117,80 @@ export function buildDayTimeline({
 
   const events: TimelineEvent[] = [];
 
-  if (workLog.check_in_time) {
-    const accent = checkInAccent(workLog);
+  const logged = (kind: WorkLogEvent['kind']) => logEvents.filter((e) => e.kind === kind);
+  const checkIns = logged('check_in');
+  const hasCheckInSentBack = logged('check_in_sent_back').length > 0;
+
+  if (checkIns.length === 0) {
+    if (workLog.check_in_time) {
+      const accent = checkInAccent(workLog);
+      events.push({
+        id: `check-in-${workLog.id}`,
+        kind: 'check-in',
+        workLogId: workLog.id,
+        date: workLog.date,
+        at: workLog.check_in_time,
+        title: checkInLabel(workLog),
+        photoCount: workLog.check_in_photos?.length ?? 0,
+        // The reason is its own card once the log has recorded the send-back.
+        subtitle: workLog.status === 'rejected' && !hasCheckInSentBack
+          ? workLog.rejection_reason || workLog.check_in_plan
+          : workLog.check_in_plan,
+        ...accent,
+      });
+    }
+  } else {
+    checkIns.forEach((e, i) => {
+      if (i === checkIns.length - 1) {
+        // The check-in as it stands now: approved, waiting, or sent back.
+        events.push({
+          id: `check-in-${e.id}`,
+          kind: 'check-in',
+          workLogId: workLog.id,
+          date: workLog.date,
+          at: e.occurred_at,
+          title: checkInLabel(workLog),
+          photoCount: workLog.check_in_photos?.length ?? 0,
+          subtitle: e.body,
+          ...checkInAccent(workLog),
+        });
+      } else {
+        // An earlier send that was sent back and replaced.
+        events.push({
+          id: `check-in-${e.id}`,
+          kind: 'check-in',
+          at: e.occurred_at,
+          title: 'Check-in sent',
+          subtitle: e.body,
+          color: AppTheme.amber,
+          soft: AppTheme.amberSoft,
+        });
+      }
+    });
+  }
+
+  for (const e of logged('plan_updated')) {
     events.push({
-      id: `check-in-${workLog.id}`,
-      kind: 'check-in',
-      workLogId: workLog.id,
-      date: workLog.date,
-      at: workLog.check_in_time,
-      title: checkInLabel(workLog),
-      photoCount: workLog.check_in_photos?.length ?? 0,
-      subtitle: workLog.status === 'rejected'
-        ? workLog.rejection_reason || workLog.check_in_plan
-        : workLog.check_in_plan,
-      ...accent,
+      id: `plan-${e.id}`,
+      kind: 'plan-update',
+      at: e.occurred_at,
+      title: 'Plan updated',
+      subtitle: e.body,
+      color: AppTheme.blue,
+      soft: AppTheme.blueSoft,
+    });
+  }
+
+  for (const e of [...logged('check_in_sent_back'), ...logged('check_out_sent_back')]) {
+    const part = e.kind === 'check_in_sent_back' ? 'Check-in' : 'Check-out';
+    events.push({
+      id: `sent-back-${e.id}`,
+      kind: 'sent-back',
+      at: e.occurred_at,
+      title: e.actor_name ? `${part} sent back by ${e.actor_name}` : `${part} sent back`,
+      subtitle: e.body || 'No reason was given.',
+      color: AppTheme.amber,
+      soft: AppTheme.amberSoft,
     });
   }
 
@@ -144,19 +210,54 @@ export function buildDayTimeline({
     });
   }
 
-  if (workLog.check_out_time) {
-    events.push({
-      id: `check-out-${workLog.id}`,
-      kind: 'check-out',
-      workLogId: workLog.id,
-      date: workLog.date,
-      at: workLog.check_out_time,
-      title: 'Checked out',
-      photoCount: workLog.check_out_photos?.length ?? 0,
-      subtitle: workLog.day_report,
-      color: AppTheme.inkSoft,
-      soft: AppTheme.soft,
-      trailing: workLog.total_hours ? `${workLog.total_hours.toFixed(1)}h` : null,
+  const checkOuts = logged('check_out');
+  // A check-out that was sent back leaves the day "working": it is not the end of the day.
+  const dayEnded = workLog.status === 'pending_checkout' || workLog.status === 'done';
+
+  if (checkOuts.length === 0) {
+    if (workLog.check_out_time) {
+      events.push({
+        id: `check-out-${workLog.id}`,
+        kind: 'check-out',
+        workLogId: workLog.id,
+        date: workLog.date,
+        at: workLog.check_out_time,
+        title: 'Checked out',
+        photoCount: workLog.check_out_photos?.length ?? 0,
+        subtitle: workLog.day_report,
+        color: AppTheme.inkSoft,
+        soft: AppTheme.soft,
+        trailing: workLog.total_hours ? `${workLog.total_hours.toFixed(1)}h` : null,
+      });
+    }
+  } else {
+    checkOuts.forEach((e, i) => {
+      if (i === checkOuts.length - 1 && dayEnded) {
+        events.push({
+          id: `check-out-${e.id}`,
+          kind: 'check-out',
+          workLogId: workLog.id,
+          date: workLog.date,
+          at: e.occurred_at,
+          title: 'Checked out',
+          photoCount: workLog.check_out_photos?.length ?? 0,
+          subtitle: e.body,
+          color: AppTheme.inkSoft,
+          soft: AppTheme.soft,
+          trailing: workLog.total_hours ? `${workLog.total_hours.toFixed(1)}h` : null,
+        });
+      } else {
+        // Sent, then sent back for a change.
+        events.push({
+          id: `check-out-${e.id}`,
+          kind: 'check-out',
+          at: e.occurred_at,
+          title: 'Check-out sent',
+          subtitle: e.body,
+          color: AppTheme.amber,
+          soft: AppTheme.amberSoft,
+        });
+      }
     });
   }
 

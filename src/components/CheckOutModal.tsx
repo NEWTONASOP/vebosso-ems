@@ -22,13 +22,15 @@ interface CheckOutModalProps {
   onDismiss: () => void;
   onSubmit: (report: string, photoUris: string[], files?: WorkFile[]) => Promise<void>;
   isLoading?: boolean;
+  /** Pre-fill the report: when a sent-back check-out is sent again, the last report is the starting point */
+  initialReport?: string;
 }
 
-export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: CheckOutModalProps) {
+export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading, initialReport = '' }: CheckOutModalProps) {
   // Above the keyboard on Android too (KeyboardAvoidingView only works on iOS here).
   const lifted = useDialogLift();
-  const reportRef = useRef('');
-  const [charCount, setCharCount] = useState(0);
+  const reportRef = useRef(initialReport);
+  const [charCount, setCharCount] = useState(initialReport.length);
   const [photos, setPhotos] = useState<string[]>([]);
   const [files, setFiles] = useState<WorkFile[]>([]);
   const [error, setError] = useState('');
@@ -129,7 +131,7 @@ export function CheckOutModal({ visible, onDismiss, onSubmit, isLoading }: Check
             <PaperOutlinedField
               label="Day Report"
               placeholder="Write a summary of your work today..."
-              defaultValue=""
+              defaultValue={initialReport}
               onChangeText={handleChangeReport}
               multiline
               maxLength={3000}

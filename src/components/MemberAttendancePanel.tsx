@@ -22,6 +22,7 @@ import {
   getDayStatus,
   getMonthRange,
 } from '../lib/attendanceTimeline';
+import { useWorkLogEvents } from '../lib/workLogEvents';
 import { useWorkStore } from '../store/workStore';
 import { useShallow } from 'zustand/react/shallow';
 import { LeaveRequest, Task, WorkLog } from '../types/database';
@@ -130,6 +131,7 @@ export function MemberAttendancePanel({
   const selectedLeave = leaveFor(selectedDate);
   const selectedStatus = getDayStatus({ workLog: selectedLog, leave: selectedLeave });
 
+  const logEvents = useWorkLogEvents(selectedLog?.id, selectedLog?.updated_at);
   const timeline = useMemo(
     () =>
       buildDayTimeline({
@@ -137,8 +139,9 @@ export function MemberAttendancePanel({
         workLog: selectedLog,
         tasks,
         leave: selectedLeave,
+        logEvents,
       }),
-    [selectedKey, selectedLog, tasks, selectedLeave]
+    [selectedKey, selectedLog, tasks, selectedLeave, logEvents]
   );
 
   const workedDays = useMemo(
