@@ -49,6 +49,7 @@ import { Chevron, DropdownBody } from './Dropdown';
 import { SheetFrame } from './SheetFrame';
 import { EmailPeopleSheet } from './EmailPeopleSheet';
 import { VenueFormSheet } from './VenueFormSheet';
+import { VenuesImportSheet } from './VenuesImportSheet';
 import { VenueMedia } from './VenueMedia';
 import { useKeyboardOverlap } from '../lib/useKeyboardHeight';
 import { PAGE, ShowMore } from './ShowMore';
@@ -122,6 +123,8 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
   const [marking, setMarking] = useState(false);
   // The "Email people" sheet: tick people, write one email to all of them.
   const [emailing, setEmailing] = useState(false);
+  // Import from Excel / CSV: from the top (no target) or into one city / brand.
+  const [importing, setImporting] = useState<{ target: { kind: Kind; id: string; name: string } | null } | null>(null);
   // The group whose ⋮ menu is open.
   const [menuFor, setMenuFor] = useState<string | null>(null);
   // Adding a city or brand: null = not adding, text '' = typing.
@@ -176,13 +179,20 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
   );
 
   useEffect(() => {
+    // One reload after a burst of changes (an import adds hundreds at once).
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const soon = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void load(), 400);
+    };
     const channel = supabase
       .channel(`venues_${Math.random().toString(36).slice(2, 8)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'venues' }, () => void load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'venue_cities' }, () => void load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'venue_brands' }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'venues' }, soon)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'venue_cities' }, soon)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'venue_brands' }, soon)
       .subscribe();
     return () => {
+      if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
   }, [load]);
@@ -541,6 +551,16 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
                             }}
                           />
                         ) : null}
+                        {access.can('add', { target: g.id }) ? (
+                          <Menu.Item
+                            leadingIcon="tray-arrow-down"
+                            title="Import here"
+                            onPress={() => {
+                              setMenuFor(null);
+                              setImporting({ target: { kind, id: g.id, name: g.name } });
+                            }}
+                          />
+                        ) : null}
                         {canManage ? (
                           <Menu.Item
                             leadingIcon="trash-can-outline"
@@ -641,6 +661,16 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
         <Feather name="mail" size={15} color={T.ink} />
         <Text style={styles.emailPillText}>Email</Text>
       </Pressable>
+      {access.canAdd ? (
+        <Pressable
+          style={({ pressed }) => [styles.emailPill, styles.importPill, pressed && { opacity: 0.85 }]}
+          onPress={() => setImporting({ target: null })}
+          accessibilityRole="button"
+          accessibilityLabel="Import venues from an Excel or CSV file"
+        >
+          <Feather name="download" size={16} color={T.ink} />
+        </Pressable>
+      ) : null}
       </View>
 
       <ScrollView
@@ -823,6 +853,22 @@ export function VenuesScreen({ canManage, showBack }: VenuesScreenProps) {
         </SheetFrame>
       ) : null}
 
+      {importing ? (
+        <VenuesImportSheet
+          cities={cities}
+          brands={brands}
+          existing={venues}
+          target={importing.target}
+          canAdd={(row) => access.can('add', row)}
+          canAddLists={access.canList('add')}
+          onDismiss={() => setImporting(null)}
+          onDone={(m) => {
+            setSnack(m);
+            void load();
+          }}
+        />
+      ) : null}
+
       {emailing ? (
         <EmailPeopleSheet
           venues={filtered}
@@ -922,6 +968,7 @@ const styles = StyleSheet.create({
     ...screenChrome.card,
   },
   emailPillText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: T.ink },
+  importPill: { width: 46, paddingHorizontal: 0, justifyContent: 'center' },
   contactLine: { marginTop: 4 },
   phoneLine: { flexDirection: 'row', alignItems: 'center', paddingRight: 8 },
   phoneText: { flexShrink: 1, paddingRight: 6 },

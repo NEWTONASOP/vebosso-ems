@@ -170,6 +170,35 @@ export async function addVenue(input: VenueInput, adderId: string, isOwner: bool
   return { success: true, data: undefined };
 }
 
+/** Many venues at once (Excel import), 200 per request. One notification to the owner for the lot. */
+export async function addVenues(inputs: VenueInput[], adderId: string, isOwner: boolean): Promise<Result<number>> {
+  const CHUNK = 200;
+  let done = 0;
+  let failure = '';
+  for (let i = 0; i < inputs.length; i += CHUNK) {
+    const rows = inputs.slice(i, i + CHUNK).map((v) => ({ ...clean(v), added_by: adderId }));
+    const { error } = await supabase.from('venues').insert(rows);
+    if (error) {
+      failure = done ? `${done} added, then: ${parseSupabaseError(error)}` : parseSupabaseError(error);
+      break;
+    }
+    done += rows.length;
+  }
+
+  if (!isOwner && done) {
+    const { data: me } = await supabase.from('profiles').select('full_name').eq('id', adderId).single();
+    sendPushNotificationToRole(
+      'owner',
+      'New Venues 🏨',
+      `${me?.full_name ?? 'Someone'} onboarded ${done} ${done === 1 ? 'venue' : 'venues'} from a file`,
+      { type: 'venue_added' },
+      [adderId],
+    );
+  }
+
+  return failure ? { success: false, error: failure } : { success: true, data: done };
+}
+
 /** Anyone with Venues access (RLS, 043). */
 export async function updateVenue(id: string, input: VenueInput): Promise<Result> {
   const { error } = await supabase.from('venues').update(clean(input)).eq('id', id);

@@ -3,7 +3,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { BottomTabBarProps } from 'expo-router/tabs';
 import React, { useEffect } from 'react';
-import { Image, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { Text } from 'react-native-paper';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,21 @@ import { useTabBarStore } from '../store/tabBarStore';
 
 const SLIM_WIDTH    = 400;
 const DESKTOP_WIDTH = 1024;
+const CONTENT_MAX   = 1400;
+
+/**
+ * Desktop web: room on the left for the fixed sidebar, and the content at most
+ * 1400 wide, centred in what is left. Given to the tab screens (sceneStyle),
+ * not to the page itself: menus and popups place themselves by window
+ * position, so the page must start at the window's corner or they land off
+ * to the right.
+ */
+export function useDesktopSceneStyle(): ViewStyle | undefined {
+  const { width } = useWindowDimensions();
+  if (Platform.OS !== 'web' || width < DESKTOP_WIDTH) return undefined;
+  const side = Math.max(0, (width - SIDEBAR_WIDTH - CONTENT_MAX) / 2);
+  return { paddingLeft: SIDEBAR_WIDTH + side, paddingRight: side };
+}
 
 // Map route names to icons
 const ICON_MAP: Record<string, string> = {
@@ -67,36 +82,6 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
     isHiddenTab(currentOptions) ||
     currentRoute.name.includes('[') ||
     currentRoute.name.includes('/');
-
-  // On desktop web: inject a CSS rule into <head> that shifts the app root
-  // right by SIDEBAR_WIDTH so content is never hidden under the fixed sidebar.
-  // Must be placed before any early returns (React hooks rules).
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const styleId = 'vebosso-sidebar-offset';
-    if (isDesktop) {
-      if (!document.getElementById(styleId)) {
-        const el = document.createElement('style');
-        el.id = styleId;
-        el.textContent = `
-          @media (min-width: ${DESKTOP_WIDTH}px) {
-            body {
-              padding-left: ${SIDEBAR_WIDTH}px !important;
-            }
-            #root, [data-expo-root] {
-              max-width: 1400px;
-              margin: 0 auto;
-            }
-          }
-        `;
-        document.head.appendChild(el);
-      }
-
-    } else {
-      document.getElementById(styleId)?.remove();
-    }
-    return () => { document.getElementById(styleId)?.remove(); };
-  }, [isDesktop]);
 
   // Tell screens how much of the bottom the floating bar covers (none when
   // hidden or shown as the desktop sidebar); the mobile bar measures itself.
@@ -257,7 +242,8 @@ const sidebarStyles = StyleSheet.create({
         left: 0,
         bottom: 0,
         boxShadow: '2px 0 12px rgba(10,12,17,0.06)',
-        zIndex: 100,
+        // No zIndex: screens are padded clear of it, and popups (later in
+        // the page) must cover it.
       },
     }),
   },

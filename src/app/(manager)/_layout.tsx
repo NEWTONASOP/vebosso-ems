@@ -7,7 +7,7 @@ import { Tabs } from 'expo-router';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { AppTheme, RoleAccent, SIDEBAR_WIDTH } from '../../constants/theme';
 import { useWorkStore } from '../../store/workStore';
-import { CustomTabBar } from '../../components/CustomTabBar';
+import { CustomTabBar, useDesktopSceneStyle } from '../../components/CustomTabBar';
 import { useResponsive } from '../../lib/responsive';
 
 function TabBarBadge({ count }: { count: number }) {
@@ -45,6 +45,7 @@ export default function ManagerLayout() {
   const pendingLeavesCount = useWorkStore((s) => s.pendingLeavesCount);
   const pendingCount = pendingApprovalsCount + pendingLeavesCount;
   const { isDesktop } = useResponsive();
+  const desktopScene = useDesktopSceneStyle();
 
   return (
     <Tabs
@@ -53,6 +54,7 @@ export default function ManagerLayout() {
         headerShown: false,
         tabBarActiveTintColor: RoleAccent.manager.color,
         tabBarInactiveTintColor: AppTheme.mute,
+        sceneStyle: desktopScene,
       }}
     >
       <Tabs.Screen

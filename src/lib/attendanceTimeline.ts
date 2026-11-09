@@ -42,6 +42,15 @@ export interface DayTimeline {
   totalHours: number | null;
 }
 
+/**
+ * Has the person's day actually ended? A check-out that was sent back leaves the
+ * day "working" and keeps its old check-out time, so that time and the hours
+ * worked are not the end of the day and must not be shown as if they were.
+ */
+export function dayHasEnded(workLog: Pick<WorkLog, 'status'> | null | undefined): boolean {
+  return workLog?.status === 'pending_checkout' || workLog?.status === 'done';
+}
+
 function checkInAccent(workLog: WorkLog): { color: string; soft: string } {
   if (workLog.status === 'rejected') {
     return { color: AppTheme.amber, soft: AppTheme.amberSoft };
@@ -211,8 +220,7 @@ export function buildDayTimeline({
   }
 
   const checkOuts = logged('check_out');
-  // A check-out that was sent back leaves the day "working": it is not the end of the day.
-  const dayEnded = workLog.status === 'pending_checkout' || workLog.status === 'done';
+  const dayEnded = dayHasEnded(workLog);
 
   if (checkOuts.length === 0) {
     if (workLog.check_out_time) {

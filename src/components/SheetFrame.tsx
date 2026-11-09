@@ -6,8 +6,8 @@
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
-import { ReactNode, useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ReactNode, useLayoutEffect, useRef } from 'react';
+import { Keyboard, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Modal, Portal, Text } from 'react-native-paper';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { useSheetLift } from '../lib/useKeyboardHeight';
@@ -47,6 +47,18 @@ export function SheetFrame({
   const lifted = useSheetLift();
   const entrance = useSheetEntrance('sheet');
   const scrollRef = useRef<ScrollView>(null);
+  // A sheet closing while one of its boxes has the keyboard: Android hands the
+  // focus to the first box left on screen (e.g. the Venues search). Let go of
+  // it first — on Close, back, a tap outside, or the sheet closing itself.
+  const shown = visible && !inline;
+  useLayoutEffect(() => {
+    if (!shown) return;
+    return () => Keyboard.dismiss();
+  }, [shown]);
+  const dismiss = () => {
+    Keyboard.dismiss();
+    onDismiss();
+  };
   if (!visible) return null;
 
   if (inline) {
@@ -60,7 +72,7 @@ export function SheetFrame({
 
   return (
     <Portal>
-      <Modal visible onDismiss={onDismiss} contentContainerStyle={[styles.container, lifted, entrance]}>
+      <Modal visible onDismiss={dismiss} contentContainerStyle={[styles.container, lifted, entrance]}>
         <FieldChainScope>
         <View style={styles.inner}>
           <View style={styles.header}>
@@ -74,7 +86,7 @@ export function SheetFrame({
               {subtitle ? <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text> : null}
             </View>
             <Pressable
-              onPress={onDismiss}
+              onPress={dismiss}
               hitSlop={10}
               style={styles.close}
               accessibilityRole="button"

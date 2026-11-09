@@ -23,6 +23,7 @@ import {
   DAY_STATUS_LABEL,
   getDayStatus,
   getMonthRange,
+  dayHasEnded,
 } from '../../lib/attendanceTimeline';
 import { useWorkLogEvents } from '../../lib/workLogEvents';
 import {
@@ -210,8 +211,8 @@ export default function MemberHistoryScreen() {
               date={selectedDate}
               status={selectedStatus}
               checkInTime={selectedLog?.check_in_time}
-              checkOutTime={selectedLog?.check_out_time}
-              totalHours={selectedLog?.total_hours}
+              checkOutTime={dayHasEnded(selectedLog) ? selectedLog?.check_out_time : null}
+              totalHours={dayHasEnded(selectedLog) ? selectedLog?.total_hours : null}
               actions={[
                 ...(backfill
                   ? ([

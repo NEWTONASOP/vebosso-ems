@@ -5,13 +5,14 @@
 import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Platform } from 'react-native';
-import { CustomTabBar } from '../../components/CustomTabBar';
+import { CustomTabBar, useDesktopSceneStyle } from '../../components/CustomTabBar';
 import { PermissionGate } from '../../components/PermissionGate';
 import { AppTheme, RoleAccent, SIDEBAR_WIDTH } from '../../constants/theme';
 import { useResponsive } from '../../lib/responsive';
 
 export default function MemberLayout() {
   const { isDesktop } = useResponsive();
+  const desktopScene = useDesktopSceneStyle();
 
   return (
     <PermissionGate>
@@ -21,7 +22,7 @@ export default function MemberLayout() {
           headerShown: false,
           tabBarActiveTintColor: RoleAccent.member.color,
           tabBarInactiveTintColor: AppTheme.mute,
-          sceneStyle: { backgroundColor: AppTheme.bg },
+          sceneStyle: [{ backgroundColor: AppTheme.bg }, desktopScene],
         }}
       >
         <Tabs.Screen

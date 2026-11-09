@@ -16,6 +16,7 @@ import {
   DAY_STATUS_LABEL,
   DayStatus,
   getDayStatus,
+  dayHasEnded,
 } from '../lib/attendanceTimeline';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { LeaveRequest, Profile, WorkLogWithProfile } from '../types/database';
@@ -89,7 +90,7 @@ export function buildTeamDayRows({
       const leave = leaveByUser.get(member.id) ?? null;
       const status = getDayStatus({ workLog: log, leave });
       const checkInTime = log?.check_in_time ?? null;
-      const checkOutTime = log?.check_out_time ?? null;
+      const checkOutTime = dayHasEnded(log) ? log?.check_out_time ?? null : null;
 
       return {
         userId: member.id,
@@ -98,7 +99,7 @@ export function buildTeamDayRows({
         status,
         checkInTime,
         checkOutTime,
-        totalHours: log?.total_hours ?? null,
+        totalHours: dayHasEnded(log) ? log?.total_hours ?? null : null,
         spanLabel: buildSpanLabel({ day, status, checkInTime, checkOutTime, today }),
       };
     })

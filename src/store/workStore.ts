@@ -13,6 +13,7 @@ import { parseSupabaseError } from '../lib/errors';
 import { sendPushNotification, sendPushNotificationToRole } from '../lib/notifications';
 import { notifyReviewers } from '../lib/selfTasks';
 import { supabase } from '../lib/supabase';
+import { dayHasEnded } from '../lib/attendanceTimeline';
 import { formatWorkLogDateForMessage } from '../lib/workLogDates';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -1115,7 +1116,7 @@ export const useWorkStore = create<WorkState>((set, get) => ({
         liveStatus[m.id] = {
           status: onLeaveSet.has(m.id) ? 'on_leave' : (log?.status ?? 'offline'),
           checkInTime: log?.check_in_time ?? null,
-          checkOutTime: log?.check_out_time ?? null,
+          checkOutTime: dayHasEnded(log) ? log?.check_out_time ?? null : null,
           checkInPlan: log?.check_in_plan ?? null,
           dayReport: log?.day_report ?? null,
           pendingTaskCount: tasks?.pending ?? 0,

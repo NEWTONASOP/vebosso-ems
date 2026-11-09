@@ -5,19 +5,21 @@
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
-import { CustomTabBar } from '../../components/CustomTabBar';
+import { CustomTabBar, useDesktopSceneStyle } from '../../components/CustomTabBar';
 import { NavgrahLogo } from '../../components/NavgrahLogo';
 import { SIDEBAR_WIDTH } from '../../constants/theme';
 import { useResponsive } from '../../lib/responsive';
 
 export default function OwnerLayout() {
   const { isDesktop } = useResponsive();
+  const desktopScene = useDesktopSceneStyle();
 
   return (
     <Tabs
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
+        sceneStyle: desktopScene,
       }}
     >
       <Tabs.Screen
