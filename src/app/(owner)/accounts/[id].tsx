@@ -25,6 +25,7 @@ import { AccountExportSheet } from '../../../components/AccountExportSheet';
 import { AccountFormSheet } from '../../../components/AccountFormSheet';
 import { AccountImportSheet } from '../../../components/AccountImportSheet';
 import { AccountMoveSheet } from '../../../components/AccountMoveSheet';
+import { AccountCategoryFilter } from '../../../components/AccountCategoryFilter';
 import { AccountPeriodFilter } from '../../../components/AccountPeriodFilter';
 import { AccountTxnSheet } from '../../../components/AccountTxnSheet';
 import { AppTheme as T, appShadow, appSoftShadow, screenChrome } from '../../../constants/theme';
@@ -71,8 +72,11 @@ export default function AccountLedgerScreen() {
     if (routes.length > 1) navigation.goBack();
     else router.replace(base as any);
   };
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // "?category=Salary" when opened from that category on the Accounts list.
+  const { id, category: categoryParam } = useLocalSearchParams<{ id: string; category?: string }>();
   const [period, setPeriod] = useState<Period>(null);
+  /** Only entries of this category (076); null = all. */
+  const [category, setCategory] = useState<string | null>(categoryParam || null);
   const [account, setAccount] = useState<Account | null>(null);
   const [allAccounts, setAllAccounts] = useState<Account[]>([]);
   const [txns, setTxns] = useState<AccountTransaction[]>([]);
@@ -128,15 +132,24 @@ export default function AccountLedgerScreen() {
     setRefreshing(false);
   };
 
+  // The categories used in this account (and the chosen one, even if none are left).
+  const categories = useMemo(() => {
+    const set = new Set(txns.map((t) => t.category).filter((c): c is string => !!c));
+    if (category) set.add(category);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [txns, category]);
+  /** The entries on screen: all of them, or one category's. */
+  const shown = useMemo(() => (category ? txns.filter((t) => t.category === category) : txns), [txns, category]);
+
   const totals = useMemo(() => {
     let credit = 0;
     let debit = 0;
-    for (const t of txns) {
+    for (const t of shown) {
       if (t.kind === 'credit') credit += num(t.amount);
       else debit += num(t.amount);
     }
     return { credit, debit, balance: credit - debit };
-  }, [txns]);
+  }, [shown]);
 
   const toggle = (txnId: string) =>
     setSelected((prev) => {
@@ -153,7 +166,7 @@ export default function AccountLedgerScreen() {
     setSelecting(false);
     setSelected(new Set());
   };
-  const allSelected = txns.length > 0 && selected.size === txns.length;
+  const allSelected = shown.length > 0 && selected.size === shown.length;
   /** A tap: pick / unpick while selecting, otherwise open the entry. */
   const tapEntry = (t: AccountTransaction) => (selecting ? toggle(t.id) : setEditing(t));
   /** A long press starts picking, with this entry already ticked. */
@@ -162,7 +175,7 @@ export default function AccountLedgerScreen() {
   };
 
   const confirmMove = (target: Account) => {
-    const chosen = txns.filter((t) => selected.has(t.id));
+    const chosen = shown.filter((t) => selected.has(t.id));
     if (chosen.length === 0) return;
     Alert.alert(
       `Move ${chosen.length} entr${chosen.length === 1 ? 'y' : 'ies'}?`,
@@ -225,11 +238,19 @@ export default function AccountLedgerScreen() {
           </Text>
         </View>
       </View>
-      {period && allTimeBalance !== null ? (
+      {period && !category && allTimeBalance !== null ? (
         <Text style={styles.allTime}>All-time balance {rupees(allTimeBalance)}</Text>
       ) : null}
 
       <AccountPeriodFilter period={period} onChange={setPeriod} />
+      <AccountCategoryFilter
+        categories={categories}
+        value={category}
+        onChange={(c) => {
+          setCategory(c);
+          setSelected(new Set());
+        }}
+      />
 
       {wide ? (
         <View style={[styles.tr, styles.th]}>
@@ -243,7 +264,7 @@ export default function AccountLedgerScreen() {
   );
 
   const footer =
-    txns.length > 0 && wide ? (
+    shown.length > 0 && wide ? (
       <View style={styles.tfoot}>
         <View style={styles.tr}>
           <View style={styles.cDate} />
@@ -273,7 +294,7 @@ export default function AccountLedgerScreen() {
             <Text style={styles.subtitle} numberOfLines={1}>
               {viewOnly
                 ? `${viewOnlyOf}'s books · view only`
-                : account?.note || `${txns.length} entr${txns.length === 1 ? 'y' : 'ies'} · ${periodLabel(period)}`}
+                : account?.note || `${shown.length} entr${shown.length === 1 ? 'y' : 'ies'} · ${category ? `${category} · ` : ''}${periodLabel(period)}`}
             </Text>
           </View>
         </View>
@@ -312,7 +333,7 @@ export default function AccountLedgerScreen() {
           </Text>
           <Pressable
             style={styles.selBtn}
-            onPress={() => setSelected(allSelected ? new Set() : new Set(txns.map((t) => t.id)))}
+            onPress={() => setSelected(allSelected ? new Set() : new Set(shown.map((t) => t.id)))}
             accessibilityRole="button"
           >
             <Text style={styles.selBtnText}>{allSelected ? 'Clear' : 'Select all'}</Text>
@@ -336,7 +357,7 @@ export default function AccountLedgerScreen() {
         <ActivityIndicator color={T.charcoal} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
-          data={txns}
+          data={shown}
           extraData={selected}
           keyExtractor={(t) => t.id}
           ListHeaderComponent={header}
@@ -344,7 +365,9 @@ export default function AccountLedgerScreen() {
           ListEmptyComponent={
             <View style={[styles.empty, !wide && styles.emptyCard]}>
               <Text style={styles.emptyText}>
-                {period
+                {category
+                  ? `No ${category} entries${period ? ` in ${periodLabel(period)}` : ''}`
+                  : period
                   ? `No entries in ${periodLabel(period)}`
                   : viewOnly
                     ? 'No entries yet'
@@ -383,6 +406,7 @@ export default function AccountLedgerScreen() {
                     </Text>
                     <View style={styles.entryMetaRow}>
                       <Text style={styles.entryMeta}>{format(parseISO(item.txn_date), 'd MMM yyyy')}</Text>
+                      {item.category && !category ? <Text style={styles.entryTag}>{item.category}</Text> : null}
                       {photos ? (
                         <View style={styles.entryClip}>
                           <Feather name="paperclip" size={11} color={T.mute} />
@@ -411,6 +435,7 @@ export default function AccountLedgerScreen() {
                 </Text>
                 <Text style={[styles.tdText, styles.cPart, { color }]}>
                   {item.particular || '—'}
+                  {item.category && !category ? <Text style={styles.clip}>{`  · ${item.category}`}</Text> : null}
                   {photos ? <Text style={styles.clip}>{`  📎${photos}`}</Text> : null}
                 </Text>
                 <Text style={[styles.tdText, styles.cNum]}>{item.kind === 'credit' ? money(item.amount) : '0'}</Text>
@@ -466,7 +491,7 @@ export default function AccountLedgerScreen() {
         />
       ) : null}
       {account && sheet === 'export' ? (
-        <AccountExportSheet accounts={[account]} period={period} onDismiss={() => setSheet(null)} />
+        <AccountExportSheet accounts={[account]} period={period} category={category} onDismiss={() => setSheet(null)} />
       ) : null}
       {account && sheet === 'import' && !viewOnly ? (
         <AccountImportSheet
@@ -579,6 +604,7 @@ const styles = StyleSheet.create({
   entryMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 0 },
   entryMeta: { fontFamily: 'Inter_400Regular', fontSize: 11, color: T.mute },
   entryClip: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  entryTag: { fontFamily: 'Inter_600SemiBold', fontSize: 10.5, color: T.violet, backgroundColor: T.violetSoft, paddingHorizontal: 6, borderRadius: 6, overflow: 'hidden' },
   entryAmount: { fontFamily: 'Inter_700Bold', fontSize: 14, flexShrink: 0 },
   picked: { backgroundColor: T.blueSoft },
   selBar: {

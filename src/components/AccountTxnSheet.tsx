@@ -20,7 +20,9 @@ import { AppTheme as T } from '../constants/theme';
 import { Alert } from '../lib/alert';
 import {
   addTransaction,
+  cleanCategory,
   deleteTransaction,
+  fetchCategories,
   MAX_RECEIPTS,
   money,
   num,
@@ -63,6 +65,11 @@ export function AccountTxnSheet({
   const [kind, setKind] = useState<TxnKind>(txn?.kind ?? 'debit');
   const [amountText, setAmountText] = useState(txn ? String(num(txn.amount)) : '');
   const [particular, setParticular] = useState(txn?.particular ?? '');
+  // Category (076): one of those already used, or a new one typed in.
+  const [category, setCategory] = useState<string | null>(txn?.category ?? null);
+  const [known, setKnown] = useState<string[]>([]);
+  const [typingNew, setTypingNew] = useState(false);
+  const [newCategory, setNewCategory] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const chain = useFieldChain();
@@ -74,6 +81,14 @@ export function AccountTxnSheet({
   const [viewing, setViewing] = useState(!!txn);
   // Uploaded in this sheet but not saved yet — removed if the sheet closes.
   const fresh = useRef<string[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    fetchCategories().then((list) => active && setKnown(list.map((c) => c.category)));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -128,7 +143,18 @@ export function AccountTxnSheet({
   const save = async () => {
     const amount = Number(amountText.replace(/[,\s₹]/g, ''));
     if (!amountText.trim() || !Number.isFinite(amount) || amount <= 0) return setError('Enter the amount');
-    const input = { txn_date: date, kind, amount, particular: particular || null, receipts };
+    // A typed category that matches one in use (any case) takes its spelling.
+    const typed = (typingNew && cleanCategory(newCategory)) || category;
+    const chosen = typed ? known.find((k) => k.toLowerCase() === typed.toLowerCase()) ?? typed : null;
+    const input = {
+      txn_date: date,
+      kind,
+      amount,
+      particular: particular || null,
+      receipts,
+      // Sent only when changed, so entries save as before until 076 is applied.
+      ...(chosen !== (txn?.category ?? null) ? { category: chosen } : {}),
+    };
     setSaving(true);
     const res = txn ? await updateTransaction(txn.id, input) : await addTransaction(accountId, input);
     setSaving(false);
@@ -205,6 +231,13 @@ export function AccountTxnSheet({
 
           <Text style={styles.label}>Particular</Text>
           <Text style={styles.viewValue}>{txn.particular || '—'}</Text>
+
+          {txn.category ? (
+            <>
+              <Text style={styles.label}>Category</Text>
+              <Text style={styles.viewValue}>{txn.category}</Text>
+            </>
+          ) : null}
 
           <Text style={styles.label}>Date</Text>
           <Text style={styles.viewValue}>{format(parseISO(txn.txn_date), 'EEE, d MMM yyyy')}</Text>
@@ -295,6 +328,47 @@ export function AccountTxnSheet({
         ]}
       />
 
+      <Text style={styles.label}>Category <Text style={styles.optional}>(optional)</Text></Text>
+      <View style={styles.cats}>
+        {known.map((c) => {
+          const on = !typingNew && category === c;
+          return (
+            <Pressable
+              key={c}
+              onPress={() => {
+                setTypingNew(false);
+                setCategory(on ? null : c);
+              }}
+              style={[styles.cat, on && styles.catOn]}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: on }}
+            >
+              <Text style={[styles.catText, on && styles.catTextOn]}>{c}</Text>
+            </Pressable>
+          );
+        })}
+        <Pressable
+          onPress={() => setTypingNew((t) => !t)}
+          style={[styles.cat, styles.catNew, typingNew && styles.catOn]}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.catText, typingNew && styles.catTextOn]}>+ New category</Text>
+        </Pressable>
+      </View>
+      {typingNew ? (
+        <PaperOutlinedField
+          label="New category"
+          placeholder="e.g. Salary"
+          value={newCategory}
+          onChangeText={setNewCategory}
+          style={{ marginTop: 10 }}
+          maxLength={40}
+          autoFocus
+          returnKeyType="done"
+          submitBehavior="blurAndSubmit"
+        />
+      ) : null}
+
       <Text style={styles.label}>Receipt photos <Text style={styles.optional}>(optional)</Text></Text>
       <View style={styles.receipts}>
         {receipts.map((p) => (
@@ -383,6 +457,12 @@ const styles = StyleSheet.create({
   error: { fontFamily: 'Inter_500Medium', fontSize: 13, color: T.coral, marginBottom: 8 },
   optional: { fontFamily: 'Inter_400Regular', color: T.mute },
   receipts: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  cats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  cat: { height: 34, paddingHorizontal: 14, borderRadius: 999, backgroundColor: T.soft, justifyContent: 'center' },
+  catNew: { backgroundColor: T.card, borderWidth: 1, borderColor: T.soft2, borderStyle: 'dashed' },
+  catOn: { backgroundColor: T.charcoal, borderColor: T.charcoal },
+  catText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
+  catTextOn: { color: T.white },
   thumb: { width: 64, height: 64, borderRadius: 12, backgroundColor: T.soft2 },
   thumbActive: { borderWidth: 2, borderColor: T.charcoal },
   thumbX: {

@@ -24,6 +24,8 @@ import { Alert } from '../lib/alert';
 import {
   documentKind,
   fetchAllPendingDocuments,
+  fetchWorkLogFiles,
+  signDocumentUrls,
   fetchAllSalaryRequests,
   fetchMonthlySalary,
   markSalaryPaid,
@@ -49,7 +51,7 @@ import { supabase } from '../lib/supabase';
 import { formatWorkLogDateForMessage } from '../lib/workLogDates';
 import { useAuthStore } from '../store/authStore';
 import { useWorkStore } from '../store/workStore';
-import { LeaveRequestWithProfile, Task, WorkLogWithProfile } from '../types/database';
+import { EmployeeDocument, LeaveRequestWithProfile, Task, WorkLogWithProfile } from '../types/database';
 import { AnimatedPressable } from './AnimatedPressable';
 import { ImageViewerModal } from './ImageViewerModal';
 import { PaperOutlinedField } from './PaperOutlinedField';
@@ -445,6 +447,7 @@ export function OwnerInboxSheet({
                 : [{ label: 'Check-in', paths: w.check_in_photos ?? [] }]
             }
           />
+          <WorkLogFiles workLogId={w.id} withCheckout={isCheckout} onMessage={onMessage} />
         </>
       }
       busy={busy === w.id}
@@ -1066,6 +1069,76 @@ function WorkLogPhotos({
   );
 }
 
+/**
+ * PDF / Word files attached at check-in (and at checkout, on a checkout card),
+ * one row each — tap to open in the phone's app (a new tab on the web).
+ */
+function WorkLogFiles({
+  workLogId,
+  withCheckout,
+  onMessage,
+}: {
+  workLogId: string;
+  withCheckout: boolean;
+  onMessage: (message: string) => void;
+}) {
+  const [files, setFiles] = useState<EmployeeDocument[]>([]);
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  const [opening, setOpening] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const docs = (await fetchWorkLogFiles(workLogId)).filter((d) => withCheckout || d.work_phase !== 'check_out');
+      if (!active || docs.length === 0) return;
+      const signed = await signDocumentUrls(docs.map((d) => d.file_path));
+      if (!active) return;
+      setFiles(docs);
+      setUrls(signed);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [workLogId, withCheckout]);
+
+  if (files.length === 0) return null;
+
+  const open = async (d: EmployeeDocument) => {
+    const url = urls[d.file_path];
+    if (!url) return onMessage('Could not load this file');
+    setOpening(d.id);
+    const res = await openDocumentFile(d, url);
+    setOpening(null);
+    if (!res.success) onMessage(res.error);
+  };
+
+  return (
+    <View style={{ marginTop: 4 }}>
+      {files.map((d) => (
+        <Pressable
+          key={d.id}
+          style={({ pressed }) => [styles.workFile, pressed && { opacity: 0.85 }]}
+          onPress={() => void open(d)}
+          disabled={opening === d.id}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${d.name}`}
+        >
+          <Feather name="file-text" size={16} color={T.inkSoft} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.workFileName} numberOfLines={1}>
+              {d.name}
+            </Text>
+            <Text style={styles.workFileMeta}>
+              {withCheckout ? (d.work_phase === 'check_out' ? 'Checkout · ' : 'Check-in · ') : ''}tap to open
+            </Text>
+          </View>
+          {opening === d.id ? <ActivityIndicator size="small" color={T.charcoal} /> : null}
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 type Tone = 'approve' | 'reject' | 'plain';
 
 function InboxItem({
@@ -1147,6 +1220,18 @@ function InboxItem({
 }
 
 const styles = StyleSheet.create({
+  workFile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 14,
+    backgroundColor: T.soft,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 6,
+  },
+  workFileName: { fontFamily: 'Inter_600SemiBold', fontSize: 13.5, color: T.ink },
+  workFileMeta: { fontFamily: 'Inter_400Regular', fontSize: 12, color: T.mute, marginTop: 1 },
   docFile: {
     flexDirection: 'row',
     alignItems: 'center',

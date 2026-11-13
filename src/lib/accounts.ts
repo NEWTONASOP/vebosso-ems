@@ -191,7 +191,12 @@ export interface TxnInput {
   particular: string | null;
   /** Receipt photo paths; left out (e.g. imports) keeps what is there. */
   receipts?: string[];
+  /** Left out keeps what is there; null clears it (076). */
+  category?: string | null;
 }
+
+/** "  salary  " → "salary"; spaces collapsed, at most 40 characters. */
+export const cleanCategory = (c: string | null | undefined) => (c ?? '').trim().replace(/\s+/g, ' ').slice(0, 40) || null;
 
 const cleanTxn = (t: TxnInput) => ({
   txn_date: t.txn_date,
@@ -199,6 +204,7 @@ const cleanTxn = (t: TxnInput) => ({
   amount: Math.round(t.amount * 100) / 100,
   particular: t.particular?.trim().slice(0, 500) || null,
   ...(t.receipts ? { receipts: t.receipts } : {}),
+  ...(t.category !== undefined ? { category: cleanCategory(t.category) } : {}),
 });
 
 export async function addTransaction(accountId: string, t: TxnInput): Promise<Result> {
@@ -222,6 +228,52 @@ export async function deleteTransaction(id: string, unsaved: string[] = []): Pro
   if (error) return fail(error);
   await removeReceipts(unsaved);
   return { success: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------
+// Categories (076)
+
+export interface CategoryUse {
+  category: string;
+  entry_count: number;
+}
+
+/**
+ * The categories in use, by name, with how many entries each has. In the given
+ * accounts, or every visible one. Empty when migration 076 isn't applied yet.
+ */
+export async function fetchCategories(accountIds?: string[]): Promise<CategoryUse[]> {
+  const { data, error } = await supabase.rpc('account_categories', { p_account_ids: accountIds ?? null });
+  if (error) return [];
+  return ((data || []) as CategoryUse[]).map((c) => ({ category: c.category, entry_count: Number(c.entry_count) }));
+}
+
+/** Every entry with this category in these accounts, in the period, newest first. */
+export async function fetchCategoryEntries(
+  accountIds: string[],
+  category: string,
+  period: Period,
+): Promise<Result<AccountTransaction[]>> {
+  if (accountIds.length === 0) return { success: true, data: [] };
+  const { from, to } = periodRange(period);
+  const all: AccountTransaction[] = [];
+  for (let page = 0; ; page++) {
+    let q = supabase
+      .from('account_transactions')
+      .select('*')
+      .in('account_id', accountIds)
+      .eq('category', category)
+      .order('txn_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .range(page * PAGE, page * PAGE + PAGE - 1);
+    if (from) q = q.gte('txn_date', from);
+    if (to) q = q.lte('txn_date', to);
+    const { data, error } = await q;
+    if (error) return fail(error);
+    all.push(...((data || []) as AccountTransaction[]));
+    if (!data || data.length < PAGE) break;
+  }
+  return { success: true, data: all };
 }
 
 // ---------------------------------------------------------------------------

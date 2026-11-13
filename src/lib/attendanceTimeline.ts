@@ -29,6 +29,8 @@ export interface TimelineEvent {
   date?: string;
   /** Check-in / check-out: photos taken then (seen in the day's full log). */
   photoCount?: number;
+  /** The photos themselves (storage paths in the "checkouts" bucket). */
+  photoPaths?: string[];
 }
 
 /** Why a day has no timeline, so the UI can explain rather than show nothing. */
@@ -141,6 +143,7 @@ export function buildDayTimeline({
         at: workLog.check_in_time,
         title: checkInLabel(workLog),
         photoCount: workLog.check_in_photos?.length ?? 0,
+        photoPaths: workLog.check_in_photos ?? [],
         // The reason is its own card once the log has recorded the send-back.
         subtitle: workLog.status === 'rejected' && !hasCheckInSentBack
           ? workLog.rejection_reason || workLog.check_in_plan
@@ -160,6 +163,7 @@ export function buildDayTimeline({
           at: e.occurred_at,
           title: checkInLabel(workLog),
           photoCount: workLog.check_in_photos?.length ?? 0,
+          photoPaths: workLog.check_in_photos ?? [],
           subtitle: e.body,
           ...checkInAccent(workLog),
         });
@@ -232,6 +236,7 @@ export function buildDayTimeline({
         at: workLog.check_out_time,
         title: 'Checked out',
         photoCount: workLog.check_out_photos?.length ?? 0,
+        photoPaths: workLog.check_out_photos ?? [],
         subtitle: workLog.day_report,
         color: AppTheme.inkSoft,
         soft: AppTheme.soft,
@@ -249,6 +254,7 @@ export function buildDayTimeline({
           at: e.occurred_at,
           title: 'Checked out',
           photoCount: workLog.check_out_photos?.length ?? 0,
+          photoPaths: workLog.check_out_photos ?? [],
           subtitle: e.body,
           color: AppTheme.inkSoft,
           soft: AppTheme.soft,

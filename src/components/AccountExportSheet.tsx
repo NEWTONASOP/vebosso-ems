@@ -1,6 +1,7 @@
 // ============================================================================
 // VEBOSSO EMS — Export / share accounts
-// One account or all of them, for the selected period, as PDF / Excel / CSV,
+// One account or all of them, for the selected period (and category, if one
+// is picked), as PDF / Excel / CSV,
 // handed to the share sheet (WhatsApp, email, Drive, Save to files…).
 // ============================================================================
 
@@ -25,11 +26,14 @@ const OPTIONS: { fmt: ExportFormat; label: string; hint: string; icon: keyof typ
 export function AccountExportSheet({
   accounts,
   period,
+  category = null,
   onDismiss,
 }: {
   /** One account, or all of them. */
   accounts: Account[];
   period: Period;
+  /** Only this category's entries (076); accounts with none are left out. */
+  category?: string | null;
   onDismiss: () => void;
 }) {
   const [busy, setBusy] = useState<ExportFormat | null>(null);
@@ -43,9 +47,12 @@ export function AccountExportSheet({
       for (const account of accounts) {
         const res = await fetchTransactions(account.id, period);
         if (!res.success) throw new Error(res.error);
-        ledgers.push({ account, txns: res.data });
+        const txns = category ? res.data.filter((t) => t.category === category) : res.data;
+        if (category && txns.length === 0 && accounts.length > 1) continue;
+        ledgers.push({ account, txns });
       }
-      await (await accountsFile()).exportLedgers(ledgers, period, fmt);
+      if (ledgers.length === 0) throw new Error(`No ${category} entries to export`);
+      await (await accountsFile()).exportLedgers(ledgers, period, fmt, category);
     } catch (e: any) {
       setError(e?.message || 'Could not export');
     } finally {
@@ -54,13 +61,14 @@ export function AccountExportSheet({
   };
 
   const title = accounts.length === 1 ? accounts[0].name : `All accounts (${accounts.length})`;
+  const filterLabel = `${category ? `${category} · ` : ''}${periodLabel(period)}`;
 
   return (
     <SheetFrame
       visible
       onDismiss={onDismiss}
       title="Export & share"
-      subtitle={`${title} · ${periodLabel(period)}`}
+      subtitle={`${title} · ${filterLabel}`}
       icon="share"
       iconColor={T.charcoal}
       iconBg={T.soft}
@@ -86,7 +94,7 @@ export function AccountExportSheet({
         </Pressable>
       ))}
       <Text style={styles.note}>
-        Uses the filter you have on ({periodLabel(period)}). Switch to “All time” to export everything.
+        Uses the filter you have on ({filterLabel}). Switch to “All” and “All time” to export everything.
       </Text>
     </SheetFrame>
   );

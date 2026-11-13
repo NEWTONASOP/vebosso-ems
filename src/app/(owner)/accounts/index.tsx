@@ -8,19 +8,23 @@
 import { Feather } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SmoothTextInput as TextInput } from '../../../components/SmoothTextInput';
 import { Menu, Snackbar, Text } from 'react-native-paper';
 import { AccountExportSheet } from '../../../components/AccountExportSheet';
 import { AccountFormSheet } from '../../../components/AccountFormSheet';
 import { AccountImportSheet } from '../../../components/AccountImportSheet';
+import { AccountCategoryFilter } from '../../../components/AccountCategoryFilter';
 import { AccountPeriodFilter } from '../../../components/AccountPeriodFilter';
 import { AppTheme as T, appShadow, appSoftShadow, screenChrome } from '../../../constants/theme';
 import {
   AccountBook,
   fetchAccounts,
+  fetchCategories,
+  fetchCategoryEntries,
   fetchSummaries,
+  money,
   num,
   Period,
   periodLabel,
@@ -29,7 +33,7 @@ import {
 } from '../../../lib/accounts';
 import { useFeatureBase } from '../../../lib/featureAccess';
 import { useAuthStore } from '../../../store/authStore';
-import { Account, AccountSummary } from '../../../types/database';
+import { Account, AccountSummary, AccountTransaction } from '../../../types/database';
 
 const loadAll = async (period: Period, isOwner: boolean) => {
   const [accounts, summaries] = await Promise.all([fetchAccounts(), fetchSummaries(period)]);
@@ -56,6 +60,12 @@ export default function AccountsScreen() {
   const [query, setQuery] = useState('');
   const [sheet, setSheet] = useState<'new' | 'export' | 'import' | null>(null);
   const [snack, setSnack] = useState('');
+  // Category view (076): one category's entries from every account in these books.
+  const [category, setCategory] = useState<string | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [catEntries, setCatEntries] = useState<AccountTransaction[]>([]);
+  const [catLoading, setCatLoading] = useState(false);
+  const [catTick, setCatTick] = useState(0);
 
   const apply = useCallback((res: Awaited<ReturnType<typeof loadAll>>) => {
     if (res.accounts.success) setAllAccounts(res.accounts.data);
@@ -78,11 +88,6 @@ export default function AccountsScreen() {
     }, [apply, period, isOwner])
   );
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  };
 
   const person = bookOf ? books?.people.find((p) => p.userId === bookOf) ?? null : null;
   // Someone else's books: look, export, nothing else.
@@ -91,6 +96,66 @@ export default function AccountsScreen() {
     () => (books ? (person ? person.accounts : books.mine) : allAccounts),
     [books, person, allAccounts]
   );
+
+  const accountIds = useMemo(() => accounts.map((a) => a.id).join(','), [accounts]);
+  const accountName = useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts]);
+
+  // The categories used in these books; a category that is no longer used is let go.
+  useEffect(() => {
+    let active = true;
+    fetchCategories(accountIds ? accountIds.split(',') : []).then((list) => {
+      if (!active) return;
+      const names = list.map((c) => c.category);
+      setCategories(names);
+      setCategory((c) => (c && names.includes(c) ? c : null));
+    });
+    return () => {
+      active = false;
+    };
+  }, [accountIds, catTick]);
+
+  useEffect(() => {
+    if (!category) {
+      setCatEntries([]);
+      return;
+    }
+    let active = true;
+    setCatLoading(true);
+    fetchCategoryEntries(accountIds ? accountIds.split(',') : [], category, period).then((res) => {
+      if (!active) return;
+      setCatLoading(false);
+      if (res.success) setCatEntries(res.data);
+      else setError(res.error);
+    });
+    return () => {
+      active = false;
+    };
+  }, [accountIds, category, period, catTick]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setCatTick((t) => t + 1);
+    setRefreshing(false);
+  };
+
+  const catTotals = useMemo(() => {
+    let credit = 0;
+    let debit = 0;
+    for (const t of catEntries) {
+      if (t.kind === 'credit') credit += num(t.amount);
+      else debit += num(t.amount);
+    }
+    return { credit, debit, balance: credit - debit };
+  }, [catEntries]);
+
+  const catList = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return catEntries;
+    return catEntries.filter((t) =>
+      [accountName.get(t.account_id), t.particular].some((f) => f?.toLowerCase().includes(q)),
+    );
+  }, [catEntries, query, accountName]);
 
   const master = useMemo(() => {
     let credit = 0;
@@ -107,6 +172,9 @@ export default function AccountsScreen() {
     }
     return { credit, debit, balance: credit - debit, allBalance: allCredit - allDebit };
   }, [accounts, summaries]);
+
+  /** The big card: one category's totals, or every account's. */
+  const shownTotals = category ? catTotals : master;
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -199,40 +267,42 @@ export default function AccountsScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <AccountPeriodFilter period={period} onChange={setPeriod} />
+        <AccountCategoryFilter categories={categories} value={category} onChange={setCategory} />
 
         {/* Master balance */}
         <View style={styles.master}>
           <View style={styles.masterGlow} />
           <Text style={styles.masterEyebrow}>
+            {category ? `${category} · ` : ''}
             {periodLabel(period)} · {person ? `all of ${person.name}'s accounts` : 'all accounts'}
           </Text>
-          <Text style={[styles.masterBalance, master.balance < 0 && { color: T.onDarkAccent }]}>
-            {rupees(master.balance)}
+          <Text style={[styles.masterBalance, shownTotals.balance < 0 && { color: T.onDarkAccent }]}>
+            {rupees(shownTotals.balance)}
           </Text>
           <Text style={styles.masterBalanceLabel}>Balance (credit − debit)</Text>
           <View style={styles.masterRow}>
             <View style={styles.masterCell}>
               <Text style={styles.masterCellLabel}>Credit</Text>
-              <Text style={[styles.masterCellValue, { color: '#7BE0B5' }]}>{rupees(master.credit)}</Text>
+              <Text style={[styles.masterCellValue, { color: '#7BE0B5' }]}>{rupees(shownTotals.credit)}</Text>
             </View>
             <View style={styles.masterDivider} />
             <View style={styles.masterCell}>
               <Text style={styles.masterCellLabel}>Debit</Text>
-              <Text style={[styles.masterCellValue, { color: '#FF9FAE' }]}>{rupees(master.debit)}</Text>
+              <Text style={[styles.masterCellValue, { color: '#FF9FAE' }]}>{rupees(shownTotals.debit)}</Text>
             </View>
           </View>
-          {period ? (
+          {period && !category ? (
             <Text style={styles.masterAllTime}>All-time balance {rupees(master.allBalance)}</Text>
           ) : null}
         </View>
 
-        {accounts.length > 6 ? (
+        {accounts.length > 6 || (category && catEntries.length > 6) ? (
           <View style={styles.search}>
             <Feather name="search" size={16} color={T.mute} />
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Search accounts"
+              placeholder={category ? 'Search account or particular' : 'Search accounts'}
               placeholderTextColor={T.mute}
               style={styles.searchInput}
             />
@@ -241,7 +311,46 @@ export default function AccountsScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        {isLoading ? (
+        {category ? (
+          catLoading && catEntries.length === 0 ? (
+            <ActivityIndicator color={T.charcoal} style={{ marginTop: 32 }} />
+          ) : catList.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptySub}>
+                No {category} entries{period ? ` in ${periodLabel(period)}` : ''}.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.list}>
+              {catList.map((t, i) => {
+                const credit = t.kind === 'credit';
+                return (
+                  <Pressable
+                    key={t.id}
+                    onPress={() =>
+                      router.push(`${base}/${t.account_id}?category=${encodeURIComponent(category)}` as any)
+                    }
+                    style={({ pressed }) => [styles.row, i > 0 && styles.rowDivider, pressed && styles.rowPressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${t.kind} ${money(t.amount)}, ${accountName.get(t.account_id) ?? ''}`}
+                  >
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.name} numberOfLines={1}>
+                        {t.particular || (credit ? 'Credit' : 'Debit')}
+                      </Text>
+                      <Text style={styles.meta} numberOfLines={1}>
+                        {accountName.get(t.account_id) ?? 'Account'} · {format(parseISO(t.txn_date), 'd MMM yyyy')}
+                      </Text>
+                    </View>
+                    <Text style={[styles.balance, { color: credit ? T.green : T.coral }]}>
+                      {credit ? '+' : '−'} ₹{money(t.amount)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )
+        ) : isLoading ? (
           <ActivityIndicator color={T.charcoal} style={{ marginTop: 32 }} />
         ) : accounts.length === 0 ? (
           <View style={styles.empty}>
@@ -320,7 +429,12 @@ export default function AccountsScreen() {
         />
       ) : null}
       {sheet === 'export' ? (
-        <AccountExportSheet accounts={list.length ? list : accounts} period={period} onDismiss={() => setSheet(null)} />
+        <AccountExportSheet
+          accounts={category ? accounts : list.length ? list : accounts}
+          period={period}
+          category={category}
+          onDismiss={() => setSheet(null)}
+        />
       ) : null}
       {sheet === 'import' && !viewOnly ? (
         <AccountImportSheet

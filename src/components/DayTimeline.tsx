@@ -20,6 +20,7 @@ import {
 } from '../lib/attendanceTimeline';
 import { AppTheme, appSoftShadow } from '../constants/theme';
 import { supabase } from '../lib/supabase';
+import { WorkLogAttachmentsSheet } from './WorkLogAttachmentsSheet';
 import { RemarksMode, WorkLogRemarks } from './WorkLogRemarks';
 
 /** Only the first few cards animate in — a long list would otherwise crawl. */
@@ -171,13 +172,15 @@ function TimelineRow({
   // Full (unclamped) line counts, reported by the hidden measuring copies.
   const [titleLines, setTitleLines] = useState<number | null>(null);
   const [subtitleLines, setSubtitleLines] = useState<number | null>(null);
+  // The chip opens just this card's photos and files, not the whole day.
+  const [showAttachments, setShowAttachments] = useState(false);
 
   const time = event.at ? format(parseISO(event.at), 'h:mm a') : 'All day';
   const kindLabel = KIND_LABEL[event.kind];
   const fullTitleLines = titleLines ?? estimateLines(event.title);
   const fullSubtitleLines = subtitleLines ?? estimateLines(event.subtitle);
   const canExpand = fullTitleLines > TITLE_LINES || fullSubtitleLines > CLAMPED_LINES;
-  // Photos and attached files live in the day's full log: say so on the card.
+  // Photos and files attached to this check-in / check-out: a chip that opens them.
   const photos = event.photoCount ?? 0;
   const mediaLabel =
     onPress && (photos > 0 || fileCount > 0)
@@ -278,7 +281,7 @@ function TimelineRow({
             <AnimatedPressable
               scaleTo={0.97}
               style={styles.mediaLink}
-              onPress={() => onPress(event)}
+              onPress={() => setShowAttachments(true)}
               accessibilityRole="button"
               accessibilityLabel={`Open ${mediaLabel}`}
             >
@@ -302,6 +305,15 @@ function TimelineRow({
           ) : null}
         </View>
       </CardShell>
+      {showAttachments && event.workLogId ? (
+        <WorkLogAttachmentsSheet
+          workLogId={event.workLogId}
+          phase={event.kind === 'check-out' ? 'check_out' : 'check_in'}
+          photoPaths={event.photoPaths ?? []}
+          subtitle={event.date ? format(parseISO(event.date), 'EEE, d MMM yyyy') : undefined}
+          onDismiss={() => setShowAttachments(false)}
+        />
+      ) : null}
     </Animated.View>
   );
 }

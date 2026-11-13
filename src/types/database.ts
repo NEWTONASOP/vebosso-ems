@@ -488,6 +488,8 @@ export interface AccountTransaction {
   /** Postgres NUMERIC — may arrive as a string. */
   amount: number | string;
   particular: string | null;
+  /** "Salary", "Rent"… for filtering (076). Null when not set. */
+  category?: string | null;
   /** Optional receipt photos — paths in the private `account-receipts` bucket. */
   receipts: string[];
   created_at: string;
