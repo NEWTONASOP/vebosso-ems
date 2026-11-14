@@ -11,7 +11,7 @@ import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-n
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
 import { Alert } from '../lib/alert';
-import { addLead, contactName, deleteLead, joinPhones, leadDate, leadPhones, markLeadsTouched, setLeadVoice, updateLead } from '../lib/leads';
+import { addLead, contactName, deleteLabel, deleteLead, joinPhones, leadDate, leadPhones, markLeadsTouched, setLeadLabel, setLeadVoice, updateLead } from '../lib/leads';
 import { clipTime, removeVoiceNote, uploadVoiceNote, VoiceClip } from '../lib/voice';
 import { useAuthStore } from '../store/authStore';
 import { RecordingBar, useVoiceRecorder, VoiceNote } from './VoiceNote';
@@ -19,7 +19,8 @@ import { RecordingBar, useVoiceRecorder, VoiceNote } from './VoiceNote';
 const leadsFile = () => import('../lib/leadsFile');
 import { telUrl, whatsappUrl } from '../lib/venues';
 import { useMyAccess } from '../lib/accessRules';
-import { Lead, LeadBanquet, LeadInput } from '../types/database';
+import { Lead, LeadBanquet, LeadInput, LeadLabel } from '../types/database';
+import { LeadLabelPicker } from './LeadLabelPicker';
 import { DateField } from './DateTimeFields';
 import { PaperOutlinedField } from './PaperOutlinedField';
 import { SheetFrame } from './SheetFrame';
@@ -32,6 +33,10 @@ export function LeadSheet({
   lead,
   banquets,
   defaultBanquetId = null,
+  labels = [],
+  defaultLabelId = null,
+  onLabelCreated,
+  onLabelsChanged,
   onDismiss,
   onSaved,
 }: {
@@ -40,6 +45,14 @@ export function LeadSheet({
   banquets: LeadBanquet[];
   /** Preselected banquet for a new lead. */
   defaultBanquetId?: string | null;
+  /** The shared labels (078). */
+  labels?: LeadLabel[];
+  /** Preselected label for a new lead. */
+  defaultLabelId?: string | null;
+  /** A new label was made here. */
+  onLabelCreated?: (label: LeadLabel) => void;
+  /** A remark was removed here: the list reloads. */
+  onLabelsChanged?: () => void;
   onDismiss: () => void;
   onSaved: (message: string) => void;
 }) {
@@ -59,6 +72,9 @@ export function LeadSheet({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // The lead's label (078). On an open lead a tap saves it at once.
+  const [labelId, setLabelId] = useState<string | null>(lead ? lead.label_id ?? null : defaultLabelId);
+  const [labelBusy, setLabelBusy] = useState(false);
   const me = useAuthStore((s) => s.profile);
   // What this person's access rules allow for this lead (062).
   const access = useMyAccess('leads');
@@ -95,8 +111,16 @@ export function LeadSheet({
       setSaving(false);
       return setError(res.error);
     }
-    // The voice note goes on after the lead itself is saved.
+    // The label and the voice note go on after the lead itself is saved.
     const id = res.data.id;
+    if (labelId !== (lead?.label_id ?? null)) {
+      const set = await setLeadLabel(id, labelId);
+      if (!set.success) {
+        setSaving(false);
+        onSaved(lead ? 'Lead updated' : 'Lead added');
+        return setError(`Saved, but the remark didn’t: ${set.error}`);
+      }
+    }
     const oldPath = lead?.remarks_voice_path ?? null;
     if (newClip && me?.id) {
       const up = await uploadVoiceNote('lead', me.id, newClip);
@@ -137,6 +161,40 @@ export function LeadSheet({
   /** Called, WhatsApped or saved: no longer new (050). */
   const touch = () => {
     if (lead && !lead.touched_at) void markLeadsTouched([lead.id]);
+  };
+
+  /** Long press on a remark: remove it from every lead (they keep everything else). */
+  const removeLabel = (l: LeadLabel) => {
+    Alert.alert(`Remove the remark "${l.name}"?`, 'It comes off every lead that has it. No lead is deleted.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove remark',
+        style: 'destructive',
+        onPress: async () => {
+          const res = await deleteLabel(l.id);
+          if (!res.success) return setError(res.error);
+          if (labelId === l.id) setLabelId(null);
+          onLabelsChanged?.();
+        },
+      },
+    ]);
+  };
+  const canRemoveLabels = access.canList('delete');
+
+  /** An open lead: the label is saved as soon as it is tapped. */
+  const pickLabel = async (id: string | null) => {
+    if (!lead) return;
+    const before = labelId;
+    setLabelId(id);
+    setLabelBusy(true);
+    const res = await setLeadLabel(lead.id, id);
+    setLabelBusy(false);
+    if (!res.success) {
+      setLabelId(before);
+      return setError(res.error);
+    }
+    touch();
+    onSaved(id ? `Marked ${labels.find((l) => l.id === id)?.name ?? ''}`.trim() : 'Remark removed');
   };
 
   const openWhatsApp = async (phone: string) => {
@@ -190,6 +248,25 @@ export function LeadSheet({
           </View>
         }
       >
+        {labels.length || access.canList('add') ? (
+          <>
+            <Text style={[styles.label, { marginTop: 0 }]}>Remark</Text>
+            {canEdit ? (
+              <LeadLabelPicker
+                labels={labels}
+                value={labelId}
+                onChange={(id) => void pickLabel(id)}
+                canCreate={access.canList('add')}
+                onCreated={(l) => onLabelCreated?.(l)}
+                onRemove={canRemoveLabels ? removeLabel : undefined}
+                disabled={labelBusy}
+              />
+            ) : (
+              <Text style={styles.viewValue}>{labels.find((l) => l.id === labelId)?.name ?? '—'}</Text>
+            )}
+          </>
+        ) : null}
+
         <Text style={styles.label}>Date of function</Text>
         <Text style={styles.viewValue}>{leadDate(lead.dof) || '—'}</Text>
 
@@ -224,7 +301,7 @@ export function LeadSheet({
           <Text style={styles.viewValue}>—</Text>
         )}
 
-        <Text style={styles.label}>Remarks</Text>
+        <Text style={styles.label}>Notes</Text>
         {lead.remarks || !lead.remarks_voice_path ? <Text style={styles.viewValue}>{lead.remarks || '—'}</Text> : null}
         {lead.remarks_voice_path ? (
           <View style={{ marginTop: lead.remarks ? 8 : 0 }}>
@@ -287,6 +364,20 @@ export function LeadSheet({
       </View>
       {banquets.length === 0 ? <Text style={styles.hint}>No banquets yet — add one with “Add banquet” on the list.</Text> : null}
 
+      {labels.length || access.canList('add') ? (
+        <>
+          <Text style={styles.label}>Remark</Text>
+          <LeadLabelPicker
+            labels={labels}
+            value={labelId}
+            onChange={setLabelId}
+            canCreate={access.canList('add')}
+            onCreated={(l) => onLabelCreated?.(l)}
+            onRemove={canRemoveLabels ? removeLabel : undefined}
+          />
+        </>
+      ) : null}
+
       <DateField style={{ marginTop: 14 }} label="Date of function" value={form.dof} onChange={set('dof')} />
 
       <PaperOutlinedField label="Name" value={form.name ?? ''} onChangeText={set('name')} maxLength={200} style={{ marginTop: 12 }} />
@@ -331,7 +422,7 @@ export function LeadSheet({
           <Text style={styles.addPhoneText}>Add another number</Text>
         </Pressable>
       </View>
-      <PaperOutlinedField label="Remarks" value={form.remarks ?? ''} onChangeText={set('remarks')} multiline maxLength={2000} style={{ marginTop: 10 }} />
+      <PaperOutlinedField label="Notes" value={form.remarks ?? ''} onChangeText={set('remarks')} multiline maxLength={2000} style={{ marginTop: 10 }} />
       <View style={{ marginTop: 8 }}>
         {recorder.recording ? (
           <RecordingBar

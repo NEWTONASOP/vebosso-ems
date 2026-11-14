@@ -23,7 +23,12 @@ const fail = (error: unknown): { success: false; error: string } => ({
 
 export const BUCKET = 'bills';
 
-export const KIND_LABEL: Record<BillKind, string> = { estimate: 'Estimate', client: 'Client bill' };
+export const KIND_LABEL: Record<BillKind, string> = { estimate: 'Estimate', client: 'Client bill', package: 'Package' };
+/** The list's tabs. */
+export const KIND_TAB: Record<BillKind, string> = { estimate: 'Estimates', client: 'Client bills', package: 'Packages' };
+
+/** "?kind=" from a link → a kind; anything else is an estimate. */
+export const kindParam = (k: string | undefined): BillKind => (k === 'client' || k === 'package' ? k : 'estimate');
 
 export const STATUS_LABEL: Record<BillStatus, string> = {
   draft: 'Draft',

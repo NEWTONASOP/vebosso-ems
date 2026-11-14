@@ -43,6 +43,7 @@ import {
   fetchBill,
   fetchBillSettings,
   KIND_LABEL,
+  kindParam,
   removeBillImage,
   restoreBill,
   saveBill,
@@ -166,7 +167,7 @@ export default function BillEditorScreen() {
   const [bill, setBill] = useState<Bill | null>(null);
   const [settings, setSettings] = useState<BillSettings | null>(null);
   const [form, setForm] = useState<BillFields>(() =>
-    emptyForm(params.kind === 'client' ? 'client' : 'estimate', newBrand)
+    emptyForm(kindParam(params.kind), newBrand)
   );
   const [defaults, setDefaults] = useState<BillFields | null>(null);
   const [loading, setLoading] = useState(true);
@@ -224,7 +225,7 @@ export default function BillEditorScreen() {
         const s = await fetchBillSettings(newBrand);
         const settingsData = s.success ? s.data : null;
         const f = {
-          ...emptyForm(params.kind === 'client' ? 'client' : 'estimate', newBrand),
+          ...emptyForm(kindParam(params.kind), newBrand),
           prepared_by: profileName,
           terms: settingsData?.default_terms ?? '',
         };
@@ -581,7 +582,7 @@ export default function BillEditorScreen() {
     if (target.status === 'draft' && me && me.role !== 'owner') {
       void sendPushNotificationToRole(
         'owner',
-        `${me.full_name} created ${res.data.kind === 'client' ? 'a bill' : 'an estimate'} 🧾`,
+        `${me.full_name} created ${res.data.kind === 'client' ? 'a bill' : res.data.kind === 'package' ? 'a package' : 'an estimate'} 🧾`,
         `${res.data.number ?? 'New'}${res.data.client_name ? ` · ${res.data.client_name}` : ''}`,
         { type: 'bill_created', bill_id: res.data.id },
         [me.id],
@@ -793,7 +794,8 @@ export default function BillEditorScreen() {
   const tone = BILL_STATUS_TONE[status];
   const saved = !!bill && status !== 'draft';
   const inTrash = status === 'trash';
-  const statusLabel = form.kind === 'estimate' && saved && !inTrash ? 'Estimate' : STATUS_LABEL[status];
+  // Estimates and packages have no Pending / Completed: a saved one is just that.
+  const statusLabel = form.kind !== 'client' && saved && !inTrash ? KIND_LABEL[form.kind] : STATUS_LABEL[status];
   // Per bill: whether their rules let them change it, or move it to trash (a change that needs both).
   const billFacts = bill ? { owner: bill.created_by, value: bill.brand } : undefined;
   const canEditBill = !bill || access.can('edit', billFacts);
@@ -865,7 +867,7 @@ export default function BillEditorScreen() {
               <View style={styles.actionsRow}>
                 <ActionBtn icon="share-2" label="Share PDF" busy={busy === 'share'} onPress={share} />
                 <ActionBtn icon="message-circle" label="WhatsApp" busy={busy === 'wa'} onPress={whatsapp} tint={T.green} />
-                {!canEditBill ? null : form.kind === 'estimate' ? (
+                {!canEditBill || form.kind === 'package' ? null : form.kind === 'estimate' ? (
                   <ActionBtn icon="arrow-right-circle" label="To client bill" busy={busy === 'convert'} onPress={convert} tint={T.violet} />
                 ) : status === 'completed' ? (
                   <ActionBtn icon="check-circle" label="Completed" busy={busy === 'status'} onPress={reopen} tint={T.green} />
@@ -958,8 +960,8 @@ export default function BillEditorScreen() {
             </Pressable>
           ) : null}
 
-          {/* Type — only while it's still a draft */}
-          {isDraft ? (
+          {/* Type — only while it's still a draft; a package stays a package (077) */}
+          {isDraft && form.kind !== 'package' ? (
             <View style={styles.segment}>
               {(['estimate', 'client'] as const).map((k) => (
                 <Pressable

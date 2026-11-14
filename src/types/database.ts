@@ -399,6 +399,14 @@ export interface LeadBanquet {
   created_at: string;
 }
 
+/** "Not picked", "Interested"… one shared list (078). */
+export interface LeadLabel {
+  id: string;
+  name: string;
+  created_by: string | null;
+  created_at: string;
+}
+
 /** A Navgrah lead: someone with a function coming up at a banquet (042). */
 export interface Lead {
   id: string;
@@ -415,6 +423,8 @@ export interface Lead {
   created_by_name?: string | null;
   /** First time anyone called, WhatsApped, saved or edited it (050); null = new. */
   touched_at?: string | null;
+  /** Its label (078); null = none. */
+  label_id?: string | null;
   /** A voice note with the remarks (054), in the voice-notes bucket. */
   remarks_voice_path?: string | null;
   remarks_voice_ms?: number | null;
@@ -507,7 +517,8 @@ export interface AccountSummary {
   last_txn_date: string | null;
 }
 
-export type BillKind = 'estimate' | 'client';
+/** 'package': a fixed package (077) — like a client bill, never completed or moved. */
+export type BillKind = 'estimate' | 'client' | 'package';
 export type BillBrand = 'vebosso' | 'navgrah';
 export type BillStatus = 'draft' | 'pending' | 'completed' | 'trash';
 

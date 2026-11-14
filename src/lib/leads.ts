@@ -6,7 +6,7 @@
 // ============================================================================
 
 import { format, parseISO } from 'date-fns';
-import { Lead, LeadBanquet, LeadInput } from '../types/database';
+import { Lead, LeadBanquet, LeadInput, LeadLabel } from '../types/database';
 import { parseSupabaseError } from './errors';
 import { supabase } from './supabase';
 
@@ -99,6 +99,40 @@ export async function addBanquet(name: string): Promise<Result<LeadBanquet>> {
 /** Its leads stay, with no banquet (ON DELETE SET NULL). */
 export async function deleteBanquet(id: string): Promise<Result> {
   const { error } = await supabase.from('lead_banquets').delete().eq('id', id);
+  if (error) return fail(error);
+  return { success: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------
+// Labels (078): one per lead, from a shared list.
+
+/** Oldest first, so they stay in the order they were made. Empty before 078. */
+export async function fetchLabels(): Promise<LeadLabel[]> {
+  const { data, error } = await supabase.from('lead_labels').select('*').order('created_at', { ascending: true });
+  return error ? [] : ((data || []) as LeadLabel[]);
+}
+
+export async function addLabel(name: string): Promise<Result<LeadLabel>> {
+  const clean = name.trim().replace(/\s+/g, ' ').slice(0, 40);
+  if (!clean) return { success: false, error: 'Type the remark' };
+  const { data, error } = await supabase.from('lead_labels').insert({ name: clean }).select().single();
+  if (error) {
+    const text = parseSupabaseError(error);
+    return { success: false, error: /duplicate|unique/i.test(text) ? `${clean} is already a remark` : text };
+  }
+  return { success: true, data: data as LeadLabel };
+}
+
+/** Its leads stay, without a label (ON DELETE SET NULL). */
+export async function deleteLabel(id: string): Promise<Result> {
+  const { error } = await supabase.from('lead_labels').delete().eq('id', id);
+  if (error) return fail(error);
+  return { success: true, data: undefined };
+}
+
+/** Give a lead a label, or none. Set on its own so saving a lead works before 078. */
+export async function setLeadLabel(id: string, labelId: string | null): Promise<Result> {
+  const { error } = await supabase.from('leads').update({ label_id: labelId }).eq('id', id);
   if (error) return fail(error);
   return { success: true, data: undefined };
 }

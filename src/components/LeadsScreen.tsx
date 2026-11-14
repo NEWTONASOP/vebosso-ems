@@ -4,7 +4,8 @@
 // first. Add one by one, or import / export Excel (dof, name, function,
 // contact, remarks). Tap a number to call; save a lead — or a whole banquet —
 // to the phone's contacts as "<name> <banquet> <dof> <function>".
-// One shared list (migration 042).
+// One shared list (migration 042). Inside a banquet, leads are split by their
+// remark ("Not picked", "Interested"…, 078); leads without one follow as usual.
 // ============================================================================
 
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,13 +17,14 @@ import { Menu, Snackbar, Text } from 'react-native-paper';
 import { AppTheme as T, screenChrome } from '../constants/theme';
 import { useMyAccess } from '../lib/accessRules';
 import { Alert } from '../lib/alert';
-import { addBanquet, contactName, deleteBanquet, fetchBanquets, fetchLeads, leadPhones, markLeadsTouched } from '../lib/leads';
+import { addBanquet, contactName, deleteBanquet, fetchBanquets, fetchLabels, fetchLeads, leadPhones, markLeadsTouched } from '../lib/leads';
 // Loaded on first use: the spreadsheet code is big and slowed down app start.
 const leadsFile = () => import('../lib/leadsFile');
 import { supabase } from '../lib/supabase';
 import { telUrl, whatsappUrl } from '../lib/venues';
 import { clipTime } from '../lib/voice';
-import { Lead, LeadBanquet } from '../types/database';
+import { Lead, LeadBanquet, LeadLabel } from '../types/database';
+import { labelColor } from './LeadLabelPicker';
 import { Chevron, DropdownBody } from './Dropdown';
 import { LeadSheet } from './LeadSheet';
 import { LeadsImportSheet } from './LeadsImportSheet';
@@ -37,8 +39,8 @@ const WHATSAPP_GREEN = '#1FA855';
 const PAGE = 30;
 
 const loadAll = async () => {
-  const [leads, banquets] = await Promise.all([fetchLeads(), fetchBanquets()]);
-  return { leads, banquets };
+  const [leads, banquets, labels] = await Promise.all([fetchLeads(), fetchBanquets(), fetchLabels()]);
+  return { leads, banquets, labels };
 };
 
 type Group = { id: string; name: string; banquet: LeadBanquet | null; leads: Lead[] };
@@ -51,6 +53,8 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
   const access = useMyAccess('leads');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [banquets, setBanquets] = useState<LeadBanquet[]>([]);
+  // The shared remarks (078), in the order they were made.
+  const [labels, setLabels] = useState<LeadLabel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -93,6 +97,7 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
       setError(res.leads.error);
     }
     if (res.banquets.success) setBanquets(res.banquets.data);
+    setLabels(res.labels);
     setIsLoading(false);
   }, []);
 
@@ -118,6 +123,7 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
       .channel(`leads_${Math.random().toString(36).slice(2, 8)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, soon)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_banquets' }, soon)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_labels' }, soon)
       .subscribe();
     return () => {
       if (timer) clearTimeout(timer);
@@ -256,6 +262,97 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
     },
     [touch]
   );
+
+  /** One run of leads: upcoming first, past ones behind "Show past leads", a page at a time. */
+  const leadList = (key: string, list: Lead[], afterHeading: boolean) => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const upcoming = list.filter((l) => !l.dof || l.dof >= today);
+    // Most recent function first.
+    const past = list.filter((l) => l.dof && l.dof < today).sort((a, b) => (a.dof! < b.dof! ? 1 : -1));
+    const pastKey = `${key}:past`;
+    const pastOpen = !!query.trim() || openIds.has(pastKey);
+    const upLimit = shown[key] ?? PAGE;
+    const pastLimit = shown[pastKey] ?? PAGE;
+    const rowFor = (l: Lead, divided: boolean) => (
+      <LeadRow key={l.id} lead={l} divided={divided} onOpen={openLead} onSave={saveOne} onWhatsApp={openWhatsApp} onCall={call} />
+    );
+    const moreBtn = (k: string, total: number, limit: number) =>
+      total > limit ? (
+        <Pressable
+          style={({ pressed }) => [styles.more, pressed && { backgroundColor: T.soft }]}
+          onPress={() => setShown((m) => ({ ...m, [k]: (m[k] ?? PAGE) + PAGE * 2 }))}
+          accessibilityRole="button"
+        >
+          <Text style={styles.moreText}>Show more · {total - limit} left</Text>
+        </Pressable>
+      ) : null;
+    return (
+      <>
+        {past.length > 0 ? (
+          <>
+            <Pressable
+              style={({ pressed }) => [styles.more, pressed && { backgroundColor: T.soft }]}
+              onPress={() => toggle(pastKey)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: pastOpen }}
+            >
+              <Text style={styles.moreText}>
+                {pastOpen ? 'Hide' : 'Show'} past leads · {past.length}
+              </Text>
+            </Pressable>
+            {pastOpen ? past.slice(0, pastLimit).map((l) => rowFor(l, true)) : null}
+            {pastOpen ? moreBtn(pastKey, past.length, pastLimit) : null}
+          </>
+        ) : null}
+        {upcoming.slice(0, upLimit).map((l, i) => rowFor(l, afterHeading || past.length > 0 || i > 0))}
+        {moreBtn(key, upcoming.length, upLimit)}
+      </>
+    );
+  };
+
+  /**
+   * A banquet's leads: one collapsible part per remark (078), in the order the
+   * remarks were made, then the leads with no remark listed as usual, with no
+   * heading. A banquet where no lead has a remark looks as it always did.
+   */
+  const banquetLeads = (g: Group) => {
+    const known = new Set(labels.map((l) => l.id));
+    const parts = labels
+      .map((lb) => ({ label: lb, leads: g.leads.filter((l) => l.label_id === lb.id) }))
+      .filter((part) => part.leads.length > 0);
+    const rest = g.leads.filter((l) => !l.label_id || !known.has(l.label_id));
+    return (
+      <>
+        {parts.map((part, i) => {
+          const key = `${g.id}:${part.label.id}`;
+          const open = !!query.trim() || openIds.has(key);
+          const c = labelColor(labels, part.label.id);
+          const fresh = part.leads.filter((l) => !l.touched_at).length;
+          return (
+            <View key={part.label.id}>
+              <Pressable
+                onPress={() => toggle(key)}
+                style={({ pressed }) => [styles.subHead, i > 0 && styles.leadDivided, pressed && { backgroundColor: T.soft }]}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: open }}
+                accessibilityLabel={`${part.label.name}, ${part.leads.length} leads`}
+              >
+                <View style={[styles.subDot, { backgroundColor: c.color }]} />
+                <Text style={styles.subName} numberOfLines={1}>
+                  {part.label.name}
+                  <Text style={styles.subCount}>{`  ${part.leads.length}`}</Text>
+                  {fresh ? <Text style={styles.groupNew}>{`  ·  ${fresh} new`}</Text> : null}
+                </Text>
+                <Chevron open={open} color={T.mute} />
+              </Pressable>
+              {open ? leadList(key, part.leads, true) : null}
+            </View>
+          );
+        })}
+        {rest.length ? leadList(g.id, rest, parts.length > 0) : null}
+      </>
+    );
+  };
 
   const nextDate = (g: Group) => {
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -470,59 +567,7 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
                 {open && g.leads.length > 0 ? (
                   <DropdownBody>
                     <View style={styles.listCard}>
-                      {(() => {
-                        const today = format(new Date(), 'yyyy-MM-dd');
-                        const upcoming = g.leads.filter((l) => !l.dof || l.dof >= today);
-                        // Most recent function first.
-                        const past = g.leads.filter((l) => l.dof && l.dof < today).sort((a, b) => (a.dof! < b.dof! ? 1 : -1));
-                        const pastKey = `${g.id}:past`;
-                        const pastOpen = !!query.trim() || openIds.has(pastKey);
-                        const upLimit = shown[g.id] ?? PAGE;
-                        const pastLimit = shown[pastKey] ?? PAGE;
-                        const rowFor = (l: Lead, divided: boolean) => (
-                          <LeadRow
-                            key={l.id}
-                            lead={l}
-                            divided={divided}
-                            onOpen={openLead}
-                            onSave={saveOne}
-                            onWhatsApp={openWhatsApp}
-                            onCall={call}
-                          />
-                        );
-                        const moreBtn = (key: string, total: number, limit: number) =>
-                          total > limit ? (
-                            <Pressable
-                              style={({ pressed }) => [styles.more, pressed && { backgroundColor: T.soft }]}
-                              onPress={() => setShown((m) => ({ ...m, [key]: (m[key] ?? PAGE) + PAGE * 2 }))}
-                              accessibilityRole="button"
-                            >
-                              <Text style={styles.moreText}>Show more · {total - limit} left</Text>
-                            </Pressable>
-                          ) : null;
-                        return (
-                          <>
-                            {past.length > 0 ? (
-                              <>
-                                <Pressable
-                                  style={({ pressed }) => [styles.more, pressed && { backgroundColor: T.soft }]}
-                                  onPress={() => toggle(pastKey)}
-                                  accessibilityRole="button"
-                                  accessibilityState={{ expanded: pastOpen }}
-                                >
-                                  <Text style={styles.moreText}>
-                                    {pastOpen ? 'Hide' : 'Show'} past leads · {past.length}
-                                  </Text>
-                                </Pressable>
-                                {pastOpen ? past.slice(0, pastLimit).map((l, i) => rowFor(l, true)) : null}
-                                {pastOpen ? moreBtn(pastKey, past.length, pastLimit) : null}
-                              </>
-                            ) : null}
-                            {upcoming.slice(0, upLimit).map((l, i) => rowFor(l, past.length > 0 || i > 0))}
-                            {moreBtn(g.id, upcoming.length, upLimit)}
-                          </>
-                        );
-                      })()}
+                      {banquetLeads(g)}
                     </View>
                   </DropdownBody>
                 ) : null}
@@ -570,6 +615,9 @@ export function LeadsScreen({ showBack }: { showBack?: boolean }) {
           lead={sheet.lead}
           banquets={banquets}
           defaultBanquetId={sheet.banquetId}
+          labels={labels}
+          onLabelCreated={(l) => setLabels((list) => (list.some((x) => x.id === l.id) ? list : [...list, l]))}
+          onLabelsChanged={() => void load()}
           onDismiss={() => setSheet(null)}
           onSaved={(m) => {
             setSnack(m);
@@ -799,6 +847,11 @@ const styles = StyleSheet.create({
     borderTopColor: T.hairline,
   },
   pastDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: T.hairline },
+  // A remark's part inside a banquet (078).
+  subHead: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: '#FAFBFC' },
+  subDot: { width: 10, height: 10, borderRadius: 5 },
+  subName: { flex: 1, fontFamily: 'Inter_700Bold', fontSize: 14, color: T.ink },
+  subCount: { fontFamily: 'Inter_600SemiBold', color: T.mute },
   moreText: { fontFamily: 'Inter_600SemiBold', fontSize: 13.5, color: T.ink },
   leadRemarks: { fontFamily: 'Inter_400Regular', fontSize: 13, color: T.inkSoft, marginTop: 3, lineHeight: 18 },
   rowBtns: { flexDirection: 'row', gap: 6 },

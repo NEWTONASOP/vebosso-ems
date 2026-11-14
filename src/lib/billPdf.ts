@@ -130,11 +130,11 @@ export function rupeesInWords(amount: number): string {
  */
 const PAGE_GAP = '14mm';
 
-/** Colours for one bill: its brand's on client bills, neutral on estimates. */
+/** Colours for one bill: its brand's on client bills and packages, neutral on estimates. */
 function paletteFor(b: Bill) {
   const brand = brandOf(b);
   const t = BRANDS[brand];
-  const client = b.kind === 'client';
+  const client = b.kind !== 'estimate';
   const [c0, c1, c2] = t.colors;
   const gradient = `linear-gradient(135deg, ${c0} 0%, ${c1} 55%, ${c2} 100%)`;
   const dark = t.logoOnDark;
@@ -291,7 +291,7 @@ export async function buildBillHtml(b: Bill, s: BillSettings): Promise<string> {
     <div class="top">
     ${logo ? `<img class="logo" src="${logo}" alt="" />` : `<div class="brandname">${esc(s.business_name)}</div>`}
     <div class="doc">
-      ${b.kind === 'estimate' ? '<div class="kind">Event Booking Estimate</div>' : ''}
+      ${b.kind === 'estimate' ? '<div class="kind">Event Booking Estimate</div>' : b.kind === 'package' ? '<div class="kind">Package</div>' : ''}
       <div class="no">${esc(b.number ?? '')}</div>
       <div class="meta">Date ${format(new Date(), 'd MMM yyyy')}</div>
       ${b.edited_at ? `<div class="rev">Revised ${format(new Date(b.edited_at), 'd MMM yyyy, h:mm a')}</div>` : ''}

@@ -18,7 +18,7 @@ import { BillSettingsSheet } from '../../../components/BillSettingsSheet';
 import { AppTheme as T, appSoftShadow, screenChrome } from '../../../constants/theme';
 import { rupees } from '../../../lib/accounts';
 import { BRAND_KEYS, BRANDS, brandOf } from '../../../lib/billBrands';
-import { BILL_STATUS_TONE, BillSummary, billTotals, fetchBills, STATUS_LABEL } from '../../../lib/bills';
+import { BILL_STATUS_TONE, BillSummary, billTotals, fetchBills, KIND_LABEL, KIND_TAB, STATUS_LABEL } from '../../../lib/bills';
 import { useMyAccess } from '../../../lib/accessRules';
 import { useFeatureBase } from '../../../lib/featureAccess';
 import { useAuthStore } from '../../../store/authStore';
@@ -46,6 +46,8 @@ const created = (iso: string) => {
 const FILTERS: Record<BillKind, Filter[]> = {
   estimate: ['all', 'draft', 'trash'],
   client: ['all', 'pending', 'completed', 'draft', 'trash'],
+  // Packages are never completed (077).
+  package: ['all', 'draft', 'trash'],
 };
 
 // Remembered while the app is open, so coming back to Bills keeps the brand.
@@ -180,7 +182,7 @@ export default function BillsScreen() {
           <View style={{ flexShrink: 1 }}>
             <Text style={screenChrome.title}>Bills</Text>
             <Text style={screenChrome.subtitle}>
-              {brandsShown.length === 1 ? `${BRANDS[brandsShown[0]].label} · ` : ''}Estimates and client bills
+              {brandsShown.length === 1 ? `${BRANDS[brandsShown[0]].label} · ` : ''}Estimates, client bills and packages
             </Text>
           </View>
         </View>
@@ -194,7 +196,7 @@ export default function BillsScreen() {
             <Pressable
               style={styles.newBtn}
               onPress={() => router.push(`${base}/new?kind=${kind}&brand=${brand}` as any)}
-              accessibilityLabel={`New ${kind === 'client' ? 'client bill' : 'estimate'}`}
+              accessibilityLabel={`New ${KIND_LABEL[kind].toLowerCase()}`}
             >
               <Feather name="plus" size={16} color={T.white} />
               <Text style={styles.newText}>New</Text>
@@ -245,7 +247,7 @@ export default function BillsScreen() {
       ) : null}
 
       <View style={styles.segment}>
-        {(['estimate', 'client'] as const).map((k) => (
+        {(['estimate', 'client', 'package'] as const).map((k) => (
           <Pressable
             key={k}
             onPress={() => switchKind(k)}
@@ -254,7 +256,7 @@ export default function BillsScreen() {
             accessibilityState={{ selected: kind === k }}
           >
             <Text style={[styles.segText, kind === k && styles.segTextActive]}>
-              {k === 'estimate' ? 'Estimates' : 'Client bills'}
+              {KIND_TAB[k]}
             </Text>
           </Pressable>
         ))}
@@ -331,7 +333,7 @@ export default function BillsScreen() {
                 ? 'No drafts'
                 : filter === 'trash'
                   ? 'Trash is empty. Trashed bills stay here and can be restored.'
-                  : `No ${BRANDS[brand].label} ${kind === 'client' ? 'client bills' : 'estimates'} yet`}
+                  : `No ${BRANDS[brand].label} ${KIND_TAB[kind].toLowerCase()} yet`}
             </Text>
           </View>
         ) : (
