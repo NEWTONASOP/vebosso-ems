@@ -597,6 +597,11 @@ export interface Bill {
   updated_at: string;
   /** Set when a saved bill is changed again; the PDF shows it as revised. */
   edited_at: string | null;
+  /** Printed mark (079): null = not printed yet. */
+  printed_at?: string | null;
+  printed_by_name?: string | null;
+  /** Last time it was printed; kept when a change took the mark off. */
+  last_printed_at?: string | null;
 }
 
 /** One line of a bill's history (038): who changed it, when, and what. */

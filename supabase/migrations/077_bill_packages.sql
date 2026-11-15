@@ -35,35 +35,7 @@ $fn$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 REVOKE ALL ON FUNCTION public.next_bill_number(TEXT) FROM PUBLIC;
 
--- 3. Packages never move, and nothing becomes one; never completed ------------
-CREATE OR REPLACE FUNCTION public.bills_before_write()
-RETURNS TRIGGER AS $fn$
-BEGIN
-  IF TG_OP = 'UPDATE' AND NEW.kind IS DISTINCT FROM OLD.kind
-     AND (OLD.kind = 'package' OR NEW.kind = 'package') THEN
-    RAISE EXCEPTION 'A package can''t be changed into another kind of bill, or the other way round';
-  END IF;
-  IF NEW.kind = 'package' AND NEW.status IN ('done', 'completed') THEN
-    RAISE EXCEPTION 'A package can''t be marked completed';
-  END IF;
-
-  -- Estimate → client bill: keep the estimate's number, get a client number.
-  IF TG_OP = 'UPDATE' AND OLD.kind = 'estimate' AND NEW.kind = 'client' THEN
-    NEW.estimate_number := coalesce(OLD.number, NEW.estimate_number);
-    NEW.number := NULL;
-  END IF;
-
-  -- First time out of draft (or just converted): hand out a number.
-  IF NEW.status <> 'draft' AND NEW.number IS NULL THEN
-    NEW.number := public.next_bill_number(NEW.kind);
-  END IF;
-
-  -- Remember where a trashed bill came from, so restore puts it back.
-  IF TG_OP = 'UPDATE' AND NEW.status = 'trash' AND OLD.status <> 'trash' THEN
-    NEW.prev_status := OLD.status;
-  END IF;
-
-  NEW.updated_at := now();
-  RETURN NEW;
-END;
-$fn$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+-- 3. The rules "a package never moves and is never completed" live in the bill
+-- trigger, bills_before_write — defined in 079 (which also handles the printed
+-- mark). It is not redefined here, so running this file after 079 can't undo
+-- 079's trigger.

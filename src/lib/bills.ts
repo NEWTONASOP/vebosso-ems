@@ -66,15 +66,44 @@ const BILL_LIST_COLUMNS = [
   'event_type', 'phone', 'total', 'advance', 'balance', 'created_at', 'updated_at',
 ] as const;
 
-export type BillSummary = Pick<Bill, (typeof BILL_LIST_COLUMNS)[number]>;
+/** The printed mark (079); read separately so the list still loads before 079 is applied. */
+const PRINT_COLUMNS = ['printed_at', 'last_printed_at'] as const;
+
+export type BillSummary = Pick<Bill, (typeof BILL_LIST_COLUMNS)[number] | (typeof PRINT_COLUMNS)[number]>;
 
 export async function fetchBills(): Promise<Result<BillSummary[]>> {
-  const { data, error } = await supabase
-    .from('bills')
-    .select(BILL_LIST_COLUMNS.join(','))
-    .order('updated_at', { ascending: false });
+  const read = (cols: readonly string[]) =>
+    supabase.from('bills').select(cols.join(',')).order('updated_at', { ascending: false });
+  let { data, error } = await read([...BILL_LIST_COLUMNS, ...PRINT_COLUMNS]);
+  if (error && /printed/i.test(error.message ?? '')) ({ data, error } = await read(BILL_LIST_COLUMNS));
   if (error) return fail(error);
   return { success: true, data: (data || []) as unknown as BillSummary[] };
+}
+
+/**
+ * The printed mark to show on a bill, or null for packages, drafts and trash
+ * (and before 079, when the bill has no such field).
+ *   'not'      never printed (or the mark was taken off by hand)
+ *   'changed'  printed once, then changed: print again
+ *   'printed'  printed
+ */
+export function printState(b: Pick<Bill, 'kind' | 'status'> & Partial<Pick<Bill, 'printed_at' | 'last_printed_at'>>) {
+  if (b.kind === 'package' || b.status === 'draft' || b.status === 'trash') return null;
+  if (b.printed_at === undefined) return null;
+  if (b.printed_at) return 'printed' as const;
+  return b.last_printed_at ? ('changed' as const) : ('not' as const);
+}
+
+/** Mark printed, or take the mark off (which also forgets the last print). */
+export async function setBillPrinted(id: string, printed: boolean): Promise<Result<Bill>> {
+  const { data, error } = await supabase
+    .from('bills')
+    .update(printed ? { printed_at: new Date().toISOString() } : { printed_at: null, last_printed_at: null })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) return fail(error);
+  return { success: true, data: data as Bill };
 }
 
 export async function fetchBill(id: string): Promise<Result<Bill>> {

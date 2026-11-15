@@ -18,7 +18,7 @@ import { BillSettingsSheet } from '../../../components/BillSettingsSheet';
 import { AppTheme as T, appSoftShadow, screenChrome } from '../../../constants/theme';
 import { rupees } from '../../../lib/accounts';
 import { BRAND_KEYS, BRANDS, brandOf } from '../../../lib/billBrands';
-import { BILL_STATUS_TONE, BillSummary, billTotals, fetchBills, KIND_LABEL, KIND_TAB, STATUS_LABEL } from '../../../lib/bills';
+import { BILL_STATUS_TONE, BillSummary, billTotals, fetchBills, KIND_LABEL, KIND_TAB, printState, STATUS_LABEL } from '../../../lib/bills';
 import { useMyAccess } from '../../../lib/accessRules';
 import { useFeatureBase } from '../../../lib/featureAccess';
 import { useAuthStore } from '../../../store/authStore';
@@ -354,11 +354,22 @@ export default function BillsScreen() {
                     {b.number ?? 'Draft'}
                     <Text style={styles.age}>{`  ·  ${created(b.created_at)}`}</Text>
                   </Text>
-                  {kind === 'client' || b.status === 'draft' || b.status === 'trash' ? (
-                    <View style={[styles.status, { backgroundColor: tone.bg }]}>
-                      <Text style={[styles.statusText, { color: tone.color }]}>{STATUS_LABEL[b.status]}</Text>
-                    </View>
-                  ) : null}
+                  <View style={styles.pills}>
+                    {/* Still to print (079): a printed bill shows nothing here. */}
+                    {printState(b) === 'not' || printState(b) === 'changed' ? (
+                      <View style={[styles.status, styles.printPill]}>
+                        <Text style={[styles.statusText, { color: T.amber }]}>
+                          {printState(b) === 'changed' ? 'Changed · print again' : 'Not printed'}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {/* Not when the filter already says it (e.g. "Pending" under Pending). */}
+                    {(kind === 'client' || b.status === 'draft' || b.status === 'trash') && b.status !== filter ? (
+                      <View style={[styles.status, { backgroundColor: tone.bg }]}>
+                        <Text style={[styles.statusText, { color: tone.color }]}>{STATUS_LABEL[b.status]}</Text>
+                      </View>
+                    ) : null}
+                  </View>
                 </View>
                 <Text style={styles.client} numberOfLines={1}>{b.client_name || 'No name yet'}</Text>
                 {b.event_type ? (
@@ -528,6 +539,8 @@ const styles = StyleSheet.create({
   number: { fontFamily: 'Inter_700Bold', fontSize: 12.5, color: T.mute, letterSpacing: 0.4 },
   age: { fontFamily: 'Inter_500Medium', fontSize: 12, color: T.mute, letterSpacing: 0 },
   status: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 9 },
+  pills: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+  printPill: { backgroundColor: '#FFF4DE' },
   statusText: { fontFamily: 'Inter_700Bold', fontSize: 11 },
   client: { fontFamily: 'Inter_700Bold', fontSize: 16, color: T.ink },
   meta: { fontFamily: 'Inter_400Regular', fontSize: 13, color: T.mute },

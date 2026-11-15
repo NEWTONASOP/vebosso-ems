@@ -47,7 +47,9 @@ import {
   removeBillImage,
   restoreBill,
   saveBill,
+  setBillPrinted,
   setBillStatus,
+  printState,
   signBillImages,
   STATUS_LABEL,
   updateBill,
@@ -721,6 +723,21 @@ export default function BillEditorScreen() {
       `Marked ${STATUS_LABEL[s].toLowerCase()}`
     );
 
+  /** Printed mark (079): mark printed, or take the mark off. */
+  const togglePrinted = () => {
+    if (!bill) return;
+    const printed = printState(bill) === 'printed';
+    void act(
+      'print',
+      async () => {
+        const res = await setBillPrinted(bill.id, !printed);
+        if (!res.success) throw new Error(res.error);
+        setBill(res.data);
+      },
+      printed ? 'Marked not printed' : 'Marked printed',
+    );
+  };
+
   const markCompleted = () =>
     Alert.alert('Mark as completed?', 'The bill moves to Completed.', [
       { text: 'Cancel', style: 'cancel' },
@@ -864,6 +881,38 @@ export default function BillEditorScreen() {
                   </ScrollView>
                 </View>
               ) : null}
+              {(() => {
+                const mark = printState(bill);
+                if (!mark) return null;
+                const done = mark === 'printed';
+                const text = done
+                  ? `Printed${bill.printed_at ? ` ${format(new Date(bill.printed_at), 'd MMM')}` : ''}${bill.printed_by_name ? ` by ${bill.printed_by_name}` : ''}`
+                  : mark === 'changed'
+                    ? `Changed after printing${bill.last_printed_at ? ` on ${format(new Date(bill.last_printed_at), 'd MMM')}` : ''} · print again`
+                    : 'Not printed yet';
+                return (
+                  <View style={[styles.printStrip, done && styles.printStripDone]}>
+                    <Feather name="printer" size={16} color={done ? T.green : T.amber} />
+                    <Text style={[styles.printText, { color: done ? T.green : T.amber }]} numberOfLines={2}>
+                      {text}
+                    </Text>
+                    {canEditBill ? (
+                      <Pressable
+                        style={styles.printBtn}
+                        onPress={togglePrinted}
+                        disabled={busy === 'print'}
+                        accessibilityRole="button"
+                      >
+                        {busy === 'print' ? (
+                          <ActivityIndicator size="small" color={T.ink} />
+                        ) : (
+                          <Text style={styles.printBtnText}>{done ? 'Undo' : 'Mark printed'}</Text>
+                        )}
+                      </Pressable>
+                    ) : null}
+                  </View>
+                );
+              })()}
               <View style={styles.actionsRow}>
                 <ActionBtn icon="share-2" label="Share PDF" busy={busy === 'share'} onPress={share} />
                 <ActionBtn icon="message-circle" label="WhatsApp" busy={busy === 'wa'} onPress={whatsapp} tint={T.green} />
@@ -1473,6 +1522,22 @@ const styles = StyleSheet.create({
   },
   editText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: T.white },
   actionsRow: { flexDirection: 'row', gap: 8 },
+  // Printed mark (079).
+  printStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingLeft: 12,
+    paddingRight: 8,
+    borderRadius: 14,
+    backgroundColor: '#FFF4DE',
+    marginBottom: 8,
+  },
+  printStripDone: { backgroundColor: T.greenSoft },
+  printText: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  printBtn: { height: 32, paddingHorizontal: 12, borderRadius: 999, backgroundColor: T.card, alignItems: 'center', justifyContent: 'center' },
+  printBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 12.5, color: T.ink },
   actionBtn: {
     flex: 1,
     height: 64,
