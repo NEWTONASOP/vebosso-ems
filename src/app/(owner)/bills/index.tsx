@@ -51,7 +51,8 @@ const FILTERS: Record<BillKind, Filter[]> = {
 };
 
 // Remembered while the app is open, so coming back to Bills keeps the brand.
-const remembered: { brand: BillBrand; sort: Sort } = { brand: 'vebosso', sort: 'function' };
+// Bills opens on Navgrah.
+const remembered: { brand: BillBrand; sort: Sort } = { brand: 'navgrah', sort: 'function' };
 const rememberBrand = (b: BillBrand) => {
   remembered.brand = b;
 };
@@ -378,12 +379,14 @@ export default function BillsScreen() {
                 <View style={styles.facts}>
                   <View style={styles.fact}>
                     <Feather name="calendar" size={13} color={b.function_date ? T.inkSoft : T.mute} />
+                    <Text style={styles.factLabel}>Event date</Text>
                     <Text style={[styles.factText, !b.function_date && styles.factEmpty]} numberOfLines={1}>
                       {b.function_date ? format(parseISO(b.function_date), 'EEE, d MMM yyyy') : 'No date yet'}
                     </Text>
                   </View>
                   <View style={styles.fact}>
                     <Feather name="map-pin" size={13} color={b.venue ? T.inkSoft : T.mute} />
+                    <Text style={styles.factLabel}>Venue</Text>
                     <Text style={[styles.factText, !b.venue && styles.factEmpty]} numberOfLines={1}>
                       {b.venue || 'No venue yet'}
                     </Text>
@@ -546,6 +549,8 @@ const styles = StyleSheet.create({
   meta: { fontFamily: 'Inter_400Regular', fontSize: 13, color: T.mute },
   facts: { gap: 4, marginTop: 6 },
   fact: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  // Same width for both, so the date and the venue start in line.
+  factLabel: { width: 70, fontFamily: 'Inter_500Medium', fontSize: 12, color: T.mute },
   factText: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 13.5, color: T.ink },
   factEmpty: { fontFamily: 'Inter_400Regular', color: T.mute },
   money: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
