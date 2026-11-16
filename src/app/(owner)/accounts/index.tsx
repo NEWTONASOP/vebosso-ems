@@ -296,7 +296,7 @@ export default function AccountsScreen() {
           ) : null}
         </View>
 
-        {accounts.length > 6 || (category && catEntries.length > 6) ? (
+        {accounts.length > 0 ? (
           <View style={styles.search}>
             <Feather name="search" size={16} color={T.mute} />
             <TextInput

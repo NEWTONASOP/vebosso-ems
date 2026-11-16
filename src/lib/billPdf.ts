@@ -5,6 +5,7 @@
 // and watermark (VEBOSSO / Navgrah); client bills also get the brand colours
 // as a gradient border, estimates stay neutral with an "Event Booking
 // Estimate" badge. A bill changed after saving shows when it was revised.
+// Photos share pages (up to 4) when they all stay big enough (photoLayout.ts).
 // ============================================================================
 
 import { format, parseISO } from 'date-fns';
@@ -18,6 +19,7 @@ import { money } from './accounts';
 import { Alert } from './alert';
 import { BRANDS, brandOf } from './billBrands';
 import { billTotals, signBillImages } from './bills';
+import { imageRatio, planPhotoPages } from './photoLayout';
 import { printHtmlOnWeb } from './webPrint';
 import * as WhatsApp from '../../modules/whatsapp-share';
 
@@ -173,6 +175,8 @@ export async function buildBillHtml(b: Bill, s: BillSettings): Promise<string> {
       }))
     )
   ).filter((x): x is { src: string; caption: string } => !!x.src);
+  // Several to a page where they fit well; each page starts on a new sheet.
+  const photoPages = planPhotoPages(images.map((i) => ({ ...i, ratio: imageRatio(i.src) })));
   const t = billTotals(b);
   const items = (b.items ?? []).filter((i) => i.description?.trim());
   const date = b.function_date ? format(parseISO(b.function_date), 'EEE, d MMM yyyy') : '';
@@ -277,9 +281,13 @@ export async function buildBillHtml(b: Bill, s: BillSettings): Promise<string> {
   .sig .name { font-size: 12px; font-weight: 700; color: #1B1E24; margin-bottom: 6px; min-height: 16px; }
 
   .imgs { break-before: page; page-break-before: always; }
-  .imgs figure { margin: 0 0 14px; break-inside: avoid; page-break-inside: avoid; }
-  .imgs img { display: block; max-width: 100%; max-height: 225mm; width: auto; height: auto; margin: 0 auto;
-    border-radius: 10px; }
+  .ipage + .ipage { break-before: page; page-break-before: always; }
+  .irow { display: flex; justify-content: center; align-items: flex-start; gap: 12px; margin-bottom: 12px;
+    break-inside: avoid; page-break-inside: avoid; }
+  .imgs figure { margin: 0; flex-shrink: 0; }
+  .imgs img { display: block; border-radius: 10px; }
+  /* A photo whose shape couldn't be read: on its own, sized by the browser. */
+  .imgs img.free { max-width: 100%; max-height: 225mm; width: auto; height: auto; margin: 0 auto; }
   .imgs figcaption { text-align: center; font-size: 11.5px; color: #4A4556; margin-top: 6px; line-height: 1.4; }
 
   tr, .kv, .card, .money, .terms, .signs { break-inside: avoid; page-break-inside: avoid; }
@@ -345,8 +353,24 @@ export async function buildBillHtml(b: Bill, s: BillSettings): Promise<string> {
       </div>
     </div>
 
-    ${images.length ? `<div class="imgs"><h3>Images</h3>${images
-      .map((i) => `<figure><img src="${i.src}" alt="" />${i.caption ? `<figcaption>${nl(i.caption)}</figcaption>` : ''}</figure>`)
+    ${photoPages.length ? `<div class="imgs"><h3>Images</h3>${photoPages
+      .map(
+        (page) =>
+          `<div class="ipage">${page
+            .map(
+              (row) =>
+                `<div class="irow">${row.pics
+                  .map((i) =>
+                    i.ratio === null
+                      ? `<figure><img class="free" src="${i.src}" alt="" />${i.caption ? `<figcaption>${nl(i.caption)}</figcaption>` : ''}</figure>`
+                      : `<figure style="width:${i.w}px"><img src="${i.src}" alt="" style="width:${i.w}px;height:${i.h}px" />${
+                          i.caption ? `<figcaption>${nl(i.caption)}</figcaption>` : ''
+                        }</figure>`
+                  )
+                  .join('')}</div>`
+            )
+            .join('')}</div>`
+      )
       .join('')}</div>` : ''}
   </div>
   </div>

@@ -28,6 +28,7 @@ import { AccountMoveSheet } from '../../../components/AccountMoveSheet';
 import { AccountCategoryFilter } from '../../../components/AccountCategoryFilter';
 import { AccountPeriodFilter } from '../../../components/AccountPeriodFilter';
 import { AccountTxnSheet } from '../../../components/AccountTxnSheet';
+import { SmoothTextInput as TextInput } from '../../../components/SmoothTextInput';
 import { AppTheme as T, appShadow, appSoftShadow, screenChrome } from '../../../constants/theme';
 import { Alert } from '../../../lib/alert';
 import {
@@ -139,7 +140,21 @@ export default function AccountLedgerScreen() {
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [txns, category]);
   /** The entries on screen: all of them, or one category's. */
-  const shown = useMemo(() => (category ? txns.filter((t) => t.category === category) : txns), [txns, category]);
+  // Search: particular, category, amount or date ("salary", "5000", "12 Nov").
+  const [query, setQuery] = useState('');
+  const shown = useMemo(() => {
+    const byCategory = category ? txns.filter((t) => t.category === category) : txns;
+    const q = query.trim().toLowerCase();
+    if (!q) return byCategory;
+    const digits = q.replace(/[,\s₹]/g, '');
+    return byCategory.filter((t) => {
+      const d = parseISO(t.txn_date);
+      return (
+        [t.particular, t.category, format(d, 'd MMM yyyy'), format(d, 'dd-MM-yyyy')].some((f) => f?.toLowerCase().includes(q)) ||
+        (!!digits && /^[\d.]+$/.test(digits) && String(num(t.amount)).includes(digits))
+      );
+    });
+  }, [txns, category, query]);
 
   const totals = useMemo(() => {
     let credit = 0;
@@ -243,6 +258,24 @@ export default function AccountLedgerScreen() {
       ) : null}
 
       <AccountPeriodFilter period={period} onChange={setPeriod} />
+      {txns.length > 0 ? (
+        <View style={styles.search}>
+          <Feather name="search" size={16} color={T.mute} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search particular, amount, date…"
+            placeholderTextColor={T.mute}
+            style={styles.searchInput}
+            autoCorrect={false}
+          />
+          {query ? (
+            <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityLabel="Clear search">
+              <Feather name="x" size={16} color={T.mute} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
       <AccountCategoryFilter
         categories={categories}
         value={category}
@@ -365,7 +398,9 @@ export default function AccountLedgerScreen() {
           ListEmptyComponent={
             <View style={[styles.empty, !wide && styles.emptyCard]}>
               <Text style={styles.emptyText}>
-                {category
+                {query.trim()
+                  ? `No entries match “${query.trim()}”`
+                  : category
                   ? `No ${category} entries${period ? ` in ${periodLabel(period)}` : ''}`
                   : period
                   ? `No entries in ${periodLabel(period)}`
@@ -525,6 +560,17 @@ const styles = StyleSheet.create({
     ...appSoftShadow,
   },
   error: { fontFamily: 'Inter_500Medium', fontSize: 13, color: T.coral, paddingHorizontal: 20 },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 44,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    backgroundColor: T.card,
+    ...appSoftShadow,
+  },
+  searchInput: { flex: 1, fontFamily: 'Inter_400Regular', fontSize: 14, color: T.ink },
   list: { paddingHorizontal: 16, maxWidth: 800, width: '100%', alignSelf: 'center' },
   headerBlock: { gap: 12, marginBottom: 0 },
   summary: {
