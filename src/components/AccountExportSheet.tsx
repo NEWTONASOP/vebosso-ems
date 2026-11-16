@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AppTheme as T } from '../constants/theme';
-import { fetchTransactions, Period, periodLabel } from '../lib/accounts';
+import { fetchTransactions, Period, periodLabel, txnMatches } from '../lib/accounts';
 import type { ExportFormat, LedgerForExport } from '../lib/accountsFile';
 // Loaded on first use: the spreadsheet code is big and slowed down app start.
 const accountsFile = () => import('../lib/accountsFile');
@@ -27,6 +27,7 @@ export function AccountExportSheet({
   accounts,
   period,
   category = null,
+  search = '',
   onDismiss,
 }: {
   /** One account, or all of them. */
@@ -34,10 +35,14 @@ export function AccountExportSheet({
   period: Period;
   /** Only this category's entries (076); accounts with none are left out. */
   category?: string | null;
+  /** Only the entries this search finds, as on screen; accounts with none are left out. */
+  search?: string;
   onDismiss: () => void;
 }) {
   const [busy, setBusy] = useState<ExportFormat | null>(null);
   const [error, setError] = useState('');
+
+  const q = search.trim();
 
   const run = async (fmt: ExportFormat) => {
     setBusy(fmt);
@@ -47,12 +52,12 @@ export function AccountExportSheet({
       for (const account of accounts) {
         const res = await fetchTransactions(account.id, period);
         if (!res.success) throw new Error(res.error);
-        const txns = category ? res.data.filter((t) => t.category === category) : res.data;
-        if (category && txns.length === 0 && accounts.length > 1) continue;
+        const txns = res.data.filter((t) => (!category || t.category === category) && txnMatches(t, search, account.name));
+        if ((category || q) && txns.length === 0 && accounts.length > 1) continue;
         ledgers.push({ account, txns });
       }
-      if (ledgers.length === 0) throw new Error(`No ${category} entries to export`);
-      await (await accountsFile()).exportLedgers(ledgers, period, fmt, category);
+      if (ledgers.length === 0) throw new Error('No entries to export');
+      await (await accountsFile()).exportLedgers(ledgers, period, fmt, category, q || null);
     } catch (e: any) {
       setError(e?.message || 'Could not export');
     } finally {
@@ -61,7 +66,7 @@ export function AccountExportSheet({
   };
 
   const title = accounts.length === 1 ? accounts[0].name : `All accounts (${accounts.length})`;
-  const filterLabel = `${category ? `${category} · ` : ''}${periodLabel(period)}`;
+  const filterLabel = `${category ? `${category} · ` : ''}${q ? `“${q}” · ` : ''}${periodLabel(period)}`;
 
   return (
     <SheetFrame
@@ -94,7 +99,7 @@ export function AccountExportSheet({
         </Pressable>
       ))}
       <Text style={styles.note}>
-        Uses the filter you have on ({filterLabel}). Switch to “All” and “All time” to export everything.
+        Exports what you see ({filterLabel}). Clear the search and switch to “All” and “All time” to export everything.
       </Text>
     </SheetFrame>
   );

@@ -6,7 +6,7 @@
 // Entries can carry receipt photos (private `account-receipts` bucket, 030).
 // ============================================================================
 
-import { endOfMonth, format, startOfMonth } from 'date-fns';
+import { endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { uploadCheckoutPhoto } from '../store/workStore';
 import { Account, AccountSummary, AccountTransaction, TxnKind } from '../types/database';
@@ -50,6 +50,28 @@ export function money(v: number | string | null | undefined): string {
 export function rupees(v: number | string | null | undefined): string {
   const n = num(v);
   return `${n < 0 ? '−' : ''}₹${money(Math.abs(n))}`;
+}
+
+// ---------------------------------------------------------------------------
+// Search
+
+/**
+ * Does an entry match a search? Particular, category, the account's name,
+ * the date ("12 Nov", "12-11-2026") or the amount ("5000" finds 5,000).
+ * The same rule decides what is on screen and what is exported.
+ */
+export function txnMatches(
+  t: Pick<AccountTransaction, 'particular' | 'category' | 'txn_date' | 'amount'>,
+  search: string,
+  accountName?: string | null,
+): boolean {
+  const q = search.trim().toLowerCase();
+  if (!q) return true;
+  const d = parseISO(t.txn_date);
+  if ([t.particular, t.category, accountName, format(d, 'd MMM yyyy'), format(d, 'dd-MM-yyyy')].some((f) => f?.toLowerCase().includes(q)))
+    return true;
+  const digits = q.replace(/[,\s₹]/g, '');
+  return !!digits && /^[\d.]+$/.test(digits) && String(num(t.amount)).includes(digits);
 }
 
 // ---------------------------------------------------------------------------

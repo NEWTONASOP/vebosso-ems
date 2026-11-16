@@ -42,6 +42,7 @@ import {
   Period,
   periodLabel,
   rupees,
+  txnMatches,
   viewOnlyOwner,
 } from '../../../lib/accounts';
 import { useFeatureBase } from '../../../lib/featureAccess';
@@ -139,22 +140,13 @@ export default function AccountLedgerScreen() {
     if (category) set.add(category);
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [txns, category]);
-  /** The entries on screen: all of them, or one category's. */
   // Search: particular, category, amount or date ("salary", "5000", "12 Nov").
   const [query, setQuery] = useState('');
-  const shown = useMemo(() => {
-    const byCategory = category ? txns.filter((t) => t.category === category) : txns;
-    const q = query.trim().toLowerCase();
-    if (!q) return byCategory;
-    const digits = q.replace(/[,\s₹]/g, '');
-    return byCategory.filter((t) => {
-      const d = parseISO(t.txn_date);
-      return (
-        [t.particular, t.category, format(d, 'd MMM yyyy'), format(d, 'dd-MM-yyyy')].some((f) => f?.toLowerCase().includes(q)) ||
-        (!!digits && /^[\d.]+$/.test(digits) && String(num(t.amount)).includes(digits))
-      );
-    });
-  }, [txns, category, query]);
+  /** The entries on screen: one category's or all, then the search. */
+  const shown = useMemo(
+    () => txns.filter((t) => (!category || t.category === category) && txnMatches(t, query)),
+    [txns, category, query],
+  );
 
   const totals = useMemo(() => {
     let credit = 0;
@@ -526,7 +518,13 @@ export default function AccountLedgerScreen() {
         />
       ) : null}
       {account && sheet === 'export' ? (
-        <AccountExportSheet accounts={[account]} period={period} category={category} onDismiss={() => setSheet(null)} />
+        <AccountExportSheet
+          accounts={[account]}
+          period={period}
+          category={category}
+          search={query}
+          onDismiss={() => setSheet(null)}
+        />
       ) : null}
       {account && sheet === 'import' && !viewOnly ? (
         <AccountImportSheet

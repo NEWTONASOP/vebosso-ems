@@ -30,6 +30,7 @@ import {
   periodLabel,
   rupees,
   splitBooks,
+  txnMatches,
 } from '../../../lib/accounts';
 import { useFeatureBase } from '../../../lib/featureAccess';
 import { useAuthStore } from '../../../store/authStore';
@@ -149,13 +150,10 @@ export default function AccountsScreen() {
     return { credit, debit, balance: credit - debit };
   }, [catEntries]);
 
-  const catList = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return catEntries;
-    return catEntries.filter((t) =>
-      [accountName.get(t.account_id), t.particular].some((f) => f?.toLowerCase().includes(q)),
-    );
-  }, [catEntries, query, accountName]);
+  const catList = useMemo(
+    () => catEntries.filter((t) => txnMatches(t, query, accountName.get(t.account_id))),
+    [catEntries, query, accountName],
+  );
 
   const master = useMemo(() => {
     let credit = 0;
@@ -433,6 +431,8 @@ export default function AccountsScreen() {
           accounts={category ? accounts : list.length ? list : accounts}
           period={period}
           category={category}
+          // Without a category the search picks accounts (the list above); with one, entries.
+          search={category ? query : ''}
           onDismiss={() => setSheet(null)}
         />
       ) : null}

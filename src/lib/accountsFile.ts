@@ -48,15 +48,15 @@ function totals(txns: AccountTransaction[]) {
 
 const safeName = (s: string) => s.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Accounts';
 
-function fileBase(ledgers: LedgerForExport[], period: Period, category: string | null) {
+function fileBase(ledgers: LedgerForExport[], period: Period, category: string | null, search: string | null) {
   const who = ledgers.length === 1 ? ledgers[0].account.name : 'All accounts';
   const when = period ? format(period, 'MMM yyyy') : 'All time';
-  return safeName(`${who} - ${category ? `${category} - ` : ''}${when}`);
+  return safeName(`${who} - ${category ? `${category} - ` : ''}${search ? `${search} - ` : ''}${when}`);
 }
 
-/** "Salary · March 2026", or just the period. */
-const filterLabel = (period: Period, category: string | null) =>
-  `${category ? `${category} · ` : ''}${periodLabel(period)}`;
+/** "Salary · “rent” · March 2026", or just the period. */
+const filterLabel = (period: Period, category: string | null, search: string | null) =>
+  `${category ? `${category} · ` : ''}${search ? `“${search}” · ` : ''}${periodLabel(period)}`;
 
 // ---------------------------------------------------------------------------
 // Export
@@ -67,11 +67,12 @@ export async function exportLedgers(
   period: Period,
   fmt: ExportFormat,
   category: string | null = null,
+  search: string | null = null,
 ): Promise<void> {
-  const base = fileBase(ledgers, period, category);
-  if (fmt === 'xlsx') return shareXlsx(buildWorkbook(ledgers, period, category), `${base}.xlsx`);
+  const base = fileBase(ledgers, period, category, search);
+  if (fmt === 'xlsx') return shareXlsx(buildWorkbook(ledgers, period, filterLabel(period, category, search)), `${base}.xlsx`);
   if (fmt === 'csv') return shareText(buildCsv(ledgers), `${base}.csv`, 'text/csv');
-  return sharePdf(buildHtml(ledgers, period, category), `${base}.pdf`);
+  return sharePdf(buildHtml(ledgers, filterLabel(period, category, search)), `${base}.pdf`);
 }
 
 function ledgerAoa(txns: AccountTransaction[]): (string | number)[][] {
@@ -90,13 +91,13 @@ function ledgerAoa(txns: AccountTransaction[]): (string | number)[][] {
   ];
 }
 
-function buildWorkbook(ledgers: LedgerForExport[], period: Period, category: string | null): XLSX.WorkBook {
+function buildWorkbook(ledgers: LedgerForExport[], period: Period, label: string): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
   const cols = [{ wch: 12 }, { wch: 40 }, { wch: 14 }, { wch: 14 }];
 
   if (ledgers.length > 1) {
     const rows: (string | number)[][] = [
-      ['Accounts summary', filterLabel(period, category)],
+      ['Accounts summary', label],
       [],
       ['Account', 'Credit(₹)', 'Debit(₹)', 'Balance(₹)'],
     ];
@@ -154,7 +155,7 @@ function buildCsv(ledgers: LedgerForExport[]): string {
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-function buildHtml(ledgers: LedgerForExport[], period: Period, category: string | null): string {
+function buildHtml(ledgers: LedgerForExport[], label: string): string {
   const all = ledgers.flatMap((l) => l.txns);
   const grand = totals(all);
 
@@ -205,7 +206,7 @@ function buildHtml(ledgers: LedgerForExport[], period: Period, category: string 
     section { page-break-inside: auto; }
   </style></head><body>
     <h1>${esc(ledgers.length === 1 ? ledgers[0].account.name : 'All accounts')}</h1>
-    <div class="sub">${esc(filterLabel(period, category))} · exported ${format(new Date(), 'd MMM yyyy, h:mm a')} · VEBOSSO EMS</div>
+    <div class="sub">${esc(label)} · exported ${format(new Date(), 'd MMM yyyy, h:mm a')} · VEBOSSO EMS</div>
     <div class="cards">
       <div class="card"><span>Credit</span><b>₹${money(grand.credit)}</b></div>
       <div class="card"><span>Debit</span><b>₹${money(grand.debit)}</b></div>
