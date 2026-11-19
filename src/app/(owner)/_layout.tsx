@@ -10,7 +10,7 @@ import { CustomTabBar, useDesktopSceneStyle } from '../../components/CustomTabBa
 import { NavgrahLogo } from '../../components/NavgrahLogo';
 import { SIDEBAR_WIDTH } from '../../constants/theme';
 import { useResponsive } from '../../lib/responsive';
-import { syncBillAlarms } from '../../lib/billAlarms';
+import { askForMissingAlarmPermissions, syncBillAlarms } from '../../lib/billAlarms';
 import { useAuthStore } from '../../store/authStore';
 
 export default function OwnerLayout() {
@@ -18,12 +18,15 @@ export default function OwnerLayout() {
   const desktopScene = useDesktopSceneStyle();
   const role = useAuthStore((s) => s.profile?.role);
 
-  // Event alarms (Android): set when the app opens and whenever it comes back.
+  // Event alarms (Android): set when the app opens and whenever it comes back;
+  // an owner whose phone still has to allow something is told (once a day).
   useEffect(() => {
     if (!role) return;
-    void syncBillAlarms(role);
+    const sync = () =>
+      void syncBillAlarms(role).then(() => (role === 'owner' ? askForMissingAlarmPermissions() : undefined));
+    sync();
     const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'active') void syncBillAlarms(role);
+      if (s === 'active') sync();
     });
     return () => sub.remove();
   }, [role]);

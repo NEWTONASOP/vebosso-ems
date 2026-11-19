@@ -8,8 +8,10 @@
 // ============================================================================
 
 import { addDays, format, parseISO } from 'date-fns';
+import * as SecureStore from 'expo-secure-store';
 import * as BillAlarm from '../../modules/bill-alarm';
 import type { EventAlarm } from '../../modules/bill-alarm';
+import { Alert } from './alert';
 import { BillSummary, fetchBills } from './bills';
 
 export const ALARM_HOUR = 11;
@@ -83,6 +85,52 @@ export function alarmProblems(): { which: 'exactAlarms' | 'fullScreen' | 'notifi
   if (!s.exactAlarms) out.push({ which: 'exactAlarms', text: '“Alarms & reminders” is not allowed' });
   if (!s.fullScreen) out.push({ which: 'fullScreen', text: 'Full-screen alerts are not allowed' });
   return out;
+}
+
+const ASKED_KEY = 'event_alarms_asked_on';
+// Sent to a settings page from here: on coming back, ask for the next one
+// straight away (one page per permission — Android opens one at a time).
+let allowing = false;
+
+/**
+ * Owner's phone missing something the alarms need: say so, with a button to
+ * the right settings page (Android has no Allow popup for these). At most
+ * once a day — except straight after "Allow", to go on to the next missing
+ * one. Settings → Event alarms shows it any time.
+ */
+export async function askForMissingAlarmPermissions(): Promise<void> {
+  const problems = alarmProblems();
+  if (!problems.length) {
+    allowing = false;
+    return;
+  }
+  const today = format(new Date(), 'yyyy-MM-dd');
+  if (!allowing) {
+    try {
+      if ((await SecureStore.getItemAsync(ASKED_KEY)) === today) return;
+      await SecureStore.setItemAsync(ASKED_KEY, today);
+    } catch {
+      // Can't remember the day: ask anyway.
+    }
+  }
+  allowing = false;
+  const time = `${ALARM_HOUR}:${String(ALARM_MINUTE).padStart(2, '0')} AM`;
+  Alert.alert(
+    'Allow event alarms',
+    `This phone rings like an alarm at ${time}, 2 days and 1 day before each pending client bill's event. ` +
+      `To ring properly it needs:\n\n• ${problems.map((p) => p.text).join('\n• ')}\n\n` +
+      'Tap Allow and switch it on. You can also do this later in Settings → Event alarms.',
+    [
+      { text: 'Later', style: 'cancel' },
+      {
+        text: problems.length > 1 ? `Allow (1 of ${problems.length})` : 'Allow',
+        onPress: () => {
+          allowing = true;
+          BillAlarm.openSettings(problems[0].which);
+        },
+      },
+    ],
+  );
 }
 
 /** "Tue 17 Nov, 11:32 AM" for the next alarm, or null. */

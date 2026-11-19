@@ -6,7 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React from 'react';
-import { ScrollView, Pressable, StyleSheet, View } from 'react-native';
+import { AppState, ScrollView, Pressable, StyleSheet, View } from 'react-native';
 import { Snackbar, Switch, Text } from 'react-native-paper';
 import { APP_NAME } from '../../../constants/roles';
 import {
@@ -261,10 +261,15 @@ function EventAlarmsRow() {
   const role = useAuthStore((s) => s.profile?.role);
   const [state, setState] = React.useState(() => ({ problems: alarmProblems(), next: nextAlarmLabel() }));
   const refresh = React.useCallback(() => setState({ problems: alarmProblems(), next: nextAlarmLabel() }), []);
-  // Coming back from the phone's settings: look again.
+  // Opening Settings, and coming back from the phone's own settings page
+  // (the app returns to the foreground — the screen itself never lost focus): look again.
   useFocusEffect(
     React.useCallback(() => {
       void syncBillAlarms(role).then(refresh);
+      const sub = AppState.addEventListener('change', (s) => {
+        if (s === 'active') void syncBillAlarms(role).then(refresh);
+      });
+      return () => sub.remove();
     }, [role, refresh]),
   );
 
