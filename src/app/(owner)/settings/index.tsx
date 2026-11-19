@@ -4,7 +4,7 @@
 
 import { Feather } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React from 'react';
 import { ScrollView, Pressable, StyleSheet, View } from 'react-native';
 import { Snackbar, Switch, Text } from 'react-native-paper';
@@ -24,6 +24,8 @@ import { BugReportSheet } from '../../../components/BugReportSheet';
 import { ProfilePhotoEditor } from '../../../components/ProfilePhotoEditor';
 import { useWorkStore } from '../../../store/workStore';
 import { useSundayReminder } from '../../../lib/useSundayReminder';
+import * as BillAlarm from '../../../../modules/bill-alarm';
+import { ALARM_HOUR, ALARM_MINUTE, alarmProblems, nextAlarmLabel, syncBillAlarms } from '../../../lib/billAlarms';
 
 export default function OwnerSettingsScreen() {
   const router = useRouter();
@@ -142,6 +144,12 @@ export default function OwnerSettingsScreen() {
           </View>
           <View style={styles.separator} />
           <SundaySummaryRow />
+          {BillAlarm.isAvailable() ? (
+            <>
+              <View style={styles.separator} />
+              <EventAlarmsRow />
+            </>
+          ) : null}
         </View>
 
         {/* Account */}
@@ -242,6 +250,60 @@ function SundaySummaryRow() {
       </View>
       <Switch value={enabled} onValueChange={(v) => void toggle(v)} disabled={saving} color={AppTheme.charcoal} />
     </View>
+  );
+}
+
+/**
+ * Event alarms on this phone (Android app): what is set, what the phone still
+ * has to allow, and a test alarm.
+ */
+function EventAlarmsRow() {
+  const role = useAuthStore((s) => s.profile?.role);
+  const [state, setState] = React.useState(() => ({ problems: alarmProblems(), next: nextAlarmLabel() }));
+  const refresh = React.useCallback(() => setState({ problems: alarmProblems(), next: nextAlarmLabel() }), []);
+  // Coming back from the phone's settings: look again.
+  useFocusEffect(
+    React.useCallback(() => {
+      void syncBillAlarms(role).then(refresh);
+    }, [role, refresh]),
+  );
+
+  const time = `${ALARM_HOUR}:${String(ALARM_MINUTE).padStart(2, '0')} AM`;
+  const subtitle = state.problems.length
+    ? `Needs: ${state.problems.map((p) => p.text).join(' · ')}`
+    : state.next
+      ? `Next: ${state.next}`
+      : `Rings 2 days and 1 day before each pending client bill, ${time}`;
+
+  const open = () => {
+    const fix = state.problems[0];
+    Alert.alert(
+      'Event alarms',
+      `This phone rings like an alarm at ${time}, 2 days and 1 day before every pending client bill's event.` +
+        (fix ? `\n\nTo ring properly: ${state.problems.map((p) => p.text).join('; ')}.` : ''),
+      [
+        ...(fix ? [{ text: 'Allow', onPress: () => BillAlarm.openSettings(fix.which) }] : []),
+        {
+          text: 'Test (rings in 1 min)',
+          onPress: () => {
+            BillAlarm.test(60);
+            Alert.alert('Test alarm set', 'It rings in about a minute. You can lock the phone to see the alarm screen.');
+          },
+        },
+        { text: 'Close', style: 'cancel' as const },
+      ],
+    );
+  };
+
+  return (
+    <SettingsRow
+      icon="clock"
+      iconColor={state.problems.length ? AppTheme.coral : AppTheme.violet}
+      iconBg={state.problems.length ? AppTheme.coralSoft : AppTheme.violetSoft}
+      title="Event alarms"
+      subtitle={subtitle}
+      onPress={open}
+    />
   );
 }
 

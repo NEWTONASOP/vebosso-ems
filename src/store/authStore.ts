@@ -374,6 +374,12 @@ export const useAuthStore = create<AuthState>((set, get) => {
         // This device only — their other phones / browsers stay signed in.
         await signOutThisDevice();
 
+        // No event alarms for whoever uses this phone next.
+        if (Platform.OS === 'android') {
+          const { clearBillAlarms } = await import('../lib/billAlarms');
+          clearBillAlarms();
+        }
+
         set({
           session: null,
           profile: null,

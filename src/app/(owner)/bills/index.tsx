@@ -20,6 +20,7 @@ import { rupees } from '../../../lib/accounts';
 import { BRAND_KEYS, BRANDS, brandOf } from '../../../lib/billBrands';
 import { BILL_STATUS_TONE, BillSummary, billTotals, fetchBills, KIND_LABEL, KIND_TAB, printState, STATUS_LABEL } from '../../../lib/bills';
 import { useMyAccess } from '../../../lib/accessRules';
+import { syncBillAlarms } from '../../../lib/billAlarms';
 import { useFeatureBase } from '../../../lib/featureAccess';
 import { useAuthStore } from '../../../store/authStore';
 import { BillBrand, BillKind, BillStatus } from '../../../types/database';
@@ -89,6 +90,9 @@ export default function BillsScreen() {
     if (res.success) {
       setBills(res.data);
       setError('');
+      // Event alarms on this (owner's) phone follow the bills just loaded.
+      const role = useAuthStore.getState().profile?.role;
+      if (role === 'owner') void syncBillAlarms(role, res.data);
     } else setError(res.error);
     setIsLoading(false);
   }, []);

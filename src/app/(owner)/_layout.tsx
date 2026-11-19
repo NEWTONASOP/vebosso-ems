@@ -4,15 +4,29 @@
 
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
+import { useEffect } from 'react';
+import { AppState, Platform } from 'react-native';
 import { CustomTabBar, useDesktopSceneStyle } from '../../components/CustomTabBar';
 import { NavgrahLogo } from '../../components/NavgrahLogo';
 import { SIDEBAR_WIDTH } from '../../constants/theme';
 import { useResponsive } from '../../lib/responsive';
+import { syncBillAlarms } from '../../lib/billAlarms';
+import { useAuthStore } from '../../store/authStore';
 
 export default function OwnerLayout() {
   const { isDesktop } = useResponsive();
   const desktopScene = useDesktopSceneStyle();
+  const role = useAuthStore((s) => s.profile?.role);
+
+  // Event alarms (Android): set when the app opens and whenever it comes back.
+  useEffect(() => {
+    if (!role) return;
+    void syncBillAlarms(role);
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') void syncBillAlarms(role);
+    });
+    return () => sub.remove();
+  }, [role]);
 
   return (
     <Tabs

@@ -88,6 +88,11 @@ const UncontrolledTextInput = forwardRef<TextInput, TextInputProps>(function Unc
 
   // What is in the box right now, as far as this component knows.
   const typed = useRef(value ?? defaultValue ?? '');
+  // The last few texts typed here. On a busy screen (a search redrawing many
+  // results) `value` comes back a keystroke or two late; an older typed text
+  // arriving then is that delay, not the screen setting new text — taking it
+  // as new text restarted the box, closing the keyboard mid-word.
+  const recent = useRef<string[]>([]);
   // What the box starts with, and a key to start it over with new text.
   const [seed, setSeed] = useState(value ?? defaultValue ?? '');
   const [generation, setGeneration] = useState(0);
@@ -95,8 +100,14 @@ const UncontrolledTextInput = forwardRef<TextInput, TextInputProps>(function Unc
   useEffect(() => {
     // Uncontrolled use (no value given): nothing to follow.
     if (value === undefined || value === null) return;
-    if (value === typed.current) return;
+    if (value === typed.current) {
+      // Caught up with the typing.
+      recent.current = [];
+      return;
+    }
+    if (recent.current.includes(value)) return;
     typed.current = value;
+    recent.current = [];
     if (value === '') {
       // Cleared by the screen (e.g. after sending): empty it, keep the keyboard up.
       inner.current?.clear();
@@ -114,6 +125,9 @@ const UncontrolledTextInput = forwardRef<TextInput, TextInputProps>(function Unc
       {...rest}
       defaultValue={seed}
       onChangeText={(text) => {
+        // Empty is never remembered: a screen clearing the box (after sending) must always work.
+        if (typed.current) recent.current.push(typed.current);
+        if (recent.current.length > 30) recent.current.shift();
         typed.current = text;
         onChangeText?.(text);
       }}
