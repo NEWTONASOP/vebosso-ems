@@ -8,7 +8,7 @@
 // ============================================================================
 
 import { Feather } from '@expo/vector-icons';
-import { differenceInCalendarDays, format, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
@@ -18,7 +18,7 @@ import { BillSettingsSheet } from '../../../components/BillSettingsSheet';
 import { AppTheme as T, appSoftShadow, screenChrome } from '../../../constants/theme';
 import { rupees } from '../../../lib/accounts';
 import { BRAND_KEYS, BRANDS, brandOf } from '../../../lib/billBrands';
-import { BILL_STATUS_TONE, BillSummary, billTotals, fetchBills, KIND_LABEL, KIND_TAB, printState, STATUS_LABEL } from '../../../lib/bills';
+import { BILL_STATUS_TONE, BillSummary, billTotals, fetchBills, KIND_LABEL, KIND_TAB, printState, setBillListOrder, STATUS_LABEL } from '../../../lib/bills';
 import { useMyAccess } from '../../../lib/accessRules';
 import { syncBillAlarms } from '../../../lib/billAlarms';
 import { useFeatureBase } from '../../../lib/featureAccess';
@@ -34,15 +34,6 @@ const SORTS: { key: Sort; label: string; icon: keyof typeof Feather.glyphMap }[]
   { key: 'recent', label: 'Recently created', icon: 'plus-circle' },
   { key: 'edited', label: 'Recently edited', icon: 'edit-3' },
 ];
-
-/** Short age: Today, Yesterday, 3d ago, then the date. */
-const created = (iso: string) => {
-  const days = differenceInCalendarDays(new Date(), new Date(iso));
-  if (days <= 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days}d ago`;
-  return format(new Date(iso), new Date(iso).getFullYear() === new Date().getFullYear() ? 'd MMM' : 'd MMM yy');
-};
 
 const FILTERS: Record<BillKind, Filter[]> = {
   estimate: ['all', 'draft', 'trash'],
@@ -166,6 +157,8 @@ export default function BillsScreen() {
         return a.updated_at < b.updated_at ? 1 : -1;
       });
   }, [ofKind, filter, query, today, sort]);
+  // An open bill steps to its neighbours in this same order.
+  useEffect(() => setBillListOrder(shown), [shown]);
   // A page at a time — a year of bills was slow to draw.
   const billPage = usePaged(shown, `${brand}-${kind}-${filter}-${query}-${sort}`);
 
@@ -219,7 +212,12 @@ export default function BillsScreen() {
             <Pressable
               key={k}
               onPress={() => setBrand(k)}
-              style={[styles.brandBtn, active && { backgroundColor: t.primary, borderColor: t.primary }]}
+              style={[
+                styles.brandBtn,
+                // VEBOSSO 30% : Navgrah 70%.
+                k === 'vebosso' ? styles.brandBtnSmall : styles.brandBtnBig,
+                active && { backgroundColor: t.primary, borderColor: t.primary },
+              ]}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               accessibilityLabel={`${t.label} bills`}
@@ -229,7 +227,15 @@ export default function BillsScreen() {
                   <View key={c} style={[styles.brandDot, { backgroundColor: c }, active && styles.brandDotOnDark]} />
                 ))}
               </View>
-              <Text style={[styles.brandText, active && styles.brandTextActive]}>{t.label}</Text>
+              <Text
+                style={[styles.brandText, active && styles.brandTextActive, { flexShrink: 1 }]}
+                numberOfLines={1}
+                // The narrow VEBOSSO button: the name shrinks a little rather than being cut.
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
+              >
+                {t.label}
+              </Text>
             </Pressable>
           );
         })}
@@ -355,10 +361,7 @@ export default function BillsScreen() {
                 accessibilityLabel={`${b.number ?? 'Draft'} ${b.client_name ?? ''}`}
               >
                 <View style={styles.cardTop}>
-                  <Text style={styles.number}>
-                    {b.number ?? 'Draft'}
-                    <Text style={styles.age}>{`  ·  ${created(b.created_at)}`}</Text>
-                  </Text>
+                  <Text style={styles.number}>{b.number ?? 'Draft'}</Text>
                   <View style={styles.pills}>
                     {/* Still to print (079): a printed bill shows nothing here. */}
                     {printState(b) === 'not' || printState(b) === 'changed' ? (
@@ -385,7 +388,7 @@ export default function BillsScreen() {
                     <Feather name="calendar" size={13} color={b.function_date ? T.inkSoft : T.mute} />
                     <Text style={styles.factLabel}>Event date</Text>
                     <Text style={[styles.factText, !b.function_date && styles.factEmpty]} numberOfLines={1}>
-                      {b.function_date ? format(parseISO(b.function_date), 'EEE, d MMM yyyy') : 'No date yet'}
+                      {b.function_date ? format(parseISO(b.function_date), 'd MMM yyyy, EEE') : 'No date yet'}
                     </Text>
                   </View>
                   <View style={styles.fact}>
@@ -437,6 +440,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
+  brandBtnSmall: { flex: 3, gap: 5, paddingHorizontal: 6 },
+  brandBtnBig: { flex: 7 },
   brandDots: { flexDirection: 'row', gap: 3 },
   brandDot: { width: 8, height: 8, borderRadius: 4 },
   brandDotOnDark: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },
@@ -544,7 +549,6 @@ const styles = StyleSheet.create({
   card: { backgroundColor: T.card, borderRadius: 18, padding: 14, gap: 3, ...appSoftShadow },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   number: { fontFamily: 'Inter_700Bold', fontSize: 12.5, color: T.mute, letterSpacing: 0.4 },
-  age: { fontFamily: 'Inter_500Medium', fontSize: 12, color: T.mute, letterSpacing: 0 },
   status: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 9 },
   pills: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
   printPill: { backgroundColor: '#FFF4DE' },

@@ -37,6 +37,7 @@ import { sendBillOnWhatsApp, sendBillVideoOnWhatsApp, shareBillPdf, waNumber } f
 import { uploadBillVideo } from '../../../lib/cloudinary';
 import {
   BILL_STATUS_TONE,
+  billNeighbours,
   billTotals,
   convertToClientBill,
   createDraft,
@@ -842,8 +843,8 @@ export default function BillEditorScreen() {
             </View>
           </View>
           <View style={styles.headerActions}>
-            <Pressable style={styles.iconBtn} onPress={() => setShowHistory(true)} accessibilityLabel="Edit history">
-              <Feather name="clock" size={16} color={T.inkSoft} />
+            <Pressable style={[styles.iconBtn, styles.historyBtn]} onPress={() => setShowHistory(true)} accessibilityLabel="Edit history">
+              <Feather name="clock" size={17} color={T.violet} />
             </Pressable>
             {/* Bills are never deleted: trash is final, and can be restored. */}
             {!inTrash && canTrashBill ? (
@@ -853,6 +854,25 @@ export default function BillEditorScreen() {
             ) : null}
           </View>
         </View>
+
+        {(() => {
+          const near = billNeighbours(bill.id);
+          const go = (b: { id: string } | null) => b && router.replace(`${billsBase}/${b.id}` as any);
+          if (!near || near.count < 2) return null;
+          return (
+            <View style={styles.navRow}>
+              <Pressable style={[styles.navBtn, !near.prev && styles.navOff]} onPress={() => go(near.prev)} disabled={!near.prev} accessibilityLabel="Previous bill">
+                <Feather name="chevron-left" size={18} color={T.ink} />
+                <Text style={styles.navText} numberOfLines={1}>Previous</Text>
+              </Pressable>
+              <Text style={styles.navCount}>{near.at} of {near.count}</Text>
+              <Pressable style={[styles.navBtn, styles.navBtnNext, !near.next && styles.navOff]} onPress={() => go(near.next)} disabled={!near.next} accessibilityLabel="Next bill">
+                <Text style={styles.navText} numberOfLines={1}>Next</Text>
+                <Feather name="chevron-right" size={18} color={T.ink} />
+              </Pressable>
+            </View>
+          );
+        })()}
 
         <View style={styles.page}>
           <BillPage bill={bill} settings={settings} />
@@ -985,8 +1005,8 @@ export default function BillEditorScreen() {
             <Feather name="eye" size={16} color={T.ink} />
           </Pressable>
           {saved ? (
-            <Pressable style={styles.iconBtn} onPress={() => setShowHistory(true)} accessibilityLabel="Edit history">
-              <Feather name="clock" size={16} color={T.inkSoft} />
+            <Pressable style={[styles.iconBtn, styles.historyBtn]} onPress={() => setShowHistory(true)} accessibilityLabel="Edit history">
+              <Feather name="clock" size={17} color={T.violet} />
             </Pressable>
           ) : null}
           {bill && !inTrash && canTrashBill ? (
@@ -1478,6 +1498,8 @@ const styles = StyleSheet.create({
   statusPillText: { fontFamily: 'Inter_700Bold', fontSize: 11 },
   draftNote: { fontFamily: 'Inter_400Regular', fontSize: 12, color: T.mute },
   headerActions: { flexDirection: 'row', gap: 6 },
+  // Edit history: tinted so it stands out from the plain trash button.
+  historyBtn: { backgroundColor: T.violetSoft, borderWidth: 1, borderColor: 'rgba(96, 52, 219, 0.25)' },
   iconBtn: {
     width: 40,
     height: 40,
@@ -1503,6 +1525,12 @@ const styles = StyleSheet.create({
   segText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: T.inkSoft },
   segTextActive: { color: T.ink },
   page: { flex: 1 },
+  navRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 8 },
+  navBtn: { flex: 1, height: 38, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, backgroundColor: T.card, borderWidth: 1, borderColor: T.hairline },
+  navBtnNext: { justifyContent: 'flex-end' },
+  navText: { flexShrink: 1, fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.ink },
+  navOff: { opacity: 0.35 },
+  navCount: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: T.inkSoft, minWidth: 48, textAlign: 'center' },
   viewBar: {
     backgroundColor: T.card,
     paddingHorizontal: 16,

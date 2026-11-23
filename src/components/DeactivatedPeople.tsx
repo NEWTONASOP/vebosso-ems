@@ -1,7 +1,7 @@
 // ============================================================================
 // VEBOSSO EMS — Deactivated people (owner's Dashboard)
 // People the owner has deactivated are kept out of the team everywhere else.
-// They are listed here, folded away, as ordinary member cards: tap one to open
+// They are listed at the bottom, folded into a small link, as ordinary member cards: tap one to open
 // the same sheet as for anyone else (attendance, tasks, documents, salary, chat…),
 // or reactivate them. Shows nothing when nobody is deactivated.
 // ============================================================================
@@ -80,6 +80,24 @@ export function DeactivatedPeople({
 
   if (people.length === 0) return null;
 
+  // Folded: just a small grey link, out of the way.
+  if (!open)
+    return (
+      <Pressable
+        style={styles.link}
+        onPress={() => setOpen(true)}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: false }}
+      >
+        <Feather name="user-x" size={13} color={T.mute} />
+        <Text style={styles.linkText}>
+          {people.length} deactivated {people.length === 1 ? 'person' : 'people'}
+        </Text>
+        <Feather name="chevron-down" size={14} color={T.mute} />
+      </Pressable>
+    );
+
   return (
     <View style={styles.card}>
       <Pressable
@@ -139,6 +157,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     ...appSoftShadow,
   },
+  link: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14, paddingVertical: 6 },
+  linkText: { fontFamily: 'Inter_500Medium', fontSize: 12.5, color: T.mute },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   headIcon: {
     width: 36,

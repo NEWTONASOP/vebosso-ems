@@ -322,3 +322,15 @@ export async function saveBillSettings(brand: BillBrand, s: Partial<BillSettings
   if (error) return fail(error);
   return { success: true, data: undefined };
 }
+
+// The Bills list as last shown (brand, type, filter, search, sort), so an open
+// bill can step to the one before or after it without going back.
+let listOrder: { id: string; number: string | null }[] = [];
+export const setBillListOrder = (bills: { id: string; number: string | null }[]) => {
+  listOrder = bills.map((b) => ({ id: b.id, number: b.number }));
+};
+export function billNeighbours(id: string) {
+  const i = listOrder.findIndex((b) => b.id === id);
+  if (i < 0) return null;
+  return { prev: listOrder[i - 1] ?? null, next: listOrder[i + 1] ?? null, at: i + 1, count: listOrder.length };
+}

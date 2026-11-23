@@ -420,17 +420,6 @@ export default function OwnerDashboard() {
               </>
             )}
 
-            <DeactivatedPeople
-              onOpen={(member) => {
-                setMenuDialog(null);
-                setMenuMember(member);
-              }}
-              onChanged={(message) => {
-                setSnackMessage(message);
-                void loadData();
-              }}
-            />
-
             <View style={styles.bottomActions}>
               <AnimatedPressable
                 scaleTo={0.98}
@@ -457,6 +446,18 @@ export default function OwnerDashboard() {
                 <Text style={styles.addMemberText}>Departments</Text>
               </AnimatedPressable>
             </View>
+
+            {/* Rarely needed: a small link at the very bottom. */}
+            <DeactivatedPeople
+              onOpen={(member) => {
+                setMenuDialog(null);
+                setMenuMember(member);
+              }}
+              onChanged={(message) => {
+                setSnackMessage(message);
+                void loadData();
+              }}
+            />
           </Animated.View>
 
         </ScrollView>
