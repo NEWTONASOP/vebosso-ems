@@ -1,198 +1,152 @@
-# VEBOSSO EMS — Employee Management System
+# VEBOSSO EMS
 
-> A production-quality Employee Management System built for internal workforce management, powered by **Expo SDK 56**, **React Native 0.85**, **TypeScript 6**, and **Supabase**.
+> The internal app VEBOSSO runs the business on: attendance, tasks and leave for the team, plus bills, accounts, leads and venues for the events side. Built with **Expo SDK 56**, **React Native 0.85**, **TypeScript 6** and **Supabase**. It ships as an Android APK and as a web app.
 
----
-
-## Documentation
-
-| Document | Audience | Purpose |
-|---|---|---|
-| **[CLIENT_GUIDE.md](./CLIENT_GUIDE.md)** | Client / end users | APK install, login, daily use, roles, troubleshooting |
-| **README.md** (this file) | Developers | Setup, database, builds, architecture |
+Current version: **2.1.0** (Android package `com.vebosso.ems`).
 
 ---
 
-## Client Delivery (APK Only)
+## Roles and access
 
-When handing off to the client **without source code**, ship a folder like:
-
-```
-VEBOSSO_EMS_Delivery_v1.2.7/
-├── vebosso-ems-v1.2.7.apk
-├── CLIENT_GUIDE.md
-└── Owner_Login.txt          ← optional; share credentials out-of-band instead
-```
-
-### Pre-delivery checklist
-
-1. **Build production APK** — `npm run build:prod` or trigger the GitHub Actions workflow (see [Building the App](#building-the-app))
-2. **Verify backend is live** — Supabase migrations applied, edge functions deployed, Realtime enabled
-3. **Confirm owner account** — `seed.sql` run (or existing owner); password changed or ready for forced change on first login
-4. **Set update URLs in Supabase** — `app_settings` keys `latest_version` and `download_url` (updated automatically by CI on release)
-5. **Test on a real Android device** — login, check-in, approval, checkout with photo, push notification
-6. **Rename APK** — e.g. `vebosso-ems-v1.2.7.apk` to match `app.json` version
-7. **Send CLIENT_GUIDE.md** with the APK — do **not** include `.env`, keystore, or service role keys
-
-### What the client gets vs. what stays with you
-
-| Include with client | Keep internal |
+| Role | What they get |
 |---|---|
-| Signed release APK | Source code (unless contracted) |
-| CLIENT_GUIDE.md | `.env`, Supabase service role key |
-| Owner login (secure channel) | Android keystore / signing secrets |
-| Support contact | `google-services.json`, Firebase console |
+| **Owner** | Everything: the team, approvals, every feature, access rules, sessions, recycle bin, bug reports, event alarms |
+| **Manager** | Their team's approvals, tasks and history, plus whichever features the owner gives them |
+| **Member** | Check-in and check-out, their own tasks, leave and history, plus whichever features the owner gives them |
 
----
-
-## What Is This App?
-
-VEBOSSO EMS is a mobile-first internal tool that lets a company manage employee attendance, tasks, leave, and announcements — all with a role-based access model. Employees check in daily with a work plan, get approved by their manager or owner, complete tasks, and check out with an end-of-day report.
-
----
-
-## Role-Based Access
-
-| Role | Capabilities |
-|---|---|
-| **Owner** | Full access: create/delete members, force-logout, manage sessions, announcements, approve all check-ins, assign managers, view all history |
-| **Manager** | Approve team check-ins/check-outs, assign tasks, view team history, create announcements for team |
-| **Member** | Check-in with daily plan, view & update tasks, check-out with report, view own history, request leave |
+Bills, Accounts, Leads and Venues are **features**. The owner turns each one on per person and can narrow it with **access rules** (062–068): what someone can view, add, edit or delete, which brand or city they see, and whose records. Row Level Security enforces this in the database through `access_ok`, `access_list_ok` and `has_feature`, not just in the UI.
 
 ---
 
 ## Features
 
-### Core Workflows
-- ✅ **Daily Check-in** — Submit a work plan; waits for Owner/Manager approval
-- ⏳ **Approval Workflow** — Approve or reject check-ins and check-outs with rejection reasons
-- 📝 **Day-end Checkout** — Submit end-of-day summary with photo evidence; total hours auto-calculated
-- 📸 **Checkout Photos** — Attach photos at checkout, stored in a private Supabase Storage bucket
-- 📋 **Task Management** — Create, assign, track, and complete tasks with notes
-- 📢 **Announcements** — Targeted to all, managers, members, or a specific user
-- 📅 **Attendance History** — Calendar view of all work logs per user
-- 🕗 **Attendance Backfill** — Owner grants a one-time permission for a user to log a missed day
-- 🏖️ **Leave Requests** — Submit, approve, or reject leave requests
-- 📊 **Real-time Dashboard** — Live stats via Supabase Realtime subscriptions
-- 🔔 **Push + In-App Notifications** — Expo Push Service plus a persisted in-app notification center (bell + log)
-- 🔒 **Force Logout & Session Management** — Owner can remotely invalidate sessions (edge function + DB RPC)
-- 🔄 **In-App APK Updates** — Optional update prompt with in-app download and install
-- 👥 **Member Management** — Owner can add, edit, delete members, assign managers
-- 🌐 **Offline Detection** — Banner shown when network is unavailable
+### Team
+- **Check-in / check-out** with a work plan, photos and an end-of-day report; owner or manager approves, sends back or rejects
+- **Day timeline** of check-in, breaks, remarks and attachments per person (`work_log_events`, 075)
+- **Attendance history** calendar, owner backfill for a missed day, check-in and checkout reminders (pg_cron)
+- **Tasks**: assigned and self-made, with comments, review and completion notes
+- **Leave requests** with date ranges
+- **Departments**, employee details and documents, salary, owner notes, chat with the owner
+- **Location tracking** between check-in and check-out only (see below)
+- **Owner inbox** on Home: waiting approvals, remarks and attached files. Deactivated people sit in a small link at the bottom.
 
-### Technical Highlights
-- Supabase Realtime for live work log / task / announcement / notification updates
-- Row Level Security (RLS) on all 9 database tables + Storage bucket policies
-- 4 Deno Edge Functions for privileged operations
-- Zustand v5 global state with typed stores (auth, work, notifications)
-- Auth session persisted via Expo SQLite
-- React Native Reanimated 4 animations
-- Inter font (400–800) with Material Design 3 via React Native Paper
-- Error Boundary with graceful recovery
-- Loading skeleton states and empty state components
-- Expo Updates (OTA) + EAS build pipeline + GitHub Actions production APK workflow
-- Storage cleanup trigger — checkout photos deleted automatically when a profile is removed
+### Bills (`(owner)/bills`)
+- Two brands, **VEBOSSO** and **Navgrah**, each with its own letterhead and settings. The list opens on Navgrah.
+- Three kinds:
+  - **Estimates** (`E-` numbers), which convert into client bills
+  - **Client bills**, pending or completed
+  - **Packages** (`P-` numbers, 077), which are never completed or converted
+- Drafts save as you type. Trash can be restored, and every edit is logged (038).
+- **Printed mark** (079) on estimates and client bills: *Not printed*, *Printed*, or *Changed, print again* after an edit
+- PDF share and one-step WhatsApp send (`modules/whatsapp-share`). Photos go into automatic collages, up to 4 per page (`src/lib/photoLayout.ts`). Videos are stored on Cloudinary.
+- Inside a bill, **‹ Previous / Next ›** step through the list in its current filter, search and sort
+- **Event alarms** (Android, owners only, see below)
+
+### Accounts
+- Ledgers per account, private per person (036), with receipts, Excel import/export and PDF statements
+- **Categories** on entries (076), filterable inside one account or across all accounts
+- Search; the export follows the period, category and search shown
+
+### Leads (Navgrah)
+- Leads grouped by banquet, with several phone numbers, voice remarks and Excel import
+- One **Remark** label per lead (078), shown as sections inside each banquet. Long-press a label to remove it. The free-text box is **Notes**.
+
+### Venues
+- Venues by city and brand, with contacts, photos and proof. Shared or private per person.
+- **Bulk import** from Excel or CSV (`src/lib/venuesFile.ts`)
+
+### App-wide
+- Push notifications (Expo on Android, Web Push on the web) and an in-app notification log
+- Over-the-air updates plus an in-app APK updater
+- Recycle bin, in-app bug reports, offline banner, force logout
 
 ---
 
-## Tech Stack
+## Event alarms
+
+A local native module, [`modules/bill-alarm`](modules/bill-alarm), rings the phone like a clock alarm for **pending client bills**, on **owners' phones only**:
+
+- **When:** 2 days and 1 day before the function date, at **11:32 AM**
+- **Ringing:** the alarm sound plays for up to 1 minute with a full-screen page and no snooze. A quiet notification stays behind, and tapping it opens the bill.
+- **Kept up to date:** the phone's alarms are replaced with the current list whenever the app opens, comes back to the front, or Bills loads ([`src/lib/billAlarms.ts`](src/lib/billAlarms.ts)). A changed date, a completed bill or a trashed bill moves or drops its alarms.
+- **Restored** after a restart, an app update or a time change (boot receiver). Signing out clears them.
+- **Permissions:** the alarms need notifications, "Alarms & reminders" and full-screen alerts. The app asks at most once a day, chaining through whatever is missing. **Settings → Event alarms** shows the status and has a 1-minute test.
+
+Because it is native code, the alarm module needs a new APK; an OTA update alone does not add it.
+
+---
+
+## Location tracking
+
+Owners and managers see where a member is now and their trail for the day.
+
+- **Recording:** only between check-in and check-out, with a fix every 3 minutes or every 100 m. Fixes are queued offline.
+- **Permission gate:** members need notifications and "Allow all the time" location before they can use the app ([`PermissionGate.tsx`](src/components/PermissionGate.tsx)).
+- **Maps:** Leaflet on OpenStreetMap inside a WebView, so there's no Google Maps key or billing.
+- **Trail analysis:** [`locationTrail.ts`](src/lib/locationTrail.ts) works out stops (80 m, 8 minutes), distance, and drops fixes worse than 150 m.
+
+---
+
+## Tech stack
 
 | Technology | Version | Purpose |
 |---|---|---|
-| Expo | ~56.0.12 | App framework (managed workflow) |
-| React Native | 0.85.3 | UI framework |
-| React | 19.2.3 | UI runtime |
-| TypeScript | ~6.0.3 | Type safety |
-| Supabase JS | ^2.108.2 | Auth, Database, Realtime, Storage, Edge Functions |
-| Zustand | ^5.0.14 | Global state management |
-| React Native Paper | ^5.15.3 | Material Design 3 components |
-| Expo Router | ~56.2.11 | File-based navigation (typed routes) |
-| React Native Reanimated | 4.3.1 | Animations |
-| Expo Notifications | ~56.0.18 | Push + in-app notifications |
-| Expo Image Picker | ~56.0.20 | Checkout photo capture |
-| Expo Updates | ~56.0.19 | Over-the-air updates |
-| date-fns | ^4.4.0 | Date formatting |
-| @expo-google-fonts/inter | ^0.4.2 | Typography |
-| NetInfo | 12.0.1 | Offline detection |
+| Expo / Expo Router | ~56.0.12 / ~56.2.11 | App framework, file-based routes |
+| React Native / React | 0.85.3 / 19.2.3 | UI |
+| TypeScript | ~6.0.3 | Types |
+| Supabase JS | ^2.108.2 | Auth, Postgres, Realtime, Storage, Edge Functions |
+| Zustand | ^5.0.14 | State (auth, work, notifications, tab bar) |
+| React Native Paper | ^5.15.3 | Material 3 components |
+| Reanimated | 4.3.1 | Animations |
+| expo-notifications, expo-updates | ~56 | Push, OTA |
+| expo-location, react-native-webview | ~56.0.25, 13.16.1 | Tracking and maps |
+| expo-print, expo-sharing | ~56 | Bill and statement PDFs |
+| SheetJS (`xlsx`) | 0.20.3 | Excel/CSV import and export |
+| date-fns | ^4.4.0 | Dates |
 
-> Current app version: **1.2.7** (bundle `com.vebosso.ems`, min Android SDK 29).
+Local native modules live in [`modules/`](modules): `bill-alarm` and `whatsapp-share`. Config plugins live in [`plugins/`](plugins): APK installer, backup override and WhatsApp package queries.
 
 ---
 
-## Prerequisites
-
-- **Node.js** 18+ (20 recommended for CI parity)
-- **EAS CLI** (for builds): `npm install -g eas-cli`
-- **Supabase CLI** (for edge functions): `npm install -g supabase`
-- **Supabase account**: [supabase.com](https://supabase.com)
-
----
-
-## Quick Start
-
-### 1. Install Dependencies
+## Quick start
 
 ```bash
 npm install
+cp .env.example .env     # fill in the three values below
+npx expo start           # press r to reload, or start with -c to clear the cache
 ```
-
-### 2. Configure Environment
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your Supabase project credentials:
 
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 EXPO_PUBLIC_PROJECT_ID=your-expo-project-id
 ```
 
-### 3. Set Up the Database
+Expo Go can't load the native modules (alarms, WhatsApp send). Use a development build (`npm run build:dev`) to test those.
 
-Run the following migrations **in order** in your Supabase SQL Editor:
+---
 
-```
-supabase/migrations/001_initial_schema.sql               — Tables, indexes, triggers
-supabase/migrations/002_rls_policies.sql                 — Row Level Security policies
-supabase/migrations/003_add_version_control.sql          — Version control columns
-supabase/migrations/003_profile_self_read.sql            — Profile self-read fix
-supabase/migrations/003_manager_assignment_updates.sql   — Manager assignment support
-supabase/migrations/004_app_update_system.sql            — Version control & forced updates
-supabase/migrations/005_task_completion_notes.sql        — Task completion notes & timestamps
-supabase/migrations/006_fix_tasks_assigned_by_cascade.sql — Soft-delete for assigned_by
-supabase/migrations/007_security_hardening.sql           — RLS triggers, privilege escalation prevention, constraints
-supabase/migrations/008_fix_total_hours_security.sql     — Secure total-hours computation trigger
-supabase/migrations/009_notifications.sql                — In-app notifications table + realtime
-supabase/migrations/010_add_checkout_photos.sql          — Checkout photos column + private storage bucket
-supabase/migrations/011_attendance_backfills.sql         — Backfill permissions table + insert trigger
-supabase/migrations/011_force_logout_rpc.sql             — force_logout_user() DB function
-supabase/migrations/012_storage_cleanup_trigger.sql      — Delete checkout photos when a profile is deleted
-```
+## Database
 
-Then run the seed to create the owner account:
+Run every file in [`supabase/migrations/`](supabase/migrations) **in numeric order** in the Supabase SQL Editor (001 → 079; a few numbers have two files, so run both). Then run `supabase/seed.sql` for the owner account.
 
-```
-supabase/seed.sql
-```
+| Range | What it adds |
+|---|---|
+| 001–018 | Core schema, RLS, version control, notifications, checkout/check-in photos, backfills, force logout, cron reminders, security fixes |
+| 019, 028 | Location tracking and its integrity checks |
+| 020–023, 045, 049, 059–061 | Documents, salary, chat, profile photos, employee details, work documents, owner notes |
+| 024, 029, 033, 040, 043, 051–052, 065, 074 | Venues, cities, contacts, sharing, photos, brands |
+| 025–026, 036, 039, 041, 044, 076 | Expenses, accounts, receipts, pay dates, categories |
+| 027, 030–031, 038, 058, 064, 070–071, 077, 079 | Bills, access, brands, edit log, videos, PDFs, captions, packages, printed mark |
+| 042, 046–047, 050, 054, 078 | Navgrah leads, numbers, voice remarks, remark labels |
+| 062–068 | Access rules |
+| 032, 037, 048, 053, 055–057, 069, 072–073, 075 | Check-in reminders, task review, remarks, leave ranges, recycle bin, web push, bug reports, self tasks, work-log events |
 
-### 4. Enable Realtime
+The migrations add the live-updating tables to the Realtime publication themselves: work logs, tasks, announcements, notifications, locations, documents, expenses, venues and leads. If live updates don't arrive, check **Database → Replication**.
 
-In Supabase Dashboard → **Database → Replication**, enable Realtime on:
-- `work_logs`
-- `tasks`
-- `announcements`
-- `notifications`
+Storage buckets (for example `checkouts`) are private and created by their migrations with their own policies.
 
-> `notifications` is added to the `supabase_realtime` publication automatically by `009_notifications.sql`.
-
-### 5. Storage Bucket
-
-Migration `010_add_checkout_photos.sql` creates a **private** `checkouts` storage bucket (10 MB limit, image MIME types only) with RLS policies so a user can upload to their own folder and owners/managers can read. No manual setup is required — just confirm the bucket exists in **Storage** after running the migration.
-
-### 6. Deploy Edge Functions
+### Edge functions
 
 ```bash
 supabase functions deploy create-member
@@ -200,290 +154,94 @@ supabase functions deploy admin-update-member
 supabase functions deploy force-logout
 supabase functions deploy send-push-notification
 supabase functions deploy send-checkout-reminders --no-verify-jwt
+supabase functions deploy send-checkin-reminders --no-verify-jwt
 ```
 
-### 7. Run the App
+Function secrets: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` for Web Push (`_shared/webPush.ts`). `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are provided by Supabase.
 
-```bash
-npx expo start
-```
+### Default owner
+
+`seed.sql` creates employee ID `VB-0001` with password `VbOwner#Reset2026!`. The app forces a password change on first login.
 
 ---
 
-## Default Owner Account
+## Releases: APK, OTA and web
 
-After running `seed.sql`, the owner account is created with:
-
-| Field | Value |
-|---|---|
-| Employee ID | `VB-0001` |
-| Password | `VbOwner#Reset2026!` |
-
-> ⚠️ **The app will force a password change on first login** (`must_change_password = true` is set). Change to a strong personal password immediately.
-
----
-
-## Building the App
-
-EAS is configured with three build profiles:
-
-| Profile | Type | Notes |
+| Workflow | Runs when | Does |
 |---|---|---|
-| `development` | APK (debug) | Includes dev client, internal distribution |
-| `preview` | APK (release) | Internal distribution, no dev client |
-| `production` | APK (release) | Production channel, internal distribution |
+| [`build-production.yml`](.github/workflows/build-production.yml) | `app.json` **version** changes on `main` (or manually) | Signed release APK, GitHub Release, updates `latest_version` / `download_url` in `app_settings` |
+| [`publish-ota-update.yml`](.github/workflows/publish-ota-update.yml) | Any other push to `main` (not `.md`, `supabase/` or `.github/` only) | Publishes the JS bundle to the `production` channel |
+| [`deploy-web.yml`](.github/workflows/deploy-web.yml) | Push to `main` | `expo export -p web` and deploy to Vercel |
+| [`build-uat.yml`](.github/workflows/build-uat.yml) | Manual | APK pointed at the UAT Supabase project |
 
-```bash
-# Development build (with dev client)
-npm run build:dev
-# or
-eas build --platform android --profile development
+The runtime version policy is `appVersion`, so an OTA reaches only APKs of the **same version**.
 
-# Preview APK (release, no dev client)
-eas build --platform android --profile preview
+- **JS/UI change:** push without bumping the version, and installed 2.1.0 phones update on next launch.
+- **Native change** (new module, permission, plugin or SDK): bump `app.json` version, and the APK workflow builds it. Users install it from the in-app update prompt.
+- **Database change:** migrations are **not** run by CI. Run them in the SQL Editor, before pushing app code that needs them.
 
-# Production APK
-npm run build:prod
-# or
-eas build --platform android --profile production
-```
+Manual OTA: `npm run update:ota -- --message "what changed"`.
 
-App version is sourced from EAS remote (`appVersionSource: remote`). Update version in the EAS dashboard before building.
+The channel must match in three places: `app.json` → `updates.requestHeaders["expo-channel-name"]`, `eas.json` → `build.production.channel`, and the OTA workflow, all `production`.
 
-### GitHub Actions (automated production builds)
+**GitHub secrets:**
+- **APK:** `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_PROJECT_ID`, `GOOGLE_SERVICES_JSON`, `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `SUPABASE_SERVICE_ROLE_KEY`
+- **OTA:** adds `EXPO_TOKEN`
+- **Web:** `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`
+- **UAT:** `EXPO_PUBLIC_SUPABASE_URL_UAT`, `EXPO_PUBLIC_SUPABASE_ANON_KEY_UAT`
 
-Pushing a version bump to `app.json` on `main` triggers [`.github/workflows/build-production.yml`](.github/workflows/build-production.yml), which:
+### In-app APK updater
 
-1. Runs `expo prebuild` and builds a signed release APK (arm64-v8a)
-2. Publishes a GitHub Release with the APK attached
-3. Updates Supabase `app_settings` (`latest_version`, `download_url`) automatically
-
-You can also trigger the workflow manually via **Actions → Build Production APK → Run workflow**.
-
-Required GitHub repository secrets: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_PROJECT_ID`, `GOOGLE_SERVICES_JSON`, `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `SUPABASE_SERVICE_ROLE_KEY`, `EXPO_TOKEN` (OTA workflow).
+After login, `UpdateChecker` compares the installed version with `app_settings.latest_version`. If the installed version is older, it offers to download `download_url` and open the Android installer. The user may need to allow **Install unknown apps**.
 
 ---
 
-## OTA Updates (Expo Updates)
-
-GitHub Actions builds the **native APK**; later **JS/UI changes** can ship via Expo Updates (no APK reinstall) — but only after the APK was built with a channel header.
-
-| Workflow | When it runs | What it does |
-|---|---|---|
-| `build-production.yml` | `app.json` **version** changes | Builds APK, GitHub Release, bumps Supabase `latest_version` |
-| `publish-ota-update.yml` | Push to `main` when version is **unchanged** | Publishes JS bundle to Expo (`production` channel) |
-
-**Channel alignment (must stay in sync):**
-
-| Place | Value |
-|---|---|
-| `app.json` → `updates.requestHeaders["expo-channel-name"]` | `production` |
-| `eas.json` → `build.production.channel` | `production` |
-| `publish-ota-update.yml` / `npm run update:ota` | `--channel production` |
-
-GitHub-built APKs (`expo prebuild` + Gradle) do **not** get a channel from EAS Build. The channel is baked into `AndroidManifest.xml` only when `updates.requestHeaders` is present at prebuild time. Publishing OTA to a channel the installed APK never requests will do nothing.
-
-**Current installed APKs (built before `requestHeaders` existed):** they have `updates.url` but **no** `expo-channel-name`, so they **cannot** receive EAS OTA until users install **one** new APK built after this config. After that, JS-only releases need no reinstall.
-
-On app launch, the client checks for an OTA bundle and reloads silently if one is available. If OTA fails (offline, no channel match, etc.), the app keeps running on the embedded bundle — nothing breaks.
-
-**Manual publish:**
-
-```bash
-npm run update:ota -- --message "Describe the JS/UI change"
-```
-
-The runtime version policy is `appVersion` — OTA updates only apply within the same native app version (e.g. all `1.3.6` APKs receive `1.3.6` OTA bundles).
-
-**Required GitHub secret (OTA workflow):** `EXPO_TOKEN` — create at [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens).
-
-**Release checklist:**
-
-1. **First time enabling OTA for users** → bump `app.json` version once → GitHub APK workflow → users install that APK (embeds `production` channel).
-2. **JS/UI only (after step 1)** → push to `main`, do **not** bump version → OTA workflow / `npm run update:ota`.
-3. **Native change** (permissions, SDK, plugins) → bump version → APK workflow again.
-
----
-
-## In-App APK Update System
-
-After login, `UpdateChecker` compares the installed version against Supabase `app_settings`:
-
-| Key | Description |
-|---|---|
-| `latest_version` | If the installed version is below this, users see an **optional** update prompt |
-| `download_url` | Direct APK URL used for in-app download/install or browser fallback |
-
-Set these in Supabase Dashboard → Table Editor → `app_settings`, or let the [GitHub Actions release workflow](.github/workflows/build-production.yml) update them automatically when a new APK is published.
-
-The app downloads the APK, then opens the Android package installer (`REQUEST_INSTALL_PACKAGES` permission). Users may need to allow **Install unknown apps** for VEBOSSO EMS in Settings.
-
-> Legacy keys from older migrations (`minimum_app_version`, `latest_app_version`, `apk_download_url`) are not read by the current app code — use `latest_version` and `download_url`.
-
----
-
-## Edge Functions
-
-| Function | Method | Auth Required | Description |
-|---|---|---|---|
-| `create-member` | POST | Owner JWT | Create a new auth user + profile row |
-| `admin-update-member` | POST | Owner JWT | Update password or delete a member |
-| `force-logout` | POST | Owner JWT | Remotely sign out a user and invalidate sessions |
-| `send-push-notification` | POST | Owner JWT | Send Expo push notification to one or all users |
-
----
-
-## Database Schema
-
-| Table | Purpose |
-|---|---|
-| `profiles` | Employee data, roles, manager assignments |
-| `work_logs` | Daily check-in/check-out records with approval state + `check_out_photos` |
-| `tasks` | Task assignments with status and completion notes |
-| `announcements` | Broadcasts targeted by role or individual user |
-| `leave_requests` | Leave submissions with approval workflow |
-| `notifications` | Per-user in-app notification feed (read/unread) |
-| `backfill_permissions` | One-time owner-granted permission to log a missed attendance day |
-| `sessions` | Active session tracking for force-logout |
-| `app_settings` | Global config including version control settings |
-| `location_pings` | Background location trail, recorded only between check-in and check-out (kept indefinitely) |
-| `member_locations` | Newest fix per member, maintained by trigger — powers the live marker |
-
-RLS is enabled on all tables. Policies are defined by role (`owner`, `manager`, `member`) with helper functions `is_owner()`, `get_user_role()`, and `is_manager_of(uuid)`. The private `checkouts` Storage bucket has its own RLS policies. A `SECURITY DEFINER` RPC `force_logout_user(uuid)` clears a target user's Supabase Auth sessions and refresh tokens. Migration `012` adds a `BEFORE DELETE` trigger on `profiles` that removes the deleted user's checkout photos from Storage.
-
----
-
-## Location Tracking
-
-Owners and managers can see where a member is now and where they were across a
-day, on the member sheet in Team / My Team and in the Attendance screen's person
-view.
-
-- **When it records.** Only between check-in and check-out. The background task
-  starts on check-in, stops on check-out, and re-arms itself on app launch if
-  the day is still open. Nothing is recorded outside a work day.
-- **Rate.** GPS accuracy, a fix every 3 minutes or every 100 m moved. Fixes are
-  queued on device when offline and replayed on the next successful upload.
-- **Permission gate.** Members cannot use the app until they grant notifications
-  *and* "Allow all the time" location — see `src/components/PermissionGate.tsx`.
-  Owners and managers are unaffected. Android shows a persistent foreground
-  notification while tracking is on, so a member always knows it is running.
-- **Maps.** Leaflet on OpenStreetMap tiles inside a WebView
-  (`src/components/LocationMap.tsx`) — no Google Maps key and no billing
-  account. Maps do not render on the web build.
-- **Trail analysis.** `src/lib/locationTrail.ts` turns raw fixes into stops
-  (80 m radius, 8 minutes minimum), distance travelled, and tracked window, and
-  discards fixes worse than 150 m accuracy.
-
-Requires migration `019_location_tracking.sql` and a **new native build** —
-`expo-location`, `expo-task-manager`, `expo-battery`, and `react-native-webview`
-were added, so an OTA update alone will not pick this up.
-
----
-
-## Project Structure
+## Project structure
 
 ```
-├── app.json                          # Expo config (v1.2.7, bundle: com.vebosso.ems)
-├── eas.json                          # EAS build profiles
-├── .env.example                      # Environment variable template
-├── plugins/withApkInstaller.js       # Expo config plugin for in-app APK install
-├── .github/workflows/
-│   └── build-production.yml          # CI: signed APK build + GitHub Release + Supabase version sync
+├── app.json, eas.json, vercel.json
+├── modules/
+│   ├── bill-alarm/          # Event alarms (Kotlin: AlarmManager, full-screen page, boot receiver)
+│   └── whatsapp-share/      # Send a file to one WhatsApp chat
+├── plugins/                 # Expo config plugins
+├── .github/workflows/       # APK, OTA, web, UAT
 ├── src/
 │   ├── app/
-│   │   ├── _layout.tsx               # Root layout — auth guard, theme, version check
-│   │   ├── index.tsx                 # Entry redirect
-│   │   ├── (auth)/
-│   │   │   ├── login.tsx             # Employee ID + password login
-│   │   │   ├── change-password.tsx   # Voluntary password change
-│   │   │   └── force-change-password.tsx  # Forced on first login
-│   │   ├── (owner)/
-│   │   │   ├── dashboard.tsx         # Live stats, team overview
-│   │   │   ├── approvals.tsx         # Pending check-in/out approvals
-│   │   │   ├── tasks.tsx             # All tasks across company
-│   │   │   ├── history.tsx           # Company-wide attendance history
-│   │   │   ├── notifications.tsx     # In-app notification log
-│   │   │   ├── member/[id].tsx       # Member detail + admin actions
-│   │   │   ├── team/
-│   │   │   │   ├── index.tsx         # Full team member list
-│   │   │   │   └── add-member.tsx    # Create new member form
-│   │   │   └── settings/
-│   │   │       ├── index.tsx         # App settings screen
-│   │   │       ├── announcements.tsx # Create/manage announcements
-│   │   │       └── session-management.tsx # Force-logout sessions
-│   │   ├── (manager)/
-│   │   │   ├── dashboard.tsx         # Team stats, pending approvals
-│   │   │   ├── approvals.tsx         # Team check-in/out & leave approvals
-│   │   │   ├── tasks.tsx             # Team task management
-│   │   │   ├── my-team.tsx           # Manager's assigned team
-│   │   │   ├── history.tsx           # Team attendance history
-│   │   │   ├── notifications.tsx     # In-app notification log
-│   │   │   ├── settings.tsx          # Manager profile & password
-│   │   │   └── leaves.tsx            # Manager's own leave request history & application
-│   │   └── (member)/
-│   │       ├── home.tsx              # Check-in/checkout + today's status
-│   │       ├── tasks.tsx             # My tasks list
-│   │       ├── history.tsx           # My attendance calendar
-│   │       ├── announcements.tsx     # Announcements feed
-│   │       ├── notifications.tsx     # In-app notification log
-│   │       ├── profile.tsx           # My profile & password change
-│   │       └── leaves.tsx            # My leave request history & application
-│   ├── components/                   # Shared UI (CheckInModal, CheckOutModal, UpdateChecker,
-│   │                                 #   NotificationBell, BackfillModal, LeaveCard, etc.)
-│   ├── lib/
-│   │   ├── supabase.ts               # Supabase client init
-│   │   ├── notifications.ts          # Expo push notification helpers
-│   │   ├── versionCheck.ts           # App version gate logic
-│   │   ├── errors.ts                 # Typed error handling
-│   │   └── alert.ts                  # Cross-platform alert utility
-│   ├── store/
-│   │   ├── authStore.ts              # Auth state, sign in/out, profile
-│   │   ├── workStore.ts              # Work logs, tasks, approvals, announcements
-│   │   └── notificationStore.ts      # In-app notifications state
-│   ├── constants/                    # Colors, roles
-│   ├── types/                        # TypeScript types (database, app)
-│   └── theme/                        # Theme config
-├── supabase/
-│   ├── migrations/                   # 15 ordered SQL migrations
-│   ├── functions/                    # 4 Deno edge functions
-│   ├── scripts/                      # Helper SQL scripts (e.g. fix-owner-account.sql)
-│   └── seed.sql                      # Owner account seed
-└── assets/                           # Icons, splash, images
+│   │   ├── (auth)/          # Login, password change
+│   │   ├── (owner)/         # dashboard, approvals, tasks, history, bills/, accounts/,
+│   │   │                    #   leads, venues, team/, member/[id], settings/ (announcements,
+│   │   │                    #   sessions, recycle bin, bug reports)
+│   │   ├── (manager)/       # Team screens + bills/, accounts/, leads, venues
+│   │   └── (member)/        # home, tasks, history, leaves + bills/, accounts/, leads, venues
+│   ├── components/          # Shared screens and sheets (LeadsScreen, VenuesScreen, Bill*, Account*…)
+│   ├── lib/                 # Data and logic: bills, billPdf, billAlarms, photoLayout, accounts,
+│   │                        #   accountsFile, leads, venues, accessRules, locationTrail, …
+│   ├── store/               # Zustand stores
+│   ├── constants/, types/
+└── supabase/
+    ├── migrations/          # 001–079, run in order
+    ├── functions/           # 6 edge functions + _shared/webPush.ts
+    ├── scripts/             # Owner fixes, UAT helpers
+    └── seed.sql
 ```
 
----
-
-## Brand Colors
-
-| Name | Hex | Usage |
-|---|---|---|
-| Light Gray | `#F2F2F7` | Main App background (iOS System Gray 6) |
-| Pure White | `#FFFFFF` | Element & card surfaces |
-| Solid Black | `#000000` | Primary Accent / Button styling |
-| Success Emerald | `#047857` | Approved status, Done, Member Accent |
-| Warning Amber | `#B45309` | Pending states, Leaves Accent |
-| Error Red | `#BE123C` | Rejected status, Errors |
-| Info Blue | `#2563EB` | Announcements, Manager Accent |
+The Bills, Accounts, Leads and Venues screens for managers and members re-export the owner's or the shared component. Access rules decide what each person sees.
 
 ---
 
 ## Troubleshooting
 
-**Owner login not working after seed?**
-Run in order in Supabase SQL Editor:
-1. `supabase/migrations/003_profile_self_read.sql`
-2. `supabase/scripts/fix-owner-account.sql`
+**Owner can't log in after seeding.** Run `003_profile_self_read.sql`, then `supabase/scripts/fix-owner-account.sql`.
 
-Then sign in with `VB-0001` / `VbOwner#Reset2026!`.
+**"Unknown module" or a stale screen in development.** Restart Metro with `npx expo start -c`.
 
-**Push notifications not arriving?**
-- Ensure `EXPO_PUBLIC_PROJECT_ID` is set in `.env`
-- Ensure the `send-push-notification` edge function is deployed
-- Physical device required (push doesn't work on simulator)
+**An OTA change doesn't show on a phone.** Check that the phone's APK version equals `app.json` version, then close and reopen the app twice: the first launch downloads the update and the next one runs it.
 
-**Build fails with missing google-services.json?**
-- Add your Firebase `google-services.json` to the project root (required by `app.json` for Android FCM)
+**Event alarms don't ring.** Open Settings → Event alarms and allow whatever it lists. Some phones (Xiaomi, Oppo, Vivo) also need battery optimisation turned off for the app.
+
+**Push not arriving.** Check `EXPO_PUBLIC_PROJECT_ID`, that `send-push-notification` is deployed, and that you're on a real device. For the web, set the VAPID secrets.
+
+**Build fails on `google-services.json`.** Put the Firebase file in the project root; CI writes it from `GOOGLE_SERVICES_JSON`.
 
 ---
 
