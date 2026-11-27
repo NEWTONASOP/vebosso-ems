@@ -82,13 +82,11 @@ export default function OwnerLayout() {
           ),
         }}
       />
+      {/* Settings: the gear at the top of Home, not in the bar. */}
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="settings" color={color} size={size} />
-          ),
+          href: null,
         }}
       />
       {/* Approvals moved to the Dashboard's "Needs you now"; kept for links. */}

@@ -11,9 +11,14 @@ interface TabBarState {
   /** Pixels from the bottom of the screen to the top of the bar; 0 if none. */
   space: number;
   setSpace: (space: number) => void;
+  /** The owner's "Arrange bottom bar" sheet is open (from Settings or a long-press). */
+  arranging: boolean;
+  setArranging: (arranging: boolean) => void;
 }
 
 export const useTabBarStore = create<TabBarState>((set) => ({
   space: 0,
   setSpace: (space) => set((s) => (s.space === space ? s : { space })),
+  arranging: false,
+  setArranging: (arranging) => set({ arranging }),
 }));

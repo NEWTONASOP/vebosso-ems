@@ -35,6 +35,29 @@ const SORTS: { key: Sort; label: string; icon: keyof typeof Feather.glyphMap }[]
   { key: 'edited', label: 'Recently edited', icon: 'edit-3' },
 ];
 
+/** `hex` mixed into white: 0 is white, 1 is the colour itself. */
+function tint(hex: string, amount: number) {
+  const n = parseInt(hex.slice(1), 16);
+  const mix = (c: number) => Math.round(255 + (c - 255) * amount).toString(16).padStart(2, '0');
+  return `#${mix(n >> 16)}${mix((n >> 8) & 255)}${mix(n & 255)}`;
+}
+
+/**
+ * The whole screen takes the open tab's colours, so it is clear which one is
+ * open: estimates in black and white (like their PDF), client bills in the
+ * brand's colours (like theirs), packages in gold — the brands' own colours
+ * are too close to each other to tell packages from client bills.
+ */
+const PACKAGE_GOLD = '#B7791F';
+function kindLook(k: BillKind, brand: BillBrand) {
+  const t = BRANDS[brand];
+  // Strong enough to see at a glance; the white cards, chips and search stand out on it.
+  // The trough is the fill colour see-through, so it stays a darker shade of the background.
+  if (k === 'estimate') return { bg: '#D9DCE2', trough: 'rgba(27,30,36,0.12)', fill: T.charcoal, ink: T.white };
+  if (k === 'client') return { bg: t.colors[2], trough: `${t.primary}26`, fill: t.primary, ink: T.white };
+  return { bg: tint(PACKAGE_GOLD, 0.32), trough: `${PACKAGE_GOLD}33`, fill: PACKAGE_GOLD, ink: T.white };
+}
+
 const FILTERS: Record<BillKind, Filter[]> = {
   estimate: ['all', 'draft', 'trash'],
   client: ['all', 'pending', 'completed', 'draft', 'trash'],
@@ -162,6 +185,8 @@ export default function BillsScreen() {
   // A page at a time — a year of bills was slow to draw.
   const billPage = usePaged(shown, `${brand}-${kind}-${filter}-${query}-${sort}`);
 
+  const look = kindLook(kind, brand);
+
   const switchKind = (k: BillKind) => {
     setKind(k);
     // Client bills open on what still needs work; estimates have no Pending.
@@ -169,7 +194,7 @@ export default function BillsScreen() {
   };
 
   return (
-    <View style={screenChrome.root}>
+    <View style={[screenChrome.root, { backgroundColor: look.bg }]}>
       <View style={screenChrome.headerRow}>
         <View style={styles.titleRow}>
           {!isOwner ? (
@@ -192,12 +217,12 @@ export default function BillsScreen() {
           ) : null}
           {access.can('add', { value: brand }) ? (
             <Pressable
-              style={styles.newBtn}
+              style={[styles.newBtn, { backgroundColor: look.fill }]}
               onPress={() => router.push(`${base}/new?kind=${kind}&brand=${brand}` as any)}
               accessibilityLabel={`New ${KIND_LABEL[kind].toLowerCase()}`}
             >
-              <Feather name="plus" size={16} color={T.white} />
-              <Text style={styles.newText}>New</Text>
+              <Feather name="plus" size={16} color={look.ink} />
+              <Text style={[styles.newText, { color: look.ink }]}>New</Text>
             </Pressable>
           ) : null}
         </View>
@@ -257,20 +282,22 @@ export default function BillsScreen() {
         </View>
       ) : null}
 
-      <View style={styles.segment}>
-        {(['estimate', 'client', 'package'] as const).map((k) => (
-          <Pressable
-            key={k}
-            onPress={() => switchKind(k)}
-            style={[styles.segBtn, kind === k && styles.segActive]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: kind === k }}
-          >
-            <Text style={[styles.segText, kind === k && styles.segTextActive]}>
-              {KIND_TAB[k]}
-            </Text>
-          </Pressable>
-        ))}
+      <View style={[styles.segment, { backgroundColor: look.trough }]}>
+        {(['estimate', 'client', 'package'] as const).map((k) => {
+          return (
+            <Pressable
+              key={k}
+              onPress={() => switchKind(k)}
+              style={[styles.segBtn, kind === k && [styles.segActive, { backgroundColor: look.fill }]]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: kind === k }}
+            >
+              <Text style={[styles.segText, kind === k && { color: look.ink }]}>
+                {KIND_TAB[k]}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       <ScrollView
@@ -283,10 +310,10 @@ export default function BillsScreen() {
           const active = filter === f;
           const n = counts[f] ?? 0;
           return (
-            <Pressable key={f} onPress={() => setFilter(f)} style={[styles.chip, active && styles.chipActive]}>
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>
+            <Pressable key={f} onPress={() => setFilter(f)} style={[styles.chip, active && { backgroundColor: look.fill }]}>
+              <Text style={[styles.chipText, active && { color: look.ink }]}>
                 {f === 'all' ? 'All' : f === 'draft' ? 'Drafts' : STATUS_LABEL[f]}
-                {n ? <Text style={[styles.chipCount, active && styles.chipTextActive]}> {n}</Text> : null}
+                {n ? <Text style={[styles.chipCount, active && { color: look.ink }]}> {n}</Text> : null}
               </Text>
             </Pressable>
           );
@@ -501,7 +528,6 @@ const styles = StyleSheet.create({
   segBtn: { flex: 1, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   segActive: { backgroundColor: T.card, ...appSoftShadow },
   segText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: T.inkSoft },
-  segTextActive: { color: T.ink },
   // Room above and below inside the strip, or it clips the chips' shadow
   // (it falls lower than it rises, and is softer on web). A fixed height —
   // chip 34 + 8 above + 16 below — because on web the strip otherwise ignores
@@ -516,10 +542,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...appSoftShadow,
   },
-  chipActive: { backgroundColor: T.charcoal },
   chipText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: T.inkSoft },
   chipCount: { fontFamily: 'Inter_500Medium', color: T.mute },
-  chipTextActive: { color: T.white },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginTop: -4 },
   sortBtn: {
     width: 44,

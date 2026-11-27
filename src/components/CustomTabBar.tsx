@@ -2,13 +2,15 @@ import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { BottomTabBarProps } from 'expo-router/tabs';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Platform, Pressable, StyleSheet, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { Text } from 'react-native-paper';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTheme, RoleAccent, SIDEBAR_WIDTH, type Role, appShadow } from '../constants/theme';
+import { applyOrder, saveOrder, TAB_ORDER_KEY, useSavedOrder } from '../lib/savedOrder';
 import { useAuthStore } from '../store/authStore';
+import { ArrangeSheet } from './ArrangeSheet';
 import { useTabBarStore } from '../store/tabBarStore';
 
 const SLIM_WIDTH    = 400;
@@ -90,7 +92,58 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
     if (shouldHide || isDesktop) setTabBarSpace(0);
   }, [shouldHide, isDesktop, setTabBarSpace]);
 
-  if (shouldHide) return null;
+  // The owner arranges their own bar (long-press it, or Settings); saved on this device.
+  const isOwner = role === 'owner';
+  const tabOrder = useSavedOrder(isOwner ? TAB_ORDER_KEY : null);
+  const arranging = useTabBarStore((s) => s.arranging);
+  const setArranging = useTabBarStore((s) => s.setArranging);
+
+  if (shouldHide && !arranging) return null;
+
+  const hasDashboard = state.routes.some((r) => r.name === 'dashboard');
+  const tabs = applyOrder(
+    state.routes
+      .map((route, index) => ({ route, index }))
+      .filter(
+        ({ route }) =>
+          !(
+            isHiddenTab(descriptors[route.key].options) ||
+            !ICON_MAP[route.name] ||
+            route.name.includes('[') ||
+            route.name.includes('/') ||
+            (route.name === 'tasks' && hasDashboard)
+          )
+      ),
+    isOwner ? tabOrder : null,
+    (t) => t.route.name
+  );
+  const labelOf = (route: (typeof state.routes)[number]) => {
+    const { options } = descriptors[route.key];
+    return (options.tabBarLabel as string) || (options.title as string) || LABEL_MAP[route.name] || route.name;
+  };
+  const arrangeSheet = isOwner ? (
+    <ArrangeSheet
+      visible={arranging}
+      title="Arrange bottom bar"
+      subtitle="Saved on this device"
+      items={tabs.map(({ route }) => {
+        const renderIcon = descriptors[route.key].options.tabBarIcon;
+        return {
+          key: route.name,
+          label: labelOf(route),
+          icon: renderIcon
+            ? renderIcon({ focused: false, color: AppTheme.inkSoft, size: 18 })
+            : <Feather name={(ICON_MAP[route.name] || 'circle') as any} size={18} color={AppTheme.inkSoft} />,
+        };
+      })}
+      onSave={(keys) => saveOrder(TAB_ORDER_KEY, keys)}
+      onReset={() => saveOrder(TAB_ORDER_KEY, null)}
+      onDismiss={() => setArranging(false)}
+    />
+  ) : null;
+  // Settings opened the sheet while the bar itself is hidden: just the sheet.
+  if (shouldHide) return arrangeSheet;
+  const onLongPress = isOwner ? () => setArranging(true) : undefined;
 
   // ── Desktop sidebar ──────────────────────────────────────────────────────────
   if (isDesktop) {
@@ -107,19 +160,9 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
 
         {/* Nav items */}
         <View style={sidebarStyles.navList}>
-          {state.routes.map((route, index) => {
+          {tabs.map(({ route, index }) => {
             const { options } = descriptors[route.key];
-            const hasDashboard = state.routes.some((r) => r.name === 'dashboard');
-
-            if (
-              isHiddenTab(options) ||
-              !ICON_MAP[route.name] ||
-              route.name.includes('[') ||
-              route.name.includes('/') ||
-              (route.name === 'tasks' && hasDashboard)
-            ) return null;
-
-            const label      = (options.tabBarLabel as string) || (options.title as string) || LABEL_MAP[route.name] || route.name;
+            const label      = labelOf(route);
             const isFocused  = state.index === index;
             const iconName   = ICON_MAP[route.name] || 'circle';
             const color      = isFocused ? accent.color : AppTheme.mute;
@@ -134,6 +177,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
               <Pressable
                 key={route.key}
                 onPress={onPress}
+                onLongPress={onLongPress}
                 style={({ pressed }) => [
                   sidebarStyles.navItem,
                   isFocused && { backgroundColor: accent.soft },
@@ -161,6 +205,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
             <Text style={[sidebarStyles.roleText, { color: accent.color }]}>{ROLE_LABEL[role]}</Text>
           </View>
         </View>
+        {arrangeSheet}
       </View>
     );
   }
@@ -179,19 +224,9 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
     >
       <BlurView tint="light" intensity={90} style={styles.blurContainer}>
         <View style={[styles.innerContainer, isSlim && styles.innerContainerSlim]}>
-          {state.routes.map((route, index) => {
+          {tabs.map(({ route, index }) => {
             const { options } = descriptors[route.key];
-            const hasDashboard = state.routes.some((r) => r.name === 'dashboard');
-
-            if (
-              isHiddenTab(options) ||
-              !ICON_MAP[route.name] ||
-              route.name.includes('[') ||
-              route.name.includes('/') ||
-              (route.name === 'tasks' && hasDashboard)
-            ) return null;
-
-            const label     = (options.tabBarLabel as string) || (options.title as string) || LABEL_MAP[route.name] || route.name;
+            const label     = labelOf(route);
             const isFocused = state.index === index;
             const iconName  = ICON_MAP[route.name] || 'circle';
             const renderIcon = options.tabBarIcon;
@@ -210,6 +245,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
                 iconName={iconName}
                 renderIcon={renderIcon}
                 onPress={onPress}
+                onLongPress={onLongPress}
                 isSlim={isSlim}
                 activeColor={accent.color}
                 activeSoft={accent.soft}
@@ -219,6 +255,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
           })}
         </View>
       </BlurView>
+      {arrangeSheet}
     </View>
   );
 }
@@ -311,13 +348,14 @@ interface TabItemProps {
   iconName: string;
   renderIcon: ((props: { focused: boolean; color: string; size: number }) => React.ReactNode) | undefined;
   onPress: () => void;
+  onLongPress?: () => void;
   isSlim: boolean;
   activeColor: string;
   activeSoft: string;
   showLabel?: boolean;
 }
 
-function TabItem({ isFocused, label, iconName, renderIcon, onPress, isSlim, activeColor, activeSoft, showLabel = false }: TabItemProps) {
+function TabItem({ isFocused, label, iconName, renderIcon, onPress, onLongPress, isSlim, activeColor, activeSoft, showLabel = false }: TabItemProps) {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -336,6 +374,7 @@ function TabItem({ isFocused, label, iconName, renderIcon, onPress, isSlim, acti
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       accessibilityRole="button"

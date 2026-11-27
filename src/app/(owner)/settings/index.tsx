@@ -20,6 +20,7 @@ import {
 import { Alert } from '../../../lib/alert';
 import { useAuthStore } from '../../../store/authStore';
 import { useShallow } from 'zustand/react/shallow';
+import { useTabBarStore } from '../../../store/tabBarStore';
 import { BugReportSheet } from '../../../components/BugReportSheet';
 import { ProfilePhotoEditor } from '../../../components/ProfilePhotoEditor';
 import { useWorkStore } from '../../../store/workStore';
@@ -67,7 +68,16 @@ export default function OwnerSettingsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={screenChrome.header}>
+        {/* Opened from the gear on Home (it is no longer in the bottom bar). */}
+        <View style={[screenChrome.header, styles.titleRow]}>
+          <Pressable
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(owner)/dashboard'))}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+          >
+            <Feather name="chevron-left" size={24} color={AppTheme.ink} />
+          </Pressable>
           <Text style={screenChrome.title}>Settings</Text>
         </View>
 
@@ -142,6 +152,15 @@ export default function OwnerSettingsScreen() {
               color={AppTheme.charcoal}
             />
           </View>
+          <View style={styles.separator} />
+          <SettingsRow
+            icon="move"
+            iconColor={AppTheme.violet}
+            iconBg={AppTheme.violetSoft}
+            title="Arrange bottom bar"
+            subtitle="Your order on this device · or long-press the bar"
+            onPress={() => useTabBarStore.getState().setArranging(true)}
+          />
           <View style={styles.separator} />
           <SundaySummaryRow />
           {BillAlarm.isAvailable() ? (
@@ -341,6 +360,7 @@ function SettingsRow({ icon, iconColor, iconBg, title, subtitle, onPress }: Sett
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   scrollContent: {
     paddingBottom: 110,
     width: '100%',

@@ -32,6 +32,8 @@ import { MemberCard } from '../../components/MemberCard';
 import { MemberDialog } from '../../components/MemberActionsModal';
 import { OwnerMemberMenu } from '../../components/OwnerMemberMenu';
 import { DeactivatedPeople } from '../../components/DeactivatedPeople';
+import { ArrangeSheet } from '../../components/ArrangeSheet';
+import { applyOrder, departmentOrderKey, saveOrder, useSavedOrder } from '../../lib/savedOrder';
 import { isAppVisible } from '../../lib/appActive';
 import { DepartmentData, fetchDepartments } from '../../lib/departments';
 import { sortMembersByLiveStatus } from '../../lib/teamSort';
@@ -275,6 +277,15 @@ export default function OwnerDashboard() {
             <Text style={styles.hello} numberOfLines={1}>Hello {firstName}</Text>
             <Text style={styles.date} numberOfLines={1}>{today}</Text>
             <SoftBell />
+            <AnimatedPressable
+              scaleTo={0.9}
+              onPress={() => router.push('/(owner)/settings' as any)}
+              style={styles.bell}
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
+            >
+              <Feather name="settings" size={18} color={T.ink} />
+            </AnimatedPressable>
           </Animated.View>
 
           {/* 2. Everything waiting on the owner — or a quiet all-clear */}
@@ -402,7 +413,7 @@ export default function OwnerDashboard() {
                               {people.length === 0 ? (
                                 <Text style={styles.sectionHint}>Add people from Departments below.</Text>
                               ) : (
-                                people.map(renderMember)
+                                <DepartmentPeople department={d} people={people} renderMember={renderMember} />
                               )}
                             </DropdownBody>
                           ) : null}
@@ -569,6 +580,50 @@ function GroupRow({
   );
 }
 
+/**
+ * A department's people: by who is working (the usual), or in the order the
+ * owner arranged — kept on this device.
+ */
+function DepartmentPeople({
+  department,
+  people,
+  renderMember,
+}: {
+  department: { id: string; name: string };
+  people: Profile[];
+  renderMember: (member: Profile) => React.ReactNode;
+}) {
+  const key = departmentOrderKey(department.id);
+  const order = useSavedOrder(key);
+  const [arranging, setArranging] = React.useState(false);
+  const shown = applyOrder(people, order, (m) => m.id);
+  return (
+    <>
+      {shown.map(renderMember)}
+      {people.length > 1 ? (
+        <AnimatedPressable
+          scaleTo={0.96}
+          onPress={() => setArranging(true)}
+          style={styles.arrangeLink}
+          accessibilityRole="button"
+        >
+          <Feather name="move" size={13} color={T.mute} />
+          <Text style={styles.arrangeText}>{order ? 'Arranged order · change' : 'Arrange order'}</Text>
+        </AnimatedPressable>
+      ) : null}
+      <ArrangeSheet
+        visible={arranging}
+        title={`Arrange ${department.name}`}
+        subtitle="Saved on this device"
+        items={shown.map((m) => ({ key: m.id, label: m.full_name }))}
+        onSave={(keys) => saveOrder(key, keys)}
+        onReset={() => saveOrder(key, null)}
+        onDismiss={() => setArranging(false)}
+      />
+    </>
+  );
+}
+
 function SoftBell() {
   const router = useRouter();
   const { profile } = useAuthStore(useShallow((s) => ({ profile: s.profile })));
@@ -708,6 +763,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: T.mute,
   },
+  arrangeLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 },
+  arrangeText: { fontFamily: 'Inter_500Medium', fontSize: 12.5, color: T.mute },
   bell: {
     width: 38,
     height: 38,
